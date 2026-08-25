@@ -6,15 +6,28 @@
 
 ## Le projet
 
-> À remplir au démarrage de chaque projet. Tant que ce bloc est vide, demander avant de coder.
-
 ```
-NOM        :
-QUOI       : (une phrase — le produit et pour qui)
-STACK      : (ex. Next.js + TypeScript + Tailwind + Supabase)
-LANCER     : (ex. npm install && npm run dev)
-TESTER     : (ex. npm test)
-PARTICULARITÉS : (contraintes, choix assumés, zones sensibles)
+NOM        : SDI pour Sandwidi et frere
+QUOI       : Application de gestion multi-boutique pour un commerce de vente de motos — ventes,
+             paiements échelonnés, dossiers administratifs (carte grise, plaque), pièces détachées —
+             utilisée au comptoir par des gérants et pilotée par un responsable.
+STACK      : Next.js (App Router) + TypeScript strict + Tailwind + PWA
+             Firebase : Auth, Firestore (persistance hors-ligne), Storage, Cloud Functions
+             Vercel pour l'hébergement (D1) — Firebase Emulator Suite en développement (D3)
+LANCER     : npm install && npm run emulators (puis npm run dev)
+TESTER     : npm test (Vitest + règles Firestore) · npm run test:e2e (Playwright, dont hors-ligne)
+PARTICULARITÉS :
+  - Le hors-ligne n'est pas une option. Tout écran de saisie fonctionne sans réseau ; les écritures
+    passent par le SDK Firestore, jamais par une Cloud Function appelée depuis l'UI. Une spec dont
+    la saisie ne marche pas hors ligne n'est pas terminée.
+  - Interface entièrement en français, montants en FCFA entiers.
+  - Coûts et marges cloisonnés hors de portée des gérants via des sous-collections `prive/` (D2) —
+    Firestore ne masque pas un champ, c'est le seul moyen. Chaque cloisonnement est prouvé par un
+    test de règles, sinon il n'existe pas.
+  - Deux notions à ne jamais confondre : « crédit » (moto livrée, le client doit) et « tranches »
+    (moto retenue au magasin, le magasin détient l'argent). Vocabulaire métier : prompt.md §13.
+  - Le cahier des charges est `prompt.md`. La progression est dans `specs/ROADMAP.md`. Tout choix
+    tranché sans arbitrage humain est consigné dans `DECISIONS.md`.
 ```
 
 ---
