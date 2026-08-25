@@ -1,13 +1,15 @@
 "use client";
 
-import { ChevronRight, LogOut, Users } from "lucide-react";
+import { ChevronRight, LogOut, Store, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
 import { LIBELLE_ROLE, peut } from "@/lib/domain/roles";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 
 export default function Reglages() {
   const session = useSession();
+  const { perimetre } = usePerimetre();
   const [deconnexion, setDeconnexion] = useState(false);
 
   if (session.statut !== "connecte") return null;
@@ -38,8 +40,11 @@ export default function Reglages() {
           <dd className="text-right text-encre">
             {utilisateur.role === "responsable" ? (
               "Toutes les boutiques"
-            ) : utilisateur.boutiqueId ? (
-              <span className="plaque-code">{utilisateur.boutiqueId}</span>
+            ) : perimetre.type === "boutique" ? (
+              <>
+                <span className="plaque-code">{perimetre.code}</span>
+                {perimetre.nom ? ` ${perimetre.nom}` : ""}
+              </>
             ) : (
               <span className="text-alerte">Aucune boutique attribuée</span>
             )}
@@ -62,6 +67,21 @@ export default function Reglages() {
           <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
             <li>
               <Link
+                href="/parametres/boutiques"
+                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
+              >
+                <Store aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-encre">Boutiques</span>
+                  <span className="block text-sm text-encre-doux">
+                    Déclarer un point de vente, son code et ses coordonnées
+                  </span>
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              </Link>
+            </li>
+            <li>
+              <Link
                 href="/parametres/utilisateurs"
                 className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
               >
@@ -77,7 +97,8 @@ export default function Reglages() {
             </li>
           </ul>
           <p className="mt-3 text-sm text-encre-doux">
-            Les boutiques arrivent avec la spec S3, les référentiels avec S4.
+            Les référentiels — marques, modèles, prestataires, types de frais — arrivent avec la
+            spec S4.
           </p>
         </>
       )}

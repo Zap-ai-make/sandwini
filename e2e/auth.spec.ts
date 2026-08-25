@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   RESPONSABLE,
+  contenu,
   emailUnique,
   messageErreur,
   messageSucces,
@@ -114,7 +115,9 @@ test.describe("gestion des comptes", () => {
     // L’entrée n’apparaît pas dans ses réglages…
     await pageGerant.goto("/parametres");
     await expect(pageGerant.getByRole("link", { name: /Utilisateurs/ })).toHaveCount(0);
-    await expect(pageGerant.getByText("Aucune boutique attribuée")).toBeVisible();
+    /* Le bandeau le dit aussi, en haut de chaque écran : on vise donc le contenu,
+       sinon les deux régions se disputent le même texte. */
+    await expect(contenu(pageGerant).getByText("Aucune boutique attribuée")).toBeVisible();
 
     // …et l’adresse tapée à la main est refusée avec une explication.
     await pageGerant.goto("/parametres/utilisateurs");

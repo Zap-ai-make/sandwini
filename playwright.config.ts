@@ -11,6 +11,12 @@ export default defineConfig({
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
+  /* Les 30 secondes par défaut ne suffisent pas ici : plusieurs tests attendent
+     volontairement des bascules réseau (coupure, retour, remise en file), et
+     s'accordent déjà 20 à 30 secondes par attente. Le plafond du test doit
+     donc être plus large que la somme de ses attentes, sinon il tombe non pas
+     sur un défaut du produit mais sur sa propre arithmétique. */
+  timeout: 60_000,
   reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
   /* Port dédié, distinct du 3000 du serveur de développement.
      Sans cela, Playwright réutilisait un `npm run dev` en cours et testait un

@@ -12,6 +12,7 @@ import {
 } from "react";
 import { configurationPresente, db } from "@/lib/firebase/client";
 import { ecouterFileEcritures, ecrituresEnAttente } from "./file-ecritures";
+import { coupureConfirmee, ecouterSourceDonnees } from "./source-donnees";
 
 export type EtatSynchronisation = "a_jour" | "envoi" | "hors_ligne";
 
@@ -45,15 +46,32 @@ const lireEnLigneAuServeur = () => true;
 const souscrireFileEcritures = (rappel: () => void) => ecouterFileEcritures(() => rappel());
 const lireFileAuServeur = () => 0;
 
+const souscrireSourceDonnees = (rappel: () => void) => ecouterSourceDonnees(rappel);
+const pasDeCoupureAuServeur = () => false;
+
 const Contexte = createContext<EtatReseau>({ enLigne: true, enAttente: 0, etat: "a_jour" });
 
 export function FournisseurEtatReseau({ children }: { children: ReactNode }) {
-  const enLigne = useSyncExternalStore(souscrireReseau, lireEnLigne, lireEnLigneAuServeur);
+  const navigateurEnLigne = useSyncExternalStore(
+    souscrireReseau,
+    lireEnLigne,
+    lireEnLigneAuServeur,
+  );
   const enAttente = useSyncExternalStore(
     souscrireFileEcritures,
     ecrituresEnAttente,
     lireFileAuServeur,
   );
+
+  /* Le navigateur dit « en ligne » dès qu’une carte réseau est active ; Firestore
+     dit s’il joint réellement le serveur. Quand les deux se contredisent, on
+     croit Firestore — c’est lui qui transporte les ventes (`DECISIONS.md` D20). */
+  const coupure = useSyncExternalStore(
+    souscrireSourceDonnees,
+    coupureConfirmee,
+    pasDeCoupureAuServeur,
+  );
+  const enLigne = navigateurEnLigne && !coupure;
 
   /* Les écritures laissées par une session précédente échappent au compteur
      (cf. file-ecritures.ts). `waitForPendingWrites` les couvre : tant qu’il ne

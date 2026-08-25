@@ -43,6 +43,65 @@ service cloud.firestore {
       allow create, update, delete: if false;
     }
 
+    // --- Boutiques (S3) ---------------------------------------------------
+    // L'identifiant du document EST le code de la boutique. Firestore ne sait
+    // pas imposer l'unicité d'un champ ; en faire la clé la donne gratuitement,
+    // et le code entre dans les numéros de reçus (D5) donc il ne bouge jamais.
+    //
+    // Le gérant ne lit que la sienne : c'est la seule dont il ait besoin, et en
+    // cas de doute on expose le moins (SECURITY.md §0, cf. D7).
+
+    function texteBorne(valeur, maximum) {
+      return valeur is string && valeur.size() <= maximum;
+    }
+
+    function boutiqueValide(donnees, code) {
+      return donnees.keys().hasOnly(['nom', 'code', 'adresse', 'telephone', 'actif',
+                                     'createdAt', 'createdBy', 'createdByName',
+                                     'updatedAt', 'updatedBy', 'updatedByName'])
+             && donnees.keys().hasAll(['nom', 'code', 'adresse', 'telephone', 'actif',
+                                       'createdAt', 'createdBy', 'createdByName',
+                                       'updatedAt', 'updatedBy', 'updatedByName'])
+             && donnees.code == code
+             && donnees.code.matches('^[A-Z]{3}$')
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && texteBorne(donnees.adresse, 200)
+             && texteBorne(donnees.telephone, 40)
+             && texteBorne(donnees.createdByName, 200)
+             && texteBorne(donnees.updatedByName, 200)
+             && donnees.actif is bool
+             && donnees.createdBy is string
+             && donnees.updatedBy is string;
+    }
+
+    match /boutiques/{code} {
+      allow read: if estResponsable()
+                  || (connecte() && request.auth.token.boutiqueId == code);
+
+      allow create: if estResponsable()
+                    && boutiqueValide(request.resource.data, code)
+                    && request.resource.data.createdAt == request.time
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.createdBy == request.auth.uid;
+
+      // Le code et la date de création ne bougent pas. C'est aussi ce qui
+      // empêche une « création » de recouvrir une boutique existante : le
+      // formulaire enverrait un createdAt neuf, refusé ici.
+      allow update: if estResponsable()
+                    && boutiqueValide(request.resource.data, code)
+                    && request.resource.data.code == resource.data.code
+                    && request.resource.data.createdAt == resource.data.createdAt
+                    && request.resource.data.createdBy == resource.data.createdBy
+                    && request.resource.data.updatedAt == request.time
+                    && request.resource.data.updatedBy == request.auth.uid;
+
+      // Une boutique ne se supprime pas : des ventes et des numéros de reçus
+      // portent son code. On la ferme, elle reste lisible.
+      allow delete: if false;
+    }
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.

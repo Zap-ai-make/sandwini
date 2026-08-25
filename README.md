@@ -71,6 +71,10 @@ npm run build && npm run test:e2e
 importance et montre son trajet : accepté sur l'appareil tout de suite, confirmé par le serveur plus
 tard. Coupez le réseau et regardez le bandeau.
 
+Le bandeau ne se fie pas qu'à `navigator.onLine`, qui répond « en ligne » dès qu'une carte réseau
+est active — même derrière un wifi captif. Il croit Firestore : tant que les données arrivent du
+cache, il annonce « hors ligne » (D20 bis).
+
 ---
 
 ## Comment le code est rangé
@@ -84,10 +88,11 @@ lib/
   domain/         types, calculs et règles métier — purs, testés, sans Firestore
   firebase/       initialisation du SDK, connexion aux émulateurs
   auth/           session, rôle courant, déconnexion
-  reseau/         état réseau et compteur d'écritures en attente
+  reseau/         état réseau, compteur d'écritures en attente, source des données
+  perimetre/      boutique courante : celle du gérant, celle que le responsable a choisie
   repositories/   accès Firestore
 components/       composants d'interface partagés
-functions/        Cloud Functions (création de comptes, activation)
+functions/        Cloud Functions (comptes : création, activation, rattachement)
 regles/           tests des règles Firestore
 e2e/              tests Playwright
 scripts/          génération d'icônes, captures de revue visuelle
@@ -99,6 +104,8 @@ Deux règles qui expliquent la plupart des choix :
    écran de saisie.** C'est ce qui permet à la file d'attente hors-ligne de fonctionner.
 2. **Les coûts et les marges vivent dans des sous-collections `prive/`.** Firestore ne sait pas
    masquer un champ : un document lisible est lisible en entier (D2).
+3. **Le périmètre s'affiche, il n'autorise pas.** `usePerimetre()` dit dans quelle boutique on
+   travaille ; ce qu'un compte peut lire est décidé par son custom claim et par les règles (D31).
 
 ---
 
@@ -110,7 +117,9 @@ l'objet que ce logiciel passe sa vie à suivre. Le blanc pur remplace le crème 
 lit en plein soleil.
 
 La signature du produit est le **bandeau d'état** : discret quand tout est envoyé, plaque jaune
-pleine dès que le réseau tombe.
+pleine dès que le réseau tombe. Il répond aux deux questions qui coûtent cher quand on se trompe —
+**où j'écris** et **est-ce que c'est parti**. Pour le responsable, la plaque est aussi le sélecteur
+de boutique : le choix se fait là où la réponse se lit.
 
 `npm run build && npm start`, puis `node scripts/captures.mjs` produit les captures de revue dans
 `captures/` (clair, sombre, mobile, bureau, hors ligne).
@@ -128,6 +137,9 @@ pleine dès que le réseau tombe.
 - **Le rôle vit dans un custom claim**, jamais dans un document modifiable. Personne n'écrit dans
   `users/{uid}` depuis un navigateur — pas même le responsable ; seules les Cloud Functions y
   touchent. C'est ce qui rend structurellement impossible de se promouvoir soi-même.
+- **Un gérant ne lit que sa boutique**, y compris la fiche de la boutique elle-même : en cas de
+  doute, on expose le moins (D7). Changer la boutique d'un gérant révoque ses jetons, sinon l'ancien
+  périmètre resterait valide jusqu'à une heure (D32).
 - Les écrans réservés au responsable sont refusés par les **règles Firestore** et par la vérification
   du rôle dans les Cloud Functions, pas par une session serveur — qui imposerait un aller-retour
   réseau à chaque navigation et casserait le hors-ligne (D27).

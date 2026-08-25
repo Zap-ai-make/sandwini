@@ -383,3 +383,74 @@ facturé et subi par l'utilisateur.
 20 secondes et faisait échouer le premier test qui appelait une fonction. La préparation des tests
 réveille donc le runtime avant de commencer — un test doit mesurer le produit, pas la lenteur d'un
 démarrage à froid.
+
+## D30 — Le code de la boutique est l'identifiant du document
+`prompt.md` §5.1, §3.3 — S3
+
+`boutiques/{code}`, trois lettres majuscules. Firestore ne sait pas imposer l'unicité d'un champ ;
+en faire la clé du document la donne gratuitement, sans compteur ni transaction. Et le code entre
+déjà dans les numéros de reçus (`PTG-2608-0042`, cf. D5), donc il ne peut pas changer de toute
+façon : un code réécrit rendrait faux des documents déjà remis à des clients.
+
+*Conséquence :* le code est définitif. L'interface le dit — le champ est verrouillé en modification
+— et les règles le vérifient (`request.resource.data.code == resource.data.code`). Une boutique mal
+codée se ferme et se recrée ; elle ne se renomme pas.
+
+*Effet de bord traité :* `setDoc` sur un identifiant déjà pris serait une mise à jour déguisée, donc
+un écrasement silencieux. Les règles l'empêchent en exigeant que `createdAt` vaille l'heure de la
+requête, ce qu'une mise à jour ne produit jamais. Le formulaire prévient avant d'en arriver là.
+
+## D31 — Le périmètre choisi est mémorisé par compte, dans `localStorage`
+`prompt.md` §3.2 (« sélecteur global persisté en session ») — S3
+
+`sessionStorage` aurait suivi la lettre du cahier des charges, mais sur le téléphone du comptoir
+l'application se ferme et se rouvre vingt fois par jour : le responsable aurait ressaisi son choix à
+chaque fois. La clé porte l'identifiant du compte, pour que deux personnes qui se relaient sur le
+même appareil ne s'héritent pas leur périmètre, et la déconnexion l'efface avec le cache Firestore.
+
+*Conséquence :* le périmètre est une préférence d'affichage, jamais une autorisation. Ce qu'un
+gérant peut lire est décidé par son claim et par les règles ; ce que le responsable a choisi de
+regarder ne change rien à ses droits.
+
+## D32 — Changer la boutique d'un gérant révoque ses jetons
+`prompt.md` §4 — S3
+
+Le périmètre d'un gérant vit dans son custom claim, que les règles Firestore lisent pour décider ce
+qu'il peut ouvrir. Le déplacer sans révoquer les jetons laisserait l'ancien périmètre valide jusqu'à
+l'expiration du jeton, soit jusqu'à une heure : le gérant continuerait de lire et d'écrire dans une
+boutique qui n'est plus la sienne.
+
+*Conséquence :* le gérant est déconnecté et doit se reconnecter. L'écran le dit au responsable avant
+qu'il valide, parce que le changement tombe souvent pendant que l'intéressé est en train de vendre.
+
+## D20 bis — L'indicateur réseau croit désormais Firestore, pas le navigateur
+S3 — l'amélioration annoncée en D20
+
+Dès qu'une collection est réellement lisible (`boutiques`), l'écouteur ouvert avec
+`includeMetadataChanges` fournit `metadata.fromCache` : la vraie réponse à « Firestore atteint-il le
+serveur ? ». Quand le navigateur dit « en ligne » et que Firestore sert le cache, on croit Firestore.
+
+Un délai de confirmation de 2,5 secondes évite le faux positif du démarrage, où Firestore sert
+d'abord le cache avant de rattraper le serveur : un bandeau qui crie « hors ligne » à chaque
+ouverture apprendrait à ne plus le regarder.
+
+*Vérifié :* un test bout en bout coupe les requêtes vers Firestore **sans** couper le navigateur —
+le cas du wifi captif — puis rouvre l'application, et vérifie que le bandeau bascule alors que
+`navigator.onLine` vaut toujours `true`. C'est le cas que D20 décrivait sans pouvoir le mesurer.
+
+*Limite mesurée, et pourquoi elle est acceptable :* le signal dit quand **Firestore** se sait hors
+ligne, ce qui n'est pas instantané. Un flux d'écoute déjà ouvert et inactif ne s'aperçoit de rien
+tant qu'il n'a rien à transmettre : en coupant le réseau sous une session en cours, le bandeau peut
+rester à « À jour » plusieurs dizaines de secondes. Ce trou est couvert par ailleurs — c'est le
+compteur d'écritures qui répond alors, et il répond tout de suite : la saisie bloquée affiche
+« Envoi d'une saisie… » et n'en bouge pas. Autrement dit, les deux indicateurs se complètent :
+`fromCache` attrape l'ouverture derrière un réseau muet, le compteur attrape la coupure en cours de
+journée. Aucun des deux ne dit « À jour » quand une saisie n'est pas partie.
+
+## D28 bis — Le gérant sans boutique n'est plus un état de transition
+S3 — clôture de D28
+
+S3 apporte la liste et l'attribution aux comptes déjà créés. Le `boutiqueId` reste pourtant
+facultatif à la création : un responsable ouvre parfois le compte avant d'avoir déclaré la boutique,
+et refuser la création l'obligerait à faire les choses dans un ordre qui n'est pas le sien. Le
+compte existe alors sans périmètre, l'application le dit en toutes lettres, et un bouton le rattache.

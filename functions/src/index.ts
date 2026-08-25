@@ -64,12 +64,37 @@ function texteObligatoire(valeur: unknown, champ: string, maximum = 200): string
 }
 
 /**
+ * Un rattachement de gérant ne vaut que si la boutique existe vraiment.
+ *
+ * Le `boutiqueId` finit dans un custom claim, que les règles Firestore lisent
+ * pour ouvrir des documents. Un claim qui désigne une boutique fantôme n'ouvre
+ * rien, mais il laisse un compte dans un état incohérent que personne ne voit.
+ */
+async function boutiqueExistante(valeur: unknown): Promise<string | null> {
+  if (valeur === null || valeur === undefined || valeur === "") return null;
+  const code = texteObligatoire(valeur, "boutique", 3);
+  if (!/^[A-Z]{3}$/.test(code)) {
+    throw new HttpsError("invalid-argument", "Le code de la boutique doit faire trois lettres.");
+  }
+  const { base } = await admin();
+  const boutique = await base.doc(`boutiques/${code}`).get();
+  if (!boutique.exists) {
+    throw new HttpsError("not-found", "Cette boutique n'existe pas.");
+  }
+  if (boutique.get("actif") === false) {
+    throw new HttpsError("failed-precondition", "Cette boutique est fermée.");
+  }
+  return code;
+}
+
+/**
  * Crée un compte de gérant : compte d'authentification, custom claims et
  * miroir dans `users/{uid}`.
  *
- * Le `boutiqueId` est facultatif ici : les boutiques arrivent avec S3. Un
- * gérant sans boutique peut se connecter mais ne voit aucune donnée, et
- * l'application le lui dit franchement plutôt que d'afficher un écran vide.
+ * Le `boutiqueId` reste facultatif : un responsable peut ouvrir le compte avant
+ * d'avoir déclaré la boutique. Un gérant sans boutique se connecte mais ne voit
+ * aucune donnée, et l'application le lui dit franchement plutôt que de lui
+ * montrer des écrans vides. `attribuerBoutique` répare cela ensuite.
  */
 export const creerGerant = onCall({ region: REGION }, async (requete) => {
   exigerResponsable(requete);
@@ -77,10 +102,7 @@ export const creerGerant = onCall({ region: REGION }, async (requete) => {
   const nom = texteObligatoire(requete.data?.nom, "nom");
   const email = texteObligatoire(requete.data?.email, "e-mail").toLowerCase();
   const motDePasse = texteObligatoire(requete.data?.motDePasse, "mot de passe", 128);
-  const boutiqueId =
-    typeof requete.data?.boutiqueId === "string" && requete.data.boutiqueId.trim()
-      ? requete.data.boutiqueId.trim()
-      : null;
+  const boutiqueId = await boutiqueExistante(requete.data?.boutiqueId);
 
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new HttpsError("invalid-argument", "Adresse e-mail invalide.");
@@ -173,4 +195,50 @@ export const changerActivationUtilisateur = onCall({ region: REGION }, async (re
   });
 
   return { uid, actif };
+});
+
+/**
+ * Rattache un gérant à une boutique, ou l'en détache.
+ *
+ * Le périmètre d'un gérant vit dans son custom claim : c'est lui que les règles
+ * Firestore lisent pour décider ce qu'il peut ouvrir. Le déplacer est donc une
+ * opération de sécurité, pas un simple changement d'affichage.
+ *
+ * D'où la révocation des jetons : sans elle, le gérant garderait son ancien
+ * périmètre jusqu'à l'expiration de son jeton, soit jusqu'à une heure — il
+ * continuerait à lire et à écrire dans une boutique qui n'est plus la sienne.
+ * Il doit se reconnecter, et l'interface prévient le responsable avant qu'il
+ * valide.
+ */
+export const attribuerBoutique = onCall({ region: REGION }, async (requete) => {
+  exigerResponsable(requete);
+
+  const uid = texteObligatoire(requete.data?.uid, "utilisateur", 128);
+  const boutiqueId = await boutiqueExistante(requete.data?.boutiqueId);
+
+  const { auth, base, horodatage } = await admin();
+
+  const cible = await auth.getUser(uid).catch(() => null);
+  if (!cible) {
+    throw new HttpsError("not-found", "Ce compte n'existe pas.");
+  }
+  const role = cible.customClaims?.role;
+  if (role !== "gerant") {
+    throw new HttpsError(
+      "failed-precondition",
+      "Seul un gérant est rattaché à une boutique ; le responsable les voit toutes.",
+    );
+  }
+
+  await auth.setCustomUserClaims(uid, { role: "gerant" satisfies Role, boutiqueId });
+  await auth.revokeRefreshTokens(uid);
+
+  await base.doc(`users/${uid}`).update({
+    boutiqueId,
+    updatedAt: horodatage,
+    updatedBy: requete.auth!.uid,
+    updatedByName: requete.auth!.token.name ?? "",
+  });
+
+  return { uid, boutiqueId };
 });

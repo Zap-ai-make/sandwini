@@ -1,6 +1,7 @@
 import { Activity, Bike, ChevronRight, Coins, Settings, Wrench } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
+import { InvitationBoutique } from "@/components/InvitationBoutique";
 
 export const metadata = { title: "Accueil — SDI" };
 
@@ -31,6 +32,8 @@ export default function Accueil() {
         Vous pouvez travailler sans réseau : vos saisies sont gardées sur l’appareil et partent
         seules dès que la connexion revient. Le bandeau en haut dit toujours où en est l’envoi.
       </p>
+
+      <InvitationBoutique />
 
       <nav aria-label="Espaces de travail" className="mt-6">
         <ul className="divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">

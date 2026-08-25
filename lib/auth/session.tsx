@@ -5,6 +5,7 @@ import { clearIndexedDbPersistence, terminate } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { authentification, configurationPresente, db } from "@/lib/firebase/client";
 import { estRole, type Role } from "@/lib/domain/roles";
+import { oublierPerimetres } from "@/lib/perimetre/memoire";
 
 export type Utilisateur = {
   uid: string;
@@ -78,10 +79,13 @@ export function useSession(): Session {
  * boutique, et l’appareil du comptoir est partagé. Sans cela, le gérant suivant
  * lirait le stock et les ventes du précédent en ouvrant l’application hors
  * ligne. La séquence imposée par le SDK est : arrêter Firestore, vider, puis
- * recharger la page — l’instance terminée n’est plus utilisable.
+ * recharger la page — l’instance terminée n’est plus utilisable. Le périmètre
+ * mémorisé part avec, pour la même raison : il dit où travaillait le compte
+ * précédent.
  */
 export async function seDeconnecter(): Promise<void> {
   await signOut(authentification());
+  oublierPerimetres();
   try {
     await terminate(db());
     await clearIndexedDbPersistence(db());
