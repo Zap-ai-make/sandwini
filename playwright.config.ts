@@ -9,8 +9,14 @@ export default defineConfig({
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
+  /* Port dédié, distinct du 3000 du serveur de développement.
+     Sans cela, Playwright réutilisait un `npm run dev` en cours et testait un
+     build de développement — où le service worker est désactivé et la CSP plus
+     permissive. La suite rendait alors un verdict qui ne portait pas sur ce
+     qu'on croyait vérifier. Un harnais de test qui mesure ce qui traîne sur le
+     port n'est pas un harnais. */
   use: {
-    baseURL: "http://127.0.0.1:3000",
+    baseURL: "http://127.0.0.1:3100",
     trace: "retain-on-failure",
   },
   projects: [
@@ -29,9 +35,11 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: "npm run start",
-      url: "http://127.0.0.1:3000/dashboard",
-      reuseExistingServer: !process.env.CI,
+      // Toujours un serveur neuf sur le build courant : jamais de réutilisation,
+      // pour que le verdict porte sur ce qui vient d'être compilé.
+      command: "npm run start -- --port 3100",
+      url: "http://127.0.0.1:3100/dashboard",
+      reuseExistingServer: false,
       timeout: 120_000,
     },
   ],

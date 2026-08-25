@@ -290,3 +290,31 @@ dit quoi lancer, plutôt que sur une cascade d'assertions en échec.
 que sur une machine vierge n'est pas vérifié tant que personne ne l'a lancé dans les conditions
 réelles de développement. C'est le lancement du projet par le responsable qui l'a montré, pas la
 suite de tests.
+
+## D24 — `unsafe-eval` dans la CSP : développement seulement
+`SECURITY.md` §5 et §6 — constaté en S1, à l'usage
+
+React utilise `eval()` en mode développement pour ses outils de débogage — reconstruction des piles
+d'appel, rafraîchissement à chaud. En production, il ne s'en sert pas du tout. Notre CSP le bloquait,
+d'où une erreur permanente dans la console de développement.
+
+`'unsafe-eval'` n'est donc ajouté à `script-src` que lorsque `NODE_ENV` vaut `development`.
+
+*Ce qui empêche la dérive :* un test bout en bout lit les en-têtes servis par le build de production
+et échoue si `unsafe-eval` s'y trouve. Une CSP relâchée par accident ne se voit pas à l'œil ; elle se
+voit dans un test. Le même test verrouille `default-src`, `object-src`, `frame-ancestors`, `base-uri`
+et les quatre autres en-têtes de sécurité.
+
+## D25 — Les tests bout en bout ont leur propre port
+Constaté en S1, à l'usage
+
+Playwright réutilisait un serveur déjà présent sur le port 3000 — donc, en pratique, le `npm run dev`
+du développeur. La suite tournait alors contre un build de développement, où le service worker est
+désactivé et la CSP plus permissive : elle rendait un verdict qui ne portait pas sur ce qu'on croyait
+vérifier, en échouant sur les tests hors-ligne et sur les en-têtes.
+
+Le serveur de test occupe désormais le **port 3100**, sans réutilisation possible : chaque exécution
+démarre un serveur neuf sur le build courant.
+
+*Leçon :* un harnais de test qui mesure ce qui traîne sur un port n'est pas un harnais. Elle est
+jumelle de D23 — les deux ont été trouvées en lançant le projet pour de vrai, pas en le compilant.
