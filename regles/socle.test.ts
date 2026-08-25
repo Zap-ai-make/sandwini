@@ -21,10 +21,25 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 let env: RulesTestEnvironment;
 
+const HOTE = "127.0.0.1";
+const PORT = 8181; // cf. firebase.json — bloc de ports propre à SDI (DECISIONS.md D18)
+
 beforeAll(async () => {
+  /* Message utile plutôt qu'une avalanche d'assertions qui échouent : la cause
+     la plus fréquente est simplement que l'émulateur n'est pas démarré. */
+  try {
+    await fetch(`http://${HOTE}:${PORT}/`);
+  } catch {
+    throw new Error(
+      `L'émulateur Firestore ne répond pas sur ${HOTE}:${PORT}.\n` +
+        "Démarrez-le dans un autre terminal avec « npm run emulators »,\n" +
+        "ou lancez « npm run test:regles:isole » qui démarre le sien.",
+    );
+  }
+
   env = await initializeTestEnvironment({
     projectId: "sdi-regles",
-    firestore: { rules: readFileSync("firestore.rules", "utf8"), host: "127.0.0.1", port: 8181 },
+    firestore: { rules: readFileSync("firestore.rules", "utf8"), host: HOTE, port: PORT },
   });
 });
 

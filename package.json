@@ -9,10 +9,11 @@
     "lint": "eslint",
     "emulators": "firebase emulators:start --only auth,firestore,storage",
     "test:unite": "vitest run",
-    "test:regles": "firebase emulators:exec --only firestore \"vitest run --config vitest.regles.config.mts\"",
+    "test:regles": "vitest run --config vitest.regles.config.mts",
     "test": "npm run test:unite && npm run test:regles",
     "test:e2e": "playwright test",
-    "icones": "node scripts/generer-icones.mjs"
+    "icones": "node scripts/generer-icones.mjs",
+    "test:regles:isole": "firebase emulators:exec --only firestore \"vitest run --config vitest.regles.config.mts\""
   },
   "dependencies": {
     "firebase": "^12.18.0",

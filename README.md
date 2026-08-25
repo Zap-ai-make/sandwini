@@ -43,8 +43,9 @@ la même machine (D18). Ils sont déclarés dans `firebase.json` et repris dans 
 | `npm start` | Sert le build de production. |
 | `npm run emulators` | Auth, Firestore et Storage en local. |
 | `npm run test:unite` | Logique métier pure (Vitest). |
-| `npm run test:regles` | Règles Firestore contre l'émulateur. |
-| `npm test` | Les deux ci-dessus. |
+| `npm run test:regles` | Règles Firestore. **Demande les émulateurs déjà démarrés.** |
+| `npm run test:regles:isole` | Idem, mais démarre son propre émulateur. Pour une machine vierge ou la CI — échoue si un émulateur occupe déjà le port. |
+| `npm test` | Les tests unitaires et les règles. |
 | `npm run test:e2e` | Playwright, **dont la vérification hors-ligne**. Demande un build à jour. |
 | `npm run lint` | ESLint. |
 | `npm run icones` | Régénère les icônes PWA depuis leur source SVG. |
@@ -123,6 +124,10 @@ pleine dès que le réseau tombe.
 
 - **Le build passe explicitement par webpack** (`next build --webpack`). Serwist génère le service
   worker via un plugin webpack, que Turbopack — défaut de Next 16 — ne supporte pas encore (D19).
+  En développement, Serwist n'est pas appelé du tout : sa seule présence dans la configuration
+  empêchait `npm run dev` de démarrer.
+- **`agentRules: false`** dans `next.config.ts` : sans cela, `next dev` réécrit un bloc de consignes
+  dans `AGENTS.md` à chaque démarrage. Ce fichier se tient à la main (D22).
 - **`firebase-tools` traîne 5 vulnérabilités modérées** signalées par `npm audit`. Elles sont
   cantonnées à l'outillage de développement et absentes de l'arbre de production, vérifié par nom
   exact ; la CLI est déjà en dernière version (D17).

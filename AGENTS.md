@@ -26,6 +26,11 @@ PARTICULARITÉS :
     test de règles, sinon il n'existe pas.
   - Deux notions à ne jamais confondre : « crédit » (moto livrée, le client doit) et « tranches »
     (moto retenue au magasin, le magasin détient l'argent). Vocabulaire métier : prompt.md §13.
+  - Next 16 : les APIs et les conventions ont changé. Les guides de la version installée vivent
+    dans `node_modules/next/dist/docs/` — s'y reporter avant d'écrire du code Next, plutôt que de
+    se fier à ce qu'on croit savoir du framework. (Next voulait injecter lui-même cet avertissement
+    dans ce fichier à chaque `next dev` ; c'est désactivé par `agentRules: false` — ce fichier se
+    tient à la main.)
   - Le cahier des charges est `prompt.md`. La progression est dans `specs/ROADMAP.md`. Tout choix
     tranché sans arbitrage humain est consigné dans `DECISIONS.md`.
 ```
