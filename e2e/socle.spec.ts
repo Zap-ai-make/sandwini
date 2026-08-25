@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { bandeauEtat, prendreLaMainEtMettreEnCache, seConnecterEtEntrer } from "./aide";
 
 /**
  * Vérification du socle sur un build réel.
@@ -7,33 +8,19 @@ import { expect, test } from "@playwright/test";
  * acceptée tout de suite, comptée, puis partir seule au retour du réseau. Tant
  * qu’il ne passe pas, l’application ne répond pas à la contrainte n°1 du cahier
  * des charges (§3.4), quoi que montrent les autres écrans.
- */
-
-/**
- * Attend que le service worker **contrôle** la page — actif ne suffit pas.
  *
- * Puis recharge une fois en ligne : la toute première visite passe à côté du
- * service worker, qui n’existait pas encore quand le document a été demandé.
- * Ce second passage est celui qui met la page en cache. C’est aussi le trajet
- * réel d’un gérant : il ouvre l’application au magasin, puis perd le réseau.
+ * Depuis S2, l’espace de travail exige une session : chaque test ouvre donc la
+ * sienne. Firebase Auth garde sa session dans IndexedDB, que Playwright ne sait
+ * pas préenregistrer — d’où une vraie connexion à chaque fois.
  */
-async function prendreLaMainEtMettreEnCache(
-  page: import("@playwright/test").Page,
-  chemin: string,
-) {
-  await page.waitForFunction(() => Boolean(navigator.serviceWorker?.controller), null, {
-    timeout: 30_000,
-  });
-  await page.reload({ waitUntil: "load" });
-  await page.waitForURL(`**${chemin}`);
-}
 
 test.describe("coquille applicative", () => {
-  test("l’accueil s’affiche en français et mène aux quatre espaces", async ({ page }) => {
-    await page.goto("/dashboard");
+  test.beforeEach(async ({ page }) => {
+    await seConnecterEtEntrer(page);
+  });
 
+  test("l’accueil s’affiche en français et mène aux quatre espaces", async ({ page }) => {
     await expect(page.locator("html")).toHaveAttribute("lang", "fr");
-    await expect(page.getByRole("heading", { name: "Accueil", level: 1 })).toBeVisible();
 
     const espaces = page.getByRole("navigation", { name: "Espaces de travail" });
     for (const libelle of ["Motos", "Pièces détachées", "Caisse", "Réglages"]) {
@@ -57,8 +44,7 @@ test.describe("coquille applicative", () => {
       expect(boite, "chaque entrée de navigation doit être visible").not.toBeNull();
       expect(boite!.height).toBeGreaterThanOrEqual(44);
     }
-    const largeurNav = (await nav.boundingBox())!.width;
-    expect(largeurNav).toBeLessThanOrEqual(360);
+    expect((await nav.boundingBox())!.width).toBeLessThanOrEqual(360);
   });
 
   test("aucun défilement horizontal sur un petit écran", async ({ page }) => {
@@ -71,18 +57,19 @@ test.describe("coquille applicative", () => {
   });
 
   test("le bandeau annonce « À jour » quand tout est parti", async ({ page }) => {
-    await page.goto("/dashboard");
-    await expect(page.getByRole("status")).toContainText("À jour");
+    await expect(bandeauEtat(page)).toContainText("À jour");
   });
+});
 
-  test("les en-têtes de sécurité du build de production sont en place", async ({ page }) => {
-    const reponse = await page.goto("/dashboard");
+test.describe("en-têtes de sécurité", () => {
+  test("le build de production ne relâche rien", async ({ page }) => {
+    const reponse = await page.goto("/login");
     const entetes = reponse!.headers();
     const csp = entetes["content-security-policy"] ?? "";
 
     /* React exige `unsafe-eval` en développement. Cette tolérance ne doit
        jamais atteindre la production — et une CSP relâchée par accident ne se
-       voit pas à l'œil, d'où ce test. */
+       voit pas à l’œil, d’où ce test. */
     expect(csp, "unsafe-eval ne doit jamais sortir du développement").not.toContain("unsafe-eval");
 
     expect(csp).toContain("default-src 'self'");
@@ -97,8 +84,11 @@ test.describe("coquille applicative", () => {
 });
 
 test.describe("hors ligne", () => {
+  test.beforeEach(async ({ page }) => {
+    await seConnecterEtEntrer(page);
+  });
+
   test("la coquille se recharge sans réseau", async ({ page, context }) => {
-    await page.goto("/dashboard");
     await prendreLaMainEtMettreEnCache(page, "/dashboard");
 
     await context.setOffline(true);
@@ -110,22 +100,20 @@ test.describe("hors ligne", () => {
 
     /* Le bandeau n’est volontairement pas vérifié ici. Après un rechargement
        sous coupure émulée, Chromium continue de répondre `navigator.onLine
-       === true` : c’est une limite de l’émulation, pas du produit — un
-       téléphone réellement sans réseau répond `false`. L’indicateur est donc
-       vérifié dans le test suivant, où la mesure est fiable. */
+       === true` : c’est une limite de l’émulation, pas du produit. L’indicateur
+       est vérifié dans le test suivant, où la mesure est fiable. */
 
     await context.setOffline(false);
   });
 
   test("le bandeau bascule quand le réseau tombe, puis revient", async ({ page, context }) => {
-    await page.goto("/dashboard");
-    await expect(page.getByRole("status")).toContainText("À jour");
+    await expect(bandeauEtat(page)).toContainText("À jour");
 
     await context.setOffline(true);
-    await expect(page.getByRole("status")).toContainText("Hors ligne");
+    await expect(bandeauEtat(page)).toContainText("Hors ligne");
 
     await context.setOffline(false);
-    await expect(page.getByRole("status")).toContainText("À jour");
+    await expect(bandeauEtat(page)).toContainText("À jour");
   });
 
   test("une saisie faite hors ligne est acceptée, comptée, puis part au retour du réseau", async ({
@@ -145,11 +133,11 @@ test.describe("hors ligne", () => {
     await context.setOffline(true);
     await bouton.click();
     await expect(page.getByText("Enregistré ici, en attente d’envoi")).toBeVisible();
-    await expect(page.getByRole("status")).toContainText("1 saisie en attente");
+    await expect(bandeauEtat(page)).toContainText("1 saisie en attente");
 
     // Réseau revenu : elle part seule, sans que personne ne la relance.
     await context.setOffline(false);
     await expect(page.getByText("Confirmé par le serveur").first()).toBeVisible({ timeout: 30_000 });
-    await expect(page.getByRole("status")).toContainText("À jour", { timeout: 30_000 });
+    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
   });
 });

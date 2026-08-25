@@ -21,9 +21,14 @@ Prérequis : **Node 22+** et un **JDK 17+** (l'émulateur Firestore tourne sur l
 ```bash
 npm install
 cp .env.example .env.local        # aucune valeur secrète : les émulateurs suffisent
-npm run emulators                 # dans un premier terminal
-npm run dev                       # dans un second, puis http://localhost:3000
+npm run emulators                 # dans un premier terminal (compile aussi les Cloud Functions)
+npm run amorcer                   # crée le compte responsable initial
+npm run dev                       # dans un troisième, puis http://localhost:3000
 ```
+
+Se connecter avec **responsable@sdi.test** / **responsable-sdi-2026**. Ce compte n'existe que sur les
+émulateurs&nbsp;: `scripts/amorcer.mjs` refuse de s'exécuter ailleurs. En production, le premier
+responsable se crée une fois depuis la console Firebase.
 
 Aucun compte Firebase n'est nécessaire pour développer : tout tourne sur la Firebase Emulator Suite
 en local (cf. `DECISIONS.md` D3).
@@ -49,6 +54,8 @@ la même machine (D18). Ils sont déclarés dans `firebase.json` et repris dans 
 | `npm run test:e2e` | Playwright, **dont la vérification hors-ligne**. Demande un build à jour ; sert le build sur le port 3100, sans toucher à votre `npm run dev`. |
 | `npm run lint` | ESLint. |
 | `npm run icones` | Régénère les icônes PWA depuis leur source SVG. |
+| `npm run amorcer` | Crée le compte responsable initial sur les émulateurs. |
+| `npm run build:functions` | Compile les Cloud Functions seules. |
 
 ### Vérifier le hors-ligne
 
@@ -76,9 +83,11 @@ app/
 lib/
   domain/         types, calculs et règles métier — purs, testés, sans Firestore
   firebase/       initialisation du SDK, connexion aux émulateurs
+  auth/           session, rôle courant, déconnexion
   reseau/         état réseau et compteur d'écritures en attente
-  repositories/   accès Firestore (à venir avec S5)
+  repositories/   accès Firestore
 components/       composants d'interface partagés
+functions/        Cloud Functions (création de comptes, activation)
 regles/           tests des règles Firestore
 e2e/              tests Playwright
 scripts/          génération d'icônes, captures de revue visuelle
@@ -116,6 +125,12 @@ pleine dès que le réseau tombe.
 - Refus par défaut dans `firestore.rules` : un utilisateur non authentifié n'a aucun accès direct.
 - Les pages publiques client et prestataire (S13, S15) passeront par l'Admin SDK côté serveur, jamais
   par une ouverture des règles.
+- **Le rôle vit dans un custom claim**, jamais dans un document modifiable. Personne n'écrit dans
+  `users/{uid}` depuis un navigateur — pas même le responsable ; seules les Cloud Functions y
+  touchent. C'est ce qui rend structurellement impossible de se promouvoir soi-même.
+- Les écrans réservés au responsable sont refusés par les **règles Firestore** et par la vérification
+  du rôle dans les Cloud Functions, pas par une session serveur — qui imposerait un aller-retour
+  réseau à chaque navigation et casserait le hors-ligne (D27).
 - Le contrat complet : [`SECURITY.md`](SECURITY.md).
 
 ---

@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import { FournisseurSession } from "@/lib/auth/session";
 import { FournisseurEtatReseau } from "@/lib/reseau/etat-reseau";
 import "./globals.css";
 
@@ -45,7 +46,9 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr" className={`${archivo.variable} ${plexMono.variable}`}>
       <body className="min-h-dvh antialiased">
-        <FournisseurEtatReseau>{children}</FournisseurEtatReseau>
+        <FournisseurSession>
+          <FournisseurEtatReseau>{children}</FournisseurEtatReseau>
+        </FournisseurSession>
       </body>
     </html>
   );

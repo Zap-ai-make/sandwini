@@ -1,10 +1,9 @@
 "use client";
 
-import { signInAnonymously } from "firebase/auth";
 import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { CheckCircle2, CircleAlert, CircleDashed } from "lucide-react";
 import { useState } from "react";
-import { authentification, configurationPresente, db } from "@/lib/firebase/client";
+import { configurationPresente, db } from "@/lib/firebase/client";
 import { formaterDateHeure } from "@/lib/domain/format";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
@@ -36,11 +35,6 @@ export default function Diagnostic() {
       setEssais((liste) => liste.map((e) => (e.id === essai.id ? { ...e, etat, motif } : e)));
 
     try {
-      // Une session est nécessaire : aucune règle n’ouvre Firestore à un
-      // utilisateur anonyme (SECURITY.md §16). En attendant la connexion réelle
-      // de S2, le diagnostic ouvre une session anonyme — à retirer avec S2.
-      if (!authentification().currentUser) await signInAnonymously(authentification());
-
       /* La promesse d’écriture ne se résout qu’à l’accusé de réception du
          serveur. Hors ligne elle reste en suspens, et c’est précisément ce que
          `suivreEcriture` compte pour le bandeau. */

@@ -12,7 +12,23 @@ import { chromium, devices } from "@playwright/test";
 const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3000";
 const DOSSIER = "captures";
 
+const RESPONSABLE = { email: "responsable@sdi.test", motDePasse: "responsable-sdi-2026" };
+
+/** Ouvre une session : la plupart des écrans en exigent une depuis S2. */
+async function seConnecter(page) {
+  await page.goto(`${BASE}/login`, { waitUntil: "load" });
+  await page.getByLabel("Adresse e-mail").fill(RESPONSABLE.email);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(RESPONSABLE.motDePasse);
+  await page.getByRole("button", { name: /Se connecter/ }).click();
+  await page.waitForURL("**/dashboard");
+}
+
 const PRISES = [
+  { nom: "connexion-mobile-clair", chemin: "/login", theme: "light", mobile: true, publique: true },
+  { nom: "connexion-mobile-sombre", chemin: "/login", theme: "dark", mobile: true, publique: true },
+  { nom: "reglages-mobile-clair", chemin: "/parametres", theme: "light", mobile: true },
+  { nom: "utilisateurs-mobile-clair", chemin: "/parametres/utilisateurs", theme: "light", mobile: true },
+  { nom: "utilisateurs-bureau-sombre", chemin: "/parametres/utilisateurs", theme: "dark", mobile: false },
   { nom: "accueil-mobile-clair", chemin: "/dashboard", theme: "light", mobile: true },
   { nom: "accueil-mobile-sombre", chemin: "/dashboard", theme: "dark", mobile: true },
   { nom: "accueil-bureau-clair", chemin: "/dashboard", theme: "light", mobile: false },
@@ -27,13 +43,15 @@ const PRISES = [
 await mkdir(DOSSIER, { recursive: true });
 const navigateur = await chromium.launch();
 
-for (const { nom, chemin, theme, mobile, coupe } of PRISES) {
+for (const { nom, chemin, theme, mobile, coupe, publique } of PRISES) {
   const contexte = await navigateur.newContext({
     ...(mobile ? devices["Pixel 7"] : { viewport: { width: 1280, height: 820 } }),
     colorScheme: theme,
   });
   const page = await contexte.newPage();
-  await page.goto(`${BASE}${chemin}`, { waitUntil: "networkidle" });
+  if (!publique) await seConnecter(page);
+  await page.goto(`${BASE}${chemin}`, { waitUntil: "load" });
+  await page.locator("h1").first().waitFor({ timeout: 20000 });
   if (coupe) {
     await contexte.setOffline(true);
     await page.getByRole("status").getByText("Hors ligne").waitFor({ timeout: 5000 });

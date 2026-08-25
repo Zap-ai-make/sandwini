@@ -1,27 +1,54 @@
 rules_version = '2';
 
 /*
-  Règles Firestore — socle (S1).
+  Règles Firestore.
 
   Principe non négociable, posé dès la première ligne : refus par défaut, et
   aucun accès direct pour un utilisateur non authentifié (SECURITY.md §1 et §4,
   prompt.md §16). Les pages publiques client et prestataire ne feront jamais
   d'exception ici : elles passeront par l'Admin SDK côté serveur.
 
-  Chaque spec de S2 à S11 ajoute ses propres règles avec ses tests. S12 est la
-  passe de durcissement d'ensemble — pas le moment où l'on commence à écrire
-  ce fichier.
+  Chaque spec ajoute ses propres règles avec ses tests. S12 est la passe de
+  durcissement d'ensemble — pas le moment où l'on commence à écrire ce fichier.
 */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Écritures de vérification de la synchronisation, produites par l'écran
-    // /diagnostic. Sans valeur métier, jamais lues par l'application, et
-    // réservées à une session ouverte : un anonyme ne peut rien écrire ici.
+    // --- Fonctions d'aide -------------------------------------------------
+    // Le rôle est lu dans le custom claim, jamais dans un document : un rôle
+    // stocké dans une collection modifiable serait un rôle qu'on peut se
+    // donner soi-même.
+
+    function connecte() {
+      return request.auth != null;
+    }
+
+    function role() {
+      return request.auth.token.role;
+    }
+
+    function estResponsable() {
+      return connecte() && role() == 'responsable';
+    }
+
+    // --- Comptes utilisateurs (S2) ---------------------------------------
+    // `users/{uid}` est un **miroir** lisible du compte, pas la source des
+    // droits. Personne ne l'écrit depuis un navigateur : seules les Cloud
+    // Functions y touchent, via le SDK Admin qui ne passe pas par ces règles.
+    // C'est ce qui rend structurellement impossible de se promouvoir
+    // responsable ou de se rattacher à une autre boutique.
+    match /users/{uid} {
+      allow read: if estResponsable() || (connecte() && request.auth.uid == uid);
+      allow create, update, delete: if false;
+    }
+
+    // --- Écritures de vérification de la synchronisation -------------------
+    // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
+    // l'application, et réservées à une session ouverte.
     match /diagnostics/{essai} {
       allow read: if false;
-      allow create: if request.auth != null
+      allow create: if connecte()
                     && request.resource.data.keys().hasOnly(['ecritA', 'origine'])
                     && request.resource.data.origine == 'diagnostic';
       allow update, delete: if false;
