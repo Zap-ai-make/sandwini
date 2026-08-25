@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#F5C518"/>
+  <rect x="30.72" y="30.72" width="450.56" height="450.56" rx="63.07840000000001"
+        fill="#F5C518" stroke="#0F1720" stroke-width="24.7808"/>
+  <text x="50%" y="50%" dy="0.35em" text-anchor="middle"
+        font-family="Arial Black, Arial, Helvetica, sans-serif"
+        font-weight="900" font-size="189.2352"
+        letter-spacing="9.0112" fill="#0F1720">SDI</text>
+</svg>

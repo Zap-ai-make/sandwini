@@ -1,0 +1,35 @@
+rules_version = '2';
+
+/*
+  Règles Firestore — socle (S1).
+
+  Principe non négociable, posé dès la première ligne : refus par défaut, et
+  aucun accès direct pour un utilisateur non authentifié (SECURITY.md §1 et §4,
+  prompt.md §16). Les pages publiques client et prestataire ne feront jamais
+  d'exception ici : elles passeront par l'Admin SDK côté serveur.
+
+  Chaque spec de S2 à S11 ajoute ses propres règles avec ses tests. S12 est la
+  passe de durcissement d'ensemble — pas le moment où l'on commence à écrire
+  ce fichier.
+*/
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Écritures de vérification de la synchronisation, produites par l'écran
+    // /diagnostic. Sans valeur métier, jamais lues par l'application, et
+    // réservées à une session ouverte : un anonyme ne peut rien écrire ici.
+    match /diagnostics/{essai} {
+      allow read: if false;
+      allow create: if request.auth != null
+                    && request.resource.data.keys().hasOnly(['ecritA', 'origine'])
+                    && request.resource.data.origine == 'diagnostic';
+      allow update, delete: if false;
+    }
+
+    // Tout le reste est fermé tant qu'une spec ne l'ouvre pas explicitement.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

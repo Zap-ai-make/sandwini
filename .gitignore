@@ -16,3 +16,36 @@
 # À compléter selon la stack du projet (node_modules/, dist/, .next/,
 # target/, __pycache__/…). Ce fichier couvre les secrets ; il ne prétend
 # pas couvrir les artefacts de build.
+
+# --- Artefacts Node / Next.js ---
+/node_modules
+/.next/
+/out/
+/build
+/coverage
+*.tsbuildinfo
+next-env.d.ts
+.vercel
+
+# --- Firebase (emulateurs, logs, cache local) ---
+.firebase/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+database-debug.log*
+pubsub-debug.log*
+storage-debug.log*
+
+# --- Tests ---
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# --- Service worker genere par Serwist au build ---
+/public/sw.js
+/public/sw.js.map
+/public/swe-worker-*.js
+
+# --- Captures de revue visuelle (regenerables) ---
+/captures/

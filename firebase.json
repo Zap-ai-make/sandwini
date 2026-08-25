@@ -1,0 +1,19 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "storage": {
+    "rules": "storage.rules"
+  },
+  "//": "Ports propres a SDI : la machine de developpement fait tourner d'autres projets Firebase, et les ports par defaut (8080, 9099, 4000, 4400, 4500) entrent en conflit avec eux.",
+  "emulators": {
+    "auth": { "port": 9399 },
+    "firestore": { "port": 8181 },
+    "storage": { "port": 9599 },
+    "ui": { "enabled": true, "port": 4100 },
+    "hub": { "port": 4700 },
+    "logging": { "port": 4800 },
+    "singleProjectMode": true
+  }
+}
