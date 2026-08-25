@@ -188,3 +188,73 @@ ventes, ni les montants, ni les dossiers des autres boutiques, qui restent clois
 (D7). Le risque résiduel est l'extraction du fichier de contacts par un gérant, pas une fuite
 financière. Si ce risque devient réel, la parade est la recherche stricte par numéro complet, sans
 parcours de liste — elle se rajoute sans changer le modèle de données.
+
+## D17 — Vulnérabilités npm résiduelles : cantonnées à l'outillage
+`SECURITY.md` §9 — constaté en S1
+
+`npm audit` signale 5 vulnérabilités modérées (`re2`, `uuid`, `@opentelemetry/core`,
+`@google-cloud/pubsub`) toutes tirées par `firebase-tools`, la CLI qui lance les émulateurs.
+
+Elles sont **absentes de l'arbre de production**, vérifié par correspondance de nom exact avec
+`npm ls --omit=dev`. Les paquets `re2js` et `@opentelemetry/api` présents côté production sont
+d'autres paquets, non concernés. `firebase-tools` est déjà en dernière version ; `npm audit fix
+--force` casserait la CLI sans rien corriger en production.
+
+*Conséquence :* exigence du §9 satisfaite — détectées, évaluées, tracées. À revérifier à chaque
+montée de version de `firebase-tools`. Si l'une d'elles atteignait un jour l'arbre de production,
+la décision se rouvre immédiatement.
+
+## D18 — Ports d'émulateurs propres à SDI
+Constaté en S1
+
+La machine de développement fait tourner d'autres projets Firebase ; les ports par défaut (8080,
+9099, 4000, 4400, 4500) étaient déjà pris. Plutôt que d'arrêter le travail de quelqu'un d'autre, SDI
+prend un bloc à lui : **Firestore 8181, Auth 9399, Storage 9599, interface 4100, hub 4700, journal
+4800**.
+
+*Conséquence :* ces ports apparaissent à trois endroits — `firebase.json`, `lib/firebase/client.ts`
+et `regles/socle.test.ts`. Les changer demande de toucher les trois.
+
+## D19 — Le build passe par webpack, pas par Turbopack
+Constaté en S1
+
+Serwist génère le service worker via un plugin webpack. Turbopack, activé par défaut dans Next 16,
+ne le supporte pas : le build échoue. Le script de build force donc `next build --webpack`.
+
+Les alternatives — `@serwist/turbopack` (expérimental) ou le mode « configurateur » — apportent du
+risque pour un gain de vitesse de compilation dont le projet n'a pas besoin. Le développement, lui,
+garde Turbopack : le service worker y est désactivé de toute façon.
+
+*Conséquence :* à revoir quand Serwist supportera Turbopack en version stable. Un seul drapeau à
+retirer.
+
+## D20 — L'indicateur réseau s'appuie sur `navigator.onLine`, avec une limite connue
+`prompt.md` §3.4 — constaté en S1
+
+`navigator.onLine` répond « en ligne » dès qu'une interface réseau est active, **même sans accès
+Internet réel** — cas fréquent avec une connexion mobile faible ou un wifi captif. L'indicateur peut
+donc afficher « À jour » alors que rien ne part.
+
+Ce que le socle garantit malgré tout : le **compteur d'écritures en attente** ne ment pas, lui. Il
+descend à zéro uniquement quand le serveur a accusé réception. Un gérant qui voit « 3 saisies en
+attente » sait que rien n'est parti, quel que soit ce que dit le mot « en ligne ».
+
+*Amélioration prévue en S3 :* dès qu'une collection est réellement lisible (`boutiques`), un écouteur
+`onSnapshot` avec `includeMetadataChanges` fournit `metadata.fromCache`, c'est-à-dire la vraie
+réponse à « Firestore atteint-il le serveur ? ». On ne l'ajoute pas aujourd'hui parce qu'il faudrait
+inventer une lecture pour la seule beauté du geste.
+
+*Note de vérification :* sous Chromium piloté par Playwright, une page rechargée en coupure émulée
+répond `navigator.onLine === true`. C'est une limite de l'émulation, pas du produit. Le test bout en
+bout vérifie donc la bascule du bandeau sans rechargement, où la mesure est fiable.
+
+## D21 — L'émulateur Functions arrive avec S2, pas avec le socle
+`specs/S1-socle-technique.md` — écart assumé
+
+Le critère de S1 mentionnait quatre émulateurs, Functions compris. Le socle en démarre trois : Auth,
+Firestore, Storage. Créer un paquet Cloud Functions vide, avec sa chaîne de compilation, pour zéro
+fonction, contredirait le premier échelon d'`ARCHITECTURE.md` §1 : si le besoin n'est pas réel et
+actuel, on ne le construit pas.
+
+*Conséquence :* S2 apporte la première fonction réelle (création d'un gérant et pose de ses custom
+claims) et, avec elle, le paquet `functions/` et son émulateur.

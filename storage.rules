@@ -1,0 +1,12 @@
+rules_version = '2';
+
+// Refus par defaut. Le seul fichier prevu au MVP est le logo de l'entreprise,
+// televerse par le responsable : sa regle arrive avec S4, avec la verification
+// du type reel et de la taille (SECURITY.md SS5).
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /{chemin=**} {
+      allow read, write: if false;
+    }
+  }
+}

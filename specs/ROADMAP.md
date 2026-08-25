@@ -18,7 +18,7 @@ Tout ce qui sert le confort, le pilotage ou un second métier (pièces détaché
 
 | ID  | Spec                                          | Dépend de        | Périmètre | Statut  |
 |-----|-----------------------------------------------|------------------|-----------|---------|
-| S1  | Socle technique et coquille applicative       | aucune           | MVP       | à faire |
+| S1  | Socle technique et coquille applicative       | aucune           | MVP       | terminée |
 | S2  | Authentification, rôles et utilisateurs       | S1               | MVP       | à faire |
 | S3  | Boutiques et sélecteur de périmètre           | S2               | MVP       | à faire |
 | S4  | Référentiels et paramètres entreprise         | S3               | MVP       | à faire |

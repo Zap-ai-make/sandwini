@@ -1,0 +1,21 @@
+{
+  "name": "SDI — Gestion",
+  "short_name": "SDI",
+  "description": "Ventes de motos, paiements et dossiers administratifs, en boutique et hors ligne.",
+  "lang": "fr",
+  "dir": "ltr",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/icones/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icones/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icones/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Vérifier la synchronisation", "url": "/diagnostic" }
+  ]
+}

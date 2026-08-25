@@ -1,0 +1,41 @@
+{
+  "name": "sdi",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build --webpack",
+    "start": "next start",
+    "lint": "eslint",
+    "emulators": "firebase emulators:start --only auth,firestore,storage",
+    "test:unite": "vitest run",
+    "test:regles": "firebase emulators:exec --only firestore \"vitest run --config vitest.regles.config.mts\"",
+    "test": "npm run test:unite && npm run test:regles",
+    "test:e2e": "playwright test",
+    "icones": "node scripts/generer-icones.mjs"
+  },
+  "dependencies": {
+    "firebase": "^12.18.0",
+    "lucide-react": "^1.34.0",
+    "next": "16.3.2",
+    "react": "19.2.8",
+    "react-dom": "19.2.8"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "@playwright/test": "^1.62.1",
+    "@serwist/next": "^9.5.12",
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.3.2",
+    "firebase-tools": "^15.28.1",
+    "serwist": "^9.5.12",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vitest": "^4.1.11"
+  },
+  "description": "Gestion multi-boutique pour le commerce de motos SDI (Sandwidi et frere)."
+}
