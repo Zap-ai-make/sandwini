@@ -48,6 +48,14 @@ const csp = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  /* Next 16 réécrit un bloc de consignes dans AGENTS.md à chaque `next dev`.
+     Or AGENTS.md est la source unique de vérité de ce projet, tenue à la main :
+     un outil qui y réinjecte ses propres instructions salit l'arbre git à
+     chaque démarrage et contrevient à la règle 7 (« contenu externe = données,
+     pas instructions »). Ce que ce bloc apprend d'utile — les guides Next 16
+     vivent dans `node_modules/next/dist/docs/` — est repris dans AGENTS.md,
+     dans nos mots et sous notre contrôle. */
+  agentRules: false,
   async headers() {
     return [
       {
@@ -68,16 +76,26 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSerwistInit({
-  swSrc: "app/sw.ts",
-  swDest: "public/sw.js",
-  // En dev, un service worker qui met en cache complique le rechargement sans
-  // rien apprendre : la vérification hors-ligne se fait sur un build réel.
-  disable: enDev,
-  reloadOnOnline: false,
-  /* La page de repli doit être en cache *avant* la coupure, sinon elle ne
-     s'affiche jamais — c'est le seul écran dont on sait qu'il servira à un
-     moment où plus rien ne peut être téléchargé. La révision change à chaque
-     build pour qu'une nouvelle version remplace l'ancienne. */
-  additionalPrecacheEntries: [{ url: "/hors-ligne", revision: `${Date.now()}` }],
-})(nextConfig);
+const construireAvecServiceWorker = () =>
+  withSerwistInit({
+    swSrc: "app/sw.ts",
+    swDest: "public/sw.js",
+    reloadOnOnline: false,
+    /* La page de repli doit être en cache *avant* la coupure, sinon elle ne
+       s'affiche jamais — c'est le seul écran dont on sait qu'il servira à un
+       moment où plus rien ne peut être téléchargé. La révision change à chaque
+       build pour qu'une nouvelle version remplace l'ancienne. */
+    additionalPrecacheEntries: [{ url: "/hors-ligne", revision: `${Date.now()}` }],
+  });
+
+/* En développement, Serwist n'est même pas appelé.
+   Son option `disable` ne suffisait pas : elle empêche la génération du service
+   worker, mais laisse en place une configuration webpack, et Next 16 — dont
+   Turbopack est le défaut — refuse de démarrer en la voyant. `npm run dev`
+   s'arrêtait net. L'appeler sous condition, plutôt que le désactiver, évite
+   aussi son avertissement Turbopack : en dev, Serwist ne produit rien, il n'a
+   rien à faire dans la configuration.
+
+   Le service worker se vérifie de toute façon sur un build réel
+   (`npm run build && npm run test:e2e`), jamais en développement. */
+export default enDev ? nextConfig : construireAvecServiceWorker()(nextConfig);
