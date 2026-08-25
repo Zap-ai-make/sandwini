@@ -20,7 +20,7 @@ Tout ce qui sert le confort, le pilotage ou un second métier (pièces détaché
 |-----|-----------------------------------------------|------------------|-----------|---------|
 | S1  | Socle technique et coquille applicative       | aucune           | MVP       | terminée |
 | S2  | Authentification, rôles et utilisateurs       | S1               | MVP       | terminée |
-| S3  | Boutiques et sélecteur de périmètre           | S2               | MVP       | à faire |
+| S3  | Boutiques et sélecteur de périmètre           | S2               | MVP       | terminée |
 | S4  | Référentiels et paramètres entreprise         | S3               | MVP       | à faire |
 | S5  | Stock motos — entrée et consultation          | S4               | MVP       | à faire |
 | S6  | Clients — recherche et création               | S3               | MVP       | à faire |

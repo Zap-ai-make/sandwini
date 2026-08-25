@@ -54,6 +54,24 @@ export async function seConnecterEtEntrer(page: Page) {
   await expect(page.getByRole("heading", { name: "Accueil", level: 1 })).toBeVisible();
 }
 
+/** L'indicateur de périmètre du bandeau : sélecteur pour le responsable, texte pour le gérant. */
+export function selecteurPerimetre(page: Page) {
+  return page.getByRole("banner").getByRole("combobox", { name: "Boutique affichée" });
+}
+
+/**
+ * Un code de boutique neuf par exécution.
+ *
+ * Les boutiques ne se suppriment pas — leur code vit dans des numéros de reçus —
+ * et les émulateurs gardent leurs données d'un test à l'autre. Réutiliser un
+ * code ferait échouer la deuxième exécution pour une raison qui n'est pas celle
+ * qu'on teste.
+ */
+export function codeUnique(): string {
+  const lettres = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+  return Array.from({ length: 3 }, () => lettres[Math.floor(Math.random() * 26)]).join("");
+}
+
 /** Un e-mail neuf par exécution : les comptes ne se suppriment jamais. */
 export function emailUnique(prefixe: string) {
   return `${prefixe}-${Date.now()}-${Math.floor(Math.random() * 1000)}@sdi.test`;

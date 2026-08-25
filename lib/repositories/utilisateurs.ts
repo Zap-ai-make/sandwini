@@ -80,6 +80,7 @@ export function messageErreurUtilisateur(cause: unknown): string {
   if (code.includes("permission-denied")) return "Cette action est réservée au responsable.";
   if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
   if (code.includes("invalid-argument")) return message || "Une information saisie est invalide.";
+  if (code.includes("not-found")) return message || "Ce compte ou cette boutique n’existe plus.";
   if (code.includes("failed-precondition")) return message || "Action impossible.";
   if (code.includes("unavailable") || code.includes("internal")) {
     return "Le serveur n’a pas répondu. Cette action demande du réseau — réessayez une fois connecté.";

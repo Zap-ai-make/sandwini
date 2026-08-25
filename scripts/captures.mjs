@@ -27,6 +27,8 @@ const PRISES = [
   { nom: "connexion-mobile-clair", chemin: "/login", theme: "light", mobile: true, publique: true },
   { nom: "connexion-mobile-sombre", chemin: "/login", theme: "dark", mobile: true, publique: true },
   { nom: "reglages-mobile-clair", chemin: "/parametres", theme: "light", mobile: true },
+  { nom: "boutiques-mobile-clair", chemin: "/parametres/boutiques", theme: "light", mobile: true },
+  { nom: "boutiques-bureau-sombre", chemin: "/parametres/boutiques", theme: "dark", mobile: false },
   { nom: "utilisateurs-mobile-clair", chemin: "/parametres/utilisateurs", theme: "light", mobile: true },
   { nom: "utilisateurs-bureau-sombre", chemin: "/parametres/utilisateurs", theme: "dark", mobile: false },
   { nom: "accueil-mobile-clair", chemin: "/dashboard", theme: "light", mobile: true },
@@ -52,6 +54,13 @@ for (const { nom, chemin, theme, mobile, coupe, publique } of PRISES) {
   if (!publique) await seConnecter(page);
   await page.goto(`${BASE}${chemin}`, { waitUntil: "load" });
   await page.locator("h1").first().waitFor({ timeout: 20000 });
+  /* Une capture prise pendant « Chargement… » ne dit rien du rendu réel : on
+     attend que les listes en direct soient arrivées (DESIGN.md §14). */
+  await page
+    .getByText(/Chargement/)
+    .first()
+    .waitFor({ state: "detached", timeout: 15000 })
+    .catch(() => {});
   if (coupe) {
     await contexte.setOffline(true);
     await page.getByRole("status").getByText("Hors ligne").waitFor({ timeout: 5000 });
