@@ -7,6 +7,7 @@ import {
   persistentMultipleTabManager,
   type Firestore,
 } from "firebase/firestore";
+import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from "firebase/storage";
 
 /* Configuration Firebase côté client. Ces valeurs ne sont pas des secrets : ce
@@ -29,6 +30,7 @@ let app: FirebaseApp | undefined;
 let firestore: Firestore | undefined;
 let auth: Auth | undefined;
 let storage: FirebaseStorage | undefined;
+let functionsInstance: Functions | undefined;
 
 function application(): FirebaseApp {
   if (!app) app = getApps().length ? getApp() : initializeApp(config);
@@ -64,6 +66,16 @@ export function stockage(): FirebaseStorage {
   storage = getStorage(application());
   if (surEmulateurs) connectStorageEmulator(storage, "127.0.0.1", 9599);
   return storage;
+}
+
+/** Région des Cloud Functions — doit correspondre à celle déclarée dans `functions/src/index.ts`. */
+export const REGION_FONCTIONS = "europe-west1";
+
+export function fonctions(): Functions {
+  if (functionsInstance) return functionsInstance;
+  functionsInstance = getFunctions(application(), REGION_FONCTIONS);
+  if (surEmulateurs) connectFunctionsEmulator(functionsInstance, "127.0.0.1", 5301);
+  return functionsInstance;
 }
 
 export const configurationPresente = Boolean(config.projectId);

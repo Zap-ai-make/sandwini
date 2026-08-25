@@ -7,13 +7,15 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "emulators": "firebase emulators:start --only auth,firestore,storage",
+    "emulators": "npm run build:functions && firebase emulators:start --only auth,firestore,storage,functions",
     "test:unite": "vitest run",
     "test:regles": "vitest run --config vitest.regles.config.mts",
     "test": "npm run test:unite && npm run test:regles",
     "test:e2e": "playwright test",
     "icones": "node scripts/generer-icones.mjs",
-    "test:regles:isole": "firebase emulators:exec --only firestore \"vitest run --config vitest.regles.config.mts\""
+    "test:regles:isole": "firebase emulators:exec --only firestore \"vitest run --config vitest.regles.config.mts\"",
+    "build:functions": "npm --prefix functions run build",
+    "amorcer": "node scripts/amorcer.mjs"
   },
   "dependencies": {
     "firebase": "^12.18.0",
@@ -32,6 +34,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
+    "firebase-admin": "^14.3.0",
     "firebase-tools": "^15.28.1",
     "serwist": "^9.5.12",
     "tailwindcss": "^4",

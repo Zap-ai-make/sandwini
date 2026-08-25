@@ -318,3 +318,68 @@ démarre un serveur neuf sur le build courant.
 
 *Leçon :* un harnais de test qui mesure ce qui traîne sur un port n'est pas un harnais. Elle est
 jumelle de D23 — les deux ont été trouvées en lançant le projet pour de vrai, pas en le compilant.
+
+## D26 — Limitation des tentatives de connexion : Firebase d'abord, l'écran ensuite
+`SECURITY.md` §3 — S2
+
+La protection réelle contre le bourrage d'identifiants est celle de Firebase Authentication, qui
+applique ses propres quotas côté serveur et renvoie `auth/too-many-requests`. Nous n'avons ni serveur
+d'authentification à nous, ni moyen de compter les tentatives ailleurs que sur l'appareil.
+
+L'écran de connexion ajoute une pause de 30 secondes après cinq échecs. Ce n'est **pas** un contrôle
+de sécurité — il se contourne en rechargeant la page — mais il coupe l'acharnement au comptoir et
+rend la limite lisible pour quelqu'un qui se trompe de mot de passe.
+
+*Conséquence :* si le projet passe un jour à Identity Platform, la protection contre les attaques par
+force brute se règle côté console et non dans ce code.
+
+## D27 — « Côté serveur » veut dire règles Firestore, pas session serveur
+`specs/S2-auth-roles-utilisateurs.md`, `prompt.md` §16 — écart assumé
+
+La spec demandait que les écrans réservés au responsable soient « refusés au gérant côté serveur, pas
+seulement masqués ». Une session serveur — cookie signé plus middleware — supposerait un aller-retour
+réseau à chaque navigation, ce qui contredit frontalement le §3.4 : l'application doit fonctionner
+sans réseau.
+
+L'intention de la règle est respectée autrement, et mieux :
+
+- **Aucune donnée ne transite par le serveur Next.** Tout vient de Firestore, côté client. Il n'y a
+  donc pas de contenu protégé à servir, et rien à fuir par une route.
+- **Les règles Firestore refusent les lectures** qu'un gérant n'a pas le droit de faire, et elles
+  sont testées dans les deux sens.
+- **Les Cloud Functions revérifient le rôle** dans le jeton avant toute action administrative.
+
+La garde de navigation (`components/GardeSession.tsx`) ne protège donc rien : elle évite qu'on tombe
+sur un écran vide sans comprendre. Un gérant qui l'ignorerait obtiendrait une page dont toutes les
+requêtes échouent.
+
+*À revoir si un jour une page rend des données côté serveur* — les pages publiques client et
+prestataire (S13, S15) en sont le cas, et elles passeront par l'Admin SDK avec vérification de jeton.
+
+## D28 — Un gérant peut exister sans boutique jusqu'à S3
+`specs/S2-auth-roles-utilisateurs.md`, `specs/S3-boutiques-perimetre.md` — S2
+
+La roadmap fait dépendre S3 de S2, mais créer un gérant demande de lui attribuer une boutique — qui
+n'existe pas encore. Plutôt que d'avancer un morceau de S3 dans S2, le `boutiqueId` est facultatif :
+le compte se crée, se connecte, et l'application lui dit en toutes lettres « aucune boutique ne vous
+est attribuée » au lieu de lui montrer des écrans vides.
+
+*Conséquence :* S3 apportera le choix dans une liste et l'attribution aux comptes déjà créés. Le
+champ existe déjà partout — modèle, claim, interface — donc il n'y a rien à migrer.
+
+## D29 — Le SDK Admin se charge à l'appel, pas à l'import des Cloud Functions
+S2 — trouvé en exécutant
+
+Importer `firebase-admin` au niveau du module faisait mettre **12,9 secondes** au fichier de
+fonctions pour se charger, au-dessus des 10 secondes que l'émulateur accorde à la découverte. Les
+fonctions n'étaient tout simplement pas servies, et l'application affichait « le serveur n'a pas
+répondu » sans autre indice.
+
+Les imports sont donc faits dans les gestionnaires, à la première invocation : **651 ms** au
+chargement du module. Le gain vaut aussi en production, où le démarrage à froid d'une fonction est
+facturé et subi par l'utilisateur.
+
+*Effet de bord traité :* la première invocation paie ce coût. Dans l'émulateur, elle atteignait
+20 secondes et faisait échouer le premier test qui appelait une fonction. La préparation des tests
+réveille donc le runtime avant de commencer — un test doit mesurer le produit, pas la lenteur d'un
+démarrage à froid.

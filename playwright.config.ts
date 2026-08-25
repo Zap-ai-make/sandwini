@@ -5,6 +5,9 @@ import { defineConfig, devices } from "@playwright/test";
    `npm start` comme serveur de test. */
 export default defineConfig({
   testDir: "./e2e",
+  // Contrôle de l'environnement avant toute mesure, puis amorçage du compte
+  // responsable — cf. e2e/preparation.ts.
+  globalSetup: "./e2e/preparation.ts",
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
@@ -26,14 +29,12 @@ export default defineConfig({
       use: { ...devices["Pixel 7"] },
     },
   ],
+  /* Les émulateurs ne sont pas démarrés d'ici : ce sont un service de
+     développement que l'on lance à part (« npm run emulators »). Les piloter
+     depuis Playwright entrait en conflit avec l'instance du développeur et
+     rendait les échecs illisibles. e2e/preparation.ts vérifie simplement
+     qu'ils répondent, et dit quoi taper sinon. */
   webServer: [
-    {
-      // Les emulateurs Firebase : le test hors-ligne ecrit reellement dans Firestore.
-      command: "npx firebase emulators:start --only auth,firestore --project sdi-dev",
-      url: "http://127.0.0.1:4100",
-      reuseExistingServer: true,
-      timeout: 120_000,
-    },
     {
       // Toujours un serveur neuf sur le build courant : jamais de réutilisation,
       // pour que le verdict porte sur ce qui vient d'être compilé.

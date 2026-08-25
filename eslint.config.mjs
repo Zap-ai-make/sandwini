@@ -21,6 +21,8 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "test-results/**",
     "captures/**",
+    // Sortie de compilation des Cloud Functions.
+    "functions/lib/**",
   ]),
 ]);
 
