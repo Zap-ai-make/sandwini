@@ -74,6 +74,26 @@ test.describe("coquille applicative", () => {
     await page.goto("/dashboard");
     await expect(page.getByRole("status")).toContainText("À jour");
   });
+
+  test("les en-têtes de sécurité du build de production sont en place", async ({ page }) => {
+    const reponse = await page.goto("/dashboard");
+    const entetes = reponse!.headers();
+    const csp = entetes["content-security-policy"] ?? "";
+
+    /* React exige `unsafe-eval` en développement. Cette tolérance ne doit
+       jamais atteindre la production — et une CSP relâchée par accident ne se
+       voit pas à l'œil, d'où ce test. */
+    expect(csp, "unsafe-eval ne doit jamais sortir du développement").not.toContain("unsafe-eval");
+
+    expect(csp).toContain("default-src 'self'");
+    expect(csp).toContain("object-src 'none'");
+    expect(csp).toContain("frame-ancestors 'none'");
+    expect(csp).toContain("base-uri 'self'");
+    expect(entetes["x-content-type-options"]).toBe("nosniff");
+    expect(entetes["referrer-policy"]).toBe("strict-origin-when-cross-origin");
+    expect(entetes["x-frame-options"]).toBe("DENY");
+    expect(entetes["strict-transport-security"]).toContain("max-age=");
+  });
 });
 
 test.describe("hors ligne", () => {

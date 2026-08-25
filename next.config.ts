@@ -31,9 +31,16 @@ const hotesEmulateurs =
    reste nécessaire dans script-src. Le durcissement par nonce demande un
    middleware et un rendu dynamique sur toutes les pages — il est traité en S12,
    avec les règles Firestore, plutôt que bâclé ici. */
+/* React a besoin d'`eval()` en développement — reconstruction des piles
+   d'appel, rafraîchissement à chaud — et jamais en production, où il ne
+   l'utilise pas du tout. On ouvre donc `unsafe-eval` uniquement en dev.
+   Le test bout en bout vérifie que le build de production ne le contient pas :
+   c'est le genre de tolérance qui, oubliée, se retrouve en ligne. */
+const scriptSrc = ["'self'", "'unsafe-inline'", ...(enDev ? ["'unsafe-eval'"] : [])].join(" ");
+
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
+  `script-src ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://firebasestorage.googleapis.com",
   "font-src 'self'",
