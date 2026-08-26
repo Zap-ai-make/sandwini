@@ -533,3 +533,64 @@ change, ce qui est pire qu'un réglage absent.
 
 *Conséquence :* il s'ajoutera à l'écran Entreprise en S9, avec sa valeur par défaut de 30 jours et la
 liste qu'il alimente.
+
+## D38 — La date d'entrée vient de l'appareil, l'horodatage d'audit du serveur
+`prompt.md` §3.4, §5.2 — S5
+
+Deux dates cohabitent sur une moto et elles ne répondent pas à la même question.
+`dateEntree` dit **quand la moto est arrivée au magasin** ; c'est une date métier, elle appartient à
+l'appareil qui l'a saisie. `createdAt` dit **quand la donnée a été écrite** ; c'est une trace
+d'audit, elle appartient au serveur.
+
+Les confondre en mettant `serverTimestamp()` partout ferait entrer mercredi une moto saisie lundi
+sans réseau — et le stock du lundi deviendrait faux rétroactivement.
+
+*Conséquence :* une horloge d'appareil déréglée peut poser une date fausse. Les règles bornent donc
+`dateEntree` à un jour dans le futur au plus : elles ne peuvent pas vérifier une date passée, mais
+elles peuvent refuser l'absurde.
+
+## D39 — Une vue de détail vit dans la route de sa liste, pas dans une route dynamique
+`prompt.md` §3.4 — constaté en S5, en coupant le réseau
+
+`/motos/[id]` est une route dynamique : le navigateur doit en demander le document au serveur, et le
+service worker n'a jamais vu celui d'une moto saisie il y a dix secondes. Résultat mesuré : le
+formulaire d'entrée fonctionnait parfaitement hors ligne, la moto s'enregistrait, et le bouton
+« Voir la fiche » juste en dessous tombait sur la page de repli.
+
+La fiche est donc un panneau de `/motos`, ouvert par `?moto=<id>`. Changer ce paramètre ne demande
+rien à personne. Le service worker ignore ce paramètre lors de la recherche en cache — c'est vrai
+pour nos écrans, rendus par le navigateur, où l'URL sans paramètre sert exactement le même document.
+
+*Conséquence :* la liste des paramètres ignorés est explicite et pas un joker. `_rsc`, que Next
+ajoute pour demander des **données** et non un document, doit continuer à ne pas correspondre au
+cache de précharge. Tout nouveau paramètre d'état d'écran s'ajoute dans `app/sw.ts`.
+
+## D40 — Tous les écrans sont mis en cache à l'installation, pas à la première visite
+`prompt.md` §3.4 — constaté en S5
+
+Le service worker ne gardait que les écrans **déjà visités**. Un gérant qui ouvre l'application sur
+l'accueil et perd le réseau ne pouvait plus atteindre le formulaire d'entrée en stock : il n'y était
+jamais allé sur cet appareil. C'est exactement ce que le produit promet de savoir faire.
+
+La liste des écrans est donc déclarée dans `next.config.ts` et téléchargée à l'installation, pendant
+qu'il y a du réseau.
+
+*Conséquence :* une route de plus dans l'application est une ligne de plus dans cette liste. L'oubli
+ne se voit qu'en coupure, donc au moins un test bout en bout traverse un écran jamais visité, réseau
+coupé.
+
+## D41 — La suite bout en bout repart d'une base vide
+S5 — constaté après une journée d'exécutions
+
+Chaque exécution héritait de la précédente : le sélecteur de boutique proposait cinquante entrées, la
+collection `motos` en contenait des centaines, et des tests échouaient pour des raisons étrangères au
+code qu'ils vérifient — jusqu'à ce que le bandeau du responsable affiche « Hors ligne » au milieu
+d'un test. La même famille de piège que D23, D25, D33 : **un harnais qui mesure ce qui traîne n'est
+pas un harnais.**
+
+`e2e/preparation.ts` vide donc Firestore et Auth avant la première mesure. Effet mesuré : le fichier
+`motos.spec.ts` est passé de 3 min 20 avec quatre échecs à 1 min 20 sans aucun.
+
+*Conséquence assumée :* lancer la suite efface les données saisies à la main dans les émulateurs.
+Elles ne survivent de toute façon pas à un redémarrage des émulateurs. En échange, les états
+« aucune boutique », « aucune moto », « aucun compte » redeviennent atteignables.

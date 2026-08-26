@@ -51,7 +51,7 @@ la même machine (D18). Ils sont déclarés dans `firebase.json` et repris dans 
 | `npm run test:regles` | Règles Firestore. **Demande les émulateurs déjà démarrés.** |
 | `npm run test:regles:isole` | Idem, mais démarre son propre émulateur. Pour une machine vierge ou la CI — échoue si un émulateur occupe déjà le port. |
 | `npm test` | Les tests unitaires et les règles. |
-| `npm run test:e2e` | Playwright, **dont la vérification hors-ligne**. Demande un build à jour ; sert le build sur le port 3100, sans toucher à votre `npm run dev`. |
+| `npm run test:e2e` | Playwright, **dont la vérification hors-ligne**. Demande un build à jour ; sert le build sur le port 3100, sans toucher à votre `npm run dev`. **Vide les émulateurs avant de commencer** (cf. `DECISIONS.md` D41). |
 | `npm run lint` | ESLint. |
 | `npm run icones` | Régénère les icônes PWA depuis leur source SVG. |
 | `npm run amorcer` | Crée le compte responsable initial sur les émulateurs. |

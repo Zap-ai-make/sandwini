@@ -242,6 +242,121 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Stock motos (S5) ---------------------------------------------------
+    // Le document est coupé en deux, et la coupure est la règle de sécurité
+    // elle-même : `motos/{id}` est lisible par le gérant de la boutique,
+    // `motos/{id}/prive/cout` par le seul responsable. Firestore ne sait pas
+    // masquer un champ ; c'est la seule façon de tenir le §8 du cahier des
+    // charges — la marge est réservée au responsable — tout en laissant le
+    // gérant lire la moto pour la vendre (D2).
+    //
+    // Le gérant écrit le coût sans jamais pouvoir le relire (D4) : une moto qui
+    // arrive au comptoir doit se saisir sans attendre le responsable.
+
+    function estGerantDe(boutiqueId) {
+      return connecte() && role() == 'gerant' && request.auth.token.boutiqueId == boutiqueId;
+    }
+
+    function montantValide(valeur) {
+      return valeur is int && valeur >= 0 && valeur <= 1000000000;
+    }
+
+    function motoValide(donnees) {
+      return donnees.keys().hasOnly(['boutiqueId', 'etat', 'marqueId', 'modeleId', 'couleur',
+                                     'annee', 'numeroChassis', 'numeroMoteur',
+                                     'prixVenteConseille', 'provenanceId', 'papiersFournis',
+                                     'photos', 'statut', 'dateEntree'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'etat', 'marqueId', 'modeleId',
+                                       'numeroChassis', 'provenanceId', 'photos', 'statut',
+                                       'dateEntree'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.etat in ['neuve', 'occasion']
+             && donnees.statut in ['en_stock', 'reservee', 'vendue', 'transferee']
+             && donnees.marqueId is string
+             && donnees.marqueId.size() > 0
+             && donnees.modeleId is string
+             && donnees.modeleId.size() > 0
+             && donnees.provenanceId is string
+             && donnees.provenanceId.size() > 0
+             && donnees.numeroChassis is string
+             && donnees.numeroChassis.size() > 0
+             && donnees.numeroChassis.size() <= 32
+             && donnees.numeroChassis.matches('^[A-Z0-9]+$')
+             && texteBorne(donnees.numeroMoteur, 32)
+             && texteBorne(donnees.couleur, 60)
+             && (donnees.annee == null
+                 || (donnees.annee is int && donnees.annee >= 1950 && donnees.annee <= 2100))
+             && (donnees.prixVenteConseille == null || montantValide(donnees.prixVenteConseille))
+             && donnees.papiersFournis is list
+             && donnees.papiersFournis.size() <= 20
+             // Les photos arrivent avec S19 : la liste existe et reste vide.
+             && donnees.photos is list
+             && donnees.photos.size() == 0
+             // La date d'entrée vient de l'appareil (D38), on la borne seulement
+             // contre une horloge déréglée.
+             && donnees.dateEntree is timestamp
+             && donnees.dateEntree <= request.time + duration.value(1, 'd');
+    }
+
+    match /motos/{motoId} {
+      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+
+      allow create: if motoValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && request.resource.data.statut == 'en_stock'
+                    && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
+
+      // La boutique d'une moto ne change pas ici : c'est un transfert, et le
+      // transfert a sa propre spec (S17) parce qu'il laisse une trace.
+      allow update: if motoValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data)
+                    && request.resource.data.boutiqueId == resource.data.boutiqueId
+                    && (estResponsable() || estGerantDe(resource.data.boutiqueId));
+
+      allow delete: if false;
+    }
+
+    // Le coût. Le `boutiqueId` y est répété : au sein d'un même lot d'écriture,
+    // les règles évaluent chaque document contre l'état d'avant, donc la moto
+    // parente n'existe pas encore quand son coût est validé. On vérifie donc le
+    // claim directement, et le parent en plus dès qu'il existe.
+    //
+    // Limite assumée : les règles ne savent pas parcourir une liste, donc ni la
+    // forme de chaque ligne de frais ni l'égalité coutTotal = prixAchat + frais
+    // ne sont vérifiées ici. C'est le domaine qui les tient, et le responsable
+    // voit le détail à côté du total.
+    function coutValide(donnees) {
+      return donnees.keys().hasOnly(['boutiqueId', 'prixAchat', 'fraisEntree', 'coutTotal',
+                                     'updatedAt', 'updatedBy', 'updatedByName'])
+             && donnees.keys().hasAll(['boutiqueId', 'prixAchat', 'fraisEntree', 'coutTotal',
+                                       'updatedAt', 'updatedBy', 'updatedByName'])
+             && donnees.boutiqueId is string
+             && montantValide(donnees.prixAchat)
+             && montantValide(donnees.coutTotal)
+             && donnees.fraisEntree is list
+             && donnees.fraisEntree.size() <= 20
+             && donnees.updatedAt == request.time
+             && donnees.updatedBy == request.auth.uid
+             && texteBorne(donnees.updatedByName, 200);
+    }
+
+    function boutiqueDeLaMoto(motoId) {
+      return get(/databases/$(database)/documents/motos/$(motoId)).data.boutiqueId;
+    }
+
+    match /motos/{motoId}/prive/{section} {
+      allow read: if estResponsable();
+
+      allow create, update: if section == 'cout'
+                            && coutValide(request.resource.data)
+                            && (estResponsable()
+                                || estGerantDe(request.resource.data.boutiqueId))
+                            && (!exists(/databases/$(database)/documents/motos/$(motoId))
+                                || boutiqueDeLaMoto(motoId) == request.resource.data.boutiqueId);
+
+      allow delete: if false;
+    }
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.

@@ -40,6 +40,9 @@ const PRISES = [
   { nom: "accueil-mobile-sombre", chemin: "/dashboard", theme: "dark", mobile: true },
   { nom: "accueil-bureau-clair", chemin: "/dashboard", theme: "light", mobile: false },
   { nom: "motos-mobile-clair", chemin: "/motos", theme: "light", mobile: true },
+  { nom: "motos-bureau-sombre", chemin: "/motos", theme: "dark", mobile: false },
+  { nom: "motos-nouvelle-mobile-clair", chemin: "/motos/nouvelle", theme: "light", mobile: true, boutique: true },
+  { nom: "motos-nouvelle-bureau-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: false, boutique: true },
   { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },
   // Le bandeau en alerte : l’état signature du produit.
@@ -50,13 +53,26 @@ const PRISES = [
 await mkdir(DOSSIER, { recursive: true });
 const navigateur = await chromium.launch();
 
-for (const { nom, chemin, theme, mobile, coupe, publique } of PRISES) {
+for (const { nom, chemin, theme, mobile, coupe, publique, boutique } of PRISES) {
   const contexte = await navigateur.newContext({
     ...(mobile ? devices["Pixel 7"] : { viewport: { width: 1280, height: 820 } }),
     colorScheme: theme,
   });
   const page = await contexte.newPage();
   if (!publique) await seConnecter(page);
+
+  /* Certains écrans n'ont de sens que dans une boutique précise : le formulaire
+     d'entrée en stock demande où ranger la moto. On en choisit une, comme le
+     ferait le responsable avant de saisir. */
+  if (boutique) {
+    const selecteur = page.getByRole("banner").getByRole("combobox", { name: "Boutique affichée" });
+    await selecteur.locator("option").nth(1).waitFor({ state: "attached", timeout: 20000 }).catch(() => {});
+    const codes = await selecteur.locator("option").evaluateAll((options) =>
+      options.map((option) => option.value).filter(Boolean),
+    );
+    if (codes.length > 0) await selecteur.selectOption(codes[0]);
+  }
+
   await page.goto(`${BASE}${chemin}`, { waitUntil: "load" });
   await page.locator("h1").first().waitFor({ timeout: 20000 });
   /* Une capture prise pendant « Chargement… » ne dit rien du rendu réel : on
