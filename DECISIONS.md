@@ -490,3 +490,46 @@ produit — les mêmes tests passaient isolés.
 avance en délais d'attente). Un test qui échoue accuse le code, pas son voisin. Si la suite
 s'allonge au point que ça pèse, la réponse sera d'isoler les données par worker — pas de remettre
 du parallélisme sur un état partagé.
+
+## D35 — Le logo de l'entreprise voyage dans Firestore, pas dans Storage
+`prompt.md` §10 — S4
+
+Un reçu doit s'imprimer **sans réseau**. Un logo servi depuis Firebase Storage demanderait une
+requête au moment de l'impression, et Storage n'a pas de file d'attente hors ligne (D14) : le premier
+reçu imprimé sur un appareil neuf, en coupure, sortirait sans en-tête.
+
+L'image est donc réduite sur l'appareil (512 pixels au plus grand côté, PNG pour garder les aplats et
+la transparence) et encodée en `data:` dans `entreprise/profil`. Elle arrive avec le cache Firestore
+et s'imprime comme le reste.
+
+*Conséquence :* une limite de taille, que Firestore impose de toute façon — 1 Mio par document. On la
+fixe à 200 000 caractères, vérifiée côté domaine **et** côté règles, parce que ce document est relu à
+chaque ouverture de l'application. Le dépôt d'un logo fonctionne d'ailleurs hors ligne, comme toute
+écriture Firestore : c'est une exception de moins à la règle du §3.4.
+
+## D36 — Les référentiels ont un identifiant tiré au sort, à l'inverse du code de boutique
+`prompt.md` §5.1 — S4
+
+Le code d'une boutique est sa clé (D30) parce qu'il est immuable par nature : il est imprimé sur des
+reçus. Un nom de marque, lui, se corrige — « Yhamaha » saisi un lundi matin. S'il était la clé, la
+correction créerait une seconde marque et couperait le stock en deux. La clé n'a donc aucun sens à
+part identifier.
+
+*Conséquence :* l'unicité du nom n'est plus donnée par la base. Elle est vérifiée à la saisie, sur une
+forme réduite qui ignore la casse et les accents, et « Yamaha » proposé alors que « YAMAHA » existe
+est refusé avec sa raison. Deux appareils hors ligne peuvent quand même créer le même nom deux fois ;
+c'est un doublon visible et corrigeable, pas une perte de données.
+
+**Un modèle, lui, est rattaché.** Les règles vérifient que sa marque **existe** et qu'elle ne change
+jamais : un modèle orphelin apparaîtrait dans une liste de choix sans qu'on sache de quelle marque il
+est, et déplacer un modèle rendrait fausses les motos déjà saisies.
+
+## D37 — Le seuil d'inactivité des tranches attend S9
+`prompt.md` §14 — S4
+
+Le §14 le range dans les paramètres, donc dans cette spec. Il n'a pourtant d'effet qu'au moment où les
+tranches existent (S9) : l'afficher ici donnerait un réglage qu'on peut changer sans que rien ne
+change, ce qui est pire qu'un réglage absent.
+
+*Conséquence :* il s'ajoutera à l'écran Entreprise en S9, avec sa valeur par défaut de 30 jours et la
+liste qu'il alimente.

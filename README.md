@@ -95,7 +95,7 @@ components/       composants d'interface partagés
 functions/        Cloud Functions (comptes : création, activation, rattachement)
 regles/           tests des règles Firestore
 e2e/              tests Playwright
-scripts/          génération d'icônes, captures de revue visuelle
+scripts/          démarrage des émulateurs, amorçage, icônes, captures de revue visuelle
 ```
 
 Deux règles qui expliquent la plupart des choix :

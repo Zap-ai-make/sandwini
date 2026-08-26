@@ -78,6 +78,18 @@ export function emailUnique(prefixe: string) {
 }
 
 /**
+ * Un libellé neuf par exécution.
+ *
+ * Les référentiels ne se suppriment pas — ils sont cités par des motos et des
+ * dossiers — et les émulateurs gardent leurs données d'un test à l'autre.
+ * Réutiliser un nom ferait échouer la deuxième exécution sur le contrôle de
+ * doublon, c'est-à-dire pour une raison qui n'est pas celle qu'on teste.
+ */
+export function nomUnique(prefixe: string): string {
+  return `${prefixe} ${Date.now().toString(36)}${Math.floor(Math.random() * 100)}`;
+}
+
+/**
  * Attend que le service worker **contrôle** la page — actif ne suffit pas — puis
  * recharge une fois en ligne.
  *
