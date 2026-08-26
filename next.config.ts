@@ -83,16 +83,49 @@ const nextConfig: NextConfig = {
   },
 };
 
+/**
+ * Les écrans que l'application met en cache dès son installation.
+ *
+ * Sans cette liste, seuls les écrans déjà **visités** survivaient à une
+ * coupure : un gérant qui ouvre l'application le matin sur l'accueil et perd
+ * le réseau ne pouvait plus atteindre le formulaire d'entrée en stock, alors
+ * que c'est précisément ce que le produit promet de savoir faire. Le service
+ * worker les télécharge donc tous à l'installation, pendant qu'il y a du
+ * réseau (D40).
+ *
+ * Une route de plus dans l'application est une ligne de plus ici. C'est le
+ * genre d'oubli qui ne se voit qu'en coupure, donc les tests bout en bout en
+ * vérifient au moins un.
+ */
+const ECRANS_HORS_LIGNE = [
+  "/hors-ligne",
+  "/login",
+  "/dashboard",
+  "/motos",
+  "/motos/nouvelle",
+  "/pieces",
+  "/caisse",
+  "/diagnostic",
+  "/parametres",
+  "/parametres/boutiques",
+  "/parametres/utilisateurs",
+  "/parametres/entreprise",
+  "/parametres/catalogue",
+  "/parametres/referentiels",
+  "/parametres/prestataires",
+];
+
+/* Une révision par build : elle change à chaque compilation pour qu'une
+   nouvelle version remplace l'ancienne dans le cache, et reste identique
+   pour toutes les entrées d'un même build. */
+const REVISION = `${Date.now()}`;
+
 const construireAvecServiceWorker = () =>
   withSerwistInit({
     swSrc: "app/sw.ts",
     swDest: "public/sw.js",
     reloadOnOnline: false,
-    /* La page de repli doit être en cache *avant* la coupure, sinon elle ne
-       s'affiche jamais — c'est le seul écran dont on sait qu'il servira à un
-       moment où plus rien ne peut être téléchargé. La révision change à chaque
-       build pour qu'une nouvelle version remplace l'ancienne. */
-    additionalPrecacheEntries: [{ url: "/hors-ligne", revision: `${Date.now()}` }],
+    additionalPrecacheEntries: ECRANS_HORS_LIGNE.map((url) => ({ url, revision: REVISION })),
   });
 
 /* En développement, Serwist n'est même pas appelé.

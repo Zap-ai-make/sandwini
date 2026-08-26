@@ -15,6 +15,10 @@ import { execFileSync } from "node:child_process";
  * qui traîne n’est pas un harnais.
  */
 
+const PROJET = "sdi-dev";
+const FIRESTORE = "http://127.0.0.1:8181";
+const AUTH = "http://127.0.0.1:9399";
+
 const SERVICES = [
   { nom: "Firestore", url: "http://127.0.0.1:8181/" },
   { nom: "Authentication", url: "http://127.0.0.1:9399/" },
@@ -48,12 +52,50 @@ export default async function preparer() {
     );
   }
 
+  await repartirDUneBaseVide();
+
   // Le premier responsable ne peut pas être créé par l’application : la
   // fonction `creerGerant` en exige déjà un. Le script d’amorçage casse la
   // boucle, exactement comme un administrateur le ferait en production.
   execFileSync("node", ["scripts/amorcer.mjs"], { stdio: "inherit" });
 
   await verifierFonctionsServies();
+}
+
+/**
+ * Vide les émulateurs avant la première mesure.
+ *
+ * Sans cela, chaque exécution héritait de la précédente : au bout d’une
+ * journée, le sélecteur de boutique proposait cinquante entrées, la collection
+ * `motos` en contenait des centaines, et les tests échouaient pour des raisons
+ * qui n’avaient rien à voir avec le code qu’ils vérifient. Un harnais qui
+ * mesure ce qui traîne n’est pas un harnais — troisième fois que cette phrase
+ * sert (D23, D25, D33).
+ *
+ * Repartir vide a un autre mérite : l’état « aucune boutique », « aucune
+ * moto », « aucun compte » devient vérifiable, alors qu’il était devenu
+ * inatteignable.
+ *
+ * **Conséquence assumée :** lancer la suite efface les données que le
+ * développeur a saisies à la main dans ses émulateurs. Elles n’ont de toute
+ * façon pas d’existence au-delà du redémarrage des émulateurs.
+ */
+async function repartirDUneBaseVide() {
+  const aVider = [
+    { nom: "Firestore", url: `${FIRESTORE}/emulator/v1/projects/${PROJET}/databases/(default)/documents` },
+    { nom: "Authentication", url: `${AUTH}/emulator/v1/projects/${PROJET}/accounts` },
+  ];
+
+  for (const cible of aVider) {
+    const reponse = await fetch(cible.url, { method: "DELETE" });
+    if (!reponse.ok) {
+      throw new Error(
+        `Impossible de vider l’émulateur ${cible.nom} (${reponse.status}). ` +
+          "La suite refuse de mesurer sur un état inconnu.",
+      );
+    }
+  }
+  console.log("Émulateurs remis à zéro : la suite part d’une base vide.");
 }
 
 /**
@@ -75,15 +117,28 @@ export default async function preparer() {
  */
 async function verifierFonctionsServies() {
   const debut = Date.now();
-  let reponse: Response;
-  try {
-    reponse = await fetch(FONCTION_TEMOIN, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ data: {} }),
-    });
-  } catch (cause) {
-    throw new Error(`L’émulateur Functions n’a pas répondu : ${String(cause)}`);
+
+  /* Trois essais : la toute première invocation démarre un processus Node, et
+     cette montée en charge fait parfois tomber la connexion avant qu'une
+     réponse revienne. Un hoquet ne doit pas annuler la suite entière — mais
+     trois échecs de suite, si. */
+  let reponse: Response | null = null;
+  let derniereCause: unknown = null;
+  for (let essai = 0; essai < 3 && !reponse; essai += 1) {
+    try {
+      reponse = await fetch(FONCTION_TEMOIN, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ data: {} }),
+      });
+    } catch (cause) {
+      derniereCause = cause;
+      await new Promise((suite) => setTimeout(suite, 2000));
+    }
+  }
+
+  if (!reponse) {
+    throw new Error(`L’émulateur Functions n’a pas répondu : ${String(derniereCause)}`);
   }
 
   if (reponse.status === 404) {
