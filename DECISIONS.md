@@ -454,3 +454,39 @@ S3 apporte la liste et l'attribution aux comptes déjà créés. Le `boutiqueId`
 facultatif à la création : un responsable ouvre parfois le compte avant d'avoir déclaré la boutique,
 et refuser la création l'obligerait à faire les choses dans un ordre qui n'est pas le sien. Le
 compte existe alors sans périmètre, l'application le dit en toutes lettres, et un bouton le rattache.
+
+## D33 — L'émulateur peut démarrer sans aucune fonction : on lui donne le temps, et on le vérifie
+S3 — constaté en relançant les émulateurs
+
+La découverte des fonctions dispose de **dix secondes** pour charger le code et lire ses exports.
+Sur une machine occupée — un build en cours, un serveur Next à côté — ce budget se dépasse, et
+l'émulateur démarre alors **sans servir une seule fonction**, tout en affichant « All emulators
+ready ». Chaque appel reçoit un 404 que l'application traduit par « le serveur n'a pas répondu » :
+un message de panne réseau pour un problème qui n'a rien de réseau. Quatre tests bout en bout ont
+échoué loin de leur cause avant qu'on lise le journal de l'émulateur.
+
+Deux corrections, parce qu'il y a deux défauts distincts :
+
+- `scripts/emulateurs.mjs` porte `FUNCTIONS_DISCOVERY_TIMEOUT` à 60 secondes. Le chargement du
+  module est mesuré à 1,8 s — le délai n'excuse aucun import lourd (D29 tient), il absorbe la
+  variabilité de la machine. Sans lui, la découverte a effectivement mis plus de 10 s et moins de
+  16 s.
+- `e2e/preparation.ts` n'accepte plus qu'un port ouvert comme preuve : il appelle une fonction
+  témoin et s'arrête si elle renvoie 404, en disant quoi taper.
+
+*Troisième fois que ce piège coûte du temps* (D23, D25, puis D29) et toujours la même forme : **un
+service qui répond n'est pas un service qui fonctionne.** Le préflight vérifie désormais la
+capacité, pas la présence.
+
+## D34 — La suite bout en bout tourne sur un seul worker
+S3 — constaté en exécutant la suite complète
+
+Toute la suite partage un jeu d'émulateurs, un compte responsable et une base. En parallèle, deux
+fichiers créaient des comptes et appelaient les mêmes Cloud Functions au même moment : la suite
+rendait un verdict différent d'une exécution à l'autre, et aucun de ces échecs ne portait sur le
+produit — les mêmes tests passaient isolés.
+
+*Conséquence :* la suite complète prend une minute au lieu de deux (le parallélisme perdait son
+avance en délais d'attente). Un test qui échoue accuse le code, pas son voisin. Si la suite
+s'allonge au point que ça pèse, la réponse sera d'isoler les données par worker — pas de remettre
+du parallélisme sur un état partagé.

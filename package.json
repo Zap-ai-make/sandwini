@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "emulators": "npm run build:functions && firebase emulators:start --only auth,firestore,storage,functions",
+    "emulators": "npm run build:functions && node scripts/emulateurs.mjs",
     "test:unite": "vitest run",
     "test:regles": "vitest run --config vitest.regles.config.mts",
     "test": "npm run test:unite && npm run test:regles",
