@@ -46,7 +46,7 @@ la même machine (D18). Ils sont déclarés dans `firebase.json` et repris dans 
 | `npm run dev` | Serveur de développement. Le service worker y est désactivé (cf. plus bas). |
 | `npm run build` | Build de production, service worker compris. |
 | `npm start` | Sert le build de production. |
-| `npm run emulators` | Auth, Firestore et Storage en local. |
+| `npm run emulators` | Auth, Firestore, Storage et Cloud Functions en local. Compile les fonctions et laisse à leur découverte un délai suffisant (cf. `DECISIONS.md` D33). |
 | `npm run test:unite` | Logique métier pure (Vitest). |
 | `npm run test:regles` | Règles Firestore. **Demande les émulateurs déjà démarrés.** |
 | `npm run test:regles:isole` | Idem, mais démarre son propre émulateur. Pour une machine vierge ou la CI — échoue si un émulateur occupe déjà le port. |

@@ -9,6 +9,13 @@ export default defineConfig({
   // responsable — cf. e2e/preparation.ts.
   globalSetup: "./e2e/preparation.ts",
   fullyParallel: false,
+  /* Un seul worker : toute la suite partage un jeu d'émulateurs, un compte
+     responsable et une base de données. En parallèle, deux fichiers créaient
+     des comptes et appelaient les mêmes Cloud Functions en même temps, et la
+     suite rendait un verdict différent d'une exécution à l'autre — sans qu'un
+     seul de ces échecs porte sur le produit. Un test qui échoue doit accuser le
+     code, pas le voisin. La suite complète tourne en une minute. */
+  workers: 1,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,
   /* Les 30 secondes par défaut ne suffisent pas ici : plusieurs tests attendent
