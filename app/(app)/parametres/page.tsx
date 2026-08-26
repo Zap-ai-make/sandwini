@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, LogOut, Store, Users } from "lucide-react";
+import { Bike, Building2, ChevronRight, HardHat, LogOut, Store, Tags, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
@@ -67,6 +67,21 @@ export default function Reglages() {
           <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
             <li>
               <Link
+                href="/parametres/entreprise"
+                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
+              >
+                <Building2 aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-encre">Entreprise</span>
+                  <span className="block text-sm text-encre-doux">
+                    Nom, adresse, téléphones et logo imprimés sur les reçus
+                  </span>
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              </Link>
+            </li>
+            <li>
+              <Link
                 href="/parametres/boutiques"
                 className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
               >
@@ -95,11 +110,51 @@ export default function Reglages() {
                 <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
               </Link>
             </li>
+            <li>
+              <Link
+                href="/parametres/catalogue"
+                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
+              >
+                <Bike aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-encre">Marques et modèles</span>
+                  <span className="block text-sm text-encre-doux">Ce que vous vendez</span>
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/parametres/referentiels"
+                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
+              >
+                <Tags aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-encre">Provenances et frais</span>
+                  <span className="block text-sm text-encre-doux">
+                    D’où viennent les motos, ce qui s’ajoute à leur prix d’achat
+                  </span>
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/parametres/prestataires"
+                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
+              >
+                <HardHat aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-encre">Prestataires</span>
+                  <span className="block text-sm text-encre-doux">
+                    Qui traite les cartes grises et les plaques
+                  </span>
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              </Link>
+            </li>
           </ul>
-          <p className="mt-3 text-sm text-encre-doux">
-            Les référentiels — marques, modèles, prestataires, types de frais — arrivent avec la
-            spec S4.
-          </p>
+
         </>
       )}
 

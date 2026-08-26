@@ -102,6 +102,146 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Référentiels et entreprise (S4) -----------------------------------
+    // Tout le monde lit, seul le responsable écrit. Le gérant a besoin de ces
+    // listes pour saisir une moto ou déposer un dossier, et des coordonnées de
+    // l'entreprise pour imprimer un reçu — y compris hors ligne, d'où le fait
+    // que le logo voyage dans le document plutôt que dans Storage (D35).
+    //
+    // Rien ne se supprime : une marque, une provenance, un prestataire sont
+    // cités par des motos et des dossiers. On les désactive.
+
+    function traceCreation(donnees) {
+      return donnees.createdAt == request.time
+             && donnees.updatedAt == request.time
+             && donnees.createdBy == request.auth.uid
+             && donnees.updatedBy == request.auth.uid
+             && texteBorne(donnees.createdByName, 200)
+             && texteBorne(donnees.updatedByName, 200);
+    }
+
+    function traceModification(donnees, ancien) {
+      return donnees.updatedAt == request.time
+             && donnees.updatedBy == request.auth.uid
+             && texteBorne(donnees.updatedByName, 200)
+             && donnees.createdAt == ancien.createdAt
+             && donnees.createdBy == ancien.createdBy;
+    }
+
+    function champsAudit() {
+      return ['createdAt', 'createdBy', 'createdByName', 'updatedAt', 'updatedBy', 'updatedByName'];
+    }
+
+    function nomBorne(valeur) {
+      return valeur is string && valeur.size() > 0 && valeur.size() <= 60;
+    }
+
+    function referentielValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'actif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'actif'].concat(champsAudit()))
+             && nomBorne(donnees.nom)
+             && donnees.actif is bool;
+    }
+
+    // Les trois référentiels de même forme : un nom, un état. La liste est
+    // explicite — ce n'est pas un joker sur les collections inconnues.
+    match /{referentiel}/{id} {
+      allow read: if connecte()
+                  && referentiel in ['marques', 'provenances', 'typesFrais'];
+      allow create: if estResponsable()
+                    && referentiel in ['marques', 'provenances', 'typesFrais']
+                    && referentielValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && referentiel in ['marques', 'provenances', 'typesFrais']
+                    && referentielValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    // Un modèle appartient à une marque, et la marque doit exister : un modèle
+    // orphelin apparaîtrait dans une liste de choix sans qu'on sache de quelle
+    // marque il est.
+    function modeleValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'actif', 'marqueId'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'actif', 'marqueId'].concat(champsAudit()))
+             && nomBorne(donnees.nom)
+             && donnees.actif is bool
+             && donnees.marqueId is string
+             && exists(/databases/$(database)/documents/marques/$(donnees.marqueId));
+    }
+
+    match /modeles/{id} {
+      allow read: if connecte();
+      allow create: if estResponsable()
+                    && modeleValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && modeleValide(request.resource.data)
+                    && request.resource.data.marqueId == resource.data.marqueId
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    // Le champ « token » du cahier des charges n'est pas au contrat : il donne
+    // accès à une page publique, et un secret ne se fabrique pas dans un
+    // navigateur. Il viendra d'une Cloud Function en S15.
+    function prestataireValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'telephone', 'typesDocuments', 'actif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'telephone', 'typesDocuments', 'actif'].concat(champsAudit()))
+             && nomBorne(donnees.nom)
+             && donnees.telephone is string
+             && donnees.telephone.size() > 0
+             && donnees.telephone.size() <= 40
+             && donnees.typesDocuments is list
+             && donnees.typesDocuments.size() > 0
+             && donnees.typesDocuments.hasOnly(['carte_grise', 'plaque'])
+             && donnees.actif is bool;
+    }
+
+    match /prestataires/{id} {
+      allow read: if connecte();
+      allow create: if estResponsable()
+                    && prestataireValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && prestataireValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    // Le logo est une image encodée dans le document : c'est ce qui permet à un
+    // reçu de s'imprimer sans réseau. On borne sa taille — Firestore plafonne à
+    // 1 Mio par document, et ce document est relu à chaque ouverture.
+    function logoValide(valeur) {
+      return valeur == null
+             || (valeur is string && valeur.size() <= 200000 && valeur[0:11] == 'data:image/');
+    }
+
+    function entrepriseValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'adresse', 'telephone', 'telephone2', 'identifiant',
+                                     'logo', 'updatedAt', 'updatedBy', 'updatedByName'])
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && texteBorne(donnees.adresse, 200)
+             && texteBorne(donnees.telephone, 40)
+             && texteBorne(donnees.telephone2, 40)
+             && texteBorne(donnees.identifiant, 40)
+             && logoValide(donnees.logo)
+             && donnees.updatedAt == request.time
+             && donnees.updatedBy == request.auth.uid
+             && texteBorne(donnees.updatedByName, 200);
+    }
+
+    match /entreprise/{document} {
+      allow read: if connecte();
+      allow create, update: if estResponsable()
+                            && document == 'profil'
+                            && entrepriseValide(request.resource.data);
+      allow delete: if false;
+    }
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.

@@ -170,7 +170,13 @@ test.describe("rattachement d’un gérant", () => {
     await rangee.getByRole("button", { name: "Rattacher à une boutique" }).click();
     await rangee.getByLabel("Boutique").selectOption(code);
     await rangee.getByRole("button", { name: "Rattacher", exact: true }).click();
-    await expect(rangee).toContainText("devra se reconnecter", { timeout: 20_000 });
+    await expect(rangee).toContainText(`Rattaché à ${code}`, { timeout: 20_000 });
+
+    /* Le miroir `users/{uid}` est écrit en dernier par la fonction : l'attendre,
+       c'est attendre que l'opération soit entièrement passée — claim compris —
+       avant de faire se connecter le gérant. Sans cela, la connexion pouvait
+       partir dans la même seconde que la révocation des jetons. */
+    await expect(rangee).toContainText(`Gérant · ${code}`, { timeout: 20_000 });
 
     // Vu du gérant : sa boutique est un fait, pas un choix.
     const contexteGerant = await browser.newContext();
