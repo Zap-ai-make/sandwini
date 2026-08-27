@@ -23,7 +23,17 @@ export default defineConfig({
      s'accordent déjà 20 à 30 secondes par attente. Le plafond du test doit
      donc être plus large que la somme de ses attentes, sinon il tombe non pas
      sur un défaut du produit mais sur sa propre arithmétique. */
-  timeout: 60_000,
+  timeout: 90_000,
+  /* Le budget par assertion, porté de cinq à quinze secondes.
+     Presque toutes les attentes de cette suite portent sur de la propagation
+     asynchrone : une écriture part dans la file Firestore, revient par un
+     écouteur, et l'écran se met à jour. Sur un émulateur partagé avec un
+     serveur Next et quatre runtimes de fonctions, ce trajet dépasse
+     régulièrement cinq secondes — et la suite rendait alors un verdict qui
+     accusait le produit d'un défaut qui n'était que de l'impatience. Quinze
+     secondes ne masquent rien : une donnée qui n'arrive pas fait toujours
+     tomber le test, simplement pour la bonne raison. */
+  expect: { timeout: 15_000 },
   reporter: process.env.CI ? "list" : [["list"], ["html", { open: "never" }]],
   /* Port dédié, distinct du 3000 du serveur de développement.
      Sans cela, Playwright réutilisait un `npm run dev` en cours et testait un

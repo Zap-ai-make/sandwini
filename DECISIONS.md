@@ -629,3 +629,132 @@ D33, pour une cause voisine mais distincte.
 *Conséquence :* une fonction de plus dans `functions/src` est une ligne de plus dans la liste de
 `e2e/preparation.ts`. Le réveil coûte une quinzaine de secondes une fois par exécution, au bon
 endroit — avant la première mesure, et non au milieu.
+
+## D44 — La clé de rapprochement des numéros est `numeroInitial`, qui ne bouge jamais
+S7 — découvert en écrivant le test de la troisième pièce
+
+La réconciliation cherche les pièces qui portent le même numéro. Le réflexe est de chercher sur
+`numero` — et c'est faux, parce que `numero` est justement ce que la réconciliation modifie.
+
+Le scénario qui le montre : trois appareils sortent `PTG-2608-0042`. La deuxième pièce arrive, reçoit
+`-B`. La troisième arrive une heure plus tard et interroge `numero == "PTG-2608-0042"` : elle ne
+trouve plus que la première, se croit deuxième, et réclame un `-B` déjà donné.
+
+Chaque pièce porte donc deux champs : `numero`, celui qu'on imprime et que le serveur peut corriger,
+et `numeroInitial`, celui que l'appareil a attribué et que **personne** ne réécrit ensuite. Le
+rapprochement se fait sur le second.
+
+*Conséquence :* les règles Firestore devront interdire toute modification de `numeroInitial` et
+exiger qu'il soit égal à `numero` à la création (S8). L'application repère une pièce renumérotée en
+comparant les deux champs — pas besoin d'un drapeau qui pourrait mentir.
+
+## D45 — La collision se tranche à l'ordre d'arrivée au serveur, pas à l'heure de saisie
+S7 — `prompt.md` §3.3 ne dit pas qui garde le numéro
+
+Deux pièces, même numéro : l'une garde, l'autre est suffixée. Le cahier des charges ne dit pas
+laquelle. On classe par `createdAt` — l'horodatage **serveur**, c'est-à-dire l'ordre d'arrivée —
+l'identifiant du document départageant les ex æquo.
+
+Deux raisons. L'heure de saisie vient d'un téléphone dont personne ne contrôle le réglage : un
+appareil en retard d'une journée volerait son numéro à une vente déjà synchronisée, peut-être déjà
+imprimée et remise au client. Et surtout, ce critère rend le verdict indépendant de l'ordre
+d'exécution des déclencheurs : deux instances qui traitent la collision en même temps arrivent à la
+même conclusion sans se parler. Une réconciliation qui aurait besoin d'un verrou serait une
+réconciliation qui échoue au pire moment.
+
+*Conséquence :* la pièce renumérotée n'est pas la plus récente au sens du comptoir, mais la plus
+tardive à s'être synchronisée. C'est le bon comportement — celle qui est restée hors ligne trois
+jours est celle dont le reçu n'a encore été comparé à rien.
+
+## D46 — Le compteur de l'appareil survit à la déconnexion
+S7 — `SECURITY.md` §6 demande d'effacer les traces locales à la déconnexion
+
+La déconnexion vide le cache Firestore et le périmètre mémorisé. Le compteur de numérotation, lui,
+reste.
+
+Ce n'est pas une exception de confort. Le compteur a deux sources : ce que l'appareil a déjà
+distribué, et ce qu'il connaît de la boutique par le cache. La déconnexion supprime la seconde ;
+effacer la première en même temps ferait repartir l'appareil de `0001` et fabriquerait en série
+exactement les doublons que le mécanisme existe pour éviter.
+
+*Conséquence :* un appareil partagé garde une trace de l'activité — le rang atteint dans le mois,
+sans aucune donnée de vente. C'est le minimum nécessaire, et cela ne dit rien qu'un coup d'œil au
+carnet de reçus ne dirait pas. L'option qui expose le moins **ici** est celle qui écrit encore.
+
+## D47 — Les deux moitiés de la numérotation ne partagent pas de code, mais un test
+S7 — question posée par la séparation `lib/` / `functions/`
+
+Le client fabrique les numéros, le serveur fabrique les suffixes ; le client relit les suffixes, le
+serveur ne relit rien. Mettre ce code en commun demandait de sortir `functions/` de son `rootDir`,
+ce qui déplace tout l'arbre compilé et fragilise le déploiement pour une trentaine de lignes.
+
+On garde donc deux moitiés étanches — `lib/domain/numerotation.ts` et `functions/src/numerotation.ts`
+— et on tient leur accord par un test d'aller-retour : tout suffixe produit par le serveur doit être
+relu par le client, au bon rang, sur deux cents rangs.
+
+*Conséquence :* le jour où l'alphabet change d'un côté, le test tombe. C'est la propriété qu'on
+voulait ; un module partagé ne l'aurait pas donnée mieux.
+
+## D48 — On demande l'application Admin par défaut, on ne compte pas les applications
+S7 — la fonction mourait à chaque déclenchement
+
+`admin()` initialisait le SDK si `getApps().length === 0`. Dans un déclencheur Firestore, ce test est
+faux : `firebase-functions` a déjà créé sa **propre** application nommée pour reconstruire
+l'instantané du document. Le compte n'est donc pas nul, l'initialisation est sautée, et l'appel
+suivant meurt sur « The default Firebase app does not exist ».
+
+Les fonctions appelables n'ont jamais montré le défaut — elles s'exécutent sans cet invité.
+
+*Conséquence :* `admin()` demande `getApp()` et n'initialise que si l'appel échoue, puis passe
+explicitement l'application à `getAuth()` et `getFirestore()`. « Aucune application » et « aucune
+application par défaut » ne sont pas la même question ; poser la bonne coûtait trois lignes.
+
+## D49 — Les déclencheurs ont leur propre harnais, et on réveille le runtime avant de mesurer
+S7 — quatrième rencontre avec la même leçon
+
+Un déclencheur ne se vérifie ni avec les tests unitaires (il lui faut deux émulateurs) ni avec les
+tests de règles (qui démarrent Firestore seul) ni avec Playwright (il n'y a pas d'écran). D'où
+`declencheurs/`, sur le modèle de `regles/`.
+
+Et comme l'émulateur démarre un runtime **par fonction** à la première invocation (D43), le premier
+test payait ce démarrage et échouait au bout de vingt-cinq secondes en accusant le code. Un
+déclencheur n'a pas d'URL à réveiller : on le réveille de la seule façon qui existe, en provoquant
+une vraie collision avant la première mesure et en attendant son verdict.
+
+*Conséquence :* la suite passe de 164 secondes à 15. Le réveil sert aussi de vérification de câblage
+— s'il échoue, le message dit quoi regarder dans le journal de l'émulateur plutôt que de laisser
+cinq tests échouer un par un.
+
+## D50 — Trois défauts du harnais rencontrés en vérifiant S7, et ce qui reste ouvert
+S7 — la suite bout en bout échouait au hasard dans `motos.spec.ts`
+
+La suite est tombée cinq fois de suite, sur un test différent à chaque exécution, tous dans le
+fichier du stock. Le premier réflexe — « ma spec a cassé quelque chose » — a été vérifié puis écarté :
+en retirant le déclencheur de S7 et en rejouant les mêmes fichiers, l'échec revenait. Trois causes
+distinctes, dont deux sont corrigées.
+
+**Un filtre qui cherchait une sous-chaîne.** `filter({ hasText: code })` cherche le texte *n'importe
+où* et sans tenir compte de la casse. Le code de boutique tiré au hasard « NTR » se trouvait au
+milieu de « Marché ce**ntr**al », et l'assertion résolvait six lignes à la fois. Les tests demandent
+désormais le code en début de mot (`e2e/aide.ts`, `ligneDeBoutique`).
+
+**Un outil de revue qui montrait autre chose que ce qu'on croyait.** `scripts/captures.mjs` choisit
+une boutique avant de photographier les écrans qui en exigent une — et avalait silencieusement
+l'échec de ce choix. Depuis S5, les captures de `motos/nouvelle` montraient donc l'invitation à
+choisir une boutique, et la revue visuelle portait sur un écran vide sans que cela se voie. Le script
+vérifie maintenant que le choix a pris, et s'arrête sinon.
+
+**Ce qui reste ouvert : la reconnexion.** Après une coupure, le SDK Firestore rétablit sa connexion
+avec une attente croissante qui peut approcher la minute ; le retour du réseau ne l'interrompt pas.
+Le test « une moto se saisit et se consulte sans réseau » échoue donc encore par intermittence, en
+fin de suite, quand l'émulateur est chargé. Il passe dix fois sur dix isolé, en dix secondes.
+
+Ce n'est pas un défaut de la numérotation, et le corriger touche le socle réseau — hors du périmètre
+de S7 (`WORKFLOW.md` §8). C'est **S27** au backlog : appeler `disableNetwork` à la coupure et
+`enableNetwork` au retour, pour que la file reparte quand le signal revient et non quand le SDK a
+fini d'attendre. Sur un marché à couverture intermittente, c'est le geste le plus visible du produit.
+
+*Conséquence :* le budget d'assertion passe de cinq à quinze secondes, et celui des deux assertions
+de reconnexion à soixante. Ces chiffres calibrent une attente réelle, ils ne masquent rien : une
+donnée qui n'arrive pas fait toujours tomber le test. Le défaut restant est **connu, isolé et
+inscrit** — pas contourné en silence.
