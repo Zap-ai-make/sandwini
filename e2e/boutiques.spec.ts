@@ -3,6 +3,7 @@ import {
   bandeauEtat,
   codeUnique,
   emailUnique,
+  ligneDeBoutique,
   seConnecter,
   seConnecterEtEntrer,
   selecteurPerimetre,
@@ -23,9 +24,7 @@ function formulaireCreation(page: Page) {
   });
 }
 
-function ligne(page: Page, code: string) {
-  return page.getByRole("listitem").filter({ hasText: code });
-}
+const ligne = ligneDeBoutique;
 
 async function creerBoutique(page: Page, code: string, nom: string) {
   const formulaire = formulaireCreation(page);

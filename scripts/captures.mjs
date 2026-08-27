@@ -45,7 +45,8 @@ const PRISES = [
   { nom: "motos-bureau-sombre", chemin: "/motos", theme: "dark", mobile: false },
   { nom: "motos-nouvelle-mobile-clair", chemin: "/motos/nouvelle", theme: "light", mobile: true, boutique: true },
   { nom: "motos-nouvelle-bureau-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: false, boutique: true },
-  { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true },
+  { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true, boutique: true },
+  { nom: "diagnostic-bureau-sombre", chemin: "/diagnostic", theme: "dark", mobile: false, boutique: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },
   // Le bandeau en alerte : l’état signature du produit.
   { nom: "accueil-mobile-coupe", chemin: "/dashboard", theme: "light", mobile: true, coupe: true },
@@ -61,6 +62,7 @@ for (const { nom, chemin, theme, mobile, coupe, publique, boutique } of PRISES) 
     colorScheme: theme,
   });
   const page = await contexte.newPage();
+  let boutiqueChoisie = null;
   if (!publique) await seConnecter(page);
 
   /* Certains écrans n'ont de sens que dans une boutique précise : le formulaire
@@ -68,15 +70,41 @@ for (const { nom, chemin, theme, mobile, coupe, publique, boutique } of PRISES) 
      ferait le responsable avant de saisir. */
   if (boutique) {
     const selecteur = page.getByRole("banner").getByRole("combobox", { name: "Boutique affichée" });
-    await selecteur.locator("option").nth(1).waitFor({ state: "attached", timeout: 20000 }).catch(() => {});
+    /* On attend une option qui porte vraiment un code : la première, « Toutes
+       les boutiques », existe avant que la liste soit chargée. */
+    await selecteur.locator('option[value]:not([value=""])').first().waitFor({
+      state: "attached",
+      timeout: 20000,
+    });
     const codes = await selecteur.locator("option").evaluateAll((options) =>
       options.map((option) => option.value).filter(Boolean),
     );
-    if (codes.length > 0) await selecteur.selectOption(codes[0]);
+    await selecteur.selectOption(codes[0]);
+    boutiqueChoisie = codes[0];
   }
 
   await page.goto(`${BASE}${chemin}`, { waitUntil: "load" });
   await page.locator("h1").first().waitFor({ timeout: 20000 });
+
+  /* Le périmètre se vérifie **après** la navigation, pas avant.
+     Le choix est mémorisé tout de suite, mais l'écran d'arrivée le relit à son
+     propre rythme : photographié trop tôt, il montre encore « Toutes les
+     boutiques ». La version précédente ne vérifiait rien du tout, et avalait
+     même l'échec du choix — depuis S5, les captures de `motos/nouvelle`
+     montraient l'invitation à choisir une boutique, et la revue visuelle
+     portait sur un écran vide sans que cela se voie. Un outil de revue qui ne
+     montre pas ce qu'on croit est pire que pas d'outil. */
+  if (boutiqueChoisie) {
+    const selecteur = page.getByRole("banner").getByRole("combobox", { name: "Boutique affichée" });
+    let applique = false;
+    for (let essai = 0; essai < 40 && !applique; essai += 1) {
+      applique = (await selecteur.inputValue().catch(() => "")) === boutiqueChoisie;
+      if (!applique) await page.waitForTimeout(500);
+    }
+    if (!applique) {
+      throw new Error(`Le périmètre ne s'est pas appliqué à « ${nom} » (attendu ${boutiqueChoisie}).`);
+    }
+  }
   /* Une capture prise pendant « Chargement… » ne dit rien du rendu réel : on
      attend que les listes en direct soient arrivées (DESIGN.md §14). */
   await page

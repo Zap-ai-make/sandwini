@@ -105,3 +105,17 @@ export async function prendreLaMainEtMettreEnCache(page: Page, chemin: string) {
   await page.reload({ waitUntil: "load" });
   await page.waitForURL(`**${chemin}`);
 }
+
+/**
+ * La ligne de liste qui porte ce code de boutique.
+ *
+ * Le code est cherché en **début de mot**, pas n'importe où dans le texte.
+ * `hasText` avec une chaîne cherche une sous-chaîne, sans tenir compte de la
+ * casse : le code « NTR » se retrouvait ainsi au milieu de « Marché central »,
+ * et l'assertion échouait sur six lignes à la fois. Un code tiré au hasard
+ * finit tôt ou tard par se cacher dans un libellé fixe — le test doit demander
+ * le code, pas une suite de lettres.
+ */
+export function ligneDeBoutique(page: Page, code: string) {
+  return page.getByRole("listitem").filter({ hasText: new RegExp(`\\b${code}`) });
+}

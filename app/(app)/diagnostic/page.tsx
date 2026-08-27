@@ -5,6 +5,8 @@ import { CheckCircle2, CircleAlert, CircleDashed } from "lucide-react";
 import { useState } from "react";
 import { configurationPresente, db } from "@/lib/firebase/client";
 import { formaterDateHeure } from "@/lib/domain/format";
+import { prochainNumero } from "@/lib/numerotation/compteur";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 
@@ -130,6 +132,8 @@ export default function Diagnostic() {
         </ul>
       )}
 
+      <Numerotation />
+
       <p className="mt-6 max-w-prose text-sm text-encre-doux">
         État global&nbsp;:{" "}
         {etat === "a_jour"
@@ -139,5 +143,76 @@ export default function Diagnostic() {
             : "hors ligne, les saisies attendent le réseau."}
       </p>
     </section>
+  );
+}
+
+/**
+ * Le prochain numéro que cet appareil donnera.
+ *
+ * Affiché ici parce que c’est une question d’appareil, pas de compte : deux
+ * téléphones du même comptoir n’en sont pas au même endroit, et c’est
+ * précisément ce qui rend les doublons possibles (`DECISIONS.md` D5). Montrer
+ * le numéro sans le consommer évite d’ouvrir un trou dans la série.
+ */
+function Numerotation() {
+  const { chargement, perimetre } = usePerimetre();
+
+  if (chargement) {
+    return (
+      <section className="mt-8">
+        <TitreNumerotation />
+        <p className="mt-3 rounded-plaque border border-bord bg-papier p-4 text-encre-doux">
+          Chargement des boutiques…
+        </p>
+      </section>
+    );
+  }
+
+  if (perimetre.type !== "boutique") {
+    return (
+      <section className="mt-8">
+        <TitreNumerotation />
+        <p className="mt-3 max-w-prose rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+          {perimetre.type === "toutes"
+            ? "Un numéro appartient à une boutique. Choisissez-en une dans le bandeau pour voir le prochain numéro de cet appareil."
+            : "Aucune boutique attribuée à ce compte : il n’y a pas de numéro à donner."}
+        </p>
+      </section>
+    );
+  }
+
+  /* La liste des numéros déjà connus viendra du cache Firestore quand les
+     ventes existeront (S8). D’ici là, seul le compteur de l’appareil parle —
+     et c’est déjà lui qui garantit que deux saisies d’affilée hors ligne ne
+     portent pas le même numéro. */
+  const numero = prochainNumero(
+    { boutiqueId: perimetre.boutiqueId ?? perimetre.code, code: perimetre.code },
+    [],
+  );
+
+  return (
+    <section className="mt-8">
+      <TitreNumerotation />
+      <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-plaque border border-bord bg-papier p-4">
+        <span className="text-sm text-encre-doux">{perimetre.nom}</span>
+        <span data-test="prochain-numero" className="plaque-code text-lg font-semibold text-encre">
+          {numero}
+        </span>
+      </p>
+      <p className="mt-3 max-w-prose text-sm text-encre-doux">
+        Ce numéro se calcule sur l’appareil&nbsp;: il est disponible sans réseau, et c’est ce qui
+        permet de remettre un reçu au comptoir pendant une coupure. Si un autre appareil de la même
+        boutique attribue le même numéro pendant ce temps, le serveur le corrigera à la
+        synchronisation et l’application le signalera.
+      </p>
+    </section>
+  );
+}
+
+function TitreNumerotation() {
+  return (
+    <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
+      Prochain numéro de cet appareil
+    </h2>
   );
 }

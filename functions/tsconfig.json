@@ -12,5 +12,7 @@
     "skipLibCheck": true,
     "sourceMap": true
   },
-  "include": ["src"]
+  "//": "Les tests des fonctions pures tournent sous Vitest depuis la racine (cf. vitest.config.mts) ; ils n'ont rien a faire dans le paquet deploye.",
+  "include": ["src"],
+  "exclude": ["src/**/*.test.ts"]
 }

@@ -1,4 +1,8 @@
+import { logger } from "firebase-functions";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
+import { QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
+import { resoudreCollision, type PieceNumerotee } from "./numerotation";
 
 /**
  * Les seules opérations du MVP qui passent par le serveur.
@@ -9,6 +13,11 @@ import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/
  * directement dans Firestore pour rester utilisable sans réseau (prompt.md
  * §3.4). Ces fonctions-ci sont administratives : le responsable les utilise au
  * calme, connecté, jamais au comptoir en pleine vente.
+ *
+ * Une exception à la fin du fichier : `reconcilierNumeroVente` n'est appelée
+ * par personne, elle réagit à une écriture. C'est la contrepartie serveur de
+ * la numérotation hors-ligne — la seule chose qu'un appareil isolé ne peut pas
+ * faire lui-même.
  */
 
 type Role = "responsable" | "gerant";
@@ -27,6 +36,14 @@ const REGION = "europe-west1";
  * Le chargement paresseux règle la découverte et allège aussi le démarrage à
  * froid en production. Le coût est payé une fois par instance, à la première
  * invocation.
+ *
+ * **On demande l'application par défaut, on ne compte pas les applications.**
+ * « Aucune application » et « aucune application *par défaut* » ne sont pas la
+ * même chose : dans un déclencheur Firestore, `firebase-functions` crée sa
+ * propre application nommée pour reconstruire l'instantané du document. Un test
+ * sur `getApps().length` la voyait, en concluait que tout était initialisé, et
+ * la fonction mourait aussitôt sur « The default Firebase app does not exist ».
+ * Les fonctions appelables, elles, marchaient — le piège n'apparaissait qu'ici.
  */
 async function admin() {
   const [app, auth, firestore] = await Promise.all([
@@ -34,10 +51,15 @@ async function admin() {
     import("firebase-admin/auth"),
     import("firebase-admin/firestore"),
   ]);
-  if (app.getApps().length === 0) app.initializeApp();
+  let defaut: import("firebase-admin/app").App;
+  try {
+    defaut = app.getApp();
+  } catch {
+    defaut = app.initializeApp();
+  }
   return {
-    auth: auth.getAuth(),
-    base: firestore.getFirestore(),
+    auth: auth.getAuth(defaut),
+    base: firestore.getFirestore(defaut),
     horodatage: firestore.FieldValue.serverTimestamp(),
   };
 }
@@ -242,3 +264,76 @@ export const attribuerBoutique = onCall({ region: REGION }, async (requete) => {
 
   return { uid, boutiqueId };
 });
+
+/**
+ * Répare les numéros en double, au moment où deux appareils se rejoignent.
+ *
+ * C'est la seule pièce du serveur qui ne soit pas appelée par quelqu'un : elle
+ * réagit. Elle le fait parce que la collision qu'elle traite n'est visible de
+ * personne d'autre — l'appareil qui a émis le numéro était hors ligne, celui
+ * d'en face aussi, et ni l'un ni l'autre ne saura jamais ce que le voisin a
+ * distribué pendant ce temps (`DECISIONS.md` D5).
+ *
+ * Le rapprochement se fait sur `numeroInitial`, pas sur `numero` : `numero`
+ * change quand cette fonction tranche, et une clé qui bouge ne rapproche plus
+ * rien. Une troisième pièce en retard doit pouvoir retrouver les deux
+ * premières, y compris celle qui porte déjà un `-B`.
+ *
+ * Ce qu'elle ne fait pas : bloquer, verrouiller, ou attendre. La vente est déjà
+ * enregistrée et le reçu peut-être déjà imprimé quand elle s'exécute. Son seul
+ * pouvoir est de corriger le numéro de la pièce arrivée en second, et
+ * l'application le signale ensuite au gérant.
+ */
+export const reconcilierNumeroVente = onDocumentCreated(
+  /* La région doit rester celle de la base Firestore : un déclencheur déployé
+     ailleurs ne se déclenche pas du tout. */
+  { region: REGION, document: "ventesMotos/{venteId}" },
+  async (evenement) => {
+    const creee = evenement.data;
+    if (!creee) return;
+
+    const boutiqueId = creee.get("boutiqueId");
+    const numeroInitial = creee.get("numeroInitial");
+    if (typeof boutiqueId !== "string" || typeof numeroInitial !== "string") return;
+
+    const { base } = await admin();
+    const memeNumero = await base
+      .collection("ventesMotos")
+      .where("boutiqueId", "==", boutiqueId)
+      .where("numeroInitial", "==", numeroInitial)
+      .get();
+
+    /* Le cas normal, et de très loin le plus fréquent : la pièce est seule à
+       porter ce numéro. On sort sans écrire. */
+    if (memeNumero.size < 2) return;
+
+    const concurrentes = memeNumero.docs.map(versPiece);
+    const moi = concurrentes.find((piece) => piece.id === creee.id);
+    if (!moi) return;
+
+    const numero = resoudreCollision(moi, concurrentes);
+    if (!numero) return;
+
+    await base.doc(`ventesMotos/${creee.id}`).update({ numero });
+    logger.info("Numéro en double réconcilié", {
+      boutiqueId,
+      numeroInitial,
+      numero,
+      vente: creee.id,
+    });
+  },
+);
+
+/** Convertit un document de vente en ce que la règle de réconciliation attend, et rien de plus. */
+function versPiece(document: QueryDocumentSnapshot): PieceNumerotee {
+  const cree = document.get("createdAt");
+  return {
+    id: document.id,
+    numeroInitial: document.get("numeroInitial"),
+    /* `createdAt` est un horodatage serveur : au moment où ce déclencheur
+       s'exécute, il est déjà résolu. S'il manquait malgré tout, l'identifiant
+       du document départage seul — un ordre arbitraire mais stable vaut mieux
+       qu'un plantage. */
+    recueA: cree instanceof Timestamp ? cree.toMillis() : 0,
+  };
+}

@@ -4,6 +4,7 @@ import {
   codeUnique,
   contenu,
   emailUnique,
+  ligneDeBoutique,
   nomUnique,
   prendreLaMainEtMettreEnCache,
   seConnecter,
@@ -40,7 +41,7 @@ async function preparerTerrain(page: Page): Promise<Terrain> {
   await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
   await formulaire.getByLabel(/^Code/).fill(code);
   await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
-  await expect(page.getByRole("listitem").filter({ hasText: code })).toBeVisible();
+  await expect(ligneDeBoutique(page, code)).toBeVisible();
 
   await page.goto("/parametres/catalogue", { waitUntil: "load" });
   const marques = page
@@ -259,6 +260,12 @@ test.describe("hors ligne", () => {
     await expect(contenu(page)).toContainText(chassis);
 
     await context.setOffline(false);
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+    /* Soixante secondes, et non trente. Après une coupure, le SDK Firestore
+       rétablit sa connexion avec un délai croissant qui peut approcher la
+       minute : le retour du réseau ne le réveille pas, il finit son attente.
+       Ce que ce test vérifie, c'est que la saisie **part toute seule** — pas
+       en combien de temps. La rapidité du réveil est une question de produit,
+       ouverte au backlog (S27), pas une question de harnais. */
+    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 60_000 });
   });
 });
