@@ -594,3 +594,38 @@ pas un harnais.**
 *Conséquence assumée :* lancer la suite efface les données saisies à la main dans les émulateurs.
 Elles ne survivent de toute façon pas à un redémarrage des émulateurs. En échange, les états
 « aucune boutique », « aucune moto », « aucun compte » redeviennent atteignables.
+
+## D42 — Le fichier clients a son écran, que l'arborescence du cahier ne prévoyait pas
+`prompt.md` §2, §7 — S6
+
+Le cahier des charges ne place les clients qu'à l'intérieur de l'écran de vente : « recherche par
+téléphone/nom ou création à la volée ». Son arborescence ne comporte pas de `/clients`.
+
+Cet écran existe quand même, pour deux raisons. D'abord parce qu'une spec doit être vérifiable seule
+(`WORKFLOW.md` §3) et que l'écran de vente n'arrive qu'en S8 : sans lui, S6 n'aurait livré que du
+code sans preuve d'usage. Ensuite parce que le fichier clients est la seule donnée partagée entre
+boutiques (D16) et qu'on a besoin de le regarder — corriger un numéro mal noté n'a pas à passer par
+une vente.
+
+*Conséquence :* l'écran n'est pas dans la barre de navigation, qui reste les cinq espaces du cahier
+des charges (§14). On y accède depuis l'accueil, et S8 y accédera depuis la vente. Si l'usage montre
+que le détour coûte, la barre pourra changer — pas l'inverse.
+
+## D43 — Le préflight réveille chaque fonction, pas seulement une
+S6 — constaté en lisant le journal de l'émulateur
+
+L'émulateur Functions démarre un runtime **par fonction**, à la première invocation. Le préflight
+n'en réveillait qu'une (`creerGerant`) : les autres payaient leur démarrage au milieu d'un test, et
+sur une machine chargée ce démarrage échoue :
+
+```
+!!  functions: Failed to handle request for function europe-west1-attribuerBoutique
+!!  functions: Failed to start functions in …: Failed to load function.
+```
+
+Côté application, cela ressortait en « le serveur n'a pas répondu » — le même message trompeur qu'en
+D33, pour une cause voisine mais distincte.
+
+*Conséquence :* une fonction de plus dans `functions/src` est une ligne de plus dans la liste de
+`e2e/preparation.ts`. Le réveil coûte une quinzaine de secondes une fois par exécution, au bon
+endroit — avant la première mesure, et non au milieu.

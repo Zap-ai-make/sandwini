@@ -237,7 +237,9 @@ test.describe("hors ligne", () => {
     await expect(bandeauEtat(page)).toContainText("Hors ligne", { timeout: 30_000 });
 
     const chassis = `OFFLINE${Date.now().toString(36).toUpperCase()}`;
-    await page.getByRole("link", { name: /Faire entrer une moto/ }).click();
+    /* Deux liens portent ce nom quand le stock est vide : celui de l en-tete
+       et celui de l etat vide. Les deux menent au meme endroit. */
+    await page.getByRole("link", { name: /Faire entrer une moto/ }).first().click();
     await page.waitForURL("**/motos/nouvelle");
 
     await page.getByLabel("Marque").selectOption({ label: terrain.marque });

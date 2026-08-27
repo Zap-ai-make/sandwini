@@ -1,4 +1,4 @@
-import { Activity, Bike, ChevronRight, Coins, Settings, Wrench } from "lucide-react";
+import { Activity, Bike, ChevronRight, Coins, Settings, Users, Wrench } from "lucide-react";
 import Link from "next/link";
 import type { ComponentType } from "react";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
@@ -13,6 +13,7 @@ const ESPACES: {
 }[] = [
   { href: "/motos", libelle: "Motos", role: "Stock, ventes, paiements et dossiers", Icone: Bike },
   { href: "/pieces", libelle: "Pièces détachées", role: "Catalogue, stock et comptoir", Icone: Wrench },
+  { href: "/clients", libelle: "Clients", role: "Retrouver ou créer une fiche", Icone: Users },
   { href: "/caisse", libelle: "Caisse", role: "Journal du jour et clôture", Icone: Coins },
   { href: "/parametres", libelle: "Réglages", role: "Boutiques, utilisateurs, référentiels", Icone: Settings },
 ];

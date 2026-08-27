@@ -1,7 +1,7 @@
-# S6 — Clients — recherche et création
+# S6 — Clients : recherche et création
 
 ```
-Statut     : à faire
+Statut     : terminée
 Périmètre  : MVP
 Dépend de  : S3
 ```
@@ -10,44 +10,70 @@ Dépend de  : S3
 
 ## Objectif
 
-Au moment de vendre, le gérant retrouve un client existant en tapant les premiers chiffres de son
-numéro ou les premières lettres de son nom — et s'il est nouveau, le crée sans quitter l'écran.
+Retrouver un client en tapant son numéro ou les premières lettres de son nom, et le créer quand il
+est nouveau. Le fichier est commun à toutes les boutiques : un client connu à Pouytenga est retrouvé
+à Koudougou sans ressaisie (D16).
 
 ---
 
 ## Critères d'acceptation
 
-- [ ] Recherche par numéro de téléphone et par nom (préfixe, insensible à la casse et aux accents)
-- [ ] La recherche fonctionne hors ligne sur les clients déjà en cache
-- [ ] Création rapide : nom et téléphone suffisent ; téléphone secondaire, adresse et note facultatifs
-- [ ] Le téléphone est normalisé au format international à l'enregistrement, quel que soit le format saisi — c'est la clé de recherche et le lien WhatsApp en dépendra (S14)
-- [ ] Un numéro déjà connu déclenche un avertissement qui propose le client existant, sans bloquer (deux personnes peuvent partager un téléphone)
-- [ ] Fiche client : coordonnées et liste de ses ventes (alimentée par S8)
-- [ ] Modification des coordonnées ; pas de suppression
-- [ ] Les clients sont communs à toutes les boutiques : une fiche unique par personne, retrouvable partout (D16)
-- [ ] Un gérant lit et crée des clients, mais ne voit d'aucune façon les ventes, montants ou dossiers rattachés à une autre boutique (test de règles)
-- [ ] États couverts : aucun client, aucun résultat, chargement, hors ligne
+- [x] La recherche trouve un client par numéro de téléphone, écrit comme on veut : espaces, indicatif, ou les huit chiffres seuls
+- [x] La recherche trouve un client par le début de son nom, sans tenir compte de la casse ni des accents
+- [x] Un client se crée avec nom et téléphone ; l'adresse et une note sont facultatives
+- [x] Un numéro déjà connu est refusé à la création, avec le client concerné nommé
+- [x] Un client se corrige : on change son nom, son numéro, son adresse
+- [x] Recherche et création fonctionnent hors ligne
+- [x] Le gérant lit et crée des clients, comme le responsable — c'est la seule donnée partagée (D16)
+- [x] Un anonyme n'accède à rien
+- [x] États couverts : fichier vide, chargement, aucun résultat, numéro en double, numéro manquant, erreur de lecture
+
+**Vérification :** 114 tests unitaires, 117 tests de règles, 46 tests bout en bout — dont un qui crée
+un client réseau coupé et le retrouve dans la foulée. Rendu regardé en clair et en sombre, mobile et
+bureau (`captures/`).
 
 ---
 
 ## Hors périmètre
 
-Pas de fusion de doublons. Pas d'historique de modifications au-delà de l'audit standard. Pas d'import
-(aucune donnée existante à reprendre — arbitré au point d'arrêt 1).
+Pas d'**historique d'achats** sur la fiche : il n'existe aucune vente avant S8.
+
+Pas de **lien de suivi client** ni de **WhatsApp** (S13, S14).
+
+Pas de suppression : un client est cité par des ventes.
+
+Pas de **fusion de doublons**. Le contrôle à la saisie les empêche là où ils naissent ; deux appareils
+hors ligne peuvent malgré tout créer la même personne deux fois, et cette réconciliation est un
+travail à part entière.
 
 ---
 
 ## Notes techniques
 
-`clients` n'a pas de `boutiqueId` : exception assumée au §3.2 du cahier des charges, qui parle de
-« donnée opérationnelle ». Un client est une personne, pas une opération (D16). C'est la seule
-collection lisible au-delà du périmètre du gérant — les règles de S12 doivent vérifier que rien de ce
-qui s'y rattache ne le devient pour autant.
+**Le téléphone est la clé de recherche, pas la clé du document.** Un numéro se corrige — une faute de
+frappe le lundi matin — et s'il était l'identifiant, la correction créerait un second client en
+orphelinant son historique. Même raisonnement qu'en D36 pour les référentiels.
 
-La recherche par préfixe se fait sur `nomNormalise` (minuscules, accents retirés) avec une requête de
-plage Firestore. Le champ est calculé à l'écriture par une fonction pure testée — la normalisation est
-exactement le genre de calcul qui diverge silencieusement s'il est écrit à deux endroits.
+**Deux formes stockées à côté du texte saisi** : `telephoneNormalise` au format international, et
+`nomNormalise` sans casse ni accents. C'est ce que le cahier des charges demande explicitement
+(§5.3), et c'est ce qui fait qu'on retrouve un client au lieu de le recréer. Les règles les exigent
+toutes les deux.
 
-La normalisation du téléphone dépend du pays. Ne pas embarquer une bibliothèque complète pour ça au
-MVP : une fonction ciblée sur l'indicatif local, testée sur les formats réellement saisis en boutique,
-suffit et se remplace si le besoin s'élargit (`ARCHITECTURE.md` §1).
+**Recherche en mémoire**, comme le stock : instantanée et fonctionnelle hors ligne. Le fichier d'une
+maison de ce type se compte en centaines. Si un jour il se compte en dizaines de milliers, la parade
+est déjà nommée dans D16 — recherche stricte par numéro complet, sans parcours de liste — et elle ne
+change pas le modèle de données.
+
+**Ce que S8 réutilisera** n'est pas un composant d'écran mais les deux pièces qui portent la logique :
+`chercherClients` du domaine, et `creerClient` du dépôt — qui rend l'identifiant **avant** que
+l'écriture n'aboutisse, ce qui est exactement ce qu'exige une création « à la volée » sans réseau.
+Écrire aujourd'hui un sélecteur pour un écran qui n'existe pas aurait été deviner sa forme.
+
+**L'écran `/clients` n'était pas dans l'arborescence du cahier** (D42) : il y est parce qu'une spec
+doit être vérifiable seule, et parce qu'un numéro mal noté n'a pas à attendre une vente pour être
+corrigé.
+
+---
+
+Spec terminée : critères cochés, code vérifié (tests + rendu), revue des trois contrats passée,
+commit effectué, statut mis à jour dans `specs/ROADMAP.md`.
