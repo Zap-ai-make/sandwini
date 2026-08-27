@@ -25,8 +25,14 @@ const SERVICES = [
   { nom: "Functions", url: "http://127.0.0.1:5301/" },
 ];
 
-/** Une fonction connue, dont la présence prouve que le code a bien été chargé. */
-const FONCTION_TEMOIN = "http://127.0.0.1:5301/sdi-dev/europe-west1/creerGerant";
+/**
+ * Toutes les fonctions appelables — pas seulement une.
+ *
+ * Une fonction de plus dans `functions/src` est une ligne de plus ici. L’oubli
+ * se paie par un échec au milieu d’un test, loin de sa cause.
+ */
+const FONCTIONS = ["creerGerant", "changerActivationUtilisateur", "attribuerBoutique"];
+const BASE_FONCTIONS = "http://127.0.0.1:5301/sdi-dev/europe-west1";
 
 async function joignable(url: string): Promise<boolean> {
   try {
@@ -99,34 +105,41 @@ async function repartirDUneBaseVide() {
 }
 
 /**
- * Vérifie qu’une fonction est **réellement servie**, pas seulement que le port
- * répond.
+ * Vérifie que **chaque** fonction est réellement servie, et réveille son
+ * runtime.
  *
- * L’émulateur Functions ouvre son port même quand il n’a chargé aucune
- * fonction : si la découverte du code dépasse son délai, il démarre vide et
- * annonce quand même « All emulators ready ». Chaque appel renvoie alors un 404
- * que l’application traduit par « le serveur n’a pas répondu » — un message de
- * panne réseau pour un problème qui n’a rien de réseau, et une suite de tests
- * qui échoue à quatre endroits, loin de sa cause.
+ * Deux pièges, et il a fallu les deux pour comprendre.
  *
- * Cette requête sert donc deux fois : elle constate que la fonction existe, et
- * elle réveille le runtime. La première invocation démarre un processus Node et
- * charge le SDK Admin ; sans ce réveil, ce coût tombe au hasard dans le premier
- * test qui appelle une fonction. Elle part volontairement sans jeton : le refus
- * pour authentification manquante prouve exactement ce qu’on cherche.
+ * Le premier : l’émulateur Functions ouvre son port même quand il n’a chargé
+ * aucune fonction. Si la découverte du code dépasse son délai, il démarre vide
+ * et annonce quand même « All emulators ready » ; chaque appel renvoie un 404
+ * que l’application traduit par « le serveur n’a pas répondu ».
+ *
+ * Le second : l’émulateur démarre un runtime **par fonction**, à la première
+ * invocation. En n’en réveillant qu’une, on laissait les autres payer ce
+ * démarrage au milieu d’un test — et sur une machine chargée, ce démarrage
+ * échoue : « Failed to handle request … : Failed to load function. »
+ *
+ * D’où cette boucle sur toutes les fonctions, sans jeton : le refus pour
+ * authentification manquante prouve exactement ce qu’on cherche.
  */
 async function verifierFonctionsServies() {
   const debut = Date.now();
+  for (const nom of FONCTIONS) await reveiller(nom);
+  console.log(
+    `${FONCTIONS.length} fonctions servies et réveillées en ${Date.now() - debut} ms.`,
+  );
+}
 
-  /* Trois essais : la toute première invocation démarre un processus Node, et
-     cette montée en charge fait parfois tomber la connexion avant qu'une
-     réponse revienne. Un hoquet ne doit pas annuler la suite entière — mais
-     trois échecs de suite, si. */
+async function reveiller(nom: string) {
+  /* Trois essais : le démarrage du runtime fait parfois tomber la connexion
+     avant qu’une réponse revienne. Un hoquet ne doit pas annuler la suite
+     entière — mais trois échecs de suite, si. */
   let reponse: Response | null = null;
   let derniereCause: unknown = null;
   for (let essai = 0; essai < 3 && !reponse; essai += 1) {
     try {
-      reponse = await fetch(FONCTION_TEMOIN, {
+      reponse = await fetch(`${BASE_FONCTIONS}/${nom}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ data: {} }),
@@ -138,13 +151,13 @@ async function verifierFonctionsServies() {
   }
 
   if (!reponse) {
-    throw new Error(`L’émulateur Functions n’a pas répondu : ${String(derniereCause)}`);
+    throw new Error(`La fonction « ${nom} » n’a pas répondu : ${String(derniereCause)}`);
   }
 
   if (reponse.status === 404) {
     throw new Error(
       [
-        "L’émulateur Functions tourne mais ne sert aucune fonction.",
+        `L’émulateur Functions ne sert pas « ${nom} ».`,
         "",
         "C’est le symptôme d’une découverte du code qui a dépassé son délai :",
         "  « Cannot determine backend specification. Timeout after 10000 »",
@@ -154,6 +167,4 @@ async function verifierFonctionsServies() {
       ].join("\n"),
     );
   }
-
-  console.log(`Fonctions servies, runtime prêt en ${Date.now() - debut} ms.`);
 }

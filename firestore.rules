@@ -357,6 +357,53 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Clients (S6) -------------------------------------------------------
+    // Le fichier clients est **commun à toutes les boutiques** (D16) : pas de
+    // `boutiqueId`, donc pas de cloisonnement. C'est la seule collection dans
+    // ce cas, et c'est un arbitrage assumé — un client est une personne, pas
+    // une opération, et le retrouver d'une boutique à l'autre évite de le
+    // ressaisir et de couper son historique en deux.
+    //
+    // Ce qu'un gérant voit ainsi : des noms et des numéros. Ce qu'il ne voit
+    // toujours pas : les ventes, les montants et les dossiers des autres
+    // boutiques, qui restent cloisonnés ailleurs dans ce fichier.
+
+    function clientValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'nomNormalise', 'telephone', 'telephoneNormalise',
+                                     'telephone2', 'adresse', 'note'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'nomNormalise', 'telephone', 'telephoneNormalise',
+                                       'telephone2', 'adresse', 'note'].concat(champsAudit()))
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && donnees.nomNormalise is string
+             && donnees.nomNormalise.size() <= 80
+             && donnees.telephone is string
+             && donnees.telephone.size() > 0
+             && donnees.telephone.size() <= 32
+             && donnees.telephoneNormalise is string
+             && donnees.telephoneNormalise.size() > 0
+             && donnees.telephoneNormalise.size() <= 32
+             && texteBorne(donnees.telephone2, 32)
+             && texteBorne(donnees.adresse, 200)
+             && texteBorne(donnees.note, 300);
+    }
+
+    match /clients/{clientId} {
+      allow read: if connecte();
+
+      allow create: if connecte()
+                    && clientValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+
+      allow update: if connecte()
+                    && clientValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+
+      // Un client est cité par des ventes : on le corrige, on ne l'efface pas.
+      allow delete: if false;
+    }
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.

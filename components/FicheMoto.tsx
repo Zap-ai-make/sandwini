@@ -7,7 +7,7 @@ import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import { LIBELLE_ETAT, LIBELLE_STATUT, type CoutMoto, type Moto } from "@/lib/domain/moto";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import { useCatalogue } from "@/lib/repositories/catalogue";
+import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
 import { ecouterCoutMoto, ecouterMoto } from "@/lib/repositories/motos";
 
 /**
@@ -100,7 +100,7 @@ export function FicheMoto({ id }: { id: string }) {
             </section>
           )}
 
-          {estResponsable ? <Cout id={id} /> : <CoutMasque />}
+          {estResponsable ? <Cout id={id} catalogue={catalogue} /> : <CoutMasque />}
         </>
       )}
     </div>
@@ -116,9 +116,14 @@ function Ligne({ titre, valeur, code = false }: { titre: string; valeur: string;
   );
 }
 
-/** Ce que le responsable voit, et lui seul. */
-function Cout({ id }: { id: string }) {
-  const catalogue = useCatalogue();
+/**
+ * Ce que le responsable voit, et lui seul.
+ *
+ * Le catalogue lui est passé plutôt que rappelé : `useCatalogue()` ouvre
+ * quatre écoutes Firestore, et les rouvrir ici les doublait sur un écran qui
+ * affiche pourtant les mêmes listes.
+ */
+function Cout({ id, catalogue }: { id: string; catalogue: Catalogue }) {
   const souscrire = useCallback(
     (auChangement: (cout: CoutMoto | null) => void, enErreur: (cause: unknown) => void) =>
       ecouterCoutMoto(id, auChangement, enErreur),

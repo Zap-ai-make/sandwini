@@ -23,7 +23,7 @@ Tout ce qui sert le confort, le pilotage ou un second métier (pièces détaché
 | S3  | Boutiques et sélecteur de périmètre           | S2               | MVP       | terminée |
 | S4  | Référentiels et paramètres entreprise         | S3               | MVP       | terminée |
 | S5  | Stock motos — entrée et consultation          | S4               | MVP       | terminée |
-| S6  | Clients — recherche et création               | S3               | MVP       | à faire |
+| S6  | Clients — recherche et création               | S3               | MVP       | terminée |
 | S7  | Numérotation hors-ligne des pièces comptables | S3               | MVP       | à faire |
 | S8  | Vente de moto — enregistrement                | S5, S6, S7       | MVP       | à faire |
 | S9  | Versements et suivi des paiements             | S8               | MVP       | à faire |

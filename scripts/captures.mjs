@@ -39,6 +39,8 @@ const PRISES = [
   { nom: "accueil-mobile-clair", chemin: "/dashboard", theme: "light", mobile: true },
   { nom: "accueil-mobile-sombre", chemin: "/dashboard", theme: "dark", mobile: true },
   { nom: "accueil-bureau-clair", chemin: "/dashboard", theme: "light", mobile: false },
+  { nom: "clients-mobile-clair", chemin: "/clients", theme: "light", mobile: true },
+  { nom: "clients-bureau-sombre", chemin: "/clients", theme: "dark", mobile: false },
   { nom: "motos-mobile-clair", chemin: "/motos", theme: "light", mobile: true },
   { nom: "motos-bureau-sombre", chemin: "/motos", theme: "dark", mobile: false },
   { nom: "motos-nouvelle-mobile-clair", chemin: "/motos/nouvelle", theme: "light", mobile: true, boutique: true },
