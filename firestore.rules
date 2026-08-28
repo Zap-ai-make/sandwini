@@ -404,6 +404,218 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Ventes de motos (S8) ----------------------------------------------
+    // Le document que le gérant lit pour travailler. Ce qu'il ne contient pas
+    // compte autant : le coût figé et la marge vivent dans
+    // `ventesMotos/{id}/prive/marge`, fermé en écriture à TOUT navigateur et
+    // ouvert en lecture au seul responsable (D2, D51). Il est rempli par un
+    // déclencheur via le SDK Admin, qui ne passe pas par ces règles — c'est ce
+    // qui rend la marge infalsifiable et pas seulement invisible.
+    //
+    // Aucune mise à jour n'est permise ici. S8 crée, et c'est tout : les
+    // agrégats de paiement s'ouvriront en S9, le cycle des documents en S11,
+    // l'annulation en S25. Ouvrir d'avance ce qu'aucun écran n'utilise, c'est
+    // ouvrir sans test (SECURITY.md §0).
+
+    function numeroDOrigine(valeur) {
+      // Jamais de suffixe à la création : un appareil n'émet que des numéros
+      // d'origine, le `-B` est la réponse du serveur à une collision (D5).
+      return valeur is string && valeur.matches('^[A-Z]{3}-[0-9]{4}-[0-9]{4,}$');
+    }
+
+    function listeBornee(valeur, maximum) {
+      return valeur is list && valeur.size() <= maximum;
+    }
+
+    function dateAppareil(valeur) {
+      // La date métier vient de l'appareil (D38). On ne peut pas vérifier une
+      // date passée, mais on peut refuser l'absurde : une horloge en avance.
+      return valeur is timestamp && valeur <= request.time + duration.value(1, 'd');
+    }
+
+    function venteValide(donnees) {
+      return donnees.keys().hasOnly(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
+                                     'date', 'prixConvenu', 'modePaiement', 'inclus', 'nonInclus',
+                                     'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
+                                     'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
+                                     'lienSuiviEnvoyeAt', 'statutDossier',
+                                     'dateClotureDossier'].concat(champsAudit()))
+             && donnees.keys().hasAll(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
+                                       'date', 'prixConvenu', 'modePaiement', 'inclus', 'nonInclus',
+                                       'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
+                                       'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
+                                       'lienSuiviEnvoyeAt', 'statutDossier',
+                                       'dateClotureDossier'].concat(champsAudit()))
+             // Les deux numéros sont égaux à la création, et `numeroInitial` ne
+             // bougera plus jamais : c'est la clé de rapprochement des doublons
+             // (D44), et une clé qui bouge ne rapproche plus rien.
+             && numeroDOrigine(donnees.numero)
+             && donnees.numero == donnees.numeroInitial
+             && donnees.boutiqueId is string
+             && donnees.motoId is string
+             && donnees.motoId.size() > 0
+             && donnees.clientId is string
+             && donnees.clientId.size() > 0
+             && dateAppareil(donnees.date)
+             && montantValide(donnees.prixConvenu)
+             && donnees.prixConvenu > 0
+             && donnees.modePaiement in ['comptant', 'credit', 'tranches']
+             && listeBornee(donnees.inclus, 20)
+             && listeBornee(donnees.nonInclus, 20)
+             // L'arithmétique de la vente, vérifiée ici et pas seulement dans le
+             // formulaire : c'est le seul endroit qu'un client modifié ne
+             // contourne pas.
+             && montantValide(donnees.totalPaye)
+             && montantValide(donnees.resteDu)
+             && donnees.totalPaye + donnees.resteDu == donnees.prixConvenu
+             && donnees.statutPaiement == (donnees.resteDu == 0
+                                           ? 'solde'
+                                           : (donnees.totalPaye > 0 ? 'partiel' : 'impaye'))
+             // Une vente au comptant est payée en entier, par définition (§6.2).
+             && (donnees.modePaiement != 'comptant' || donnees.resteDu == 0)
+             // Crédit et comptant livrent la moto ; les tranches la retiennent.
+             && donnees.motoRemise is bool
+             && donnees.motoRemise == (donnees.modePaiement != 'tranches')
+             && (donnees.motoRemise ? dateAppareil(donnees.dateRemiseMoto)
+                                    : donnees.dateRemiseMoto == null)
+             && (donnees.totalPaye > 0 ? dateAppareil(donnees.dernierVersementAt)
+                                       : donnees.dernierVersementAt == null)
+             // 32 octets en base64url : le secret qui ouvre la page de suivi (D6).
+             && donnees.tokenSuivi is string
+             && donnees.tokenSuivi.size() == 43
+             && donnees.tokenSuivi.matches('^[A-Za-z0-9_-]+$')
+             && donnees.lienSuiviEnvoyeAt == null
+             && donnees.statutDossier == 'ouvert'
+             && donnees.dateClotureDossier == null;
+    }
+
+    function peutVendrePour(boutiqueId) {
+      return estResponsable() || estGerantDe(boutiqueId);
+    }
+
+    match /ventesMotos/{venteId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+
+      allow create: if venteValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+
+      allow update, delete: if false;
+    }
+
+    // La marge : lecture réservée au responsable, écriture refusée à tout le
+    // monde. Seul le déclencheur `figerMargeVente` la remplit, et il passe par
+    // le SDK Admin — hors de portée de ces règles, donc hors de portée d'un
+    // navigateur.
+    match /ventesMotos/{venteId}/prive/{section} {
+      allow read: if estResponsable();
+      allow write: if false;
+    }
+
+    // Le dossier. Le `boutiqueId` y est répété pour deux raisons : dans un lot,
+    // les règles évaluent chaque document contre l'état d'AVANT — la vente
+    // parente n'existe donc pas encore quand son dossier est validé — et une
+    // requête de groupe de collections ne peut filtrer que sur les champs du
+    // document lui-même. Même montage qu'en S5 sur le coût d'une moto.
+    //
+    // Le type est l'identifiant du document : deux cartes grises dans un même
+    // dossier sont structurellement impossibles, sans qu'aucune règle ait à le
+    // dire.
+    function documentDossierValide(donnees, venteId, type) {
+      return donnees.keys().hasOnly(['boutiqueId', 'venteId', 'type', 'statut'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'venteId', 'type', 'statut'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.venteId == venteId
+             && donnees.type == type
+             && type in ['quittance', 'cmc', 'carte_grise', 'plaque']
+             // S8 ouvre le dossier ; c'est S11 qui fera vivre les autres statuts.
+             && donnees.statut == 'a_faire';
+    }
+
+    match /ventesMotos/{venteId}/documents/{type} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+      allow create: if documentDossierValide(request.resource.data, venteId, type)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+      allow update, delete: if false;
+    }
+
+    // La lecture d'ensemble des dossiers, sur laquelle repose la liste des
+    // ventes (§6.4). Une requête de groupe de collections n'emprunte PAS la
+    // règle du chemin complet ci-dessus : il lui faut un chemin récursif, sinon
+    // elle est refusée quoi qu'on autorise plus haut. La condition reste la
+    // même — chacun ne lit que sa boutique.
+    match /{chemin=**}/documents/{type} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+    }
+
+    // Les versements. S8 n'en écrit qu'un, celui du jour de la vente, dans le
+    // lot de la vente. Les suivants sont l'affaire de S9 — d'où l'absence de
+    // mise à jour ici : corriger ou annuler un versement est une opération
+    // journalisée, réservée au responsable, qui n'existe pas encore.
+    function versementValide(donnees, venteId) {
+      return donnees.keys().hasOnly(['boutiqueId', 'venteId', 'numeroRecu', 'date', 'montant',
+                                     'moyenPaiement', 'reference',
+                                     'encaissementId'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'venteId', 'numeroRecu', 'date', 'montant',
+                                       'moyenPaiement', 'reference',
+                                       'encaissementId'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.venteId == venteId
+             && numeroDOrigine(donnees.numeroRecu)
+             && dateAppareil(donnees.date)
+             && montantValide(donnees.montant)
+             && donnees.montant > 0
+             && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave']
+             && texteBorne(donnees.reference, 60)
+             && donnees.encaissementId is string
+             && donnees.encaissementId.size() > 0;
+    }
+
+    match /ventesMotos/{venteId}/versements/{versementId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+      allow create: if versementValide(request.resource.data, venteId)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+      allow update, delete: if false;
+    }
+
+    // La caisse. Rien ne lit encore ces documents — le journal et la clôture
+    // sont post-MVP (S22) — mais l'argent qui entre aujourd'hui se trace
+    // aujourd'hui : un journal comptable troué se répare par une migration, ce
+    // qui coûte bien plus cher que ces quelques lignes (D53).
+    function encaissementValide(donnees) {
+      return donnees.keys().hasOnly(['boutiqueId', 'date', 'sens', 'montant', 'moyenPaiement',
+                                     'origine', 'origineRefId', 'libelle',
+                                     'categorieTranches'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'date', 'sens', 'montant', 'moyenPaiement',
+                                       'origine', 'origineRefId', 'libelle',
+                                       'categorieTranches'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && dateAppareil(donnees.date)
+             && donnees.sens in ['entree', 'sortie']
+             && montantValide(donnees.montant)
+             && donnees.montant > 0
+             && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave']
+             && donnees.origine in ['vente_moto', 'versement', 'vente_piece', 'depense',
+                                    'avance_prestataire', 'autre']
+             && donnees.origineRefId is string
+             && texteBorne(donnees.libelle, 120)
+             // L'argent des tranches est un engagement, pas une recette, tant
+             // que la moto dort au magasin (§6.2). Le drapeau se pose à
+             // l'encaissement ; le retrouver après coup serait un cauchemar.
+             && donnees.categorieTranches is bool;
+    }
+
+    match /encaissements/{encaissementId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+      allow create: if encaissementValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+      // Une écriture de caisse ne se retouche pas : on la contre-passe. S22.
+      allow update, delete: if false;
+    }
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.

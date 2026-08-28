@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, Plus, Search } from "lucide-react";
+import { LoaderCircle, Plus, Receipt, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
@@ -86,13 +86,30 @@ function Stock() {
             {perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
           </p>
         </div>
-        <Link
-          href="/motos/nouvelle"
-          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-          Faire entrer une moto
-        </Link>
+        {/* Vendre est le geste quotidien, faire entrer une moto l’exception :
+            c’est la vente qui porte l’accent de plaque. */}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link
+            href="/motos/ventes/nouvelle"
+            className="inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
+          >
+            <Receipt aria-hidden="true" className="size-4" />
+            Nouvelle vente
+          </Link>
+          <Link
+            href="/motos/ventes"
+            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          >
+            Ventes
+          </Link>
+          <Link
+            href="/motos/nouvelle"
+            className="inline-flex h-12 items-center gap-2 rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Faire entrer une moto
+          </Link>
+        </div>
       </div>
 
       <Recherche filtres={filtres} changer={setFiltres} />

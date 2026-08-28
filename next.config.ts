@@ -103,6 +103,8 @@ const ECRANS_HORS_LIGNE = [
   "/dashboard",
   "/motos",
   "/motos/nouvelle",
+  "/motos/ventes",
+  "/motos/ventes/nouvelle",
   "/clients",
   "/pieces",
   "/caisse",
