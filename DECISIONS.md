@@ -758,3 +758,125 @@ fini d'attendre. Sur un marché à couverture intermittente, c'est le geste le p
 de reconnexion à soixante. Ces chiffres calibrent une attente réelle, ils ne masquent rien : une
 donnée qui n'arrive pas fait toujours tomber le test. Le défaut restant est **connu, isolé et
 inscrit** — pas contourné en silence.
+
+## D51 — Le coût de la moto est figé par le serveur, parce qu'un gérant ne peut pas le lire
+`prompt.md` §5.4, §8 — S8, le point le plus délicat de la spec
+
+Le cahier des charges veut un `coutMotoSnapshot` figé au moment de la vente, et le §8 réserve la
+marge au responsable. Les deux exigences se contredisent dès qu'un gérant vend : le coût vit dans
+`motos/{id}/prive/cout`, que les règles lui refusent en lecture (D2). **Un navigateur ne peut pas
+figer ce qu'il n'a pas le droit de lire.**
+
+Trois issues ont été pesées :
+
+- *Le client écrit la marge.* Impossible pour un gérant, et lui ouvrir la lecture du coût reviendrait
+  à annuler D2 — c'est-à-dire le §8.
+- *Pas d'instantané, on recalcule à l'affichage.* La marge changerait rétroactivement le jour où un
+  coût se corrige. Le cahier dit « figé » ; recalculer, c'est autre chose.
+- **Retenue : un déclencheur Firestore.** `figerMargeVente` lit le coût et écrit
+  `ventesMotos/{id}/prive/marge`. Un seul chemin, identique pour le gérant et le responsable.
+
+Ce n'est pas une écriture de saisie passée par le serveur — le §3.4 l'interdirait. La vente, elle,
+est déjà écrite et le reçu déjà remis quand le déclencheur s'exécute ; son retard ne bloque personne,
+parce que la marge est un chiffre de pilotage, lu au calme, jamais au comptoir.
+
+*Conséquence, et elle est meilleure que prévu :* les règles ferment `prive/marge` en écriture à
+**tout** navigateur, y compris celui du responsable. La marge n'est donc plus seulement cachée au
+gérant, elle est **infalsifiable** — personne ne la retouche depuis l'application.
+
+*Limite inscrite, à rouvrir avec l'écran de correction d'un coût :* le coût est lu à la
+synchronisation, pas à la seconde de la vente. Aujourd'hui il est écrit une fois pour toutes à
+l'entrée en stock, donc les deux valeurs coïncident. Le jour où un coût devient modifiable, cet écran
+devra refuser de toucher une moto vendue, ou laisser cet instantané tranquille.
+
+## D52 — Le premier versement appartient au lot de la vente, et porte son numéro
+`prompt.md` §6.1 étape 5 — S8, frontière avec S9
+
+Le §6.1 met le versement du jour dans le lot de la vente, alors que les versements sont S9. La
+frontière retenue : **S8 écrit un versement, S9 possède leur cycle de vie.** Autrement dit S8 tient
+la forme du document, ses règles, et sa création dans le lot ; S9 apporte les versements suivants,
+les listes de dettes et de tranches, la correction et l'annulation.
+
+L'exclure était impossible : une vente au comptant sans son versement afficherait « soldée » sans
+qu'aucun encaissement n'existe — un mensonge comptable dès la première vente.
+
+**Ce versement porte le numéro de la vente**, et non un numéro tiré du compteur de la boutique. La
+raison est mécanique : le compteur de l'appareil s'amorce sur les numéros connus, qu'il lit dans la
+collection `ventesMotos` (S7). Des numéros consommés par des versements — qui vivent dans une
+sous-collection — resteraient invisibles à un appareil neuf, qui repartirait au milieu de la série et
+fabriquerait précisément les doublons que le mécanisme existe pour éviter. Et sur le fond, c'est le
+même reçu : celui qu'on tend au client avec les clés. **Une vente consomme un numéro, un seul.**
+
+*Conséquence :* S9 choisit librement comment numéroter les versements suivants, en sachant que la
+réconciliation serveur ne couvre aujourd'hui que `ventesMotos`.
+
+## D53 — L'encaissement s'écrit dès maintenant, bien que la caisse soit post-MVP
+`prompt.md` §5.9, §6.1 étape 5 — S8, arbitrage demandé
+
+Le cahier veut un `encaissement` par versement ; l'écran de caisse est S22. Fallait-il écrire ce
+document maintenant, ou l'ajouter avec son écran ?
+
+Il s'écrit maintenant. `ARCHITECTURE.md` §1 dit de ne pas construire ce dont le besoin n'est pas
+actuel — mais le besoin actuel, ici, c'est la **donnée**, pas l'écran : l'argent qui entre dans la
+caisse aujourd'hui est une trace qui n'existera plus demain si on ne l'écrit pas. Ce qui est reporté
+à S22, c'est la lecture, le journal et la clôture. Écrire un enregistrement n'est pas livrer une
+fonctionnalité.
+
+L'autre terme de la balance est franc : reconstituer après coup les encaissements des premières
+ventes demanderait une migration sur des données réelles — une opération sensible (`AGENTS.md`
+règle 6) — là où l'écriture immédiate coûte une trentaine de lignes de règles et aucun écran.
+
+*Conséquence :* `categorieTranches` est posé dès l'encaissement, alors que rien ne le lit encore.
+C'est justement le champ qu'on ne saurait pas recalculer plus tard : il dit si l'argent est une
+recette ou un engagement, et cela dépend de l'état de la vente **à cet instant** (§6.2). La
+collection est fermée en modification et en suppression : une écriture de caisse ne se retouche pas,
+elle se contre-passe.
+
+## D54 — Une attente de synchronisation ne se met qu'où un second navigateur regarde
+S8 — trouvé en instrumentant la suite des ventes, après trois diagnostics faux
+
+La suite bout en bout des ventes échouait de façons changeantes. Les trois premières explications
+étaient fausses, et chacune a coûté une exécution complète :
+
+- « Le produit est cassé » — écarté : la même page, sondée à la main, affichait la moto en une
+  seconde. Ce sont les tests qui mentaient, pas l'écran.
+- « L'écoute Firestore est en panne » — écarté aussi : le message n'était pas un délai de
+  localisateur mais `Test timeout of 90000ms exceeded`. Le décor consommait le budget entier du test
+  avant la première assertion.
+- « Il faut attendre la synchronisation partout » — la correction qui a fait le plus de dégâts. Mise
+  dans le décor de chaque test, cette attente a fait passer la suite de 4 à 12 minutes **et** l'a
+  rendue plus fragile : l'attente elle-même expirait, et deux tests qui passaient se sont mis à
+  échouer.
+
+Le principe qui reste : **un navigateur qui vient d'écrire lit son propre cache et n'a rien à
+attendre** — c'est même exactement la promesse du produit. L'attente n'a de sens que là où un
+*second* navigateur doit voir les données, donc les avoir reçues du serveur. Dans cette suite, un
+seul test est dans ce cas : celui où le gérant ouvre sa propre session.
+
+*Mesuré :* 8 tests, 12 min 20 avec l'attente partout et deux échecs ; **4 min 30 sans, et zéro
+échec**. Le test hors-ligne, lui, est passé de 3 min 6 et un échec à **13 secondes**.
+
+*Conséquence, et c'est la leçon généralisable :* une attente ajoutée pour stabiliser un test doit
+nommer ce qu'elle attend. « Que tout soit calme » n'est pas une condition — c'est une superstition
+qui rend la suite lente, et lente veut dire fragile.
+
+## D55 — Ce qui reste fragile dans la suite bout en bout, et pourquoi on le laisse
+S8 — mesuré sur trois exécutions complètes
+
+Deux tests échouent **en suite complète** et passent isolés. Ce ne sont pas des défauts introduits
+par S8 — vérifié en rejouant chaque fichier seul, où il passe intégralement.
+
+- `boutiques.spec.ts` › « un gérant créé sans boutique en reçoit une » (S3). Isolé : 8 tests, 8
+  passés. En fin de suite chargée, la liste des comptes revient vide alors que la fonction a bien
+  répondu « Compte créé ». La cause est celle de D50 : quand la file d'écritures est encombrée, le
+  SDK Firestore sert un cache où `users` n'a jamais été chargé, et une collection jamais vue revient
+  vide plutôt qu'en attente.
+- `motos.spec.ts` › « une moto se saisit et se consulte sans réseau » (S5, déjà inscrit en D50).
+
+*Ce qui a été fait pour ne pas propager le défaut :* le test équivalent de S8 n'interroge plus la
+liste des comptes mais la confirmation de la fonction, qui prouve la même chose sans dépendre d'une
+écoute encombrée. La correction de fond reste **S27** — rebrancher le réseau à la reprise plutôt
+qu'attendre la fin du délai croissant du SDK.
+
+*Chiffre de référence, suite complète :* 56 tests, 54 passés, les 2 ci-dessus en échec. Fichier par
+fichier, tout passe.

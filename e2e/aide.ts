@@ -119,3 +119,100 @@ export async function prendreLaMainEtMettreEnCache(page: Page, chemin: string) {
 export function ligneDeBoutique(page: Page, code: string) {
   return page.getByRole("listitem").filter({ hasText: new RegExp(`\\b${code}`) });
 }
+
+export type Terrain = { code: string; marque: string; modele: string; provenance: string };
+
+/**
+ * Met en place ce qu'une moto exige avant d'exister : une boutique où la ranger,
+ * une marque, un modèle et une provenance. Tout passe par l'interface — c'est
+ * le vrai chemin d'un premier jour d'utilisation.
+ *
+ * Partagé par les suites du stock (S5) et des ventes (S8) : une vente a besoin
+ * du même décor, et en tenir deux copies, c'était s'assurer qu'elles divergent.
+ */
+export async function preparerTerrain(page: Page): Promise<Terrain> {
+  const code = codeUnique();
+  const marque = nomUnique("Yamaha");
+  const modele = nomUnique("Crux");
+  const provenance = nomUnique("Import");
+
+  await page.goto("/parametres/boutiques", { waitUntil: "load" });
+  const formulaire = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Créer la boutique" }),
+  });
+  await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
+  await formulaire.getByLabel(/^Code/).fill(code);
+  await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
+  await expect(ligneDeBoutique(page, code)).toBeVisible();
+
+  await page.goto("/parametres/catalogue", { waitUntil: "load" });
+  const marques = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Marques" }) });
+  await marques.getByLabel("Ajouter une marque").fill(marque);
+  await marques.getByRole("button", { name: "Ajouter" }).click();
+  await expect(marques.getByRole("listitem").filter({ hasText: marque })).toBeVisible();
+
+  const modeles = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Modèles" }) });
+  await modeles.getByLabel("Marque").selectOption({ label: marque });
+  await modeles.getByLabel(/^Ajouter un modèle/).fill(modele);
+  await modeles.getByRole("button", { name: "Ajouter" }).click();
+  await expect(modeles.getByRole("listitem").filter({ hasText: modele })).toBeVisible();
+
+  await page.goto("/parametres/referentiels", { waitUntil: "load" });
+  const provenances = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Provenances" }) });
+  await provenances.getByLabel("Ajouter une provenance").fill(provenance);
+  await provenances.getByRole("button", { name: "Ajouter" }).click();
+  await expect(provenances.getByRole("listitem").filter({ hasText: provenance })).toBeVisible();
+
+  // On se place dans la boutique : une moto entre quelque part de précis.
+  await selecteurPerimetre(page).selectOption(code);
+
+  return { code, marque, modele, provenance };
+}
+
+/** Fait entrer une moto en stock par le formulaire de S5. */
+export async function saisirMoto(
+  page: Page,
+  terrain: Terrain,
+  chassis: string,
+  options: { prixAchat?: string; conseille?: string; refusAttendu?: boolean } = {},
+) {
+  await page.goto("/motos/nouvelle", { waitUntil: "load" });
+  await page.getByLabel("Marque").selectOption({ label: terrain.marque });
+  await page.getByLabel("Modèle").selectOption({ label: terrain.modele });
+  await page.getByLabel("Numéro de châssis").fill(chassis);
+  await page.getByLabel("Provenance").selectOption({ label: terrain.provenance });
+  await page.getByLabel("Prix d’achat").fill(options.prixAchat ?? "850000");
+  if (options.conseille) {
+    await page.getByLabel(/Prix de vente conseillé/).fill(options.conseille);
+  }
+  await page.getByRole("button", { name: "Faire entrer en stock" }).click();
+
+  if (options.refusAttendu) return;
+
+  /* On attend la confirmation avant de quitter l'écran, comme le ferait
+     quelqu'un qui la lit. Enchaîner deux saisies sans l'attendre quittait la
+     page pendant que Firestore écrivait encore dans son cache local. */
+  await expect(contenu(page).getByRole("status")).toContainText(
+    chassis.replace(/[\s-]+/g, "").toUpperCase(),
+    { timeout: 20_000 },
+  );
+}
+
+/** Crée un client depuis l'écran du fichier clients (S6). */
+export async function creerClientDepuisLeFichier(page: Page, nom: string, telephone: string) {
+  await page.goto("/clients", { waitUntil: "load" });
+  await page.getByRole("button", { name: "Nouveau client" }).click();
+  const formulaire = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Créer le client" }),
+  });
+  await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
+  await formulaire.getByLabel("Téléphone", { exact: true }).fill(telephone);
+  await formulaire.getByRole("button", { name: "Créer le client" }).click();
+  await expect(contenu(page).getByRole("status")).toContainText(nom, { timeout: 20_000 });
+}

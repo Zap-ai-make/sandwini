@@ -11,6 +11,8 @@
  * ce dont on a besoin pour vendre : quelle moto, quel châssis, quel état.
  */
 
+import { ecrireLignes, lireLignes } from "./saisie";
+
 export const ETATS = ["neuve", "occasion"] as const;
 export type EtatMoto = (typeof ETATS)[number];
 
@@ -125,15 +127,11 @@ export function coutTotal(prixAchat: number, frais: { montant: number }[]): numb
 
 /** Les papiers fournis, un par ligne — on ne les invente pas en référentiel. */
 export function lirePapiers(brut: string): string[] {
-  return brut
-    .split("\n")
-    .map((ligne) => ligne.trim())
-    .filter(Boolean)
-    .slice(0, 20);
+  return lireLignes(brut);
 }
 
 export function ecrirePapiers(papiers: string[]): string {
-  return papiers.join("\n");
+  return ecrireLignes(papiers);
 }
 
 export function validerMoto(saisie: SaisieMoto): string | null {

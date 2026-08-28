@@ -337,3 +337,75 @@ function versPiece(document: QueryDocumentSnapshot): PieceNumerotee {
     recueA: cree instanceof Timestamp ? cree.toMillis() : 0,
   };
 }
+
+/**
+ * Fige le coût de la moto sur la vente, et calcule la marge.
+ *
+ * **C'est le seul acteur du système qui voit les deux côtés.** Le cahier des
+ * charges veut un `coutMotoSnapshot` figé au moment de la vente (§5.4), et le
+ * §8 réserve la marge au responsable. Ces deux exigences se contredisent dès
+ * qu'un gérant vend : le coût vit dans `motos/{id}/prive/cout`, que les règles
+ * lui refusent en lecture (`DECISIONS.md` D2) — il ne peut donc pas le recopier
+ * dans la vente qu'il enregistre. Un navigateur ne peut pas figer ce qu'il n'a
+ * pas le droit de lire.
+ *
+ * D'où ce déclencheur. Il ne fait rien qu'un appareil pourrait faire, ce qui
+ * est la seule justification acceptable pour mettre du serveur dans un produit
+ * hors-ligne d'abord (§3.4) : la vente, elle, est déjà écrite et le reçu déjà
+ * remis quand il s'exécute. Son retard ne bloque personne — la marge est un
+ * chiffre de pilotage, lu au calme par le responsable, jamais au comptoir.
+ *
+ * Il écrit dans une sous-collection qu'**aucun navigateur ne peut écrire** (les
+ * règles la ferment en écriture). La marge n'est donc pas seulement cachée au
+ * gérant : elle est infalsifiable, y compris par un responsable qui voudrait la
+ * retoucher depuis l'application.
+ *
+ * *Limite, à rouvrir le jour où le coût d'une moto deviendra modifiable :* le
+ * coût est lu à la synchronisation, pas à la seconde de la vente. Aujourd'hui
+ * il est écrit une fois pour toutes à l'entrée en stock, donc les deux valeurs
+ * sont la même. Un écran de correction du coût devra soit refuser de toucher
+ * une moto vendue, soit laisser cet instantané tranquille.
+ */
+export const figerMargeVente = onDocumentCreated(
+  { region: REGION, document: "ventesMotos/{venteId}" },
+  async (evenement) => {
+    const vente = evenement.data;
+    if (!vente) return;
+
+    const motoId = vente.get("motoId");
+    const prixConvenu = vente.get("prixConvenu");
+    const boutiqueId = vente.get("boutiqueId");
+    if (typeof motoId !== "string" || typeof prixConvenu !== "number") return;
+
+    const { base, horodatage } = await admin();
+    const cout = await base.doc(`motos/${motoId}/prive/cout`).get();
+
+    /* Aucun coût connu : on n'écrit rien. Poser un zéro annoncerait une marge
+       égale au prix de vente entier — un chiffre faux est plus dangereux qu'un
+       chiffre absent, parce qu'il ne se remarque pas. */
+    if (!cout.exists) {
+      logger.warn("Marge non figée : la moto n'a pas de coût enregistré", {
+        vente: vente.id,
+        moto: motoId,
+      });
+      return;
+    }
+
+    const coutMotoSnapshot = cout.get("coutTotal");
+    if (typeof coutMotoSnapshot !== "number") {
+      logger.warn("Marge non figée : coût illisible", { vente: vente.id, moto: motoId });
+      return;
+    }
+
+    await base.doc(`ventesMotos/${vente.id}/prive/marge`).set({
+      boutiqueId,
+      coutMotoSnapshot,
+      marge: prixConvenu - coutMotoSnapshot,
+      updatedAt: horodatage,
+      /* L'auteur est le serveur, et le dire explicitement vaut mieux que
+         recopier l'identifiant du gérant : personne n'a saisi ce chiffre. */
+      updatedBy: "systeme",
+      updatedByName: "Calcul automatique",
+    });
+  },
+);
