@@ -14,7 +14,27 @@ export type Entreprise = {
   identifiant: string;
   /** Le logo encodé en `data:` — voir plus bas pourquoi il n'est pas dans Storage. */
   logo: string | null;
+  /**
+   * Au bout de combien de jours sans versement une vente en tranches est
+   * signalée comme inactive (`prompt.md` §6.3, §14).
+   *
+   * Rangé ici et pas dans une collection de réglages : c'est le seul paramètre
+   * chiffré de l'entreprise, et un document déjà lu à chaque ouverture le porte
+   * sans coûter une lecture de plus. Il est arrivé en S9 et pas en S4 parce
+   * qu'un réglage sans liste à alimenter est pire qu'un réglage absent (D37).
+   */
+  seuilInactiviteTranches: number;
 };
+
+/**
+ * Trente jours, valeur par défaut du cahier des charges (§6.3).
+ *
+ * Les bornes ne sont pas décoratives : en dessous d'un jour la liste dirait
+ * n'importe quoi, et au-delà d'un an elle ne dirait plus rien.
+ */
+export const SEUIL_INACTIVITE_DEFAUT = 30;
+export const SEUIL_INACTIVITE_MIN = 1;
+export const SEUIL_INACTIVITE_MAX = 365;
 
 export const ENTREPRISE_VIDE: Entreprise = {
   nom: "",
@@ -23,6 +43,7 @@ export const ENTREPRISE_VIDE: Entreprise = {
   telephone2: "",
   identifiant: "",
   logo: null,
+  seuilInactiviteTranches: SEUIL_INACTIVITE_DEFAUT,
 };
 
 export const LONGUEUR_NOM_MAX = 80;
@@ -79,6 +100,11 @@ export function validerEntreprise(entreprise: Entreprise): string | null {
     return `Le numéro d’identification dépasse ${LONGUEUR_IDENTIFIANT_MAX} caractères.`;
   }
 
+  const seuil = entreprise.seuilInactiviteTranches;
+  if (!Number.isInteger(seuil) || seuil < SEUIL_INACTIVITE_MIN || seuil > SEUIL_INACTIVITE_MAX) {
+    return `Le seuil d’inactivité doit être un nombre de jours entre ${SEUIL_INACTIVITE_MIN} et ${SEUIL_INACTIVITE_MAX}.`;
+  }
+
   if (entreprise.logo !== null) {
     if (!estLogoValide(entreprise.logo)) return "Ce fichier n’est pas une image utilisable.";
     if (tailleLogo(entreprise.logo) > LOGO_OCTETS_MAX) {
@@ -96,6 +122,7 @@ export function normaliserEntreprise(entreprise: Entreprise): Entreprise {
     telephone2: entreprise.telephone2.trim(),
     identifiant: entreprise.identifiant.trim(),
     logo: entreprise.logo,
+    seuilInactiviteTranches: entreprise.seuilInactiviteTranches,
   };
 }
 

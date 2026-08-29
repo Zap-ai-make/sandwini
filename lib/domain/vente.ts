@@ -1,3 +1,4 @@
+import { formaterMontant } from "./format";
 import { lireLignes, ligneTropLongue, LIGNES_MAX, LONGUEUR_LIGNE_MAX } from "./saisie";
 
 /**
@@ -112,6 +113,8 @@ export type Vente = {
 
 export type Versement = {
   id: string;
+  /** Répété sur le document : une sous-collection ne connaît pas son grand-parent. */
+  venteId: string;
   numeroRecu: string;
   date: Date | null;
   montant: number;
@@ -347,4 +350,182 @@ export function resumerDossier(documents: readonly DocumentDossier[]): string {
   return STATUTS_DOCUMENT.filter((statut) => parStatut.has(statut))
     .map((statut) => `${parStatut.get(statut)} ${LIBELLE_STATUT_DOCUMENT[statut].toLowerCase()}`)
     .join(" · ");
+}
+
+/* ---------------------------------------------------------------------------
+   S9 — versements ultérieurs, suivi des dettes et des tranches
+   ------------------------------------------------------------------------ */
+
+export type SaisieVersement = {
+  montant: string;
+  moyenPaiement: MoyenPaiement;
+  reference: string;
+};
+
+export const SAISIE_VERSEMENT_VIDE: SaisieVersement = {
+  montant: "",
+  moyenPaiement: "especes",
+  reference: "",
+};
+
+/**
+ * Valide un versement contre ce qui reste réellement dû.
+ *
+ * `resteDu` est recalculé depuis les versements chargés, jamais lu sur
+ * l'agrégat de la vente : c'est la sous-collection qui fait foi (D56).
+ */
+export function validerVersement(saisie: SaisieVersement, resteDu: number): string | null {
+  const montant = lireMontant(saisie.montant);
+  if (montant === null) return "Le montant est obligatoire, en chiffres entiers.";
+  if (montant <= 0) return "Le montant doit être supérieur à zéro.";
+  if (resteDu <= 0) return "Cette vente est déjà soldée : il n’y a plus rien à encaisser.";
+  if (montant > resteDu) {
+    return `Un versement ne peut pas dépasser le reste dû, soit ${formaterMontant(resteDu)}.`;
+  }
+  if (saisie.reference.trim().length > LONGUEUR_REFERENCE_MAX) {
+    return `La référence dépasse ${LONGUEUR_REFERENCE_MAX} caractères.`;
+  }
+  return null;
+}
+
+/**
+ * Le numéro du reçu d'un versement : celui de la vente, suivi de son rang.
+ *
+ * Ex. `PTG-2608-0042/V2` pour le deuxième encaissement de la vente
+ * `PTG-2608-0042`. Le premier versement, écrit dans le lot de la vente (D52),
+ * porte le numéro nu — il est le rang 1.
+ *
+ * Ce n'est pas une seconde série de compteurs, et c'est délibéré (D57) : le
+ * compteur de l'appareil s'amorce sur les numéros lus dans `ventesMotos`, donc
+ * des numéros consommés ailleurs seraient invisibles à un appareil neuf, qui
+ * fabriquerait exactement les doublons que le mécanisme existe pour éviter.
+ * Dérivé du numéro de la vente, ce reçu ne consomme rien : `analyserNumero` ne
+ * le reconnaît pas, il ne peut donc pas perturber la série.
+ */
+export function numeroRecuVersement(numeroVente: string, rang: number): string {
+  return `${numeroVente}/V${rang}`;
+}
+
+/** Le nombre de jours entiers écoulés depuis une date. `null` si la date manque. */
+export function joursDepuis(date: Date | null, maintenant: Date): number | null {
+  if (!date || Number.isNaN(date.getTime())) return null;
+  const jours = Math.floor((maintenant.getTime() - date.getTime()) / 86_400_000);
+  return jours >= 0 ? jours : 0;
+}
+
+/**
+ * Une vente vue sous l'angle de l'argent, avec ses totaux recalculés.
+ *
+ * `totalPaye` et `resteDu` viennent **des versements**, pas des champs de la
+ * vente. Les seconds sont un cache d'affichage que deux appareils hors ligne
+ * peuvent se marcher dessus ; les sous-documents, eux, survivent tous (D56).
+ */
+export type LignePaiement = {
+  vente: Vente;
+  totalPaye: number;
+  resteDu: number;
+  statutPaiement: StatutPaiement;
+  dernierVersementAt: Date | null;
+  /** Jours écoulés depuis la vente — l'ancienneté d'une dette (§6.3). */
+  anciennete: number | null;
+  /** Jours depuis le dernier versement, ou depuis la vente s'il n'y en a aucun. */
+  joursSansVersement: number | null;
+};
+
+export function lignePaiement(
+  vente: Vente,
+  versements: readonly Versement[],
+  maintenant: Date,
+): LignePaiement {
+  const { totalPaye, resteDu, statutPaiement } = agregatsPaiement(vente.prixConvenu, versements);
+  const dernier = versements.reduce<Date | null>(
+    (plusRecent, versement) =>
+      versement.date && (!plusRecent || versement.date > plusRecent) ? versement.date : plusRecent,
+    null,
+  );
+  return {
+    vente,
+    totalPaye,
+    resteDu,
+    statutPaiement,
+    dernierVersementAt: dernier,
+    anciennete: joursDepuis(vente.date, maintenant),
+    /* Sans versement, l'inactivité se compte depuis la vente : un client qui
+       n'a jamais rien déposé est le plus inactif de tous. */
+    joursSansVersement: joursDepuis(dernier ?? vente.date, maintenant),
+  };
+}
+
+/** Les lignes de paiement du périmètre, versements regroupés par vente. */
+export function suivrePaiements(
+  ventes: readonly Vente[],
+  versements: readonly Versement[],
+  maintenant: Date,
+): LignePaiement[] {
+  const parVente = new Map<string, Versement[]>();
+  for (const versement of versements) {
+    const liste = parVente.get(versement.venteId);
+    if (liste) liste.push(versement);
+    else parVente.set(versement.venteId, [versement]);
+  }
+  return ventes.map((vente) => lignePaiement(vente, parVente.get(vente.id) ?? [], maintenant));
+}
+
+/** De la plus ancienne à la plus récente : on relance d'abord celui qui doit depuis le plus longtemps. */
+function comparerParAnciennete(a: LignePaiement, b: LignePaiement): number {
+  return (a.vente.date?.getTime() ?? 0) - (b.vente.date?.getTime() ?? 0);
+}
+
+/**
+ * Les dettes : moto partie chez le client, argent encore dû (§6.3).
+ *
+ * Le mode `comptant` n'y figure jamais — il est soldé par définition — et les
+ * `tranches` non plus : là, c'est le magasin qui détient l'argent, pas le
+ * client qui le doit. Confondre les deux ferait compter deux fois la même
+ * somme, une fois en créance et une fois en engagement.
+ */
+export function dettes(lignes: readonly LignePaiement[]): LignePaiement[] {
+  return lignes
+    .filter((ligne) => ligne.vente.modePaiement === "credit" && ligne.resteDu > 0)
+    .sort(comparerParAnciennete);
+}
+
+/** Les tranches en cours : moto retenue au magasin, argent détenu pour le client (§6.3). */
+export function tranchesEnCours(lignes: readonly LignePaiement[]): LignePaiement[] {
+  return lignes
+    .filter((ligne) => ligne.vente.modePaiement === "tranches" && !ligne.vente.motoRemise)
+    .sort(comparerParAnciennete);
+}
+
+/**
+ * Une tranche sans versement depuis `seuil` jours (§6.3).
+ *
+ * Signalée, jamais traitée : aucune action automatique ne se déclenche ici. Le
+ * cahier des charges est explicite, et il a raison — un client peut avoir prévenu
+ * de vive voix, et une application qui annulerait toute seule une vente en
+ * tranches détruirait de l'argent réel.
+ */
+export function estInactive(ligne: LignePaiement, seuil: number): boolean {
+  return ligne.joursSansVersement !== null && ligne.joursSansVersement >= seuil;
+}
+
+/** Le total dû par les clients — l'en-tête de la liste des dettes. */
+export function totalDu(lignes: readonly LignePaiement[]): number {
+  return lignes.reduce((somme, ligne) => somme + ligne.resteDu, 0);
+}
+
+/** Le total détenu pour le compte des clients — l'en-tête des tranches. */
+export function totalDetenu(lignes: readonly LignePaiement[]): number {
+  return lignes.reduce((somme, ligne) => somme + ligne.totalPaye, 0);
+}
+
+/**
+ * La moto d'une vente en tranches peut-elle être remise au client ?
+ *
+ * Trois conditions, et la troisième est celle qui compte : le reste dû doit
+ * être nul. C'est le seul moment où l'argent des tranches cesse d'être un
+ * engagement pour devenir une recette (§6.2), et il ne s'atteint pas à moitié.
+ */
+export function peutRemettreMoto(vente: Vente, resteDu: number): boolean {
+  return vente.modePaiement === "tranches" && !vente.motoRemise && resteDu === 0;
 }

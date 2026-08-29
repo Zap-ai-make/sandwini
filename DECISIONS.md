@@ -534,6 +534,10 @@ change, ce qui est pire qu'un réglage absent.
 *Conséquence :* il s'ajoutera à l'écran Entreprise en S9, avec sa valeur par défaut de 30 jours et la
 liste qu'il alimente.
 
+*Fait en S9 :* `seuilInactiviteTranches` vit sur `entreprise/profil`, borné entre 1 et 365 jours par
+les règles, et alimente la liste des tranches inactives. Le champ est facultatif — une fiche saisie
+avant S9 n'en a pas, et le défaut de trente jours prend le relais côté application.
+
 ## D38 — La date d'entrée vient de l'appareil, l'horodatage d'audit du serveur
 `prompt.md` §3.4, §5.2 — S5
 
@@ -880,3 +884,134 @@ qu'attendre la fin du délai croissant du SDK.
 
 *Chiffre de référence, suite complète :* 56 tests, 54 passés, les 2 ci-dessus en échec. Fichier par
 fichier, tout passe.
+
+*Mesuré à nouveau en S9, et le facteur manquait :* **l'ancienneté de l'instance d'émulateur compte
+autant que la charge de la suite.** Le même fichier `paiements.spec.ts` est passé en 2 min 36 (7/7),
+puis en 11 min 30 avec 2 échecs sur une instance d'émulateur vieille de plusieurs heures, puis à
+nouveau en 7 min 24 (7/7) après un simple redémarrage des émulateurs — sans qu'une ligne de code
+change entre les deux derniers.
+
+Les échecs ne portaient jamais sur une assertion de S9 : ils tombaient tous dans le **décor**
+(`getByLabel('Chercher dans le stock')`, le radio d'un client), c'est-à-dire sur une écoute Firestore
+qui ne délivrait plus. C'est le défaut de D50, et la suite de S9 y est la plus exposée du projet
+parce qu'elle est la plus gourmande en décor : sept tests qui chacun créent une boutique, des
+référentiels, une moto, un client et une vente.
+
+*Conséquence pratique, avant d'accuser le code :* un échec de décor dans cette suite se rejoue sur
+des émulateurs redémarrés. Si l'échec persiste, alors seulement il porte sur le produit. La
+correction de fond reste **S27**.
+
+## D56 — Les versements font foi, les agrégats de la vente sont un cache d'affichage
+`prompt.md` §3.4, §5.4 — S9, le point le plus délicat de la spec
+
+Le cahier des charges met `totalPaye` et `resteDu` sur le document de vente (§5.4). Le hors-ligne
+rend ce choix faux dans un cas précis, et ce cas n'est pas rare : **deux gérants sans réseau qui
+encaissent chacun un versement sur la même vente écrivent tous deux ce champ.** La dernière écriture
+gagne (§3.4), et un versement disparaît des totaux alors que son reçu est entre les mains du client.
+Les sous-documents, eux, survivent tous les deux — une sous-collection n'a pas de dernière écriture
+gagnante.
+
+Trois issues ont été pesées :
+
+- *Garder l'agrégat comme vérité.* C'est ce que S8 faisait, et c'est ce qui produit exactement le
+  défaut ci-dessus. Un total de paiement faux n'est pas une gêne d'affichage : c'est de l'argent
+  réclamé deux fois ou perdu.
+- *Supprimer l'agrégat, tout recalculer à la lecture.* Juste, mais le cahier des charges le demande
+  sur le document, et l'écran des ventes afficherait cinquante restes dus en ouvrant cinquante
+  sous-collections.
+- **Retenue : les deux, avec une hiérarchie explicite.** Les versements sont la source de vérité ;
+  le parent est un cache. L'appareil l'écrit dans son lot pour que l'écran soit juste tout de suite,
+  sans réseau. Un déclencheur, `recalculerPaiementsVente`, le recalcule depuis la sous-collection dès
+  que l'écriture parvient au serveur — il est le seul à voir les versements de *tous* les appareils.
+
+Le déclencheur n'a besoin d'aucun verrou : il relit la collection entière et écrit une valeur
+absolue, jamais un incrément. Deux exécutions concurrentes tombent donc d'accord sans se parler,
+comme la réconciliation des numéros (D45). Il s'abstient d'écrire quand les totaux sont déjà justes —
+c'est-à-dire dans le cas ordinaire à un seul appareil — pour ne pas payer une écriture par versement
+sur le document le plus sollicité du produit.
+
+*Conséquence côté écrans, et c'est la moitié qui compte :* **l'interface additionne les versements
+chargés, elle ne lit pas l'agrégat.** La fiche d'une vente écoute sa sous-collection ; les trois
+listes de suivi écoutent un groupe de collections filtré par boutique. Le champ du parent ne sert que
+de repli tant que les versements ne sont pas lus. C'est aussi ce que le §3.4 demande : les agrégats
+se calculent côté client, jamais depuis le serveur.
+
+*Conséquence côté règles :* `totalPaye` ne peut que **monter** depuis un navigateur, et jamais
+dépasser le prix convenu. Un trop-perçu ne peut donc venir que du déclencheur, qui l'écrit tel quel —
+et cette vente n'accepte alors plus aucun versement, ce qui est le comportement voulu. La remise de
+la moto, elle, se garde sur `resteDu == 0` de l'état d'avant : cet agrégat ne peut se tromper que
+dans le bon sens, puisque `totalPaye` n'additionne que des versements réels et reste donc inférieur
+ou égal à la vérité.
+
+*Limite inscrite :* un versement enregistré hors ligne reste invisible aux autres appareils jusqu'à
+la synchronisation. Aucun mécanisme ne peut y changer quoi que ce soit — c'est la définition du
+hors-ligne, pas un défaut de ce montage.
+
+## D57 — Le reçu d'un versement dérive du numéro de la vente, il ne consomme pas de numéro
+`prompt.md` §3.3, §10 — S9, suite de D52
+
+D52 laissait S9 libre de numéroter les versements suivants, en prévenant que la réconciliation
+serveur ne couvre que `ventesMotos`. Deux voies s'ouvraient.
+
+- *Une seconde série de compteurs.* Elle respecterait le format du §3.3 à la lettre, mais le compteur
+  d'un appareil s'amorce sur les numéros qu'il lit dans `ventesMotos` (S7) : des numéros consommés
+  par des versements resteraient invisibles à un appareil neuf, qui repartirait au milieu de la série
+  et fabriquerait précisément les doublons que le mécanisme existe pour éviter. Il faudrait alors
+  étendre la réconciliation serveur à une sous-collection — du travail réel, pour un gain nul.
+- **Retenue : le numéro de la vente, suivi du rang du reçu.** `PTG-2608-0042/V2` pour le deuxième
+  encaissement. Le premier versement, écrit dans le lot de la vente (D52), porte le numéro nu : il
+  est le rang 1. Le suffixe d'une vente renumérotée suit : `PTG-2608-0042-B/V2`.
+
+Ce numéro n'est pas une nouvelle série mais la dérivation d'un numéro déjà conforme. `analyserNumero`
+ne le reconnaît pas — vérifié par un test — donc il ne peut structurellement pas perturber le
+compteur des ventes. Et il tient le §10 mieux qu'un numéro indépendant : un reçu doit être retrouvable
+depuis la vente concernée, et celui-ci la porte écrite dessus.
+
+*Le rang se lit sur les versements chargés,* d'où une règle d'écran : le formulaire n'apparaît
+qu'une fois la sous-collection lue. Numéroter à l'aveugle serait pire que ne pas numéroter.
+
+*Limite assumée :* deux appareils hors ligne qui encaissent sur **la même vente** produiront tous
+deux un `/V2`. Les deux versements existent, les totaux restent justes après recalcul (D56), et seule
+l'étiquette du reçu se répète — dans un seul dossier, où elle se voit. C'est un ordre de grandeur
+moins grave qu'un compteur qui dérive pour toute une boutique, et cela ne demande aucun serveur.
+
+## D58 — La remise de la moto ne retouche pas les encaissements passés
+`prompt.md` §5.9, §6.2 — S9
+
+À la remise d'une moto en tranches, l'argent détenu pour le compte du client devient une recette du
+magasin. Fallait-il alors repasser sur les encaissements déjà écrits pour y retourner
+`categorieTranches` ?
+
+Non, et pour une raison qui n'est pas de commodité : **une écriture de caisse ne se retouche pas**
+(D53), et les règles la ferment en modification pour tout le monde. Le drapeau dit ce qu'était
+l'argent au moment où il est entré ; c'est un fait daté, pas un statut courant.
+
+L'information n'est pas perdue pour autant : la vente porte `motoRemise` et `dateRemiseMoto`. Un
+encaissement marqué `categorieTranches` appartient à une vente qui dit elle-même si — et quand —
+l'engagement est devenu recette. La caisse (S22) lira les deux ensemble.
+
+*Ce que la remise écrit, en revanche :* une entrée dans `ventesMotos/{id}/historique` (§3.5). Ce
+n'est pas un doublon des champs de la vente — `updatedBy` sera écrasé par la prochaine écriture,
+alors que ce geste-là doit rester attribuable. Un versement, lui, **est** sa propre trace : il
+n'écrit rien dans l'historique.
+
+*Conséquence :* la correction et l'annulation d'un versement restent hors de S9, y compris pour le
+responsable. Le §6.2 les lui réserve ; ce sont des opérations sensibles sur de l'argent encaissé et
+un reçu déjà remis, et elles rejoignent S25, qui traite déjà l'annulation d'une vente. Les règles
+gardent donc `update, delete: if false` sur les versements, pour tous les rôles — arbitré avec le
+responsable du projet, pas décidé seul.
+
+## D59 — Un déclencheur ajouté au code des fonctions coûte un rechargement complet
+S9 — constaté en vérifiant les déclencheurs
+
+Après l'ajout de `recalculerPaiementsVente`, la première exécution de `npm run test:declencheurs` a
+échoué sur `marge.test.ts` : son réveil de runtime (D43, D49) a dépassé son budget de 90 secondes,
+alors que la fonction elle-même était intacte. Les exécutions suivantes passent en 16 secondes.
+
+L'explication est le rechargement : l'émulateur Functions redécouvre tout le code après une
+recompilation, et le premier déclencheur sollicité paie cette redécouverte en plus de son propre
+démarrage à froid.
+
+*Conséquence, à savoir avant d'accuser le code :* après un `npm run build:functions`, la première
+exécution des tests de déclencheurs n'est pas une mesure. On la relance. Le réveil déjà en place
+(D49) protège des démarrages à froid ordinaires, pas de celui-là.

@@ -51,6 +51,17 @@ const PRISES = [
   { nom: "vente-nouvelle-mobile-sombre", chemin: "/motos/ventes/nouvelle", theme: "dark", mobile: true, boutique: true },
   { nom: "vente-nouvelle-bureau-clair", chemin: "/motos/ventes/nouvelle", theme: "light", mobile: false, boutique: true },
   { nom: "vente-nouvelle-bureau-sombre", chemin: "/motos/ventes/nouvelle", theme: "dark", mobile: false, boutique: true },
+  /* Sans choix de boutique : le périmètre « toutes » est celui du responsable,
+     et c'est le seul qui montre des listes garnies quel que soit l'état de la
+     base. Un écran de suivi photographié vide ne se revoit pas. */
+  { nom: "paiements-mobile-clair", chemin: "/motos/paiements", theme: "light", mobile: true },
+  { nom: "paiements-bureau-sombre", chemin: "/motos/paiements", theme: "dark", mobile: false },
+  /* La fiche d'une vente n'a pas d'adresse fixe : c'est un panneau ouvert par
+     `?vente=`. On ouvre donc la première de la liste, comme le ferait un
+     gérant — sans quoi l'écran qui porte le formulaire de versement ne serait
+     jamais regardé. */
+  { nom: "vente-fiche-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, premiereVente: true },
+  { nom: "vente-fiche-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, premiereVente: true },
   { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true, boutique: true },
   { nom: "diagnostic-bureau-sombre", chemin: "/diagnostic", theme: "dark", mobile: false, boutique: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },
@@ -62,7 +73,7 @@ const PRISES = [
 await mkdir(DOSSIER, { recursive: true });
 const navigateur = await chromium.launch();
 
-for (const { nom, chemin, theme, mobile, coupe, publique, boutique } of PRISES) {
+for (const { nom, chemin, theme, mobile, coupe, publique, boutique, premiereVente } of PRISES) {
   const contexte = await navigateur.newContext({
     ...(mobile ? devices["Pixel 7"] : { viewport: { width: 1280, height: 820 } }),
     colorScheme: theme,
@@ -118,6 +129,19 @@ for (const { nom, chemin, theme, mobile, coupe, publique, boutique } of PRISES) 
     .first()
     .waitFor({ state: "detached", timeout: 15000 })
     .catch(() => {});
+  if (premiereVente) {
+    /* Dans le contenu, pas n'importe où : la navigation principale est elle
+       aussi une liste, et sa première entrée renvoyait à l'accueil. */
+    const premiere = page.getByRole("main").getByRole("listitem").first().getByRole("link").first();
+    await premiere.waitFor({ timeout: 20000 });
+    await premiere.click();
+    await page.locator("h1").first().waitFor({ timeout: 20000 });
+    await page
+      .getByText(/Chargement/)
+      .first()
+      .waitFor({ state: "detached", timeout: 15000 })
+      .catch(() => {});
+  }
   if (coupe) {
     await contexte.setOffline(true);
     await page.getByRole("status").getByText("Hors ligne").waitFor({ timeout: 5000 });

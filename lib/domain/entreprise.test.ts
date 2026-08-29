@@ -2,6 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   ENTREPRISE_VIDE,
   LOGO_OCTETS_MAX,
+  SEUIL_INACTIVITE_DEFAUT,
+  SEUIL_INACTIVITE_MAX,
+  SEUIL_INACTIVITE_MIN,
   entrepriseComplete,
   estLogoValide,
   normaliserEntreprise,
@@ -86,5 +89,23 @@ describe("entrepriseComplete", () => {
     expect(entrepriseComplete(entreprise())).toBe(true);
     expect(entrepriseComplete(entreprise({ telephone: "" }))).toBe(false);
     expect(entrepriseComplete(ENTREPRISE_VIDE)).toBe(false);
+  });
+});
+
+describe("seuil d’inactivité des tranches", () => {
+  it("vaut trente jours par défaut, comme le cahier des charges", () => {
+    expect(ENTREPRISE_VIDE.seuilInactiviteTranches).toBe(SEUIL_INACTIVITE_DEFAUT);
+  });
+
+  it("accepte les bornes", () => {
+    for (const seuil of [SEUIL_INACTIVITE_MIN, 30, SEUIL_INACTIVITE_MAX]) {
+      expect(validerEntreprise(entreprise({ seuilInactiviteTranches: seuil }))).toBeNull();
+    }
+  });
+
+  it("refuse hors bornes, ou pas un entier de jours", () => {
+    for (const seuil of [0, -1, 366, 15.5, Number.NaN]) {
+      expect(validerEntreprise(entreprise({ seuilInactiviteTranches: seuil }))).toMatch(/seuil/i);
+    }
   });
 });

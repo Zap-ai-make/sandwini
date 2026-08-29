@@ -3,6 +3,7 @@ import { db } from "@/lib/firebase/client";
 import {
   ENTREPRISE_VIDE,
   LOGO_LARGEUR_MAX,
+  SEUIL_INACTIVITE_DEFAUT,
   normaliserEntreprise,
   type Entreprise,
 } from "@/lib/domain/entreprise";
@@ -39,6 +40,13 @@ export function ecouterEntreprise(
               telephone2: donnees.telephone2 ?? "",
               identifiant: donnees.identifiant ?? "",
               logo: typeof donnees.logo === "string" && donnees.logo ? donnees.logo : null,
+              /* Absent des fiches saisies avant S9 : le défaut du cahier des
+                 charges prend le relais plutôt qu'un zéro qui signalerait
+                 toutes les tranches comme inactives. */
+              seuilInactiviteTranches:
+                typeof donnees.seuilInactiviteTranches === "number"
+                  ? donnees.seuilInactiviteTranches
+                  : SEUIL_INACTIVITE_DEFAUT,
             }
           : ENTREPRISE_VIDE,
       );

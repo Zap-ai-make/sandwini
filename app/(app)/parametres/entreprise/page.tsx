@@ -13,6 +13,8 @@ import {
   LONGUEUR_IDENTIFIANT_MAX,
   LONGUEUR_NOM_MAX,
   LONGUEUR_TELEPHONE_MAX,
+  SEUIL_INACTIVITE_MAX,
+  SEUIL_INACTIVITE_MIN,
   validerEntreprise,
   type Entreprise,
 } from "@/lib/domain/entreprise";
@@ -208,6 +210,44 @@ function FicheEntreprise() {
                 </button>
               )}
             </span>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-plaque border border-bord bg-papier p-4">
+          <h2 className="font-semibold text-encre">Tranches inactives</h2>
+          <p className="mt-1 max-w-prose text-sm text-encre-doux">
+            Une vente en tranches dont le client n’a rien versé depuis ce nombre de jours est
+            signalée dans la liste des tranches. Rien ne se déclenche tout seul&nbsp;: la moto reste
+            au magasin, et l’argent reste au client.
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-end gap-3">
+            <div>
+              <label htmlFor="seuil-inactivite" className="block text-sm font-medium text-encre">
+                Signaler après
+              </label>
+              <input
+                id="seuil-inactivite"
+                type="number"
+                inputMode="numeric"
+                min={SEUIL_INACTIVITE_MIN}
+                max={SEUIL_INACTIVITE_MAX}
+                step={1}
+                value={
+                  Number.isFinite(saisie.seuilInactiviteTranches)
+                    ? String(saisie.seuilInactiviteTranches)
+                    : ""
+                }
+                onChange={(evenement) => {
+                  const brut = evenement.target.value.trim();
+                  changer({
+                    seuilInactiviteTranches: brut === "" ? Number.NaN : Number(brut),
+                  });
+                }}
+                className="mt-1.5 h-12 w-28 rounded-plaque border border-bord bg-papier px-3 text-encre tabular-nums"
+              />
+            </div>
+            <span className="pb-3 text-encre-doux">jours sans versement</span>
           </div>
         </div>
 

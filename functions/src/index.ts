@@ -409,3 +409,95 @@ export const figerMargeVente = onDocumentCreated(
     });
   },
 );
+
+/**
+ * Recalcule les agrégats de paiement d'une vente depuis ses versements.
+ *
+ * **Le problème qu'il résout est le pendant exact de la marge, côté argent.**
+ * `totalPaye` et `resteDu` vivent sur le document de vente, où le cahier des
+ * charges les met (§5.4). Deux gérants hors ligne qui encaissent chacun un
+ * versement sur la même vente écrivent tous deux ce champ : la dernière
+ * écriture gagne (§3.4), et un versement disparaît des totaux alors que son
+ * reçu est entre les mains du client. Les sous-documents, eux, survivent tous
+ * les deux — une sous-collection n'a pas de dernière écriture gagnante.
+ *
+ * D'où le partage retenu (`DECISIONS.md` D56) : **les versements font foi, le
+ * parent est un cache d'affichage**. L'appareil écrit le cache tout de suite
+ * pour que l'écran soit juste sans réseau ; ce déclencheur le recalcule depuis
+ * la sous-collection dès que l'écriture parvient au serveur.
+ *
+ * Il ne fait rien qu'un appareil pourrait faire — seul le serveur voit les
+ * versements de *tous* les appareils — ce qui est la seule justification
+ * acceptable de mettre du serveur dans un produit hors-ligne d'abord (§3.4).
+ * Et il n'a besoin d'aucun verrou : il relit la collection entière et écrit une
+ * valeur absolue, jamais un incrément. Deux exécutions concurrentes tombent
+ * donc sur le même résultat.
+ */
+export const recalculerPaiementsVente = onDocumentCreated(
+  { region: REGION, document: "ventesMotos/{venteId}/versements/{versementId}" },
+  async (evenement) => {
+    const venteId = evenement.params.venteId;
+    const { base, horodatage } = await admin();
+
+    const venteRef = base.doc(`ventesMotos/${venteId}`);
+    const vente = await venteRef.get();
+    if (!vente.exists) {
+      logger.warn("Recalcul impossible : la vente n'existe pas", { vente: venteId });
+      return;
+    }
+
+    const prixConvenu = vente.get("prixConvenu");
+    if (typeof prixConvenu !== "number") return;
+
+    const versements = await venteRef.collection("versements").get();
+
+    let totalPaye = 0;
+    let dernierVersementAt: Timestamp | null = null;
+    for (const versement of versements.docs) {
+      const montant = versement.get("montant");
+      if (typeof montant === "number") totalPaye += montant;
+      const date = versement.get("date");
+      if (date instanceof Timestamp && (!dernierVersementAt || date > dernierVersementAt)) {
+        dernierVersementAt = date;
+      }
+    }
+
+    /* Jamais de reste négatif : un trop-perçu vient de deux appareils qui ont
+       encaissé chacun de leur côté, et l'afficher en négatif ferait croire que
+       le magasin doit de l'argent au client. Le total, lui, dit la vérité. */
+    const resteDu = Math.max(prixConvenu - totalPaye, 0);
+    const statutPaiement = resteDu === 0 ? "solde" : totalPaye > 0 ? "partiel" : "impaye";
+
+    /* On n'écrit que si quelque chose a changé. Sans ce test, chaque versement
+       déclencherait une écriture de vente, donc rien du tout de plus — mais une
+       facture Firestore pour rien, sur le document le plus écrit du produit. */
+    if (
+      vente.get("totalPaye") === totalPaye &&
+      vente.get("resteDu") === resteDu &&
+      vente.get("statutPaiement") === statutPaiement
+    ) {
+      return;
+    }
+
+    await venteRef.update({
+      totalPaye,
+      resteDu,
+      statutPaiement,
+      dernierVersementAt,
+      updatedAt: horodatage,
+      /* Personne n'a saisi ces chiffres : ils sont la somme de ce que d'autres
+         ont saisi. Le dire vaut mieux que recopier l'auteur du dernier
+         versement, qui n'a pas décidé du total. */
+      updatedBy: "systeme",
+      updatedByName: "Recalcul automatique",
+    });
+
+    /* Le nombre de versements suffit à diagnostiquer : c'est lui qui dit si le
+       déclencheur a vu ce qu'il devait voir. Les montants, eux, n'ont rien à
+       faire dans un journal de serveur (`SECURITY.md` §13). */
+    logger.info("Agrégats de paiement recalculés", {
+      vente: venteId,
+      versements: versements.size,
+    });
+  },
+);

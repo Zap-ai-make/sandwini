@@ -60,3 +60,17 @@ export function formaterDateHeure(date: Date): string {
   if (Number.isNaN(date.getTime())) return "—";
   return `${dateCourte.format(date)} à ${heureMinute.format(date)}`;
 }
+
+/**
+ * Une ancienneté en jours, dite comme on la dit à voix haute.
+ *
+ * « Il y a 0 jour » n’est pas du français, et c’est pourtant ce que produit un
+ * compteur laissé nu. Les deux premiers jours ont leurs propres mots ; au-delà,
+ * le nombre reprend ses droits — c’est lui qu’on compare d’une ligne à l’autre.
+ */
+export function formaterAnciennete(jours: number | null): string {
+  if (jours === null || !Number.isFinite(jours)) return "date inconnue";
+  if (jours <= 0) return "aujourd’hui";
+  if (jours === 1) return "hier";
+  return `il y a ${jours} jours`;
+}

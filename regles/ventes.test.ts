@@ -196,6 +196,46 @@ beforeEach(async () => {
       ...documentDossier({ boutiqueId: "KDG", venteId: "vente-kdg" }),
       ...auditFige,
     });
+    /* Une vente à crédit partiellement payée : le cas sur lequel S9 encaisse. */
+    await setDoc(doc(base, "ventesMotos/vente-credit"), {
+      ...vente({
+        numero: "PTG-2608-0043",
+        numeroInitial: "PTG-2608-0043",
+        modePaiement: "credit",
+        totalPaye: 400_000,
+        resteDu: 800_000,
+        statutPaiement: "partiel",
+      }),
+      ...auditFige,
+    });
+
+    /* Une vente en tranches entièrement versée, moto encore au magasin :
+       le seul état d'où la remise est permise. */
+    await setDoc(doc(base, "ventesMotos/vente-tranches"), {
+      ...venteTranches({
+        numero: "PTG-2608-0044",
+        numeroInitial: "PTG-2608-0044",
+        totalPaye: 1_200_000,
+        resteDu: 0,
+        statutPaiement: "solde",
+        dernierVersementAt: hier,
+      }),
+      ...auditFige,
+    });
+
+    /* Et une autre qui doit encore, pour prouver que la remise lui est fermée. */
+    await setDoc(doc(base, "ventesMotos/vente-tranches-en-cours"), {
+      ...venteTranches({
+        numero: "PTG-2608-0045",
+        numeroInitial: "PTG-2608-0045",
+        totalPaye: 500_000,
+        resteDu: 700_000,
+        statutPaiement: "partiel",
+        dernierVersementAt: hier,
+      }),
+      ...auditFige,
+    });
+
     await setDoc(doc(base, "encaissements/enc-ptg"), { ...encaissement(), ...auditFige });
     await setDoc(doc(base, "encaissements/enc-kdg"), {
       ...encaissement({ boutiqueId: "KDG" }),
@@ -568,5 +608,300 @@ describe("versements et encaissements", () => {
   it("le gérant ne lit pas la caisse d’une autre boutique", async () => {
     await assertSucceeds(getDoc(doc(gerant(), "encaissements/enc-ptg")));
     await assertFails(getDoc(doc(gerant(), "encaissements/enc-kdg")));
+  });
+});
+
+/**
+ * S9 — la porte étroite ouverte dans un document que S8 avait fermé.
+ *
+ * Tout l'enjeu tient en une phrase : on peut désormais écrire sur une vente,
+ * et il faut prouver qu'on ne peut y écrire QUE deux choses. Un prix qui bouge
+ * après coup, un mode de paiement retourné, un client échangé — ce sont les
+ * fraudes que ces tests interdisent, bien plus que l'erreur de saisie.
+ */
+describe("S9 — encaisser un versement sur une vente", () => {
+  const encaisser = (base: ReturnType<typeof gerant>, id: string, partie: Record<string, unknown>) =>
+    updateDoc(doc(base, `ventesMotos/${id}`), {
+      updatedAt: serverTimestamp(),
+      updatedBy: "ger-1",
+      updatedByName: "Auteur",
+      ...partie,
+    });
+
+  const agregats = {
+    totalPaye: 600_000,
+    resteDu: 600_000,
+    statutPaiement: "partiel",
+    dernierVersementAt: hier,
+  };
+
+  it("le gérant met à jour les agrégats de paiement de sa boutique", async () => {
+    await assertSucceeds(encaisser(gerant(), "vente-credit", agregats));
+  });
+
+  it("un versement qui solde passe en « solde »", async () => {
+    await assertSucceeds(
+      encaisser(gerant(), "vente-credit", {
+        totalPaye: 1_200_000,
+        resteDu: 0,
+        statutPaiement: "solde",
+        dernierVersementAt: hier,
+      }),
+    );
+  });
+
+  it("le total payé ne peut pas baisser : une annulation n’est pas un encaissement", async () => {
+    await assertFails(
+      encaisser(gerant(), "vente-credit", {
+        totalPaye: 100_000,
+        resteDu: 1_100_000,
+        statutPaiement: "partiel",
+        dernierVersementAt: hier,
+      }),
+    );
+  });
+
+  it("le total payé ne peut pas stagner non plus", async () => {
+    await assertFails(
+      encaisser(gerant(), "vente-credit", { ...agregats, totalPaye: 400_000, resteDu: 800_000 }),
+    );
+  });
+
+  it("l’arithmétique doit tomber juste : reste dû = prix − payé", async () => {
+    await assertFails(encaisser(gerant(), "vente-credit", { ...agregats, resteDu: 700_000 }));
+  });
+
+  it("le statut de paiement doit suivre les montants", async () => {
+    await assertFails(encaisser(gerant(), "vente-credit", { ...agregats, statutPaiement: "solde" }));
+  });
+
+  it("aucun trop-perçu depuis un navigateur", async () => {
+    await assertFails(
+      encaisser(gerant(), "vente-credit", {
+        totalPaye: 1_300_000,
+        resteDu: 0,
+        statutPaiement: "solde",
+        dernierVersementAt: hier,
+      }),
+    );
+  });
+
+  it("un montant à virgule ou négatif est refusé", async () => {
+    await assertFails(
+      encaisser(gerant(), "vente-credit", { ...agregats, totalPaye: 600_000.5, resteDu: 599_999.5 }),
+    );
+    await assertFails(
+      encaisser(gerant(), "vente-credit", { ...agregats, totalPaye: -1, resteDu: 1_200_001 }),
+    );
+  });
+
+  it("le gérant d’une autre boutique ne touche à rien", async () => {
+    await assertFails(encaisser(gerant("ger-2", "KDG"), "vente-credit", agregats));
+  });
+
+  it("le responsable, lui, peut encaisser partout", async () => {
+    await assertSucceeds(
+      updateDoc(doc(responsable(), "ventesMotos/vente-credit"), {
+        ...agregats,
+        updatedAt: serverTimestamp(),
+        updatedBy: "resp-1",
+        updatedByName: "Responsable",
+      }),
+    );
+  });
+});
+
+describe("S9 — tout le reste de la vente demeure immuable", () => {
+  const modifier = (partie: Record<string, unknown>) =>
+    updateDoc(doc(gerant(), "ventesMotos/vente-credit"), {
+      updatedAt: serverTimestamp(),
+      updatedBy: "ger-1",
+      updatedByName: "Auteur",
+      ...partie,
+    });
+
+  it("ni le prix convenu", async () => {
+    await assertFails(modifier({ prixConvenu: 900_000 }));
+  });
+
+  it("ni le mode de paiement", async () => {
+    await assertFails(modifier({ modePaiement: "comptant" }));
+  });
+
+  it("ni le client, ni la moto", async () => {
+    await assertFails(modifier({ clientId: "client-2" }));
+    await assertFails(modifier({ motoId: "moto-autre" }));
+  });
+
+  it("ni les deux numéros, dont dépend le rapprochement des doublons", async () => {
+    await assertFails(modifier({ numero: "PTG-2608-9999" }));
+    await assertFails(modifier({ numeroInitial: "PTG-2608-9999" }));
+  });
+
+  it("ni le token de suivi, qui ouvre une page publique", async () => {
+    await assertFails(modifier({ tokenSuivi: TOKEN_VALIDE }));
+  });
+
+  it("ni la boutique : un transfert de vente n’existe pas", async () => {
+    await assertFails(modifier({ boutiqueId: "KDG" }));
+  });
+
+  it("ni un champ glissé en plus des agrégats", async () => {
+    await assertFails(
+      modifier({
+        totalPaye: 600_000,
+        resteDu: 600_000,
+        statutPaiement: "partiel",
+        dernierVersementAt: hier,
+        statutDossier: "clos",
+      }),
+    );
+  });
+
+  it("et une vente ne se supprime toujours pas", async () => {
+    await assertFails(deleteDoc(doc(gerant(), "ventesMotos/vente-credit")));
+    await assertFails(deleteDoc(doc(responsable(), "ventesMotos/vente-credit")));
+  });
+});
+
+describe("S9 — la remise de la moto au terme des tranches", () => {
+  const remettre = (base: ReturnType<typeof gerant>, id: string, auteur = "ger-1") =>
+    updateDoc(doc(base, `ventesMotos/${id}`), {
+      motoRemise: true,
+      dateRemiseMoto: hier,
+      updatedAt: serverTimestamp(),
+      updatedBy: auteur,
+      updatedByName: "Auteur",
+    });
+
+  it("permise quand les tranches sont soldées", async () => {
+    await assertSucceeds(remettre(gerant(), "vente-tranches"));
+  });
+
+  it("refusée tant qu’il reste quelque chose à verser", async () => {
+    await assertFails(remettre(gerant(), "vente-tranches-en-cours"));
+  });
+
+  it("refusée sur une vente déjà remise : elle ne se rejoue pas", async () => {
+    await assertSucceeds(remettre(gerant(), "vente-tranches"));
+    await assertFails(remettre(gerant(), "vente-tranches"));
+  });
+
+  it("sans objet sur un crédit soldé : la moto est partie le jour de la vente", async () => {
+    await assertFails(remettre(gerant(), "vente-ptg"));
+  });
+
+  it("ne sert pas de porte dérobée pour solder la vente au passage", async () => {
+    await assertFails(
+      updateDoc(doc(gerant(), "ventesMotos/vente-tranches-en-cours"), {
+        motoRemise: true,
+        dateRemiseMoto: hier,
+        totalPaye: 1_200_000,
+        resteDu: 0,
+        statutPaiement: "solde",
+        updatedAt: serverTimestamp(),
+        updatedBy: "ger-1",
+        updatedByName: "Auteur",
+      }),
+    );
+  });
+
+  it("le gérant d’une autre boutique ne remet pas cette moto", async () => {
+    await assertFails(remettre(gerant("ger-2", "KDG"), "vente-tranches", "ger-2"));
+  });
+});
+
+describe("S9 — le reçu d’un versement ultérieur", () => {
+  const versementSuivant = (partie: Record<string, unknown> = {}) =>
+    addDoc(collection(gerant(), "ventesMotos/vente-credit/versements"), {
+      ...versement({ venteId: "vente-credit", numeroRecu: "PTG-2608-0043/V2", ...partie }),
+      date: hier,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+
+  it("porte le numéro de la vente suivi de son rang", async () => {
+    await assertSucceeds(versementSuivant());
+  });
+
+  it("admet le suffixe d’une vente renumérotée par le serveur", async () => {
+    await assertSucceeds(versementSuivant({ numeroRecu: "PTG-2608-0043-B/V2" }));
+  });
+
+  it("refuse un numéro qui ne dérive d’aucune vente", async () => {
+    await assertFails(versementSuivant({ numeroRecu: "reçu numéro 2" }));
+    await assertFails(versementSuivant({ numeroRecu: "PTG-2608-0043/V" }));
+  });
+
+  it("ne se modifie ni ne se supprime — pour personne", async () => {
+    await assertFails(
+      updateDoc(doc(gerant(), "ventesMotos/vente-ptg/versements/vers-1"), { montant: 1 }),
+    );
+    await assertFails(
+      updateDoc(doc(responsable(), "ventesMotos/vente-ptg/versements/vers-1"), { montant: 1 }),
+    );
+    await assertFails(deleteDoc(doc(responsable(), "ventesMotos/vente-ptg/versements/vers-1")));
+  });
+
+  it("se lit d’un bout à l’autre du périmètre, par groupe de collections", async () => {
+    await assertSucceeds(
+      getDocs(query(collectionGroup(gerant(), "versements"), where("boutiqueId", "==", "PTG"))),
+    );
+  });
+
+  it("mais jamais ceux d’une autre boutique", async () => {
+    await assertFails(
+      getDocs(query(collectionGroup(gerant(), "versements"), where("boutiqueId", "==", "KDG"))),
+    );
+  });
+});
+
+describe("S9 — l’historique de la remise", () => {
+  const entree = (partie: Record<string, unknown> = {}) => ({
+    boutiqueId: "PTG",
+    venteId: "vente-tranches",
+    evenement: "remise_moto",
+    date: hier,
+    ...audit("ger-1"),
+    ...partie,
+  });
+
+  it("le gérant journalise la remise", async () => {
+    await assertSucceeds(
+      addDoc(collection(gerant(), "ventesMotos/vente-tranches/historique"), entree()),
+    );
+  });
+
+  it("aucun autre événement n’y est admis tant qu’aucune spec ne l’écrit", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "ventesMotos/vente-tranches/historique"), {
+        ...entree(),
+        evenement: "annulation_versement",
+      }),
+    );
+  });
+
+  it("un journal ne se réécrit pas", async () => {
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await setDoc(doc(contexte.firestore(), "ventesMotos/vente-tranches/historique/h1"), {
+        ...entree(),
+        ...auditFige,
+      });
+    });
+    await assertFails(
+      updateDoc(doc(responsable(), "ventesMotos/vente-tranches/historique/h1"), {
+        evenement: "autre",
+      }),
+    );
+    await assertFails(deleteDoc(doc(responsable(), "ventesMotos/vente-tranches/historique/h1")));
+  });
+
+  it("le gérant d’une autre boutique n’y écrit pas", async () => {
+    await assertFails(
+      addDoc(collection(gerant("ger-2", "KDG"), "ventesMotos/vente-tranches/historique"), {
+        ...entree(),
+        ...audit("ger-2"),
+      }),
+    );
   });
 });
