@@ -1,24 +1,40 @@
 import { describe, expect, it } from "vitest";
 import { normaliserNom } from "./client";
+import { formaterMontant } from "./format";
+import { estNumeroValide } from "./numerotation";
 import {
   MONTANT_MAX,
   SAISIE_VENTE_VIDE,
+  SAISIE_VERSEMENT_VIDE,
   agregatsPaiement,
   chercherVentes,
   comparerVentes,
+  dettes,
   estEngagement,
+  estInactive,
   estRenumerotee,
+  joursDepuis,
+  lignePaiement,
   lireMontant,
   lireMontantEncaisse,
   motoRemiseA,
+  numeroRecuVersement,
+  peutRemettreMoto,
   resumerDossier,
   statutMotoApresVente,
   statutPaiementDe,
+  suivrePaiements,
+  totalDetenu,
+  totalDu,
+  tranchesEnCours,
   validerVente,
+  validerVersement,
   versementMaximal,
   type SaisieVente,
+  type SaisieVersement,
   type Vente,
   type VenteCherchable,
+  type Versement,
 } from "./vente";
 
 /**
@@ -302,5 +318,239 @@ describe("résumé du dossier", () => {
 
   it("distingue « pas encore chargé » de « rien à faire »", () => {
     expect(resumerDossier([])).toBe("Dossier non chargé");
+  });
+});
+
+/* --- S9 — versements, dettes et tranches --------------------------------- */
+
+const versement = (partie: Partial<Versement> = {}): Versement => ({
+  id: "vers-1",
+  venteId: "v1",
+  numeroRecu: "PTG-2608-0042",
+  date: new Date("2026-08-20T10:00:00Z"),
+  montant: 200_000,
+  moyenPaiement: "especes",
+  reference: "",
+  encaissementId: "enc-1",
+  ...partie,
+});
+
+const venteS9 = (partie: Partial<Vente> = {}): Vente => ({
+  id: "v1",
+  numero: "PTG-2608-0042",
+  numeroInitial: "PTG-2608-0042",
+  boutiqueId: "PTG",
+  motoId: "moto-1",
+  clientId: "client-1",
+  date: new Date("2026-08-01T10:00:00Z"),
+  prixConvenu: 1_200_000,
+  modePaiement: "credit",
+  inclus: [],
+  nonInclus: [],
+  totalPaye: 0,
+  resteDu: 1_200_000,
+  statutPaiement: "impaye",
+  dernierVersementAt: null,
+  motoRemise: true,
+  dateRemiseMoto: null,
+  tokenSuivi: "t",
+  lienSuiviEnvoyeAt: null,
+  statutDossier: "ouvert",
+  dateClotureDossier: null,
+  ...partie,
+});
+
+/** Le 31 août 2026 à midi : trente jours après la vente de référence. */
+const MAINTENANT = new Date("2026-08-31T12:00:00Z");
+
+describe("validation d’un versement", () => {
+  const saisieVersement = (partie: Partial<SaisieVersement> = {}): SaisieVersement => ({
+    ...SAISIE_VERSEMENT_VIDE,
+    montant: "100000",
+    ...partie,
+  });
+
+  it("accepte un versement inférieur au reste dû", () => {
+    expect(validerVersement(saisieVersement(), 500_000)).toBeNull();
+  });
+
+  it("accepte un versement qui solde exactement", () => {
+    expect(validerVersement(saisieVersement({ montant: "500000" }), 500_000)).toBeNull();
+  });
+
+  it("refuse un versement qui dépasse le reste dû, et dit le maximum", () => {
+    /* Le montant est formaté, pas brut : c'est un chiffre qu'on lit à voix
+       haute au client qui attend au comptoir. */
+    const message = validerVersement(saisieVersement({ montant: "500001" }), 500_000);
+    expect(message).toContain(formaterMontant(500_000));
+  });
+
+  it("refuse d’encaisser sur une vente déjà soldée", () => {
+    expect(validerVersement(saisieVersement(), 0)).toContain("soldée");
+  });
+
+  it("refuse un montant vide, décimal ou nul", () => {
+    for (const montant of ["", "0", "1500,50", "abc"]) {
+      expect(validerVersement(saisieVersement({ montant }), 500_000)).not.toBeNull();
+    }
+  });
+
+  it("refuse une référence trop longue", () => {
+    const reference = "R".repeat(61);
+    expect(validerVersement(saisieVersement({ reference }), 500_000)).toContain("référence");
+  });
+});
+
+describe("numéro de reçu d’un versement", () => {
+  it("dérive du numéro de la vente et de son rang", () => {
+    expect(numeroRecuVersement("PTG-2608-0042", 2)).toBe("PTG-2608-0042/V2");
+  });
+
+  it("suit la vente jusque dans son suffixe de collision", () => {
+    expect(numeroRecuVersement("PTG-2608-0042-B", 3)).toBe("PTG-2608-0042-B/V3");
+  });
+
+  it("ne se lit pas comme un numéro de pièce : il ne perturbe pas le compteur", () => {
+    expect(estNumeroValide(numeroRecuVersement("PTG-2608-0042", 2))).toBe(false);
+  });
+});
+
+describe("ancienneté", () => {
+  it("compte les jours entiers écoulés", () => {
+    expect(joursDepuis(new Date("2026-08-01T10:00:00Z"), MAINTENANT)).toBe(30);
+  });
+
+  it("rend zéro le jour même", () => {
+    expect(joursDepuis(new Date("2026-08-31T08:00:00Z"), MAINTENANT)).toBe(0);
+  });
+
+  it("rend zéro plutôt qu’un négatif si l’horloge de l’appareil est en avance", () => {
+    expect(joursDepuis(new Date("2026-09-10T10:00:00Z"), MAINTENANT)).toBe(0);
+  });
+
+  it("rend null quand la date manque", () => {
+    expect(joursDepuis(null, MAINTENANT)).toBeNull();
+  });
+});
+
+describe("ligne de paiement", () => {
+  it("recalcule les totaux depuis les versements, pas depuis l’agrégat de la vente", () => {
+    /* L’agrégat ment volontairement ici : c’est exactement le cas de deux
+       appareils hors ligne qui se marchent dessus (D56). */
+    const ligne = lignePaiement(
+      venteS9({ totalPaye: 200_000, resteDu: 1_000_000 }),
+      [versement({ montant: 200_000 }), versement({ id: "v2", montant: 300_000 })],
+      MAINTENANT,
+    );
+    expect(ligne.totalPaye).toBe(500_000);
+    expect(ligne.resteDu).toBe(700_000);
+    expect(ligne.statutPaiement).toBe("partiel");
+  });
+
+  it("retient la date du versement le plus récent", () => {
+    const ligne = lignePaiement(
+      venteS9(),
+      [
+        versement({ id: "a", date: new Date("2026-08-10T10:00:00Z") }),
+        versement({ id: "b", date: new Date("2026-08-25T10:00:00Z") }),
+        versement({ id: "c", date: new Date("2026-08-18T10:00:00Z") }),
+      ],
+      MAINTENANT,
+    );
+    expect(ligne.dernierVersementAt).toEqual(new Date("2026-08-25T10:00:00Z"));
+    expect(ligne.joursSansVersement).toBe(6);
+  });
+
+  it("compte l’inactivité depuis la vente quand rien n’a jamais été versé", () => {
+    const ligne = lignePaiement(venteS9(), [], MAINTENANT);
+    expect(ligne.joursSansVersement).toBe(30);
+    expect(ligne.anciennete).toBe(30);
+  });
+});
+
+describe("listes de suivi des paiements", () => {
+  const ancienne = venteS9({ id: "ancienne", date: new Date("2026-07-01T10:00:00Z") });
+  const recente = venteS9({ id: "recente", date: new Date("2026-08-20T10:00:00Z") });
+  const soldee = venteS9({ id: "soldee", date: new Date("2026-07-15T10:00:00Z") });
+  const enTranches = venteS9({
+    id: "tranches",
+    modePaiement: "tranches",
+    motoRemise: false,
+    date: new Date("2026-07-10T10:00:00Z"),
+  });
+  const remise = venteS9({ id: "remise", modePaiement: "tranches", motoRemise: true });
+  const comptant = venteS9({ id: "comptant", modePaiement: "comptant" });
+
+  const lignes = suivrePaiements(
+    [ancienne, recente, soldee, enTranches, remise, comptant],
+    [
+      versement({ id: "p1", venteId: "recente", montant: 200_000 }),
+      versement({ id: "p2", venteId: "soldee", montant: 1_200_000 }),
+      versement({ id: "p3", venteId: "tranches", montant: 450_000 }),
+      versement({ id: "p4", venteId: "remise", montant: 1_200_000 }),
+      versement({ id: "p5", venteId: "comptant", montant: 1_200_000 }),
+    ],
+    MAINTENANT,
+  );
+
+  it("les dettes sont les crédits non soldés, de la plus ancienne à la plus récente", () => {
+    expect(dettes(lignes).map((ligne) => ligne.vente.id)).toEqual(["ancienne", "recente"]);
+  });
+
+  it("une vente au comptant ou en tranches n’est jamais une dette", () => {
+    const identifiants = dettes(lignes).map((ligne) => ligne.vente.id);
+    expect(identifiants).not.toContain("comptant");
+    expect(identifiants).not.toContain("tranches");
+  });
+
+  it("le total dû additionne les restes, pas les prix", () => {
+    expect(totalDu(dettes(lignes))).toBe(1_200_000 + 1_000_000);
+  });
+
+  it("les tranches en cours sont celles dont la moto n’est pas partie", () => {
+    expect(tranchesEnCours(lignes).map((ligne) => ligne.vente.id)).toEqual(["tranches"]);
+  });
+
+  it("le total détenu additionne ce qui a été encaissé pour le compte des clients", () => {
+    expect(totalDetenu(tranchesEnCours(lignes))).toBe(450_000);
+  });
+});
+
+describe("tranches inactives", () => {
+  const seuil = 30;
+  const sansVersementDepuis = (date: string) =>
+    lignePaiement(
+      venteS9({ modePaiement: "tranches", motoRemise: false }),
+      [versement({ date: new Date(date) })],
+      MAINTENANT,
+    );
+
+  it("signale une tranche sans versement depuis le seuil", () => {
+    expect(estInactive(sansVersementDepuis("2026-08-01T10:00:00Z"), seuil)).toBe(true);
+  });
+
+  it("laisse tranquille celle qui a versé la semaine dernière", () => {
+    expect(estInactive(sansVersementDepuis("2026-08-25T10:00:00Z"), seuil)).toBe(false);
+  });
+
+  it("un seuil abaissé élargit la liste", () => {
+    expect(estInactive(sansVersementDepuis("2026-08-25T10:00:00Z"), 5)).toBe(true);
+  });
+});
+
+describe("remise de la moto en fin de tranches", () => {
+  const tranches = venteS9({ modePaiement: "tranches", motoRemise: false });
+
+  it("possible seulement quand plus rien n’est dû", () => {
+    expect(peutRemettreMoto(tranches, 0)).toBe(true);
+    expect(peutRemettreMoto(tranches, 1)).toBe(false);
+  });
+
+  it("ne s’applique pas à un crédit : la moto est déjà partie", () => {
+    expect(peutRemettreMoto(venteS9({ modePaiement: "credit" }), 0)).toBe(false);
+  });
+
+  it("ne se refait pas une seconde fois", () => {
+    expect(peutRemettreMoto(venteS9({ modePaiement: "tranches", motoRemise: true }), 0)).toBe(false);
   });
 });

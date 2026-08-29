@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowLeft, CircleAlert, LoaderCircle, Lock, TriangleAlert } from "lucide-react";
+import { ArrowLeft, CircleAlert, KeyRound, LoaderCircle, Lock, TriangleAlert } from "lucide-react";
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import { formaterTelephone, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
@@ -13,9 +13,17 @@ import {
   LIBELLE_MOYEN,
   LIBELLE_STATUT_DOCUMENT,
   LIBELLE_STATUT_PAIEMENT,
+  MOYENS_PAIEMENT,
+  SAISIE_VERSEMENT_VIDE,
   estRenumerotee,
+  lignePaiement,
+  peutRemettreMoto,
+  validerVersement,
   type DocumentDossier,
+  type LignePaiement,
   type MargeVente,
+  type MoyenPaiement,
+  type SaisieVersement,
   type Vente,
   type Versement,
 } from "@/lib/domain/vente";
@@ -24,10 +32,13 @@ import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterMoto } from "@/lib/repositories/motos";
 import {
+  confirmerRemiseMoto,
   ecouterDocumentsDeVente,
   ecouterMargeVente,
   ecouterVente,
   ecouterVersements,
+  enregistrerVersement,
+  messageErreurVersement,
 } from "@/lib/repositories/ventes";
 
 /**
@@ -81,15 +92,30 @@ export function FicheVente({ id }: { id: string }) {
   const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
   const client = vente ? clients.find((fiche) => fiche.id === vente.clientId) : undefined;
 
+  /* Les totaux affichés viennent des versements, pas des champs de la vente :
+     ceux-ci sont un cache que deux appareils hors ligne peuvent s'écraser
+     mutuellement (D56). Tant que les versements ne sont pas lus, `suivi` reste
+     nul et l'écran retombe sur le cache — c'est le seul chiffre disponible, et
+     il est juste dans le cas ordinaire. */
+  const suivi = useMemo<LignePaiement | null>(
+    () => (vente && versements ? lignePaiement(vente, versements, new Date()) : null),
+    [vente, versements],
+  );
+
   return (
     <div>
-      <Link
-        href="/motos/ventes"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Ventes
-      </Link>
+      {/* Le lien de retour dans son propre bloc : « inline-flex » seul, la
+          plaque du numéro qui suit se posait sur la même ligne et recouvrait le
+          mot « Ventes ». */}
+      <div>
+        <Link
+          href="/motos/ventes"
+          className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
+        >
+          <ArrowLeft aria-hidden="true" className="size-4" />
+          Ventes
+        </Link>
+      </div>
 
       {erreur ? (
         <p role="alert" className="mt-6 text-alerte">
@@ -115,15 +141,17 @@ export function FicheVente({ id }: { id: string }) {
 
           {estRenumerotee(vente) && <Renumerotee vente={vente} />}
 
-          <Argent vente={vente} />
+          <Argent vente={vente} suivi={suivi} />
 
-          <MotoVendue vente={vente} catalogue={catalogue} />
+          {suivi && peutRemettreMoto(vente, suivi.resteDu) && <RemiseMoto vente={vente} />}
+
+          <MotoVendue vente={vente} catalogue={catalogue} suivi={suivi} />
 
           {client && <FicheClient client={client} />}
 
           <Dossier documents={documents} />
 
-          <Versements versements={versements} />
+          <Versements vente={vente} versements={versements} suivi={suivi} />
 
           {(vente.inclus.length > 0 || vente.nonInclus.length > 0) && (
             <div className="mt-6 grid gap-6 sm:grid-cols-2">
@@ -163,38 +191,123 @@ function Renumerotee({ vente }: { vente: Vente }) {
   );
 }
 
-function Argent({ vente }: { vente: Vente }) {
-  const solde = vente.resteDu === 0;
+function Argent({ vente, suivi }: { vente: Vente; suivi: LignePaiement | null }) {
+  const totalPaye = suivi?.totalPaye ?? vente.totalPaye;
+  const resteDu = suivi?.resteDu ?? vente.resteDu;
+  const statutPaiement = suivi?.statutPaiement ?? vente.statutPaiement;
+  const dernierVersementAt = suivi?.dernierVersementAt ?? vente.dernierVersementAt;
+  const solde = resteDu === 0;
+
   return (
     <section className="mt-6 overflow-hidden rounded-plaque border-2 border-plaque-bord bg-papier">
       <dl className="divide-y divide-bord">
         <Ligne titre="Prix convenu" valeur={formaterMontant(vente.prixConvenu)} />
-        <Ligne titre="Déjà payé" valeur={formaterMontant(vente.totalPaye)} />
+        <Ligne titre="Déjà payé" valeur={formaterMontant(totalPaye)} />
         <div className="flex items-baseline justify-between gap-4 bg-fond px-4 py-3">
           <dt className="text-sm font-medium text-encre">Reste dû</dt>
           <dd
             className={[
-              "text-right text-xl font-semibold",
+              "text-right text-xl font-semibold tabular-nums",
               solde ? "text-solde" : "text-encre",
             ].join(" ")}
           >
-            {formaterMontant(vente.resteDu)}
+            {formaterMontant(resteDu)}
           </dd>
         </div>
       </dl>
       {/* Jamais la couleur seule : le statut est écrit en toutes lettres
           (DESIGN.md §5). */}
       <p className="border-t border-bord px-4 py-3 text-sm text-encre-doux">
-        {LIBELLE_STATUT_PAIEMENT[vente.statutPaiement]}
-        {vente.dernierVersementAt
-          ? ` · dernier versement le ${formaterDate(vente.dernierVersementAt)}`
+        {LIBELLE_STATUT_PAIEMENT[statutPaiement]}
+        {dernierVersementAt
+          ? ` · dernier versement le ${formaterDate(dernierVersementAt)}`
           : " · aucun versement"}
       </p>
     </section>
   );
 }
 
-function MotoVendue({ vente, catalogue }: { vente: Vente; catalogue: Catalogue }) {
+/**
+ * La remise de la moto au terme des tranches.
+ *
+ * C'est le seul geste du produit qui change la nature de l'argent déjà
+ * encaissé : jusqu'ici le magasin le détenait pour le compte du client, après
+ * il l'a gagné (§6.2). D'où la confirmation en deux temps — pas une boîte de
+ * dialogue du navigateur, qui se ferme d'un clic distrait et ne se teste pas —
+ * et d'où la phrase qui dit ce qui devient irréversible.
+ */
+function RemiseMoto({ vente }: { vente: Vente }) {
+  const session = useSession();
+  const [confirmation, setConfirmation] = useState(false);
+  const [erreur, setErreur] = useState<string | null>(null);
+
+  function remettre() {
+    if (session.statut !== "connecte") return;
+    setErreur(null);
+    setConfirmation(false);
+    confirmerRemiseMoto(vente, {
+      uid: session.utilisateur.uid,
+      nom: session.utilisateur.nom,
+    }).catch((cause) => setErreur(messageErreurVersement(cause)));
+  }
+
+  return (
+    <section className="mt-6 rounded-plaque border-2 border-plaque-bord bg-plaque/15 p-4">
+      <h2 className="flex items-center gap-2 font-semibold text-encre">
+        <KeyRound aria-hidden="true" className="size-4 shrink-0" />
+        Tranches soldées — la moto peut partir
+      </h2>
+      <p className="mt-1 max-w-prose text-sm text-encre-doux">
+        Le client a versé la totalité du prix convenu. En confirmant, la moto passe en vendue et
+        l’argent détenu pour son compte devient une recette du magasin. Cette confirmation ne
+        s’annule pas depuis l’application.
+      </p>
+
+      {erreur && (
+        <p role="alert" className="mt-3 text-sm text-alerte">
+          {erreur}
+        </p>
+      )}
+
+      {confirmation ? (
+        <div className="mt-4 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={remettre}
+            className="inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          >
+            Oui, la moto est remise
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmation(false)}
+            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          >
+            Pas encore
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setConfirmation(true)}
+          className="mt-4 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+        >
+          Confirmer la remise de la moto
+        </button>
+      )}
+    </section>
+  );
+}
+
+function MotoVendue({
+  vente,
+  catalogue,
+  suivi,
+}: {
+  vente: Vente;
+  catalogue: Catalogue;
+  suivi: LignePaiement | null;
+}) {
   const souscrire = useCallback(
     (auChangement: (moto: Moto | null) => void, enErreur: (cause: unknown) => void) =>
       ecouterMoto(vente.motoId, auChangement, enErreur),
@@ -220,7 +333,13 @@ function MotoVendue({ vente, catalogue }: { vente: Vente; catalogue: Catalogue }
                 ? vente.dateRemiseMoto
                   ? `Oui, le ${formaterDate(vente.dateRemiseMoto)}`
                   : "Oui"
-                : "Non — la moto reste au magasin"
+                : /* Le montant s'ajoute, la phrase ne se remplace pas : « la
+                     moto reste au magasin » est la distinction crédit /
+                     tranches elle-même, et elle ne se dilue pas dans un
+                     chiffre (§13). */
+                  suivi && suivi.resteDu > 0
+                  ? `Non — la moto reste au magasin, il reste ${formaterMontant(suivi.resteDu)} à verser`
+                  : "Non — la moto reste au magasin"
             }
           />
           <div className="px-4 py-3">
@@ -280,7 +399,33 @@ function Dossier({ documents }: { documents: DocumentDossier[] | null }) {
   );
 }
 
-function Versements({ versements }: { versements: Versement[] | null }) {
+function Versements({
+  vente,
+  versements,
+  suivi,
+}: {
+  vente: Vente;
+  versements: Versement[] | null;
+  suivi: LignePaiement | null;
+}) {
+  return (
+    <>
+      <ListeVersements versements={versements} />
+      {/* Le formulaire n’apparaît qu’une fois les versements lus : leur nombre
+          donne le rang du reçu, et leur somme le reste réellement dû. Sans
+          eux, on numéroterait à l’aveugle. */}
+      {suivi && suivi.resteDu > 0 && (
+        <FormulaireVersement
+          vente={vente}
+          versements={versements ?? []}
+          resteDu={suivi.resteDu}
+        />
+      )}
+    </>
+  );
+}
+
+function ListeVersements({ versements }: { versements: Versement[] | null }) {
   return (
     <Bloc titre="Versements">
       {versements === null ? (
@@ -297,13 +442,20 @@ function Versements({ versements }: { versements: Versement[] | null }) {
               className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3"
             >
               <span className="min-w-0">
-                <span className="block text-encre">{LIBELLE_MOYEN[versement.moyenPaiement]}</span>
+                <span className="block text-encre">
+                  {LIBELLE_MOYEN[versement.moyenPaiement]}
+                  {versement.numeroRecu && (
+                    <span className="plaque-code ml-2 text-sm text-encre-doux">
+                      {versement.numeroRecu}
+                    </span>
+                  )}
+                </span>
                 <span className="block text-sm text-encre-doux">
                   {versement.date ? formaterDateHeure(versement.date) : "—"}
                   {versement.reference ? ` · ${versement.reference}` : ""}
                 </span>
               </span>
-              <span className="font-semibold text-encre">
+              <span className="font-semibold text-encre tabular-nums">
                 {formaterMontant(versement.montant)}
               </span>
             </li>
@@ -418,5 +570,151 @@ function Ligne({ titre, valeur, code = false }: { titre: string; valeur: string;
       <dt className="text-sm text-encre-doux">{titre}</dt>
       <dd className={["text-right text-encre", code ? "plaque-code" : ""].join(" ")}>{valeur}</dd>
     </div>
+  );
+}
+
+/**
+ * Encaisser un versement.
+ *
+ * Trois champs, dont un seul est obligatoire : c'est un geste de comptoir, pas
+ * une saisie comptable. Le maximum admissible est affiché plutôt que deviné —
+ * dire « au plus 350 000 FCFA » vaut mieux que refuser après coup.
+ *
+ * L'écriture n'est pas attendue : le lot part dans la file de Firestore et
+ * l'écoute de la sous-collection met la fiche à jour depuis le cache, sans
+ * réseau. Le gérant voit son versement et peut annoncer le numéro du reçu
+ * immédiatement, comme pour la vente elle-même.
+ */
+function FormulaireVersement({
+  vente,
+  versements,
+  resteDu,
+}: {
+  vente: Vente;
+  versements: readonly Versement[];
+  resteDu: number;
+}) {
+  const session = useSession();
+  const [saisie, setSaisie] = useState<SaisieVersement>(SAISIE_VERSEMENT_VIDE);
+  const [erreur, setErreur] = useState<string | null>(null);
+  const [recu, setRecu] = useState<string | null>(null);
+
+  function encaisser(evenement: React.FormEvent) {
+    evenement.preventDefault();
+    if (session.statut !== "connecte") return;
+
+    const probleme = validerVersement(saisie, resteDu);
+    if (probleme) {
+      setErreur(probleme);
+      setRecu(null);
+      return;
+    }
+
+    setErreur(null);
+    const { numeroRecu, enregistre } = enregistrerVersement(vente, versements, saisie, {
+      uid: session.utilisateur.uid,
+      nom: session.utilisateur.nom,
+    });
+    enregistre.catch((cause) => setErreur(messageErreurVersement(cause)));
+
+    setRecu(numeroRecu);
+    setSaisie(SAISIE_VERSEMENT_VIDE);
+  }
+
+  return (
+    <section className="mt-6">
+      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
+        Encaisser un versement
+      </h2>
+
+      {recu && (
+        <p
+          role="status"
+          className="mt-2 rounded-plaque border border-plaque-bord bg-plaque/15 p-4 text-sm text-encre"
+        >
+          Versement enregistré — reçu <span className="plaque-code">{recu}</span>. Si le réseau
+          manque, il partira seul dès son retour.
+        </p>
+      )}
+
+      <form
+        onSubmit={encaisser}
+        noValidate
+        className="mt-2 rounded-plaque border border-bord bg-papier p-4"
+      >
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="montant-versement" className="block text-sm font-medium text-encre">
+              Montant reçu
+            </label>
+            <input
+              id="montant-versement"
+              type="text"
+              inputMode="numeric"
+              autoComplete="off"
+              value={saisie.montant}
+              onChange={(evenement) =>
+                setSaisie((actuel) => ({ ...actuel, montant: evenement.target.value }))
+              }
+              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre tabular-nums"
+            />
+            <p className="mt-1 text-sm text-encre-doux">
+              Au plus {formaterMontant(resteDu)}, le reste dû.
+            </p>
+          </div>
+
+          <div>
+            <label htmlFor="moyen-versement" className="block text-sm font-medium text-encre">
+              Moyen de paiement
+            </label>
+            <select
+              id="moyen-versement"
+              value={saisie.moyenPaiement}
+              onChange={(evenement) =>
+                setSaisie((actuel) => ({
+                  ...actuel,
+                  moyenPaiement: evenement.target.value as MoyenPaiement,
+                }))
+              }
+              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+            >
+              {MOYENS_PAIEMENT.map((moyen) => (
+                <option key={moyen} value={moyen}>
+                  {LIBELLE_MOYEN[moyen]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="sm:col-span-2">
+            <label htmlFor="reference-versement" className="block text-sm font-medium text-encre">
+              Référence <span className="font-normal text-encre-doux">(facultatif)</span>
+            </label>
+            <input
+              id="reference-versement"
+              type="text"
+              autoComplete="off"
+              placeholder="Numéro de transaction mobile money"
+              value={saisie.reference}
+              onChange={(evenement) =>
+                setSaisie((actuel) => ({ ...actuel, reference: evenement.target.value }))
+              }
+              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre placeholder:text-encre-doux"
+            />
+          </div>
+        </div>
+
+        <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
+          {erreur ?? ""}
+        </p>
+
+        <button
+          type="submit"
+          className="inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+        >
+          Enregistrer le versement
+        </button>
+      </form>
+    </section>
   );
 }

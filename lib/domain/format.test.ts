@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  formaterAnciennete,
   formaterDate,
   formaterDateCourte,
   formaterDateHeure,
@@ -69,5 +70,22 @@ describe("formatage des dates", () => {
     expect(formaterDate(cassee)).toBe("—");
     expect(formaterDateCourte(cassee)).toBe("—");
     expect(formaterDateHeure(cassee)).toBe("—");
+  });
+});
+
+describe("formaterAnciennete", () => {
+  it("dit les deux premiers jours avec des mots, pas avec un compteur", () => {
+    expect(formaterAnciennete(0)).toBe("aujourd’hui");
+    expect(formaterAnciennete(1)).toBe("hier");
+  });
+
+  it("reprend le nombre au-delà : c’est lui qu’on compare d’une ligne à l’autre", () => {
+    expect(formaterAnciennete(2)).toBe("il y a 2 jours");
+    expect(formaterAnciennete(47)).toBe("il y a 47 jours");
+  });
+
+  it("dit « date inconnue » plutôt que d’inventer un chiffre", () => {
+    expect(formaterAnciennete(null)).toBe("date inconnue");
+    expect(formaterAnciennete(Number.NaN)).toBe("date inconnue");
   });
 });

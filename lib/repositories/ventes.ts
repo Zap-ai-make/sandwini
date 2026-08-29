@@ -21,12 +21,14 @@ import {
   lireMontant,
   lireMontantEncaisse,
   motoRemiseA,
+  numeroRecuVersement,
   statutMotoApresVente,
   type DocumentDossier,
   type MargeVente,
   type ModePaiement,
   type MoyenPaiement,
   type SaisieVente,
+  type SaisieVersement,
   type StatutDocument,
   type StatutPaiement,
   type TypeDocument,
@@ -202,6 +204,25 @@ export function ecouterVente(
   );
 }
 
+function lireVersement(document: QueryDocumentSnapshot<DocumentData>): Versement {
+  const donnees = document.data();
+  return {
+    id: document.id,
+    venteId: donnees.venteId ?? document.ref.parent.parent?.id ?? "",
+    numeroRecu: donnees.numeroRecu ?? "",
+    date: versDate(donnees.date),
+    montant: typeof donnees.montant === "number" ? donnees.montant : 0,
+    moyenPaiement: (donnees.moyenPaiement as MoyenPaiement) ?? "especes",
+    reference: donnees.reference ?? "",
+    encaissementId: donnees.encaissementId ?? "",
+  };
+}
+
+/** Du plus ancien au plus récent : un relevé se lit dans le sens du temps. */
+function parDate(a: Versement, b: Versement): number {
+  return (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0);
+}
+
 export function ecouterVersements(
   venteId: string,
   auChangement: (versements: Versement[]) => void,
@@ -210,24 +231,37 @@ export function ecouterVersements(
   return onSnapshot(
     collection(db(), "ventesMotos", venteId, "versements"),
     { includeMetadataChanges: true },
-    (instantane) => {
-      auChangement(
-        instantane.docs
-          .map((document): Versement => {
-            const donnees = document.data();
-            return {
-              id: document.id,
-              numeroRecu: donnees.numeroRecu ?? "",
-              date: versDate(donnees.date),
-              montant: typeof donnees.montant === "number" ? donnees.montant : 0,
-              moyenPaiement: (donnees.moyenPaiement as MoyenPaiement) ?? "especes",
-              reference: donnees.reference ?? "",
-              encaissementId: donnees.encaissementId ?? "",
-            };
-          })
-          .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0)),
-      );
-    },
+    (instantane) => auChangement(instantane.docs.map(lireVersement).sort(parDate)),
+    enErreur,
+  );
+}
+
+/**
+ * Tous les versements du périmètre, en une seule écoute (S9).
+ *
+ * Les trois listes de suivi (§6.3) additionnent les **versements**, jamais les
+ * agrégats portés par les ventes : deux appareils hors ligne qui encaissent sur
+ * la même vente écrasent mutuellement `totalPaye`, alors que leurs deux
+ * sous-documents survivent (D56). C'est aussi ce que le cahier des charges
+ * demande — les agrégats se calculent côté client (§3.4).
+ *
+ * Une requête de groupe de collections, comme pour les dossiers : une écoute
+ * par vente ferait cinquante flux pour un écran. Elle a besoin de l'index de
+ * portée « groupe » déclaré dans `firestore.indexes.json` — l'émulateur crée
+ * les siens tout seul et ne l'aurait jamais signalé.
+ */
+export function ecouterVersementsDuPerimetre(
+  boutiqueId: string | null,
+  auChangement: (versements: Versement[]) => void,
+  enErreur: (cause: unknown) => void,
+): () => void {
+  const base = collectionGroup(db(), "versements");
+  const requete = boutiqueId ? query(base, where("boutiqueId", "==", boutiqueId)) : query(base);
+
+  return onSnapshot(
+    requete,
+    { includeMetadataChanges: true },
+    (instantane) => auChangement(instantane.docs.map(lireVersement).sort(parDate)),
     enErreur,
   );
 }
@@ -396,6 +430,124 @@ export function enregistrerVente(
   return { id: reference.id, numero, enregistre: suivreEcriture(lot.commit()) };
 }
 
+/**
+ * Enregistre un versement ultérieur : le reçu, l'encaissement, les agrégats.
+ *
+ * Trois documents dans un seul lot, comme la vente elle-même. Le lot est ce qui
+ * garantit qu'un reçu remis au client a toujours son encaissement en face —
+ * hors ligne y compris, Firestore gardant le lot entier dans sa file.
+ *
+ * **Les agrégats écrits ici sont un cache d'affichage, pas la vérité (D56).**
+ * Deux appareils hors ligne qui encaissent sur la même vente écrasent
+ * mutuellement `totalPaye` : la dernière écriture gagne et un versement
+ * disparaîtrait des totaux alors que son reçu est entre les mains du client.
+ * Les deux sous-documents, eux, survivent. C'est pourquoi un déclencheur
+ * serveur recalcule les agrégats depuis la sous-collection après coup, et
+ * pourquoi les écrans additionnent les versements chargés plutôt que de croire
+ * le champ.
+ *
+ * `versements` est la liste déjà chargée par l'écran : elle sert au rang du
+ * reçu et au recalcul local. L'appeler sans elle donnerait un rang faux.
+ */
+export function enregistrerVersement(
+  vente: Vente,
+  versements: readonly Versement[],
+  saisie: SaisieVersement,
+  auteur: Auteur,
+): { numeroRecu: string; enregistre: Promise<void> } {
+  const montant = lireMontant(saisie.montant) ?? 0;
+  const maintenant = Timestamp.fromDate(new Date());
+  const versement = doc(collection(db(), "ventesMotos", vente.id, "versements"));
+  const encaissement = doc(collection(db(), "encaissements"));
+  const numeroRecu = numeroRecuVersement(vente.numero, versements.length + 1);
+
+  const { totalPaye, resteDu, statutPaiement } = agregatsPaiement(vente.prixConvenu, [
+    ...versements,
+    { montant },
+  ]);
+
+  const lot = writeBatch(db());
+
+  lot.set(versement, {
+    boutiqueId: vente.boutiqueId,
+    venteId: vente.id,
+    numeroRecu,
+    date: maintenant,
+    montant,
+    moyenPaiement: saisie.moyenPaiement,
+    reference: saisie.reference.trim(),
+    encaissementId: encaissement.id,
+    ...traceCreation(auteur),
+  });
+
+  lot.set(encaissement, {
+    boutiqueId: vente.boutiqueId,
+    date: maintenant,
+    sens: "entree",
+    montant,
+    moyenPaiement: saisie.moyenPaiement,
+    origine: "versement",
+    origineRefId: vente.id,
+    libelle: `Versement ${numeroRecu}`,
+    /* L'argent d'une vente en tranches reste un engagement tant que la moto
+       dort au magasin (§6.2). Le drapeau se pose ici et ne bougera plus : une
+       écriture de caisse ne se retouche pas (D53). C'est `motoRemise` sur la
+       vente qui dira plus tard quand cet engagement est devenu une recette. */
+    categorieTranches: estEngagement(vente.modePaiement, vente.motoRemise),
+    ...traceCreation(auteur),
+  });
+
+  lot.update(doc(db(), "ventesMotos", vente.id), {
+    totalPaye,
+    resteDu,
+    statutPaiement,
+    dernierVersementAt: maintenant,
+    ...traceModification(auteur),
+  });
+
+  return { numeroRecu, enregistre: suivreEcriture(lot.commit()) };
+}
+
+/**
+ * La remise de la moto au terme des tranches (§6.2).
+ *
+ * C'est le seul moment du produit où l'argent détenu pour le compte d'un client
+ * devient une recette du magasin. Trois écritures, indissociables : la vente
+ * enregistre la remise, la moto passe de `reservee` à `vendue`, et l'historique
+ * garde qui a remis les clés et quand.
+ *
+ * L'historique n'est pas un doublon des champs de la vente : `updatedBy` sera
+ * écrasé par la prochaine écriture, alors que ce geste-là doit rester
+ * attribuable. Les encaissements passés, eux, ne sont pas retouchés — ils sont
+ * immuables (D53), et `motoRemise` suffit à la caisse pour savoir que
+ * l'engagement a basculé.
+ */
+export function confirmerRemiseMoto(vente: Vente, auteur: Auteur): Promise<void> {
+  const maintenant = Timestamp.fromDate(new Date());
+  const lot = writeBatch(db());
+
+  lot.update(doc(db(), "ventesMotos", vente.id), {
+    motoRemise: true,
+    dateRemiseMoto: maintenant,
+    ...traceModification(auteur),
+  });
+
+  lot.update(doc(db(), "motos", vente.motoId), {
+    statut: "vendue",
+    ...traceModification(auteur),
+  });
+
+  lot.set(doc(collection(db(), "ventesMotos", vente.id, "historique")), {
+    boutiqueId: vente.boutiqueId,
+    venteId: vente.id,
+    evenement: "remise_moto",
+    date: maintenant,
+    ...traceCreation(auteur),
+  });
+
+  return suivreEcriture(lot.commit());
+}
+
 /** Traduit les refus de Firestore en phrases qui disent quoi faire. */
 export function messageErreurVente(cause: unknown): string {
   const code = (cause as { code?: string }).code ?? "";
@@ -405,4 +557,21 @@ export function messageErreurVente(cause: unknown): string {
   if (code.includes("not-found")) return "Cette moto n’existe plus dans le stock.";
   if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
   return "L’enregistrement de la vente n’a pas abouti.";
+}
+
+/**
+ * Les refus propres aux versements et à la remise.
+ *
+ * Le refus le plus probable n'est pas un défaut de droits mais une vente que
+ * l'appareil voyait autrement : reste dû déjà nul, moto déjà remise. Le message
+ * dit de rouvrir la fiche plutôt que de retenter à l'identique.
+ */
+export function messageErreurVersement(cause: unknown): string {
+  const code = (cause as { code?: string }).code ?? "";
+  if (code.includes("permission-denied")) {
+    return "Ce versement a été refusé. La vente a peut-être été soldée depuis un autre appareil : rouvrez la fiche pour voir le reste dû à jour.";
+  }
+  if (code.includes("not-found")) return "Cette vente n’existe plus.";
+  if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
+  return "L’enregistrement du versement n’a pas abouti.";
 }

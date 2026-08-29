@@ -220,7 +220,8 @@ service cloud.firestore {
 
     function entrepriseValide(donnees) {
       return donnees.keys().hasOnly(['nom', 'adresse', 'telephone', 'telephone2', 'identifiant',
-                                     'logo', 'updatedAt', 'updatedBy', 'updatedByName'])
+                                     'logo', 'seuilInactiviteTranches',
+                                     'updatedAt', 'updatedBy', 'updatedByName'])
              && donnees.nom is string
              && donnees.nom.size() > 0
              && donnees.nom.size() <= 80
@@ -229,6 +230,13 @@ service cloud.firestore {
              && texteBorne(donnees.telephone2, 40)
              && texteBorne(donnees.identifiant, 40)
              && logoValide(donnees.logo)
+             // Le seuil d'inactivité des tranches (S9, §6.3). Facultatif :
+             // les fiches saisies avant S9 n'en ont pas, et le défaut de
+             // trente jours prend le relais côté application.
+             && (!donnees.keys().hasAny(['seuilInactiviteTranches'])
+                 || (donnees.seuilInactiviteTranches is int
+                     && donnees.seuilInactiviteTranches >= 1
+                     && donnees.seuilInactiviteTranches <= 365))
              && donnees.updatedAt == request.time
              && donnees.updatedBy == request.auth.uid
              && texteBorne(donnees.updatedByName, 200);
@@ -493,6 +501,62 @@ service cloud.firestore {
       return estResponsable() || estGerantDe(boutiqueId);
     }
 
+    // --- Versements et suivi des paiements (S9) ----------------------------
+    // S8 avait fermé ce document en modification. S9 y perce une porte
+    // étroite : deux gestes passent, et tout le reste demeure immuable. Le
+    // numéro, le prix, le mode de paiement, le client, la moto et le token de
+    // suivi ne bougeront jamais depuis un navigateur.
+    //
+    // Ce qui NE passe toujours pas : corriger ou annuler un versement. C'est
+    // une opération sensible sur de l'argent déjà encaissé et un reçu déjà
+    // remis ; elle reste à S25, avec son historique (D58).
+
+    function seulsChangent(champs) {
+      // Les horodatages d'audit accompagnent toute modification : ils font
+      // partie du geste, pas de ce qu'on autorise en plus.
+      return request.resource.data.diff(resource.data).affectedKeys()
+             .hasOnly(champs.concat(['updatedAt', 'updatedBy', 'updatedByName']));
+    }
+
+    // Un encaissement. `totalPaye` ne peut que MONTER : un total qui baisse est
+    // soit une erreur, soit une annulation — et l'annulation est journalisée,
+    // réservée au responsable, et n'existe pas encore (S25).
+    //
+    // Le plafond `totalPaye <= prixConvenu` interdit le trop-perçu depuis un
+    // navigateur. Le déclencheur serveur, lui, ne passe pas par ces règles :
+    // s'il constate une somme supérieure — deux appareils hors ligne ayant
+    // encaissé chacun de leur côté — il l'écrit, et cette vente n'accepte plus
+    // aucun versement, ce qui est exactement ce qu'on veut.
+    function encaissementValideSurVente(donnees, ancien) {
+      return seulsChangent(['totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt'])
+             && montantValide(donnees.totalPaye)
+             && montantValide(donnees.resteDu)
+             && donnees.totalPaye > ancien.totalPaye
+             && donnees.totalPaye <= donnees.prixConvenu
+             && donnees.resteDu == donnees.prixConvenu - donnees.totalPaye
+             && donnees.statutPaiement == (donnees.resteDu == 0
+                                           ? 'solde'
+                                           : (donnees.totalPaye > 0 ? 'partiel' : 'impaye'))
+             && dateAppareil(donnees.dernierVersementAt);
+    }
+
+    // La remise de la moto au terme des tranches (§6.2) : le seul moment où
+    // l'argent détenu pour le compte d'un client devient une recette.
+    //
+    // La condition tient à `resteDu == 0` sur l'état d'AVANT. Cet agrégat est
+    // un cache d'affichage (D56), mais il ne peut se tromper que dans le bon
+    // sens : `totalPaye` n'additionne que des versements réels, donc il reste
+    // inférieur ou égal à la vérité, donc `resteDu` reste supérieur ou égal.
+    // Un reste dû nul l'est donc vraiment.
+    function remiseMotoValide(donnees, ancien) {
+      return seulsChangent(['motoRemise', 'dateRemiseMoto'])
+             && ancien.modePaiement == 'tranches'
+             && ancien.motoRemise == false
+             && ancien.resteDu == 0
+             && donnees.motoRemise == true
+             && dateAppareil(donnees.dateRemiseMoto);
+    }
+
     match /ventesMotos/{venteId} {
       allow read: if peutVendrePour(resource.data.boutiqueId);
 
@@ -500,6 +564,38 @@ service cloud.firestore {
                     && traceCreation(request.resource.data)
                     && peutVendrePour(request.resource.data.boutiqueId);
 
+      allow update: if peutVendrePour(resource.data.boutiqueId)
+                    && traceModification(request.resource.data, resource.data)
+                    && (encaissementValideSurVente(request.resource.data, resource.data)
+                        || remiseMotoValide(request.resource.data, resource.data));
+
+      // Une vente ne se supprime pas : elle s'annule, et l'annulation laisse
+      // une trace. S25.
+      allow delete: if false;
+    }
+
+    // L'historique d'une vente (§3.5). Une seule entrée y est écrite
+    // aujourd'hui — la remise de la moto — parce que c'est le seul changement
+    // d'état dont la trace disparaîtrait autrement : `updatedBy` sur la vente
+    // sera écrasé par la prochaine écriture. Un versement, lui, EST sa propre
+    // trace.
+    function historiqueValide(donnees, venteId) {
+      return donnees.keys().hasOnly(['boutiqueId', 'venteId', 'evenement',
+                                     'date'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'venteId', 'evenement',
+                                       'date'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.venteId == venteId
+             && donnees.evenement == 'remise_moto'
+             && dateAppareil(donnees.date);
+    }
+
+    match /ventesMotos/{venteId}/historique/{entree} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+      allow create: if historiqueValide(request.resource.data, venteId)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+      // Un journal ne se réécrit pas. C'est ce qui en fait un journal.
       allow update, delete: if false;
     }
 
@@ -549,10 +645,22 @@ service cloud.firestore {
       allow read: if peutVendrePour(resource.data.boutiqueId);
     }
 
-    // Les versements. S8 n'en écrit qu'un, celui du jour de la vente, dans le
-    // lot de la vente. Les suivants sont l'affaire de S9 — d'où l'absence de
-    // mise à jour ici : corriger ou annuler un versement est une opération
-    // journalisée, réservée au responsable, qui n'existe pas encore.
+    // Les versements. S8 écrit celui du jour de la vente dans le lot de la
+    // vente ; S9 ajoute les suivants. Aucun ne se modifie ni ne se supprime,
+    // pour personne : un reçu remis à un client ne se retouche pas depuis un
+    // écran. La correction et l'annulation sont à S25, journalisées.
+    //
+    // Le numéro du reçu dérive de celui de la vente, suivi du rang du versement
+    // (D57) : `PTG-2608-0042/V2`. Ce n'est pas une seconde série de compteurs,
+    // et c'est délibéré — un compteur nourri ailleurs que dans `ventesMotos`
+    // serait invisible à un appareil neuf, qui refabriquerait les doublons que
+    // le mécanisme existe pour éviter. Le suffixe `-B` d'une vente renumérotée
+    // est admis : le reçu suit sa vente.
+    function numeroRecu(valeur) {
+      return valeur is string
+             && valeur.matches('^[A-Z]{3}-[0-9]{4}-[0-9]{4,}(-[A-Z]+)?(/V[0-9]{1,4})?$');
+    }
+
     function versementValide(donnees, venteId) {
       return donnees.keys().hasOnly(['boutiqueId', 'venteId', 'numeroRecu', 'date', 'montant',
                                      'moyenPaiement', 'reference',
@@ -562,7 +670,7 @@ service cloud.firestore {
                                        'encaissementId'].concat(champsAudit()))
              && donnees.boutiqueId is string
              && donnees.venteId == venteId
-             && numeroDOrigine(donnees.numeroRecu)
+             && numeroRecu(donnees.numeroRecu)
              && dateAppareil(donnees.date)
              && montantValide(donnees.montant)
              && donnees.montant > 0
@@ -578,6 +686,15 @@ service cloud.firestore {
                     && traceCreation(request.resource.data)
                     && peutVendrePour(request.resource.data.boutiqueId);
       allow update, delete: if false;
+    }
+
+    // La lecture d'ensemble des versements, sur laquelle reposent les trois
+    // listes de suivi (§6.3) : elles additionnent les versements, jamais les
+    // agrégats portés par les ventes (§3.4, D56). Comme pour les dossiers, une
+    // requête de groupe de collections n'emprunte pas la règle du chemin
+    // complet ci-dessus — il lui faut ce chemin récursif, à condition égale.
+    match /{chemin=**}/versements/{versementId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
     }
 
     // La caisse. Rien ne lit encore ces documents — le journal et la clôture

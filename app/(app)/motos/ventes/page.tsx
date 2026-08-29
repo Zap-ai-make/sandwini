@@ -132,13 +132,21 @@ function Ventes() {
             {perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
           </p>
         </div>
-        <Link
-          href="/motos/ventes/nouvelle"
-          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-        >
-          <Plus aria-hidden="true" className="size-4" />
-          Nouvelle vente
-        </Link>
+        <div className="flex shrink-0 flex-wrap gap-2">
+          <Link
+            href="/motos/ventes/nouvelle"
+            className="inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Nouvelle vente
+          </Link>
+          <Link
+            href="/motos/paiements"
+            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          >
+            Paiements
+          </Link>
+        </div>
       </div>
 
       <div className="mt-6">

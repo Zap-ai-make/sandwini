@@ -26,7 +26,7 @@ Tout ce qui sert le confort, le pilotage ou un second métier (pièces détaché
 | S6  | Clients — recherche et création               | S3               | MVP       | terminée |
 | S7  | Numérotation hors-ligne des pièces comptables | S3               | MVP       | terminée |
 | S8  | Vente de moto — enregistrement                | S5, S6, S7       | MVP       | terminée |
-| S9  | Versements et suivi des paiements             | S8               | MVP       | à faire |
+| S9  | Versements et suivi des paiements             | S8               | MVP       | terminée |
 | S10 | Reçus imprimables hors-ligne                  | S8, S9           | MVP       | à faire |
 | S11 | Dossier documents — cycle de vie et suivi     | S4, S8           | MVP       | à faire |
 | S12 | Règles Firestore — durcissement et tests      | S1 → S11         | MVP       | à faire |
@@ -52,7 +52,7 @@ avant toute spec post-MVP.
 | S22 | Caisse — journal et clôture de journée        | S9          | Les encaissements existent dès S9 ; ici on ajoute la lecture et le comptage. |
 | S23 | Inventaires motos et pièces + comparaison     | S5, S20     | Exercice périodique, pas quotidien. |
 | S24 | Tableau de bord — vue d'ensemble responsable  | S9, S11     | Pilotage ; a besoin que les données à agréger existent d'abord. |
-| S25 | Annulation et correction de vente             | S9          | Opération sensible, cf. `DECISIONS.md` D10. |
+| S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
 | S27 | Reconnexion immédiate au retour du réseau     | aucune      | Aujourd'hui, la file d'écritures repart quand le SDK Firestore a fini son attente croissante — jusqu'à une minute après le retour du signal. Sur un marché à couverture intermittente, c'est le geste le plus visible du produit. Cf. `DECISIONS.md` D50. |
 
