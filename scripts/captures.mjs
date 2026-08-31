@@ -62,6 +62,16 @@ const PRISES = [
      jamais regardé. */
   { nom: "vente-fiche-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, premiereVente: true },
   { nom: "vente-fiche-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, premiereVente: true },
+  { nom: "recus-mobile-clair", chemin: "/motos/recus", theme: "light", mobile: true },
+  { nom: "recus-bureau-sombre", chemin: "/motos/recus", theme: "dark", mobile: false },
+  /* Le reçu lui-même : un panneau ouvert par `?recu=`, donc atteint en cliquant
+     la première ligne de la liste, comme le ferait un gérant. */
+  { nom: "recu-mobile-clair", chemin: "/motos/recus", theme: "light", mobile: true, premierRecu: true },
+  { nom: "recu-bureau-sombre", chemin: "/motos/recus", theme: "dark", mobile: false, premierRecu: true },
+  /* **Le rendu imprimé, qui est le vrai livrable de S10.** Un `@media print`
+     cassé ne se voit sur aucune capture ordinaire : sans cette prise, la revue
+     visuelle regarderait un écran et croirait avoir vu le papier. */
+  { nom: "recu-papier", chemin: "/motos/recus", theme: "light", mobile: false, premierRecu: true, impression: true },
   { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true, boutique: true },
   { nom: "diagnostic-bureau-sombre", chemin: "/diagnostic", theme: "dark", mobile: false, boutique: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },
@@ -73,7 +83,18 @@ const PRISES = [
 await mkdir(DOSSIER, { recursive: true });
 const navigateur = await chromium.launch();
 
-for (const { nom, chemin, theme, mobile, coupe, publique, boutique, premiereVente } of PRISES) {
+for (const {
+  nom,
+  chemin,
+  theme,
+  mobile,
+  coupe,
+  publique,
+  boutique,
+  premiereVente,
+  premierRecu,
+  impression,
+} of PRISES) {
   const contexte = await navigateur.newContext({
     ...(mobile ? devices["Pixel 7"] : { viewport: { width: 1280, height: 820 } }),
     colorScheme: theme,
@@ -129,7 +150,7 @@ for (const { nom, chemin, theme, mobile, coupe, publique, boutique, premiereVent
     .first()
     .waitFor({ state: "detached", timeout: 15000 })
     .catch(() => {});
-  if (premiereVente) {
+  if (premiereVente || premierRecu) {
     /* Dans le contenu, pas n'importe où : la navigation principale est elle
        aussi une liste, et sa première entrée renvoyait à l'accueil. */
     const premiere = page.getByRole("main").getByRole("listitem").first().getByRole("link").first();
@@ -146,6 +167,10 @@ for (const { nom, chemin, theme, mobile, coupe, publique, boutique, premiereVent
     await contexte.setOffline(true);
     await page.getByRole("status").getByText("Hors ligne").waitFor({ timeout: 5000 });
   }
+  /* On regarde ce qui sortira de l'imprimante, pas ce qui est à l'écran : la
+     feuille `@media print` retire la coquille, repasse la palette en clair et
+     ajoute les traits de signature (DESIGN.md §14 — regarder le rendu réel). */
+  if (impression) await page.emulateMedia({ media: "print" });
   await page.screenshot({ path: `${DOSSIER}/${nom}.png`, fullPage: !mobile });
   console.log(`capturé  ${DOSSIER}/${nom}.png`);
   await contexte.close();

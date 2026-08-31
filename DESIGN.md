@@ -166,6 +166,7 @@ On critique son propre travail pendant la construction, pas seulement à la fin.
 - Dépense ta hardiesse à un seul endroit : que la signature soit la chose mémorable, et que tout le reste soit calme et discipliné. Coupe toute décoration qui ne sert pas le brief.
 - Le conseil de Chanel : avant de sortir, regarde-toi dans le miroir et retire un accessoire. Un élément en moins, presque toujours.
 - Si l'environnement le permet, prends une capture d'écran et regarde le rendu réel — une image vaut mille tokens.
+- **Un écran qui a un rendu imprimé en a deux, et la capture ordinaire n'en montre qu'un.** Un `@media print` cassé — palette sombre partie sur le papier, navigation qui sort de l'imprimante, marges absentes — ne se voit sur aucune capture d'écran. Si le livrable se pose sur du papier ou part en PDF, on le photographie aussi sous média `print` (leçon de S10).
 - Ne pas prendre de risque est aussi un risque. La direction générique « safe » est précisément ce qu'on veut éviter.
 
 **Passage obligatoire avant de considérer un écran fini :**

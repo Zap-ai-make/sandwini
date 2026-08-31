@@ -1,13 +1,5 @@
-import { expect, test, type Page } from "@playwright/test";
-import {
-  bandeauEtat,
-  contenu,
-  creerClientDepuisLeFichier,
-  preparerTerrain,
-  saisirMoto,
-  seConnecterEtEntrer,
-  type Terrain,
-} from "./aide";
+import { expect, test } from "@playwright/test";
+import { bandeauEtat, contenu, encaisser, seConnecterEtEntrer, vendre } from "./aide";
 
 /**
  * Versements et suivi des paiements (S9).
@@ -33,53 +25,6 @@ import {
 test.beforeEach(({}, informations) => {
   informations.setTimeout(180_000);
 });
-
-function chassisUnique(prefixe: string): string {
-  return `${prefixe}${Date.now().toString(36).toUpperCase()}`;
-}
-
-/**
- * Enregistre une vente et ouvre sa fiche. Rend de quoi la retrouver.
- *
- * `encaisse` est le montant déposé le jour de la vente — celui que S8 écrit
- * dans le lot. Tout ce que S9 ajoute vient après.
- */
-async function vendre(
-  page: Page,
-  options: { mode: "Crédit" | "Tranches"; prix: string; encaisse: string },
-): Promise<{ terrain: Terrain; client: string; chassis: string; numero: string }> {
-  const terrain = await preparerTerrain(page);
-  const chassis = chassisUnique("PAIE");
-  await saisirMoto(page, terrain, chassis, { prixAchat: "700000", conseille: options.prix });
-
-  const client = `Zongo ${Date.now().toString(36)}`;
-  await creerClientDepuisLeFichier(page, client, `78${String(Date.now()).slice(-6)}`);
-
-  await page.goto("/motos/ventes/nouvelle", { waitUntil: "load" });
-  await page.getByLabel("Chercher dans le stock").fill(chassis);
-  await page.getByRole("radio", { name: new RegExp(chassis) }).check();
-  await page.getByLabel("Chercher un client").fill(client);
-  await page.getByRole("radio", { name: new RegExp(client) }).check();
-  await page.getByLabel("Prix convenu", { exact: true }).fill(options.prix);
-  await page.getByRole("radio", { name: new RegExp(options.mode) }).check();
-  await page.getByLabel(/Montant reçu/).fill(options.encaisse);
-  await page.getByRole("button", { name: "Enregistrer la vente" }).click();
-
-  const confirmation = contenu(page).getByRole("status");
-  await expect(confirmation).toContainText("Vente enregistrée", { timeout: 20_000 });
-  const numero = (await confirmation.locator(".plaque-code").textContent())!.trim();
-
-  await page.getByRole("link", { name: "Voir la vente" }).click();
-  await expect(contenu(page).getByRole("heading", { level: 1 })).toContainText(client);
-
-  return { terrain, client, chassis, numero };
-}
-
-/** Encaisse un versement depuis la fiche ouverte. */
-async function encaisser(page: Page, montant: string) {
-  await page.getByLabel("Montant reçu").fill(montant);
-  await page.getByRole("button", { name: "Enregistrer le versement" }).click();
-}
 
 test.describe("encaisser un versement", () => {
   test("un versement s’ajoute à une vente à crédit, et le reste dû tombe", async ({ page }) => {

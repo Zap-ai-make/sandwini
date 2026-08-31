@@ -27,7 +27,7 @@ Tout ce qui sert le confort, le pilotage ou un second métier (pièces détaché
 | S7  | Numérotation hors-ligne des pièces comptables | S3               | MVP       | terminée |
 | S8  | Vente de moto — enregistrement                | S5, S6, S7       | MVP       | terminée |
 | S9  | Versements et suivi des paiements             | S8               | MVP       | terminée |
-| S10 | Reçus imprimables hors-ligne                  | S8, S9           | MVP       | à faire |
+| S10 | Reçus imprimables hors-ligne                  | S8, S9           | MVP       | terminée |
 | S11 | Dossier documents — cycle de vie et suivi     | S4, S8           | MVP       | à faire |
 | S12 | Règles Firestore — durcissement et tests      | S1 → S11         | MVP       | à faire |
 

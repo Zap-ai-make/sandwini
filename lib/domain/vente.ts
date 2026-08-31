@@ -109,6 +109,15 @@ export type Vente = {
   lienSuiviEnvoyeAt: Date | null;
   statutDossier: StatutDossier;
   dateClotureDossier: Date | null;
+  /**
+   * Le nom de qui a enregistré la vente, tel qu'il s'imprime sur le reçu (§10).
+   *
+   * Recopié depuis la trace d'audit `createdByName` : le reçu doit nommer une
+   * personne, et `createdBy` n'est qu'un identifiant de compte. Ce champ ne se
+   * relit jamais pour décider quoi que ce soit — c'est une mention, pas un
+   * droit.
+   */
+  operateur: string;
 };
 
 export type Versement = {
@@ -121,6 +130,8 @@ export type Versement = {
   moyenPaiement: MoyenPaiement;
   reference: string;
   encaissementId: string;
+  /** Le nom de qui a encaissé, imprimé sur le reçu (§10). Cf. `Vente.operateur`. */
+  operateur: string;
 };
 
 export type DocumentDossier = {

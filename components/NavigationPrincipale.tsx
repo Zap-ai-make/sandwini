@@ -36,7 +36,8 @@ export function NavigationPrincipale() {
     <nav
       aria-label="Navigation principale"
       className={[
-        "sticky bottom-0 z-30 border-t border-bord bg-papier",
+        // `print:hidden` : la navigation ne sort pas sur le papier (S10).
+        "sticky bottom-0 z-30 border-t border-bord bg-papier print:hidden",
         // Placée après le contenu dans le DOM (cf. (app)/layout.tsx) : elle est
         // donc en bas sur téléphone, et repasse à gauche sur grand écran.
         "sm:sticky sm:top-0 sm:order-first sm:h-dvh sm:w-56 sm:shrink-0 sm:border-t-0 sm:border-r",

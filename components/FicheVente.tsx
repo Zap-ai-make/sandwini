@@ -1,12 +1,22 @@
 "use client";
 
-import { ArrowLeft, CircleAlert, KeyRound, LoaderCircle, Lock, TriangleAlert } from "lucide-react";
+import {
+  ArrowLeft,
+  CircleAlert,
+  KeyRound,
+  LoaderCircle,
+  Lock,
+  Printer,
+  ReceiptText,
+  TriangleAlert,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import { formaterTelephone, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
+import { identifiantRecu, rangInscrit } from "@/lib/domain/recu";
 import {
   LIBELLE_DOCUMENT,
   LIBELLE_MODE,
@@ -142,6 +152,16 @@ export function FicheVente({ id }: { id: string }) {
           {estRenumerotee(vente) && <Renumerotee vente={vente} />}
 
           <Argent vente={vente} suivi={suivi} />
+
+          {/* Le reçu de la vente se réimprime à tout moment, et il se compose
+              à la lecture : rien n'a été figé à la première impression (D61). */}
+          <Link
+            href={`/motos/recus?recu=${identifiantRecu(vente.id, null)}`}
+            className="mt-4 inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
+          >
+            <Printer aria-hidden="true" className="size-4" />
+            Reçu de vente
+          </Link>
 
           {suivi && peutRemettreMoto(vente, suivi.resteDu) && <RemiseMoto vente={vente} />}
 
@@ -455,8 +475,21 @@ function ListeVersements({ versements }: { versements: Versement[] | null }) {
                   {versement.reference ? ` · ${versement.reference}` : ""}
                 </span>
               </span>
-              <span className="font-semibold text-encre tabular-nums">
-                {formaterMontant(versement.montant)}
+              <span className="flex shrink-0 items-center gap-3">
+                <span className="font-semibold text-encre tabular-nums">
+                  {formaterMontant(versement.montant)}
+                </span>
+                {/* L'acompte du jour de la vente n'a pas de reçu à lui : il est
+                    porté par le reçu de vente, remis en même temps (D52). */}
+                {rangInscrit(versement.numeroRecu) !== null && (
+                  <Link
+                    href={`/motos/recus?recu=${identifiantRecu(versement.venteId, versement.id)}`}
+                    className="inline-flex items-center gap-1.5 rounded-plaque border border-bord px-2.5 py-1.5 text-sm font-medium text-encre hover:bg-fond"
+                  >
+                    <ReceiptText aria-hidden="true" className="size-4" />
+                    Reçu
+                  </Link>
+                )}
               </span>
             </li>
           ))}

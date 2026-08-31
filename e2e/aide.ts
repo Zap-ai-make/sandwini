@@ -216,3 +216,56 @@ export async function creerClientDepuisLeFichier(page: Page, nom: string, teleph
   await formulaire.getByRole("button", { name: "Créer le client" }).click();
   await expect(contenu(page).getByRole("status")).toContainText(nom, { timeout: 20_000 });
 }
+
+/** Un numéro de châssis neuf par exécution, sur le même principe. */
+export function chassisUnique(prefixe: string): string {
+  return `${prefixe}${Date.now().toString(36).toUpperCase()}`;
+}
+
+/**
+ * Enregistre une vente de bout en bout et ouvre sa fiche.
+ *
+ * Monté pour S9, repris tel quel par S10 : un reçu a besoin exactement du même
+ * décor qu'un versement — boutique, référentiels, moto, client, vente — et en
+ * tenir deux copies, c'était s'assurer qu'elles divergent (même raison que
+ * `preparerTerrain`).
+ *
+ * `encaisse` est le montant déposé le jour de la vente, celui que S8 écrit dans
+ * le lot. Tout le reste vient après.
+ */
+export async function vendre(
+  page: Page,
+  options: { mode: "Crédit" | "Tranches"; prix: string; encaisse: string },
+): Promise<{ terrain: Terrain; client: string; chassis: string; numero: string }> {
+  const terrain = await preparerTerrain(page);
+  const chassis = chassisUnique("PAIE");
+  await saisirMoto(page, terrain, chassis, { prixAchat: "700000", conseille: options.prix });
+
+  const client = `Zongo ${Date.now().toString(36)}`;
+  await creerClientDepuisLeFichier(page, client, `78${String(Date.now()).slice(-6)}`);
+
+  await page.goto("/motos/ventes/nouvelle", { waitUntil: "load" });
+  await page.getByLabel("Chercher dans le stock").fill(chassis);
+  await page.getByRole("radio", { name: new RegExp(chassis) }).check();
+  await page.getByLabel("Chercher un client").fill(client);
+  await page.getByRole("radio", { name: new RegExp(client) }).check();
+  await page.getByLabel("Prix convenu", { exact: true }).fill(options.prix);
+  await page.getByRole("radio", { name: new RegExp(options.mode) }).check();
+  await page.getByLabel(/Montant reçu/).fill(options.encaisse);
+  await page.getByRole("button", { name: "Enregistrer la vente" }).click();
+
+  const confirmation = contenu(page).getByRole("status");
+  await expect(confirmation).toContainText("Vente enregistrée", { timeout: 20_000 });
+  const numero = (await confirmation.locator(".plaque-code").textContent())!.trim();
+
+  await page.getByRole("link", { name: "Voir la vente" }).click();
+  await expect(contenu(page).getByRole("heading", { level: 1 })).toContainText(client);
+
+  return { terrain, client, chassis, numero };
+}
+
+/** Encaisse un versement depuis la fiche de vente ouverte. */
+export async function encaisser(page: Page, montant: string) {
+  await page.getByLabel("Montant reçu").fill(montant);
+  await page.getByRole("button", { name: "Enregistrer le versement" }).click();
+}
