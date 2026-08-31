@@ -52,7 +52,7 @@ export function Recu({
        serait illisible sur un comptoir. */
     <article
       aria-label={`${LIBELLE_TYPE_RECU[contenu.type]} ${contenu.numero}`}
-      className="mx-auto max-w-[148mm] rounded-plaque border border-bord bg-papier p-6 text-encre print:max-w-none print:rounded-none print:border-0 print:p-0"
+      className="mx-auto max-w-[148mm] rounded-plaque border border-bord bg-papier p-6 text-encre print:rounded-none print:border-0 print:p-0"
     >
       <header className="flex items-start justify-between gap-4">
         <div className="min-w-0">
@@ -79,7 +79,7 @@ export function Recu({
             revenant au comptoir. À l'impression, le fond jaune cède la place à
             un cadre — de l'encre en moins, et un aplat de couleur ne sort pas
             en noir et blanc. */}
-        <p className="plaque-code shrink-0 rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe print:bg-transparent print:text-encre">
+        <p className="plaque-code shrink-0 rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe print:border-encre print:bg-transparent print:text-encre">
           {contenu.numero}
         </p>
       </header>
@@ -112,7 +112,7 @@ export function Recu({
           )}
         </Ligne>
         <Ligne titre="Moto">
-          <span className="block">{moto ? modele : "Moto hors de ce périmètre"}</span>
+          <span className="block">{moto ? modele : "Moto introuvable"}</span>
           {moto && <span className="plaque-code block text-sm">{moto.numeroChassis}</span>}
         </Ligne>
         <Ligne titre="Mode de paiement">{LIBELLE_MODE[vente.modePaiement]}</Ligne>

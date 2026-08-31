@@ -1,10 +1,10 @@
 "use client";
 
-import { ArrowLeft, Check, LoaderCircle, Printer, Share2 } from "lucide-react";
+import { ArrowLeft, Check, LoaderCircle, Printer, Share2, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Recu } from "@/components/Recu";
-import { ENTREPRISE_VIDE, type Entreprise } from "@/lib/domain/entreprise";
+import { ENTREPRISE_VIDE, entrepriseComplete, type Entreprise } from "@/lib/domain/entreprise";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_TYPE_RECU, lireIdentifiantRecu, textePartage, trouverRecu } from "@/lib/domain/recu";
@@ -77,13 +77,19 @@ export function PanneauRecu({ cle }: { cle: string }) {
     "L’en-tête de l’entreprise n’a pas pu être lu.",
   );
 
+  /* Enveloppée pour la même raison que la vente : une moto absente et une moto
+     pas encore arrivée sont deux `null` différents, et le reçu doit attendre la
+     seconde sans attendre la première. */
   const motoId = vente?.motoId ?? "";
   const souscrireMoto = useCallback(
-    (auChangement: (moto: Moto | null) => void, enErreur: (cause: unknown) => void) =>
-      motoId ? ecouterMoto(motoId, auChangement, enErreur) : () => {},
+    (auChangement: (etat: { moto: Moto | null }) => void, enErreur: (cause: unknown) => void) =>
+      motoId ? ecouterMoto(motoId, (moto) => auChangement({ moto }), enErreur) : () => {},
     [motoId],
   );
-  const { valeur: moto } = useAbonnement(souscrireMoto, "La moto n’a pas pu être chargée.");
+  const { valeur: etatMoto, erreur: erreurMoto } = useAbonnement(
+    souscrireMoto,
+    "La moto n’a pas pu être chargée.",
+  );
 
   /* Le reçu ne se compose qu'une fois les versements lus : leur somme donne le
      reste dû du jour, et l'agrégat de la vente ne le donnerait pas (D56). */
@@ -92,7 +98,19 @@ export function PanneauRecu({ cle }: { cle: string }) {
     [vente, versements, cle],
   );
 
-  const enCours = venteId !== "" && (etatVente === null || versements === null) && !erreur;
+  /* **Le reçu s'affiche complet ou pas du tout.** L'en-tête de l'entreprise et
+     la moto arrivent par des écoutes distinctes, et pendant leur trajet le
+     document disait « Entreprise non renseignée » et « Moto introuvable » — deux
+     affirmations fausses, sur un papier qu'un gérant pressé aurait pu imprimer.
+     Vu en regardant la capture du rendu imprimé, pas à l'écran (`DESIGN.md`
+     §14). */
+  const enCours =
+    venteId !== "" &&
+    !erreur &&
+    (etatVente === null ||
+      versements === null ||
+      entreprise === null ||
+      (vente !== null && etatMoto === null && !erreurMoto));
 
   return (
     <div>
@@ -129,15 +147,35 @@ export function PanneauRecu({ cle }: { cle: string }) {
             )}
             venteId={contenu.vente.id}
           />
+          {/* Un reçu sans en-tête reste imprimable — mieux vaut un papier
+              incomplet que pas de papier — mais on le dit, et seulement à
+              l'écran : cette phrase ne part pas chez le client. */}
+          {entreprise && !entrepriseComplete(entreprise) && (
+            <p className="mt-3 flex gap-3 rounded-plaque border border-dashed border-bord p-3 text-sm text-encre-doux print:hidden">
+              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+              <span>
+                La fiche entreprise n’a ni nom ni téléphone : ce reçu s’imprimera sans en-tête.{" "}
+                <Link
+                  href="/parametres/entreprise"
+                  className="font-medium text-encre underline underline-offset-4"
+                >
+                  Compléter la fiche
+                </Link>
+              </span>
+            </p>
+          )}
+
           <div className="mt-4 print:mt-0">
             <Recu
               contenu={contenu}
               entreprise={entreprise ?? ENTREPRISE_VIDE}
               boutique={boutiques.find((b) => b.id === contenu.vente.boutiqueId) ?? null}
               client={clients.find((fiche) => fiche.id === contenu.vente.clientId) ?? null}
-              moto={moto}
+              moto={etatMoto?.moto ?? null}
               modele={
-                moto ? `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)}` : ""
+                etatMoto?.moto
+                  ? `${catalogue.nomMarque(etatMoto.moto.marqueId)} ${catalogue.nomModele(etatMoto.moto.modeleId)}`
+                  : ""
               }
             />
           </div>

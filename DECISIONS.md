@@ -901,6 +901,25 @@ référentiels, une moto, un client et une vente.
 des émulateurs redémarrés. Si l'échec persiste, alors seulement il porte sur le produit. La
 correction de fond reste **S27**.
 
+*Mesuré une troisième fois en S10, et le redémarrage ne suffit plus.* La règle ci-dessus a été
+appliquée à la lettre — émulateurs redémarrés, fichier rejoué seul — et `paiements.spec.ts` est
+resté à 5/7. Restait à savoir si S10 en était la cause. **Vérifié sur `master`, sans une ligne de
+S10 : 6/7, le même test de remise en échec, sur la même attente de décor.** La suite complète, elle,
+donne 65/67.
+
+Deux chiffres à retenir de cette mesure. D'abord les échecs sont **tournants** : trois exécutions
+consécutives ont fait tomber trois ensembles différents, jamais deux fois le même. Ensuite les durées
+d'un test identique vont de 5,8 secondes à 2 minutes 6 selon l'exécution — un facteur vingt sur du
+code inchangé. Ce n'est pas un produit qui échoue par intermittence, c'est un harnais dont la mesure
+est bruitée.
+
+*Ce que cela change, à partir de S10 :* le redémarrage des émulateurs ne suffit plus à disculper le
+code, et « fichier par fichier, tout passe » n'est plus vrai. La comparaison qui tranche est
+désormais celle-ci — **rejouer le même fichier sur `master`.** Si la branche et `master` échouent au
+même endroit, l'échec est du harnais. La correction de fond reste S27, et son rang dans le backlog
+n'a jamais été aussi mérité : c'est le même défaut qui gêne le produit sur le marché et la
+vérification sur cette machine.
+
 ## D56 — Les versements font foi, les agrégats de la vente sont un cache d'affichage
 `prompt.md` §3.4, §5.4 — S9, le point le plus délicat de la spec
 
