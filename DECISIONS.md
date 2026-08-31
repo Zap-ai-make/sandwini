@@ -901,6 +901,25 @@ référentiels, une moto, un client et une vente.
 des émulateurs redémarrés. Si l'échec persiste, alors seulement il porte sur le produit. La
 correction de fond reste **S27**.
 
+*Mesuré une troisième fois en S10, et le redémarrage ne suffit plus.* La règle ci-dessus a été
+appliquée à la lettre — émulateurs redémarrés, fichier rejoué seul — et `paiements.spec.ts` est
+resté à 5/7. Restait à savoir si S10 en était la cause. **Vérifié sur `master`, sans une ligne de
+S10 : 6/7, le même test de remise en échec, sur la même attente de décor.** La suite complète, elle,
+donne 65/67.
+
+Deux chiffres à retenir de cette mesure. D'abord les échecs sont **tournants** : trois exécutions
+consécutives ont fait tomber trois ensembles différents, jamais deux fois le même. Ensuite les durées
+d'un test identique vont de 5,8 secondes à 2 minutes 6 selon l'exécution — un facteur vingt sur du
+code inchangé. Ce n'est pas un produit qui échoue par intermittence, c'est un harnais dont la mesure
+est bruitée.
+
+*Ce que cela change, à partir de S10 :* le redémarrage des émulateurs ne suffit plus à disculper le
+code, et « fichier par fichier, tout passe » n'est plus vrai. La comparaison qui tranche est
+désormais celle-ci — **rejouer le même fichier sur `master`.** Si la branche et `master` échouent au
+même endroit, l'échec est du harnais. La correction de fond reste S27, et son rang dans le backlog
+n'a jamais été aussi mérité : c'est le même défaut qui gêne le produit sur le marché et la
+vérification sur cette machine.
+
 ## D56 — Les versements font foi, les agrégats de la vente sont un cache d'affichage
 `prompt.md` §3.4, §5.4 — S9, le point le plus délicat de la spec
 
@@ -1015,3 +1034,67 @@ démarrage à froid.
 *Conséquence, à savoir avant d'accuser le code :* après un `npm run build:functions`, la première
 exécution des tests de déclencheurs n'est pas une mesure. On la relance. Le réveil déjà en place
 (D49) protège des démarrages à froid ordinaires, pas de celui-là.
+
+
+## D60 — Le PDF sort de la boîte d'impression du navigateur, pas d'une bibliothèque
+`prompt.md` §10 — S10, l'arbitrage de la spec
+
+Le §10 propose « une librairie client type `jsPDF` ou `react-pdf` », et la fiche de S10 en héritait :
+import dynamique, mise en cache par le service worker, sans quoi le PDF ne se génère pas hors ligne.
+L'échelle d'`ARCHITECTURE.md` §1 impose de regarder le barreau 3 avant le barreau 4, et il tient :
+**`window.print()` produit déjà un PDF.** « Enregistrer au format PDF » est une destination
+d'impression native — le service d'impression d'Android l'offre, un ordinateur en fait son défaut —
+et elle est entièrement locale, donc disponible en coupure.
+
+Ce que la bibliothèque aurait apporté en plus est précis : un `File` en mémoire, que
+`navigator.share({ files })` tend à WhatsApp en un geste. Ce que ça aurait coûté l'est aussi.
+
+- Une centaine de kilo-octets à précharger **sur chaque appareil**, puisque nos écrans sont mis en
+  cache à l'installation (D40). Un import dynamique n'y change rien : il déplace le moment du
+  téléchargement, pas son obligation, dès lors qu'il doit être là avant la coupure.
+- Et surtout : `jsPDF` ne sait pas rendre notre HTML. Il faudrait **recomposer le reçu une seconde
+  fois** en appels de dessin — deux rendus du même document financier, tenus d'être identiques,
+  dans deux langages différents. C'est la duplication silencieuse qu'`ARCHITECTURE.md` §2 interdit,
+  sur le document où elle se paierait le plus cher : le jour où les deux divergent, le papier et le
+  fichier envoyé au client ne disent plus la même chose.
+
+**Retenu : impression navigateur seule.** Un seul rendu, celui de `components/Recu.tsx`, composé par
+le moteur du navigateur pour l'écran, pour le papier et pour le PDF. Le partage porte le
+récapitulatif en texte — numéro, montant, reste dû, ce que le §11 décrit comme message type 3 — via
+Web Share quand elle existe, sinon le presse-papiers. Les deux sont natives et fonctionnent hors
+ligne, elles aussi.
+
+*Ce qui rouvrirait la décision :* un besoin exprimé d'envoyer la pièce jointe elle-même, et non son
+récapitulatif. Il se traitera avec S14, dont l'envoi au client est le sujet — et la bibliothèque
+s'ajoutera là, où le besoin est réel, plutôt qu'ici au cas où.
+
+*Conséquence assumée :* le gérant qui veut un fichier passe par la boîte d'impression, soit un geste
+de plus qu'un bouton « Télécharger ». En échange, aucune dépendance, aucun octet préchargé, et
+l'impossibilité structurelle que le reçu imprimé et le reçu partagé divergent.
+
+## D61 — Un reçu se recalcule, il ne se fige pas
+`prompt.md` §10 — S10
+
+La fiche de S10 demandait de figer les données à l'impression : « on ne recalcule pas un reste dû au
+moment de réimprimer un vieux reçu, on réimprime ce que le client a reçu ce jour-là — le stocker
+explicitement, ne pas le déduire ». L'intention est juste, la conclusion ne suit pas.
+
+Elle supposerait qu'un recalcul puisse donner autre chose. Or les deux données dont le reçu dérive
+sont **immuables**, et pas par convention : le prix convenu est fermé en écriture depuis S8, et un
+versement ne se modifie ni ne se supprime, pour aucun rôle — les règles portent `update, delete: if
+false` et S25 hérite de la correction (D58). Le total payé au jour d'un reçu est donc exactement la
+somme des versements jusqu'à sa date, et le reste dû la soustraction correspondante. Le calcul ne
+peut pas rendre un autre nombre que celui qui a été imprimé.
+
+Stocker ces deux chiffres créerait une seconde copie de la vérité, sans en créer une seconde source.
+Et une copie qui ne peut que se dégrader : elle serait écrite par l'appareil, donc exposée au même
+écrasement hors ligne que les agrégats de la vente (D56), sur un document qui, lui, prétend faire foi.
+
+*Conséquence :* aucune collection `recus`, aucun champ ajouté, aucune écriture au moment d'imprimer.
+Un reçu est une **lecture** — `composerRecus(vente, versements)` — et son identifiant d'URL est le
+couple de ceux dont il rend compte. Réimprimer six mois plus tard rend le même papier, et le test
+bout en bout le vérifie en encaissant un versement de plus **après** celui qu'il rouvre.
+
+*Le seul champ ajouté par S10 l'est pour une autre raison :* `operateur`, lu depuis la trace d'audit
+`createdByName` déjà écrite. Le §10 exige de nommer l'opérateur sur le document ; `createdBy` n'est
+qu'un identifiant de compte. Rien de neuf n'est écrit — seulement lu.

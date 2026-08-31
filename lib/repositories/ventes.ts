@@ -89,6 +89,9 @@ function lireVente(instantane: DocumentSnapshot<DocumentData>): Vente {
     lienSuiviEnvoyeAt: versDate(donnees.lienSuiviEnvoyeAt),
     statutDossier: donnees.statutDossier === "clos" ? "clos" : "ouvert",
     dateClotureDossier: versDate(donnees.dateClotureDossier),
+    /* La trace d'audit sert ici de contenu : le reçu doit nommer l'opérateur
+       (§10), et `createdBy` n'est qu'un identifiant de compte. */
+    operateur: donnees.createdByName ?? "",
   };
 }
 
@@ -215,6 +218,7 @@ function lireVersement(document: QueryDocumentSnapshot<DocumentData>): Versement
     moyenPaiement: (donnees.moyenPaiement as MoyenPaiement) ?? "especes",
     reference: donnees.reference ?? "",
     encaissementId: donnees.encaissementId ?? "",
+    operateur: donnees.createdByName ?? "",
   };
 }
 

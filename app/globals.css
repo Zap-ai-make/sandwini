@@ -61,6 +61,30 @@
   }
 }
 
+/* Impression — la feuille dédiée des reçus (`prompt.md` §10, S10).
+
+   Elle vit dans le même bloc de thème que le mode sombre, et **après** lui :
+   les deux media queries peuvent être vraies en même temps, et c'est l'ordre
+   qui tranche. Sans cela, un reçu imprimé depuis un téléphone réglé en sombre
+   sortait en blanc sur noir — illisible sur un comptoir, et une cartouche
+   vidée par reçu.
+
+   L'impression n'est donc pas une inversion du thème : c'est le seul rendu du
+   produit dont la surface est un objet physique, et le papier est blanc. */
+@layer theme {
+  @media print {
+    :root {
+      --color-encre: #0f1720;
+      --color-papier: #ffffff;
+      --color-fond: #ffffff;
+      --color-bord: #b9c0c7;
+      --color-encre-doux: #4a5560;
+      --color-alerte: #b3261e;
+      --color-solde: #1b6b4a;
+    }
+  }
+}
+
 @layer base {
   html {
     /* Les montants et les quantités s'alignent en colonne : sans chiffres
@@ -103,5 +127,34 @@
     font-weight: 500;
     letter-spacing: 0.08em;
     font-variant-numeric: tabular-nums;
+  }
+}
+
+@media print {
+  /* Le reçu occupe la feuille entière : pas de coquille, pas de fond, pas de
+     marge d'écran. Les marges sont celles de la page, tenues par `@page` —
+     elles valent pour l'A5 comme pour l'A4, la colonne du reçu étant bornée à
+     la largeur d'une A5 (cf. `components/Recu.tsx`). */
+  @page {
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: #fff;
+  }
+
+  /* Ce qui aide à l'écran n'aide pas sur le papier : le bandeau réseau, la
+     navigation et les boutons d'action portent `print:hidden` là où ils sont
+     déclarés. Ici on ne défait que la mise en page de la coquille. */
+  main {
+    max-width: none;
+    padding: 0;
+  }
+
+  /* Un reçu tient sur une page ; s'il déborde, il ne se coupe pas au milieu
+     d'un montant. */
+  article {
+    break-inside: avoid;
   }
 }

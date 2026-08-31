@@ -146,6 +146,12 @@ function Ventes() {
           >
             Paiements
           </Link>
+          <Link
+            href="/motos/recus"
+            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          >
+            Reçus
+          </Link>
         </div>
       </div>
 

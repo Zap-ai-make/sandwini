@@ -14,6 +14,13 @@ import { useEffect, useState } from "react";
  *
  * `souscrire` doit être stable d'un rendu à l'autre, sinon l'écouteur se ferme
  * et se rouvre en boucle : les appelants le passent dans un `useCallback`.
+ *
+ * **Le piège, quand la valeur écoutée peut elle-même être nulle** — un document
+ * qui n'existe pas, comme `ecouterVente` sur un identifiant inconnu : « pas
+ * encore chargé » et « n'existe pas » deviennent le même `null`, et l'écran
+ * reste sur « Chargement… » pour une donnée qui n'arrivera jamais. On enveloppe
+ * alors la valeur (`{ vente }`), qui n'est jamais nulle : cf. `PanneauRecu`,
+ * où l'état « reçu introuvable » en dépend.
  */
 export function useAbonnement<T>(
   souscrire: (auChangement: (valeur: T) => void, enErreur: (cause: unknown) => void) => () => void,

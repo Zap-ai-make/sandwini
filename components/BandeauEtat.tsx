@@ -53,7 +53,8 @@ export function BandeauEtat() {
   return (
     <header
       className={[
-        "sticky top-0 z-40 flex items-center gap-3 border-b px-3 py-2",
+        // `print:hidden` : un reçu imprimé ne porte pas l’état du réseau (S10).
+        "sticky top-0 z-40 flex items-center gap-3 border-b px-3 py-2 print:hidden",
         horsLigne ? "border-plaque-bord bg-plaque" : "border-bord bg-papier",
       ].join(" ")}
     >

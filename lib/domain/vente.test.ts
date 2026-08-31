@@ -235,6 +235,7 @@ describe("recherche d’une vente", () => {
     lienSuiviEnvoyeAt: null,
     statutDossier: "ouvert",
     dateClotureDossier: null,
+    operateur: "Awa Sawadogo",
     ...partie,
   });
 
@@ -332,6 +333,7 @@ const versement = (partie: Partial<Versement> = {}): Versement => ({
   moyenPaiement: "especes",
   reference: "",
   encaissementId: "enc-1",
+  operateur: "Awa Sawadogo",
   ...partie,
 });
 
@@ -357,6 +359,7 @@ const venteS9 = (partie: Partial<Vente> = {}): Vente => ({
   lienSuiviEnvoyeAt: null,
   statutDossier: "ouvert",
   dateClotureDossier: null,
+  operateur: "Awa Sawadogo",
   ...partie,
 });
 
