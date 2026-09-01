@@ -12,7 +12,9 @@ import { httpsCallable } from "firebase/functions";
 import { db, fonctions } from "@/lib/firebase/client";
 import {
   comparerBoutiques,
+  METIERS,
   normaliserBoutique,
+  normaliserMetiers,
   type Boutique,
   type SaisieBoutique,
 } from "@/lib/domain/boutique";
@@ -44,6 +46,10 @@ function lireBoutique(instantane: DocumentSnapshot<DocumentData>): Boutique {
     nom: donnees.nom ?? "",
     adresse: donnees.adresse ?? "",
     telephone: donnees.telephone ?? "",
+    /* Un document écrit avant D62 n'a pas de métier : il tenait tout, et lire
+       « les deux » ne cache donc rien. Les règles exigent le champ à
+       l'écriture — ce défaut ne survit pas à la première modification. */
+    metiers: Array.isArray(donnees.metiers) ? normaliserMetiers(donnees.metiers) : [...METIERS],
     actif: donnees.actif !== false,
   };
 }
@@ -112,7 +118,11 @@ export function creerBoutique(saisie: SaisieBoutique, auteur: Auteur): Promise<v
   );
 }
 
-/** Modifie le nom, l’adresse ou le téléphone. Le code, lui, ne bouge jamais. */
+/**
+ * Modifie le nom, les métiers, l’adresse ou le téléphone. Le code, lui, ne bouge
+ * jamais : il est imprimé sur des reçus. Les métiers, si — une boutique peut se
+ * mettre aux pièces, et rien de ce qui est déjà imprimé n’en dépend.
+ */
 export function modifierBoutique(
   id: string,
   saisie: SaisieBoutique,
@@ -122,6 +132,7 @@ export function modifierBoutique(
   return suivreEcriture(
     updateDoc(doc(db(), "boutiques", id), {
       nom: propre.nom,
+      metiers: propre.metiers,
       adresse: propre.adresse,
       telephone: propre.telephone,
       updatedAt: serverTimestamp(),

@@ -10,9 +10,12 @@ import {
   LONGUEUR_CODE,
   LONGUEUR_NOM_MAX,
   LONGUEUR_TELEPHONE_MAX,
+  LIBELLE_METIER,
+  METIERS,
   normaliserCode,
   validerBoutique,
   type Boutique,
+  type Metier,
   type SaisieBoutique,
 } from "@/lib/domain/boutique";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -39,7 +42,7 @@ export default function PageBoutiques() {
   );
 }
 
-const VIDE: SaisieBoutique = { nom: "", code: "", adresse: "", telephone: "" };
+const VIDE: SaisieBoutique = { nom: "", code: "", metiers: [], adresse: "", telephone: "" };
 
 function Boutiques() {
   const { boutiques, chargement, erreur } = usePerimetre();
@@ -55,8 +58,7 @@ function Boutiques() {
       </Link>
       <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Boutiques</h1>
       <p className="mt-2 max-w-prose text-encre-doux">
-        Le code de trois lettres apparaît sur chaque reçu et ouvre les numéros de vente. Il ne peut
-        plus changer une fois la boutique créée.
+        Ce que vend une boutique décide des espaces que son gérant voit.
       </p>
 
       <FormulaireCreation existantes={boutiques} />
@@ -134,8 +136,13 @@ function LigneBoutique({ boutique }: { boutique: Boutique }) {
             )}
           </span>
           <span className="block text-sm text-encre-doux">
-            {[boutique.adresse, boutique.telephone].filter(Boolean).join(" · ") ||
-              "Adresse et téléphone à compléter"}
+            {[
+              boutique.metiers.map((metier) => LIBELLE_METIER[metier]).join(" et "),
+              boutique.adresse,
+              boutique.telephone,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </span>
 
@@ -168,6 +175,14 @@ function LigneBoutique({ boutique }: { boutique: Boutique }) {
       {edition && <FormulaireEdition boutique={boutique} surFin={() => setEdition(false)} />}
     </li>
   );
+}
+
+/** Coche ou décoche un métier, en gardant l’ordre de `METIERS`. */
+function basculerMetier(actuels: Metier[], metier: Metier): Metier[] {
+  const suivants = actuels.includes(metier)
+    ? actuels.filter((autre) => autre !== metier)
+    : [...actuels, metier];
+  return METIERS.filter((candidat) => suivants.includes(candidat));
 }
 
 function ChampsBoutique({
@@ -216,6 +231,40 @@ function ChampsBoutique({
             : "Des reçus portent déjà ce code : le changer rendrait leurs numéros faux."}
         </p>
       </div>
+
+      {/* Un `fieldset` avec sa `legend` : c’est le regroupement que les lecteurs
+          d’écran annoncent avant chaque case, et il n’y a rien à écrire de plus
+          (DESIGN.md §11). */}
+      <fieldset>
+        <legend className="block text-sm font-medium text-encre">Ce que cette boutique vend</legend>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {METIERS.map((metier) => {
+            const coche = saisie.metiers.includes(metier);
+            return (
+              <label
+                key={metier}
+                className={[
+                  "inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-plaque border px-3 text-sm font-medium",
+                  coche
+                    ? "border-plaque-bord bg-plaque text-encre-fixe"
+                    : "border-bord bg-papier text-encre",
+                ].join(" ")}
+              >
+                <input
+                  type="checkbox"
+                  checked={coche}
+                  onChange={() => changer({ metiers: basculerMetier(saisie.metiers, metier) })}
+                  className="size-4 accent-encre-fixe"
+                />
+                {LIBELLE_METIER[metier]}
+              </label>
+            );
+          })}
+        </div>
+        <p className="mt-1 text-sm text-encre-doux">
+          Le gérant de cette boutique ne verra que le ou les espaces cochés ici.
+        </p>
+      </fieldset>
 
       <div>
         <label htmlFor={`${prefixe}-adresse`} className="block text-sm font-medium text-encre">
@@ -327,6 +376,7 @@ function FormulaireEdition({ boutique, surFin }: { boutique: Boutique; surFin: (
   const [saisie, setSaisie] = useState<SaisieBoutique>({
     nom: boutique.nom,
     code: boutique.code,
+    metiers: boutique.metiers,
     adresse: boutique.adresse,
     telephone: boutique.telephone,
   });

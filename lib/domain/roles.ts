@@ -30,6 +30,7 @@ export const LIBELLE_ROLE: Record<Role, string> = {
  * qui revérifient le même rôle côté serveur (cf. `DECISIONS.md` D27).
  */
 export type Capacite =
+  | "acceder_supervision"
   | "gerer_utilisateurs"
   | "gerer_boutiques"
   | "gerer_referentiels"
@@ -39,6 +40,7 @@ export type Capacite =
 
 const CAPACITES: Record<Role, readonly Capacite[]> = {
   responsable: [
+    "acceder_supervision",
     "gerer_utilisateurs",
     "gerer_boutiques",
     "gerer_referentiels",

@@ -55,11 +55,14 @@ service cloud.firestore {
       return valeur is string && valeur.size() <= maximum;
     }
 
+    // Les metiers disent ce que la boutique vend (D62). Le champ est exige a
+    // l'ecriture : une boutique sans metier n'ouvre aucun espace, et son gerant
+    // se connecterait sur une application vide sans rien pouvoir y corriger.
     function boutiqueValide(donnees, code) {
-      return donnees.keys().hasOnly(['nom', 'code', 'adresse', 'telephone', 'actif',
+      return donnees.keys().hasOnly(['nom', 'code', 'metiers', 'adresse', 'telephone', 'actif',
                                      'createdAt', 'createdBy', 'createdByName',
                                      'updatedAt', 'updatedBy', 'updatedByName'])
-             && donnees.keys().hasAll(['nom', 'code', 'adresse', 'telephone', 'actif',
+             && donnees.keys().hasAll(['nom', 'code', 'metiers', 'adresse', 'telephone', 'actif',
                                        'createdAt', 'createdBy', 'createdByName',
                                        'updatedAt', 'updatedBy', 'updatedByName'])
              && donnees.code == code
@@ -67,6 +70,10 @@ service cloud.firestore {
              && donnees.nom is string
              && donnees.nom.size() > 0
              && donnees.nom.size() <= 80
+             && donnees.metiers is list
+             && donnees.metiers.size() > 0
+             && donnees.metiers.size() <= 2
+             && donnees.metiers.hasOnly(['motos', 'pieces'])
              && texteBorne(donnees.adresse, 200)
              && texteBorne(donnees.telephone, 40)
              && texteBorne(donnees.createdByName, 200)
@@ -89,6 +96,9 @@ service cloud.firestore {
       // Le code et la date de création ne bougent pas. C'est aussi ce qui
       // empêche une « création » de recouvrir une boutique existante : le
       // formulaire enverrait un createdAt neuf, refusé ici.
+      //
+      // Les métiers, eux, se modifient : une boutique peut se mettre aux pièces,
+      // et rien de ce qui est déjà imprimé n'en dépend (D62).
       allow update: if estResponsable()
                     && boutiqueValide(request.resource.data, code)
                     && request.resource.data.code == resource.data.code

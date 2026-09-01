@@ -13,15 +13,19 @@
 
 ## 1. Vue d'ensemble
 
-Le système comporte **deux espaces** dans une même application, plus un **tableau de bord** transversal :
+Le système comporte **trois espaces** dans une même application :
 
-| Espace | Contenu |
-|---|---|
-| **Motos** | Motos neuves et d'occasion, ventes, dossiers documents, paiements, échanges/reprises, inventaire motos |
-| **Pièces détachées** | Références, entrées/sorties, vente au comptoir, quantités, alertes rupture, inventaire pièces |
-| **Vue d'ensemble** (responsable) | Toutes les boutiques réunies : ventes, encaissements, stock, alertes, dettes, tranches en cours |
+| Espace | Qui y travaille | Contenu |
+|---|---|---|
+| **Motos** | Gérant d'une boutique de motos | Motos neuves et d'occasion, ventes, dossiers documents, paiements, échanges/reprises, inventaire motos |
+| **Pièces détachées** | Gérant d'une boutique de pièces | Références, entrées/sorties, vente au comptoir, quantités, alertes rupture, inventaire pièces |
+| **Supervision** | Responsable, et lui seul | Toutes les boutiques réunies : ventes, encaissements, stock, alertes, dettes, tranches en cours |
 
-L'entreprise possède **plusieurs boutiques**. Chaque donnée opérationnelle (moto, pièce, vente, encaissement) est rattachée à une boutique.
+L'entreprise possède **plusieurs boutiques**, et **c'est la boutique qui porte le métier** : certaines vendent des motos, une autre vend des pièces détachées, rien n'interdit qu'une boutique tienne les deux. Un gérant ne voit que le ou les espaces des métiers de sa boutique ; l'espace pièces n'existe pas pour le gérant d'une boutique de motos.
+
+La supervision est une **section à part**, avec ses propres écrans, et non un tableau de bord posé dans l'application commune. Le gérant en ignore l'existence. (Cf. `DECISIONS.md` D62 et D63.)
+
+Chaque donnée opérationnelle (moto, pièce, vente, encaissement) est rattachée à une boutique.
 
 Deux accès externes sans compte, par lien :
 - **Client** : suit l'avancement de ses documents (carte grise, plaque).
@@ -84,6 +88,7 @@ Contraintes :
 
 ### 3.2 Multi-boutique
 
+- Chaque boutique porte un champ `metiers` (`'motos'` et/ou `'pieces'`), qui décide des espaces ouverts à son gérant. Au moins un métier ; une boutique sans métier n'ouvrirait aucun écran.
 - Chaque document opérationnel porte un champ `boutiqueId`.
 - Le gérant est rattaché à une seule boutique (`boutiqueId` dans son profil). Ses requêtes sont toujours filtrées sur cette boutique.
 - Le responsable peut sélectionner « Toutes les boutiques » ou une boutique précise (sélecteur global persisté en session).
@@ -137,7 +142,7 @@ Les types sont donnés en pseudo-TypeScript. `Ref<X>` = ID de document de la col
 ### 5.1 Référentiels (modifiables par le responsable)
 
 ```ts
-boutiques/{id}          { nom, code (3 lettres, ex: "PTG"), adresse, telephone, actif }
+boutiques/{id}          { nom, code (3 lettres, ex: "PTG"), metiers: ('motos'|'pieces')[], adresse, telephone, actif }
 users/{uid}             { nom, role: 'responsable'|'gerant', boutiqueId?, actif }
 marques/{id}            { nom, actif }
 modeles/{id}            { marqueId, nom, actif }
@@ -521,7 +526,7 @@ Le système enregistre la date du dernier envoi (`lienSuiviEnvoyeAt`) au clic su
 | **Tranches** | Paiement échelonné **avant** livraison ; la moto reste au magasin |
 | **Crédit** | Paiement échelonné **après** livraison ; la moto est déjà chez le client |
 | **Confrère** | Autre revendeur chez qui l'entreprise peut prendre une moto pour un client |
-| **Boutique** | Point de vente physique ; l'entreprise en possède plusieurs |
+| **Boutique** | Point de vente physique ; l'entreprise en possède plusieurs. Elle porte un ou deux **métiers** — motos, pièces — qui décident des espaces ouverts à son gérant |
 | **Gérant** | Responsable d'une boutique |
 | **Responsable** | Propriétaire/dirigeant, accès total |
 
@@ -529,11 +534,11 @@ Le système enregistre la date du dernier envoi (`lienSuiviEnvoyeAt`) au clic su
 
 ## 14. Écrans — Résumé
 
-### Responsable — Vue d'ensemble (`/dashboard`)
-Cartes : ventes du jour / du mois (par boutique), encaissements par moyen de paiement, motos en stock (neuves/occasion), pièces en alerte, CMC disponibles, dossiers en retard, total des dettes, total des tranches en cours + nb motos à livrer. Chaque carte est cliquable vers la liste détaillée. Utilisable sur mobile.
+### Responsable — Supervision (`/supervision`)
+Section réservée au responsable, où il atterrit à la connexion. Il y choisit la boutique qu'il regarde, et y trouve les cartes toutes boutiques réunies : ventes du jour / du mois (par boutique), encaissements par moyen de paiement, motos en stock (neuves/occasion), pièces en alerte, CMC disponibles, dossiers en retard, total des dettes, total des tranches en cours + nb motos à livrer. Chaque carte est cliquable vers la liste détaillée. Utilisable sur mobile.
 
-### Gérant — Vue boutique
-Même structure, restreinte à sa boutique, sans marges ni comparatif inter-boutiques.
+### Gérant — Accueil de sa boutique (`/dashboard`)
+Même structure de chiffres, restreinte à sa boutique, sans marges ni comparatif inter-boutiques. Ne mène qu'aux espaces des métiers de sa boutique.
 
 ### Espace motos
 Stock · Nouvelle vente · Ventes (liste + recherche) · Détail vente (paiements, documents, reçus, WhatsApp) · Dossiers en attente · Dettes · Tranches · Échanges · CMC · Inventaire.
@@ -551,7 +556,7 @@ Entreprise (coordonnées, logo) · Boutiques · Utilisateurs · Marques/Modèles
 
 ## 15. Ordre de réalisation recommandé
 
-1. **Socle** : projet Next.js + Tailwind + Firebase, PWA, auth, rôles, sélecteur boutique, persistance hors-ligne, indicateur réseau.
+1. **Socle** : projet Next.js + Tailwind + Firebase, PWA, auth, rôles, sélecteur boutique, métiers de boutique et les trois espaces, persistance hors-ligne, indicateur réseau.
 2. **Référentiels** et paramètres.
 3. **Stock motos** (entrée, liste, transfert, photos).
 4. **Vente moto** (comptant/crédit/tranches) + clients + versements + encaissements + reçus.

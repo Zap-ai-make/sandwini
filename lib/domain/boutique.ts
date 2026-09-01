@@ -5,13 +5,37 @@
  * de chaque reçu (`PTG-2608-0042`, cf. `DECISIONS.md` D5) et il sert
  * d'identifiant de document. Un code qui change casserait la numérotation déjà
  * imprimée, donc il ne change pas.
+ *
+ * Ses **métiers** disent ce qu'elle vend. L'entreprise tient des boutiques de
+ * motos et une boutique de pièces détachées ; c'est le magasin physique qui
+ * porte le métier, pas un rayon à l'intérieur (`DECISIONS.md` D62). De là
+ * découle ce qu'un gérant voit : sa boutique ne vend pas de pièces, l'espace
+ * pièces n'existe pas pour lui.
  */
+
+/**
+ * Un tableau plutôt qu'une valeur unique : rien n'interdit qu'une boutique
+ * finisse par tenir les deux, et ce jour-là le modèle n'a pas à être repeint.
+ */
+export const METIERS = ["motos", "pieces"] as const;
+export type Metier = (typeof METIERS)[number];
+
+export const LIBELLE_METIER: Record<Metier, string> = {
+  motos: "Motos",
+  pieces: "Pièces détachées",
+};
+
+export function estMetier(valeur: unknown): valeur is Metier {
+  return typeof valeur === "string" && (METIERS as readonly string[]).includes(valeur);
+}
 
 export type Boutique = {
   /** Identique au code : `boutiques/{code}` (cf. D30). */
   id: string;
   nom: string;
   code: string;
+  /** Ce que cette boutique vend. Au moins un métier, jamais vide. */
+  metiers: Metier[];
   adresse: string;
   telephone: string;
   actif: boolean;
@@ -20,6 +44,7 @@ export type Boutique = {
 export type SaisieBoutique = {
   nom: string;
   code: string;
+  metiers: Metier[];
   adresse: string;
   telephone: string;
 };
@@ -49,6 +74,17 @@ export function estCodeValide(code: string): boolean {
 }
 
 /**
+ * Range les métiers dans l'ordre de `METIERS` et retire les doublons.
+ *
+ * L'ordre vient de la déclaration, pas de l'ordre de clic : deux boutiques aux
+ * mêmes métiers ont ainsi le même tableau en base, et les comparer ne demande
+ * pas de les trier d'abord.
+ */
+export function normaliserMetiers(bruts: readonly unknown[]): Metier[] {
+  return METIERS.filter((metier) => bruts.includes(metier));
+}
+
+/**
  * Valide une saisie de boutique et renvoie le message à afficher, ou `null` si
  * tout va bien.
  *
@@ -67,6 +103,12 @@ export function validerBoutique(saisie: SaisieBoutique): string | null {
     return `Le code doit faire exactement ${LONGUEUR_CODE} lettres, sans chiffre ni accent.`;
   }
 
+  /* Une boutique sans métier n'ouvre aucun espace : son gérant se connecterait
+     sur une application vide, sans rien à corriger de son côté. */
+  if (normaliserMetiers(saisie.metiers).length === 0) {
+    return "Choisissez ce que cette boutique vend.";
+  }
+
   if (saisie.adresse.trim().length > LONGUEUR_ADRESSE_MAX) {
     return `L’adresse dépasse ${LONGUEUR_ADRESSE_MAX} caractères.`;
   }
@@ -81,9 +123,17 @@ export function normaliserBoutique(saisie: SaisieBoutique): SaisieBoutique {
   return {
     nom: saisie.nom.trim(),
     code: normaliserCode(saisie.code),
+    metiers: normaliserMetiers(saisie.metiers),
     adresse: saisie.adresse.trim(),
     telephone: saisie.telephone.trim(),
   };
+}
+
+/** Les métiers réunis de plusieurs boutiques — le périmètre « toutes ». */
+export function reunirMetiers(boutiques: readonly Boutique[]): Metier[] {
+  return METIERS.filter((metier) =>
+    boutiques.some((boutique) => boutique.metiers.includes(metier)),
+  );
 }
 
 /** Tri d'affichage : les boutiques actives d'abord, puis par nom. */

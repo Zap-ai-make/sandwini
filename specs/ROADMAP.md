@@ -28,6 +28,7 @@ Tout ce qui sert le confort, le pilotage ou un second métier (pièces détaché
 | S8  | Vente de moto — enregistrement                | S5, S6, S7       | MVP       | terminée |
 | S9  | Versements et suivi des paiements             | S8               | MVP       | terminée |
 | S10 | Reçus imprimables hors-ligne                  | S8, S9           | MVP       | terminée |
+| S3bis | Les trois espaces — métiers et supervision   | S3               | MVP       | terminée |
 | S11 | Dossier documents — cycle de vie et suivi     | S4, S8           | MVP       | à faire |
 | S12 | Règles Firestore — durcissement et tests      | S1 → S11         | MVP       | à faire |
 
@@ -51,7 +52,7 @@ avant toute spec post-MVP.
 | S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. |
 | S22 | Caisse — journal et clôture de journée        | S9          | Les encaissements existent dès S9 ; ici on ajoute la lecture et le comptage. |
 | S23 | Inventaires motos et pièces + comparaison     | S5, S20     | Exercice périodique, pas quotidien. |
-| S24 | Tableau de bord — vue d'ensemble responsable  | S9, S11     | Pilotage ; a besoin que les données à agréger existent d'abord. |
+| S24 | Supervision — les chiffres toutes boutiques   | S9, S11     | Pilotage ; S3bis a posé la section, il reste à la remplir — et il faut que les données à agréger existent d'abord. |
 | S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
 | S27 | Reconnexion immédiate au retour du réseau     | aucune      | Aujourd'hui, la file d'écritures repart quand le SDK Firestore a fini son attente croissante — jusqu'à une minute après le retour du signal. Sur un marché à couverture intermittente, c'est le geste le plus visible du produit. Cf. `DECISIONS.md` D50. |
@@ -60,7 +61,7 @@ avant toute spec post-MVP.
 
 ## Ce que le MVP ne fait volontairement pas
 
-Espace pièces détachées · inventaires · caisse et clôture · tableau de bord chiffré · pages publiques
+Espace pièces détachées · inventaires · caisse et clôture · chiffres de la supervision · pages publiques
 client et prestataire · WhatsApp · échanges et reprises · transferts inter-boutiques · stock de CMC ·
 photos de motos · annulation de vente.
 

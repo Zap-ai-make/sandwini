@@ -7,6 +7,18 @@ détachées.
 Elle est conçue pour être utilisée debout, au comptoir, sur un téléphone Android bon marché, **sans
 réseau**. Ce n'est pas une option de confort : chaque écran de saisie doit fonctionner hors ligne.
 
+Elle a **trois espaces**, et personne ne les voit tous de la même façon :
+
+| Espace | Qui y travaille |
+|---|---|
+| **Motos** (`/motos`) | Le gérant d'une boutique de motos |
+| **Pièces détachées** (`/pieces`) | Le gérant d'une boutique de pièces |
+| **Supervision** (`/supervision`) | Le responsable, et lui seul |
+
+C'est la **boutique** qui porte le métier : son champ `metiers` décide des espaces ouverts à son
+gérant (D62). Le responsable atterrit sur sa supervision, où il choisit la boutique qu'il regarde ;
+le gérant sur l'accueil de la sienne (D63).
+
 - Le cahier des charges fait foi : [`prompt.md`](prompt.md).
 - La progression et le découpage : [`specs/ROADMAP.md`](specs/ROADMAP.md).
 - Les choix tranchés et leurs raisons : [`DECISIONS.md`](DECISIONS.md).
@@ -106,6 +118,9 @@ Deux règles qui expliquent la plupart des choix :
    masquer un champ : un document lisible est lisible en entier (D2).
 3. **Le périmètre s'affiche, il n'autorise pas.** `usePerimetre()` dit dans quelle boutique on
    travaille ; ce qu'un compte peut lire est décidé par son custom claim et par les règles (D31).
+4. **Une seule réponse à « quels espaces voit-il ? ».** `lib/domain/espaces.ts` la donne, et la
+   navigation, les gardes de route et les accueils s'y réfèrent tous. Une barre qui propose ce que
+   l'écran refuse ensuite, c'est un produit qui a l'air cassé.
 
 ---
 

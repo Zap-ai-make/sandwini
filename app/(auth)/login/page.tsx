@@ -4,8 +4,9 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { authentification, configurationPresente } from "@/lib/firebase/client";
 import { useSession } from "@/lib/auth/session";
+import { accueilDuRole } from "@/lib/domain/espaces";
+import { authentification, configurationPresente } from "@/lib/firebase/client";
 
 /* Après cinq échecs, l’écran s’impose une pause. Ce n’est pas la protection
    principale — un attaquant sérieux n’utilise pas notre formulaire — mais
@@ -41,8 +42,12 @@ export default function Connexion() {
   const [echecs, setEchecs] = useState(0);
   const [pause, setPause] = useState(0);
 
+  /* La destination dépend du rôle (D63) : le responsable ouvre sur la
+     supervision, le gérant sur l'accueil de sa boutique. Elle n'est donc connue
+     qu'une fois la session ouverte — d'où la redirection ici, et non dans le
+     gestionnaire de soumission, qui rendrait la main avant que le rôle arrive. */
   useEffect(() => {
-    if (session.statut === "connecte") router.replace("/dashboard");
+    if (session.statut === "connecte") router.replace(accueilDuRole(session.utilisateur.role));
   }, [session, router]);
 
   useEffect(() => {
@@ -59,7 +64,7 @@ export default function Connexion() {
     try {
       await signInWithEmailAndPassword(authentification(), email.trim().toLowerCase(), motDePasse);
       setEchecs(0);
-      router.replace("/dashboard");
+      // La redirection est faite par l'effet ci-dessus, qui connaît le rôle.
     } catch (cause) {
       setErreur(messageDErreur(cause));
       setMotDePasse("");

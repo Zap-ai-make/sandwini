@@ -920,6 +920,26 @@ même endroit, l'échec est du harnais. La correction de fond reste S27, et son 
 n'a jamais été aussi mérité : c'est le même défaut qui gêne le produit sur le marché et la
 vérification sur cette machine.
 
+*Mesuré une quatrième fois en S3bis — cinq suites complètes, cinq ensembles disjoints.* Les verdicts
+successifs sur une même branche : 74/74, puis 71/74, puis 67/74, puis 68/74 sur des émulateurs
+fraîchement redémarrés. **Aucun test n'a échoué deux fois de suite**, et la durée de la suite est
+allée de 10 min 54 à 37 min 06 sans qu'une ligne de code applicatif change entre les deux.
+
+Deux enseignements que les mesures précédentes n'avaient pas isolés :
+
+- **Le redémarrage des émulateurs n'améliore pas le taux** — il a donné 68/74 là où l'instance âgée
+  donnait 67/74. Ce qui pèse est la charge pendant l'exécution, pas seulement l'âge de l'instance.
+- **Il existe un signal plus rapide que le détour par `master`** : si l'ensemble des échecs ne
+  contient aucun test écrit ou modifié par la branche, la question est tranchée sans changer de
+  branche. La dernière mesure contenait `auth.spec.ts` « un mot de passe faux ne dit pas si le compte
+  existe » — un test sans boutique, sans gérant et sans écriture, qui ne peut dépendre d'aucun
+  changement de S3bis.
+
+*Ce que S3bis en a tiré pour ses propres tests :* créer un compte est la seule opération de
+l'application qui exige le réseau, et c'est la plus exposée. Une suite qui en crée trois rend le
+piège trois fois plus probable. `e2e/espaces.spec.ts` en crée donc deux, et attend la confirmation de
+la fonction plutôt que la ligne dans la liste des comptes — le remède déjà retenu en S8.
+
 ## D56 — Les versements font foi, les agrégats de la vente sont un cache d'affichage
 `prompt.md` §3.4, §5.4 — S9, le point le plus délicat de la spec
 
@@ -1098,3 +1118,61 @@ bout en bout le vérifie en encaissant un versement de plus **après** celui qu'
 *Le seul champ ajouté par S10 l'est pour une autre raison :* `operateur`, lu depuis la trace d'audit
 `createdByName` déjà écrite. Le §10 exige de nommer l'opérateur sur le document ; `createdBy` n'est
 qu'un identifiant de compte. Rien de neuf n'est écrit — seulement lu.
+
+---
+
+## D62 — Le métier est porté par la boutique, pas par un rayon
+
+**Contexte.** `prompt.md` §3.2 et §5.7 supposaient que chaque boutique tenait à la
+fois des motos et des pièces : `stockPieces/{boutiqueId}_{pieceId}` existe pour toute
+boutique, et rien dans le modèle `boutiques` ne disait le contraire. La réalité de
+l'entreprise est autre : il y a des boutiques de vente de motos, et une boutique de
+pièces détachées. Ce sont des magasins différents, avec des gérants différents.
+
+**Décision.** `boutiques` porte un champ `metiers: ('motos'|'pieces')[]`, au moins une
+valeur, exigé par les règles Firestore à la création comme à la modification. Il décide
+des espaces ouverts au gérant de cette boutique.
+
+Un **tableau** plutôt qu'un `type` unique : rien n'interdit qu'un magasin finisse par
+tenir les deux, et ce jour-là le modèle n'a pas à être repeint. Le coût est nul — un
+tableau de deux valeurs au maximum, validé par `hasOnly` côté règles.
+
+Contrairement au `code`, les métiers **se modifient**. Le code entre dans les numéros de
+reçus déjà imprimés (D5, D30) ; les métiers n'apparaissent nulle part sur du papier.
+
+**Conséquence sur les documents déjà écrits.** À la lecture, un document sans `metiers`
+est lu comme portant les deux : c'est ce qu'il tenait avant cette décision, donc ce
+défaut ne cache rien. Les règles, elles, exigent le champ à l'écriture — le défaut ne
+survit pas à la première modification de la boutique.
+
+**Écart assumé avec le cahier des charges**, qui a été corrigé en conséquence
+(`prompt.md` §1, §3.2, §5.1, §13, §14, §15).
+
+---
+
+## D63 — La supervision est une section, pas un tableau de bord
+
+**Contexte.** `prompt.md` §1 décrivait « deux espaces plus un tableau de bord
+transversal », et §14 en faisait une page de cartes dans l'application commune. Le
+besoin réel est un **troisième espace** : le responsable pilote plusieurs boutiques
+qu'il ne peut pas toutes avoir sous les yeux, et sa place n'est pas au comptoir.
+
+**Décision.** `/supervision` est une section réservée au responsable, gardée par la
+capacité `acceder_supervision`. C'est là qu'il atterrit à la connexion, et c'est de là
+qu'il choisit la boutique qu'il regarde. Le gérant en ignore l'existence : elle
+n'apparaît pas dans sa navigation, et la garde explique le refus s'il suit un lien.
+
+`/dashboard` reste l'accueil du **gérant** seul ; un responsable qui y arrive est
+renvoyé vers sa supervision. Deux pages d'accueil qui diraient presque la même chose
+divergeraient à la première évolution.
+
+**Ce que S3bis livre, et ce qu'elle ne livre pas.** Le *lieu*, pas les *chiffres*. La
+supervision liste les boutiques et ouvre chacune sur son espace. Les agrégats — ventes
+du jour, encaissements, dettes, tranches, alertes — restent le sujet de S24 : les
+afficher maintenant produirait des cartes à zéro, c'est-à-dire un tableau de bord qui
+ment.
+
+**Conséquence sur la coquille.** La navigation principale n'est plus une liste figée :
+elle se déduit du rôle et des métiers du périmètre courant, par une fonction pure
+(`lib/domain/espaces.ts`) partagée par la barre, les gardes de route et les accueils.
+Sans ce point unique, la barre proposerait une entrée que l'écran refuserait ensuite.

@@ -26,10 +26,16 @@ function formulaireCreation(page: Page) {
 
 const ligne = ligneDeBoutique;
 
-async function creerBoutique(page: Page, code: string, nom: string) {
+async function creerBoutique(
+  page: Page,
+  code: string,
+  nom: string,
+  metier: "Motos" | "Pièces détachées" = "Motos",
+) {
   const formulaire = formulaireCreation(page);
   await formulaire.getByLabel("Nom de la boutique").fill(nom);
   await formulaire.getByLabel(/^Code/).fill(code);
+  await formulaire.getByRole("checkbox", { name: metier, exact: true }).check();
   await formulaire.getByLabel(/^Adresse/).fill("Marché central");
   await formulaire.getByLabel("Téléphone").fill("70 00 00 00");
   await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
@@ -60,9 +66,32 @@ test.describe("déclaration des boutiques", () => {
     const formulaire = formulaireCreation(page);
     await formulaire.getByLabel("Nom de la boutique").fill("Code trop court");
     await formulaire.getByLabel(/^Code/).fill("PT");
+    await formulaire.getByRole("checkbox", { name: "Motos", exact: true }).check();
     await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
 
     await expect(formulaire.getByRole("alert")).toContainText("3 lettres");
+  });
+
+  test("une boutique sans métier est refusée : elle n’ouvrirait aucun espace", async ({ page }) => {
+    const formulaire = formulaireCreation(page);
+    await formulaire.getByLabel("Nom de la boutique").fill("Sans métier");
+    await formulaire.getByLabel(/^Code/).fill(codeUnique());
+    await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
+
+    await expect(formulaire.getByRole("alert")).toContainText("vend");
+  });
+
+  test("le métier est écrit dans la liste, et se corrige après coup", async ({ page }) => {
+    const code = codeUnique();
+    await creerBoutique(page, code, `Métier ${code}`, "Motos");
+    await expect(ligne(page, code)).toContainText("Motos");
+
+    const rangee = ligne(page, code);
+    await rangee.getByRole("button", { name: "Modifier" }).click();
+    await rangee.getByRole("checkbox", { name: "Pièces détachées", exact: true }).check();
+    await rangee.getByRole("button", { name: "Enregistrer" }).click();
+
+    await expect(ligne(page, code)).toContainText("Motos et Pièces détachées");
   });
 
   test("un code déjà pris est refusé, et la boutique existante reste intacte", async ({ page }) => {

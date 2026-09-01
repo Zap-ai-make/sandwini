@@ -27,6 +27,10 @@ import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
  * qu’il est imprimé sur des reçus et qu’il ouvre leurs numéros. Un code qu’on
  * pourrait réécrire, ou une création qui recouvrirait une boutique existante,
  * rendraient faux des documents déjà remis à des clients.
+ *
+ * S’y ajoutent les **métiers** (D62) : ils décident de ce qu’un gérant voit de
+ * l’application. Une boutique sans métier, ou avec un métier inventé, ouvrirait
+ * une application vide que personne ne saurait réparer de l’intérieur.
  */
 
 let env: RulesTestEnvironment;
@@ -43,6 +47,7 @@ const gerant = (uid = "ger-1", boutiqueId = "PTG") =>
 const creation = (code: string, auteur = "resp-1") => ({
   nom: "Boutique de " + code,
   code,
+  metiers: ["motos"],
   adresse: "Marché central",
   telephone: "70 00 00 00",
   actif: true,
@@ -58,6 +63,7 @@ const creation = (code: string, auteur = "resp-1") => ({
 const existante = (code: string) => ({
   nom: "Boutique de " + code,
   code,
+  metiers: ["motos"],
   adresse: "Marché central",
   telephone: "70 00 00 00",
   actif: true,
@@ -156,6 +162,32 @@ describe("création", () => {
     );
   });
 
+  it("accepte une boutique qui tient les deux métiers", async () => {
+    await assertSucceeds(
+      setDoc(doc(responsable(), "boutiques/ZRG"), {
+        ...creation("ZRG"),
+        metiers: ["motos", "pieces"],
+      }),
+    );
+  });
+
+  it("refuse une boutique sans métier — elle n’ouvrirait aucun espace", async () => {
+    await assertFails(
+      setDoc(doc(responsable(), "boutiques/ZRG"), { ...creation("ZRG"), metiers: [] }),
+    );
+    const sansChamp: Record<string, unknown> = { ...creation("ZRG") };
+    delete sansChamp.metiers;
+    await assertFails(setDoc(doc(responsable(), "boutiques/ZRG"), sansChamp));
+  });
+
+  it("refuse un métier que l’application ne sait pas servir", async () => {
+    for (const metiers of [["carburant"], ["motos", "carburant"], ["motos", "motos", "pieces"], "motos"]) {
+      await assertFails(
+        setDoc(doc(responsable(), "boutiques/ZRG"), { ...creation("ZRG"), metiers }),
+      );
+    }
+  });
+
   it("refuse un champ qui n’est pas au contrat", async () => {
     await assertFails(
       setDoc(doc(responsable(), "boutiques/ZRG"), { ...creation("ZRG"), marge: 42 }),
@@ -194,6 +226,25 @@ describe("modification", () => {
   it("le responsable ferme et rouvre une boutique", async () => {
     await assertSucceeds(
       updateDoc(doc(responsable(), "boutiques/PTG"), miseAJour({ actif: false })),
+    );
+  });
+
+  it("le responsable change le métier d’une boutique — rien d’imprimé n’en dépend", async () => {
+    await assertSucceeds(
+      updateDoc(doc(responsable(), "boutiques/PTG"), miseAJour({ metiers: ["pieces"] })),
+    );
+  });
+
+  it("un métier ne se vide pas et ne s’invente pas", async () => {
+    await assertFails(updateDoc(doc(responsable(), "boutiques/PTG"), miseAJour({ metiers: [] })));
+    await assertFails(
+      updateDoc(doc(responsable(), "boutiques/PTG"), miseAJour({ metiers: ["carburant"] })),
+    );
+  });
+
+  it("un gérant ne s’ouvre pas un espace en changeant le métier de sa boutique", async () => {
+    await assertFails(
+      updateDoc(doc(gerant(), "boutiques/PTG"), miseAJour({ metiers: ["motos", "pieces"] }, "ger-1")),
     );
   });
 

@@ -20,7 +20,7 @@ async function seConnecter(page) {
   await page.getByLabel("Adresse e-mail").fill(RESPONSABLE.email);
   await page.getByLabel("Mot de passe", { exact: true }).fill(RESPONSABLE.motDePasse);
   await page.getByRole("button", { name: /Se connecter/ }).click();
-  await page.waitForURL("**/dashboard");
+  await page.waitForURL("**/supervision");
 }
 
 const PRISES = [
@@ -36,9 +36,14 @@ const PRISES = [
   { nom: "prestataires-bureau-clair", chemin: "/parametres/prestataires", theme: "light", mobile: false },
   { nom: "utilisateurs-mobile-clair", chemin: "/parametres/utilisateurs", theme: "light", mobile: true },
   { nom: "utilisateurs-bureau-sombre", chemin: "/parametres/utilisateurs", theme: "dark", mobile: false },
-  { nom: "accueil-mobile-clair", chemin: "/dashboard", theme: "light", mobile: true },
-  { nom: "accueil-mobile-sombre", chemin: "/dashboard", theme: "dark", mobile: true },
-  { nom: "accueil-bureau-clair", chemin: "/dashboard", theme: "light", mobile: false },
+  /* Le responsable atterrit sur sa supervision, pas sur l'accueil du gérant
+     (D63) : c'est donc cet écran-là qu'une session de responsable photographie.
+     L'accueil du gérant, lui, est vérifié par la suite bout en bout, qui sait
+     ouvrir une session de gérant — ce script ne le sait pas. */
+  { nom: "supervision-mobile-clair", chemin: "/supervision", theme: "light", mobile: true },
+  { nom: "supervision-mobile-sombre", chemin: "/supervision", theme: "dark", mobile: true },
+  { nom: "supervision-bureau-clair", chemin: "/supervision", theme: "light", mobile: false },
+  { nom: "supervision-bureau-sombre", chemin: "/supervision", theme: "dark", mobile: false },
   { nom: "clients-mobile-clair", chemin: "/clients", theme: "light", mobile: true },
   { nom: "clients-bureau-sombre", chemin: "/clients", theme: "dark", mobile: false },
   { nom: "motos-mobile-clair", chemin: "/motos", theme: "light", mobile: true },
@@ -76,8 +81,8 @@ const PRISES = [
   { nom: "diagnostic-bureau-sombre", chemin: "/diagnostic", theme: "dark", mobile: false, boutique: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },
   // Le bandeau en alerte : l’état signature du produit.
-  { nom: "accueil-mobile-coupe", chemin: "/dashboard", theme: "light", mobile: true, coupe: true },
-  { nom: "accueil-mobile-sombre-coupe", chemin: "/dashboard", theme: "dark", mobile: true, coupe: true },
+  { nom: "supervision-mobile-coupe", chemin: "/supervision", theme: "light", mobile: true, coupe: true },
+  { nom: "supervision-mobile-sombre-coupe", chemin: "/supervision", theme: "dark", mobile: true, coupe: true },
 ];
 
 await mkdir(DOSSIER, { recursive: true });

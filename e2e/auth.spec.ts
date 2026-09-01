@@ -38,20 +38,20 @@ test.describe("accès", () => {
     await expect(messageErreur(page)).toHaveText("Adresse e-mail ou mot de passe incorrect.");
   });
 
-  test("le responsable se connecte et arrive sur l’accueil", async ({ page }) => {
+  test("le responsable se connecte et arrive sur sa supervision", async ({ page }) => {
     await seConnecterEtEntrer(page);
   });
 
   test("la session survit à un rechargement sans réseau", async ({ page, context }) => {
     await seConnecterEtEntrer(page);
-    await prendreLaMainEtMettreEnCache(page, "/dashboard");
+    await prendreLaMainEtMettreEnCache(page, "/supervision");
 
     await context.setOffline(true);
     await page.reload();
 
     // Toujours connecté : ni redirection vers /login, ni écran vide.
-    await expect(page.getByRole("heading", { name: "Accueil", level: 1 })).toBeVisible();
-    expect(page.url()).toContain("/dashboard");
+    await expect(page.getByRole("heading", { name: "Supervision", level: 1 })).toBeVisible();
+    expect(page.url()).toContain("/supervision");
 
     await context.setOffline(false);
   });

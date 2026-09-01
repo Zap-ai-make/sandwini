@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   bandeauEtat,
   codeUnique,
+  creerBoutique,
   prendreLaMainEtMettreEnCache,
   seConnecterEtEntrer,
   selecteurPerimetre,
@@ -17,19 +18,6 @@ import {
  */
 
 const prochainNumero = (page: Page) => page.locator('[data-test="prochain-numero"]');
-
-async function creerBoutique(page: Page, code: string) {
-  await page.goto("/parametres/boutiques", { waitUntil: "load" });
-  const formulaire = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Créer la boutique" }),
-  });
-  await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
-  await formulaire.getByLabel(/^Code/).fill(code);
-  await formulaire.getByLabel(/^Adresse/).fill("Marché central");
-  await formulaire.getByLabel("Téléphone").fill("70 00 00 00");
-  await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
-  await expect(page.getByText(`Boutique ${code} créée, code ${code}.`)).toBeVisible();
-}
 
 test.describe("le numéro de la prochaine pièce", () => {
   test("un numéro appartient à une boutique, pas à l’entreprise", async ({ page }) => {

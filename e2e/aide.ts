@@ -47,11 +47,16 @@ export async function seConnecter(
   await page.getByRole("button", { name: /Se connecter/ }).click();
 }
 
-/** Connexion suivie de l'arrivée effective sur l'accueil. */
+/**
+ * Connexion du responsable, suivie de son arrivée effective.
+ *
+ * Le responsable atterrit sur la supervision, pas sur l'accueil du gérant
+ * (D63) : c'est de là qu'il choisit la boutique qu'il regarde.
+ */
 export async function seConnecterEtEntrer(page: Page) {
   await seConnecter(page);
-  await page.waitForURL("**/dashboard");
-  await expect(page.getByRole("heading", { name: "Accueil", level: 1 })).toBeVisible();
+  await page.waitForURL("**/supervision");
+  await expect(page.getByRole("heading", { name: "Supervision", level: 1 })).toBeVisible();
 }
 
 /** L'indicateur de périmètre du bandeau : sélecteur pour le responsable, texte pour le gérant. */
@@ -120,6 +125,31 @@ export function ligneDeBoutique(page: Page, code: string) {
   return page.getByRole("listitem").filter({ hasText: new RegExp(`\\b${code}`) });
 }
 
+/**
+ * Déclare une boutique par le formulaire de S3, avec ses métiers.
+ *
+ * Passer par l'interface plutôt que par le SDK Admin : c'est le vrai chemin
+ * d'un premier jour d'utilisation, et c'est le seul qui vérifie que les cases à
+ * cocher écrivent bien ce que les règles attendent.
+ */
+export async function creerBoutique(
+  page: Page,
+  code: string,
+  metiers: readonly ("Motos" | "Pièces détachées")[] = ["Motos"],
+) {
+  await page.goto("/parametres/boutiques", { waitUntil: "load" });
+  const formulaire = page.locator("form").filter({
+    has: page.getByRole("button", { name: "Créer la boutique" }),
+  });
+  await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
+  await formulaire.getByLabel(/^Code/).fill(code);
+  for (const metier of metiers) {
+    await formulaire.getByRole("checkbox", { name: metier, exact: true }).check();
+  }
+  await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
+  await expect(ligneDeBoutique(page, code)).toBeVisible();
+}
+
 export type Terrain = { code: string; marque: string; modele: string; provenance: string };
 
 /**
@@ -136,14 +166,7 @@ export async function preparerTerrain(page: Page): Promise<Terrain> {
   const modele = nomUnique("Crux");
   const provenance = nomUnique("Import");
 
-  await page.goto("/parametres/boutiques", { waitUntil: "load" });
-  const formulaire = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Créer la boutique" }),
-  });
-  await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
-  await formulaire.getByLabel(/^Code/).fill(code);
-  await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
-  await expect(ligneDeBoutique(page, code)).toBeVisible();
+  await creerBoutique(page, code, ["Motos"]);
 
   await page.goto("/parametres/catalogue", { waitUntil: "load" });
   const marques = page

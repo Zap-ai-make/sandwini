@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import { useSession } from "@/lib/auth/session";
-import type { Boutique } from "@/lib/domain/boutique";
+import { reunirMetiers, type Boutique, type Metier } from "@/lib/domain/boutique";
 import { ecouterBoutique, ecouterBoutiques } from "@/lib/repositories/boutiques";
 import { ecouterPerimetreMemorise, lirePerimetreMemorise, memoriserPerimetre } from "./memoire";
 
@@ -42,6 +42,14 @@ export type Perimetre = {
   boutiqueId: string | null;
   code: string;
   nom: string;
+  /**
+   * Ce que ce périmètre vend, et donc quels espaces s’ouvrent (D62).
+   *
+   * Vide tant que la réponse n’est pas connue — chargement en cours, ou aucune
+   * boutique déclarée. La navigation ne rend alors que les espaces certains
+   * plutôt qu’une entrée qui disparaîtrait sous le doigt.
+   */
+  metiers: Metier[];
 };
 
 export type EtatPerimetre = {
@@ -59,6 +67,7 @@ const TOUTES: Perimetre = {
   boutiqueId: null,
   code: CODE_ENTREPRISE,
   nom: "Toutes les boutiques",
+  metiers: [],
 };
 
 const PAR_DEFAUT: EtatPerimetre = {
@@ -73,7 +82,13 @@ const PAR_DEFAUT: EtatPerimetre = {
 const Contexte = createContext<EtatPerimetre>(PAR_DEFAUT);
 
 function versPerimetre(boutique: Boutique): Perimetre {
-  return { type: "boutique", boutiqueId: boutique.id, code: boutique.code, nom: boutique.nom };
+  return {
+    type: "boutique",
+    boutiqueId: boutique.id,
+    code: boutique.code,
+    nom: boutique.nom,
+    metiers: boutique.metiers,
+  };
 }
 
 export function FournisseurPerimetre({ children }: { children: ReactNode }) {
@@ -153,6 +168,7 @@ export function FournisseurPerimetre({ children }: { children: ReactNode }) {
             boutiqueId: boutiqueDuGerant,
             code: boutiqueDuGerant ?? CODE_ENTREPRISE,
             nom: boutiqueDuGerant ? "" : "Aucune boutique attribuée",
+            metiers: [],
           };
     } else if (visibles.length === 0 && !chargement) {
       perimetre = { ...TOUTES, type: "aucune", nom: "Aucune boutique" };
@@ -160,7 +176,12 @@ export function FournisseurPerimetre({ children }: { children: ReactNode }) {
       /* Une boutique fermée ne peut pas rester le périmètre courant : on
          retomberait sur un écran de saisie qui n’a plus de destination. */
       const choisie = visibles.find((boutique) => boutique.id === choix && boutique.actif);
-      perimetre = choisie ? versPerimetre(choisie) : TOUTES;
+      /* « Toutes les boutiques » ouvre l’union des métiers : le responsable
+         garde les deux espaces sous la main tant qu’il n’a pas choisi. Une
+         boutique fermée n’y contribue pas — on ne saisit plus dedans. */
+      perimetre = choisie
+        ? versPerimetre(choisie)
+        : { ...TOUTES, metiers: reunirMetiers(visibles.filter((boutique) => boutique.actif)) };
     }
 
     return {

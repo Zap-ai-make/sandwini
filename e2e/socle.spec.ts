@@ -1,5 +1,11 @@
 import { expect, test } from "@playwright/test";
-import { bandeauEtat, prendreLaMainEtMettreEnCache, seConnecterEtEntrer } from "./aide";
+import {
+  bandeauEtat,
+  codeUnique,
+  creerBoutique,
+  prendreLaMainEtMettreEnCache,
+  seConnecterEtEntrer,
+} from "./aide";
 
 /**
  * Vérification du socle sur un build réel.
@@ -19,18 +25,24 @@ test.describe("coquille applicative", () => {
     await seConnecterEtEntrer(page);
   });
 
-  test("l’accueil s’affiche en français et mène aux quatre espaces", async ({ page }) => {
+  test("la supervision s’affiche en français et mène aux boutiques", async ({ page }) => {
     await expect(page.locator("html")).toHaveAttribute("lang", "fr");
 
-    const espaces = page.getByRole("navigation", { name: "Espaces de travail" });
-    for (const libelle of ["Motos", "Pièces détachées", "Caisse", "Réglages"]) {
-      await expect(espaces.getByRole("link", { name: new RegExp(libelle) })).toBeVisible();
-    }
+    const code = codeUnique();
+    await creerBoutique(page, code, ["Motos"]);
+    await page.goto("/supervision", { waitUntil: "load" });
+
+    const boutiques = page.getByRole("navigation", { name: "Boutiques" });
+    await expect(boutiques.getByRole("link", { name: new RegExp(code) })).toBeVisible();
   });
 
   test("la navigation principale tient sous le pouce sur un écran de 360 px", async ({ page }) => {
+    /* Une boutique aux deux métiers : la barre est alors à son maximum, cinq
+       entrées, et c’est cette densité-là qui doit tenir en 360 px. */
+    await creerBoutique(page, codeUnique(), ["Motos", "Pièces détachées"]);
+
     await page.setViewportSize({ width: 360, height: 740 });
-    await page.goto("/dashboard");
+    await page.goto("/supervision", { waitUntil: "load" });
 
     const nav = page.getByRole("navigation", { name: "Navigation principale" });
     await expect(nav).toBeVisible();
@@ -89,13 +101,13 @@ test.describe("hors ligne", () => {
   });
 
   test("la coquille se recharge sans réseau", async ({ page, context }) => {
-    await prendreLaMainEtMettreEnCache(page, "/dashboard");
+    await prendreLaMainEtMettreEnCache(page, "/supervision");
 
     await context.setOffline(true);
     await page.reload();
 
     // Pas la page d’erreur du navigateur : notre écran, avec notre navigation.
-    await expect(page.getByRole("heading", { name: "Accueil", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Supervision", level: 1 })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Navigation principale" })).toBeVisible();
 
     /* Le bandeau n’est volontairement pas vérifié ici. Après un rechargement

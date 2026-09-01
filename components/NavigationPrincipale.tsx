@@ -1,22 +1,27 @@
 "use client";
 
-import { Bike, Coins, LayoutGrid, Settings, Wrench } from "lucide-react";
+import { Bike, Building2, Coins, LayoutGrid, Settings, Wrench } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ComponentType } from "react";
+import { useSession } from "@/lib/auth/session";
+import { ESPACES, espacesVisibles, type Espace } from "@/lib/domain/espaces";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 
-type Entree = { href: string; libelle: string; Icone: ComponentType<{ className?: string }> };
-
-/* Les cinq espaces du cahier des charges §14. L’ordre suit la journée d’un
-   gérant : on regarde l’accueil, on vend une moto, on vend une pièce, on
-   compte la caisse. Les paramètres ferment la marche, on y va rarement. */
-const ENTREES: Entree[] = [
-  { href: "/dashboard", libelle: "Accueil", Icone: LayoutGrid },
-  { href: "/motos", libelle: "Motos", Icone: Bike },
-  { href: "/pieces", libelle: "Pièces", Icone: Wrench },
-  { href: "/caisse", libelle: "Caisse", Icone: Coins },
-  { href: "/parametres", libelle: "Réglages", Icone: Settings },
-];
+/* L’icône de chaque espace. Le reste — route et intitulé — vit dans
+   `lib/domain/espaces.ts`, avec la règle qui décide qui voit quoi ; ici on ne
+   garde que ce qui relève du rendu. */
+const ICONE: Record<Espace, ComponentType<{ className?: string }>> = {
+  /* L'entreprise, pas un radar : la supervision est le niveau au-dessus des
+     boutiques, pas un poste de surveillance. Le même pictogramme désigne déjà
+     l'entreprise dans les réglages. */
+  supervision: Building2,
+  accueil: LayoutGrid,
+  motos: Bike,
+  pieces: Wrench,
+  caisse: Coins,
+  reglages: Settings,
+};
 
 function estActive(chemin: string, href: string): boolean {
   return chemin === href || chemin.startsWith(`${href}/`);
@@ -28,9 +33,19 @@ function estActive(chemin: string, href: string): boolean {
  * En bas sur téléphone : c’est la zone du pouce, et l’application s’utilise
  * debout, une main occupée par le client ou la moto. Sur grand écran elle passe
  * en rail vertical à gauche, où le regard la cherche.
+ *
+ * Ses entrées ne sont pas une liste figée : elles se déduisent du rôle et des
+ * métiers de la boutique en cours (D62). Un gérant de boutique motos n’a pas
+ * d’onglet « Pièces », parce que le lui montrer serait promettre un écran que
+ * la garde refuserait ensuite.
  */
 export function NavigationPrincipale() {
   const chemin = usePathname();
+  const session = useSession();
+  const { perimetre } = usePerimetre();
+
+  if (session.statut !== "connecte") return null;
+  const entrees = espacesVisibles(session.utilisateur.role, perimetre.metiers);
 
   return (
     <nav
@@ -49,7 +64,9 @@ export function NavigationPrincipale() {
           "sm:h-full sm:flex-col sm:justify-start sm:gap-1 sm:p-2",
         ].join(" ")}
       >
-        {ENTREES.map(({ href, libelle, Icone }) => {
+        {entrees.map((espace) => {
+          const { href, libelle } = ESPACES[espace];
+          const Icone = ICONE[espace];
           const active = estActive(chemin, href);
           return (
             <li key={href} className="flex-1 sm:flex-none">

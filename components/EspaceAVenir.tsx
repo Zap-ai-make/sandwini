@@ -1,4 +1,8 @@
+"use client";
+
 import Link from "next/link";
+import { useSession } from "@/lib/auth/session";
+import { accueilDuRole } from "@/lib/domain/espaces";
 
 /**
  * L’état d’un espace que le socle dessert déjà mais que sa spec n’a pas encore
@@ -8,18 +12,23 @@ import Link from "next/link";
  * chose honnête à dire est : voilà ce que cet espace fera, voilà la spec qui
  * l’apporte, et voilà où aller en attendant. Le repère de spec n’est pas une
  * décoration — c’est une information vraie sur l’état du produit (§6).
+ *
+ * Le retour suit le rôle : le responsable rentre dans sa supervision, le gérant
+ * à son accueil (D63). Un bouton « Revenir à l’accueil » qui mène ailleurs que
+ * là d’où l’on vient use la confiance qu’on a dans les autres.
  */
 export function EspaceAVenir({
   titre,
   spec,
   contenu,
-  retour = { href: "/dashboard", libelle: "Revenir à l’accueil" },
 }: {
   titre: string;
   spec: string;
   contenu: string[];
-  retour?: { href: string; libelle: string };
 }) {
+  const session = useSession();
+  if (session.statut !== "connecte") return null;
+
   return (
     <section className="max-w-prose">
       <p className="plaque-code mb-3 inline-block rounded-plaque border border-bord px-2 py-1 text-xs text-encre-doux">
@@ -38,10 +47,10 @@ export function EspaceAVenir({
         ))}
       </ul>
       <Link
-        href={retour.href}
+        href={accueilDuRole(session.utilisateur.role)}
         className="mt-6 inline-flex h-11 items-center rounded-plaque border border-bord px-4 text-sm font-medium text-encre hover:bg-fond"
       >
-        {retour.libelle}
+        Revenir à l’accueil
       </Link>
     </section>
   );
