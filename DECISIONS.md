@@ -1226,3 +1226,36 @@ ressemblent à quelque chose qui n'est pas encore parvenu là où on le lit — 
 écriture, une écoute. C'est une meilleure piste que « bruit du harnais », et elle n'a pas
 été suivie : elle relève de S2 et de S12. À ne pas reclasser en flakiness sans l'avoir
 regardée — c'est l'erreur que S3bis a failli commettre sur le cas ci-dessus.
+
+---
+
+## D65 — Un document traité au magasin ne passe pas par un prestataire fictif
+
+Le cahier dessine un cycle linéaire (`prompt.md` §7.1) :
+
+```
+a_faire → chez_prestataire → revenu_magasin → remis_client
+```
+
+Appliqué à la lettre, il oblige les quatre documents à transiter par un
+prestataire. Or deux d'entre eux n'en voient jamais : les pages prestataire ne
+listent que la carte grise et la plaque (§12.2), et §7.2 fait passer un CMC
+attribué **directement** à `revenu_magasin`. La quittance, elle, est une
+démarche que le magasin fait lui-même.
+
+**Décision.** `a_faire → revenu_magasin` est autorisé. Sinon il aurait fallu
+inscrire un prestataire qui n'a rien fait pour clore une quittance — et c'est
+précisément le nom du prestataire que la liste des dossiers en attente affiche
+en face de chaque document (§7.3). Une donnée fausse à cet endroit rend l'écran
+inutile.
+
+**Deux autres passages sont refusés, et méritent d'être dits.**
+
+- `chez_prestataire → non_applicable`. Déposer un document crée un encaissement
+  de sortie pour l'avance versée (§7.1). L'écarter ensuite laisserait de
+  l'argent sorti sans contrepartie. On écarte avant de déposer, pas après.
+- Tout retour en arrière, et toute sortie de `remis_client` ou
+  `non_applicable`. Corriger une erreur de saisie est une opération sensible,
+  journalisée et réservée au responsable : c'est le sujet de **S25**, au même
+  titre que l'annulation d'une vente ou d'un versement (D10, D58). En faire une
+  transition ordinaire la rendrait invisible dans l'historique.
