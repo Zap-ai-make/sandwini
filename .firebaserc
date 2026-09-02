@@ -1,5 +1,6 @@
 {
   "projects": {
-    "default": "sdi-dev"
+    "default": "sdi-dev",
+    "preversion": "sandwini"
   }
 }
