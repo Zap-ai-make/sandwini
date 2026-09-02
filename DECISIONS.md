@@ -1305,3 +1305,34 @@ toujours.
 priorité produit, puisque le hors-ligne n'est plus la promesse centrale. Elle garde sa
 valeur pour la **vérification** — c'est le défaut qui rend la suite bout en bout bruitée
 (D55).
+
+---
+
+## D67 — La base de la préversion est en `nam5`, celle de production sera en Europe
+
+*Constat de déploiement, S11.*
+
+Le déploiement des règles a **créé** la base Firestore de `sandwini`, et faute d'emplacement
+demandé, Google l'a placée dans `nam5` — multi-région États-Unis. Les déclencheurs le disent
+en clair : `projects/sandwini/locations/nam5/triggers/…`, alors que les fonctions tournent en
+`europe-west1`.
+
+**L'emplacement d'une base Firestore ne se change pas.** Ni par une commande, ni par la
+console : il faut créer une autre base et tout recopier.
+
+**Pour la préversion, on garde.** C'est un environnement jetable (`DEPLOIEMENT.md` §4) ; le
+détour par les États-Unis coûte quelques dizaines de millisecondes à chaque écriture, ce qui
+ne change rien à ce que le responsable vient y regarder. Recréer la base pour cela
+coûterait plus cher que le défaut.
+
+**Pour la production, non.** Les utilisateurs sont au Burkina Faso, et une base américaine
+leur ajoute un aller-retour transatlantique sur chaque lecture non mise en cache — sur des
+téléphones et un réseau qui n'ont pas de marge. La base de production se crée
+**explicitement** en `eur3`, *avant* le premier déploiement de règles :
+
+```
+firebase firestore:databases:create "(default)" --location eur3 --project <production>
+```
+
+À faire figurer dans la procédure de mise en production, parce que c'est une commande qu'on
+ne peut passer qu'une fois.

@@ -72,3 +72,58 @@ quelque part, révoquez-la et régénérez-en une.
 
 L'application tourne en local sur cette machine, avec les émulateurs — voir le `README`.
 Ce que vous y voyez est exactement ce qui sera déployé : c'est le même build.
+
+---
+
+## 6. Journal de la mise en ligne de `sandwini`
+
+Trois obstacles se sont présentés. Aucun n'est propre à ce projet ; ils se
+représenteront à la mise en production, d'où ces notes.
+
+### La découverte des fonctions expire au bout de 10 s
+
+```
+Error: User code failed to load. Cannot determine backend specification. Timeout after 10000.
+```
+
+Avant de déployer, la CLI lance le code compilé et l'interroge pour savoir quelles
+fonctions il déclare. Elle accorde dix secondes. Sur cette machine, le seul chargement du
+module en prend près de quatre à froid — le reste n'a pas la marge.
+
+Ce n'est pas une erreur de code : `functions/src/index.ts` charge déjà le SDK Admin
+paresseusement, précisément pour ce genre de délai. Le remède est le délai lui-même :
+
+```
+FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy --only functions --project sandwini
+```
+
+### Le premier déploiement de 2ᵉ génération échoue à moitié
+
+Les trois fonctions **appelables** sont passées ; les trois **déclencheurs Firestore** ont
+été refusés :
+
+> Permission denied while using the Eventarc Service Agent […] it may take a few minutes
+> before all necessary permissions are propagated.
+
+Le déploiement venait d'activer `eventarc.googleapis.com` et d'en créer l'agent de service ;
+les droits n'étaient pas encore propagés quand les déclencheurs les ont demandés. **Relancer
+la même commande quelques minutes plus tard suffit** — la seconde passe saute les fonctions
+inchangées et ne crée que les trois manquantes. Rien à corriger dans le code.
+
+### Les images de conteneur s'accumulent et se facturent
+
+Chaque déploiement laisse une image dans Artifact Registry. Sans politique de nettoyage,
+elles s'entassent et finissent par coûter. Une fois par projet et par région :
+
+```
+npx firebase functions:artifacts:setpolicy --project sandwini --location europe-west1 --days 3
+```
+
+### Ce qui est en ligne
+
+Règles Firestore et index · six fonctions en `europe-west1` (`creerGerant`,
+`changerActivationUtilisateur`, `attribuerBoutique`, `reconcilierNumeroVente`,
+`figerMargeVente`, `recalculerPaiementsVente`) · politique de nettoyage à 3 jours.
+
+Base Firestore en `nam5` — voir `DECISIONS.md` D67 : à ne pas reproduire en production,
+où l'emplacement se choisit explicitement, une seule fois, avant tout.
