@@ -119,6 +119,43 @@ elles s'entassent et finissent par coûter. Une fois par projet et par région :
 npx firebase functions:artifacts:setpolicy --project sandwini --location europe-west1 --days 3
 ```
 
+### La construction Vercel contrôle du code que Vercel n'installe pas
+
+```
+functions/src/index.ts(1,24): error TS2307: Cannot find module 'firebase-functions'
+Failed to type check.
+Error: Command "npm run build" exited with 1
+```
+
+Le `tsconfig.json` de la racine déclarait `include: ["**/*.ts"]` — donc
+`functions/src/index.ts` faisait partie du programme contrôlé par `next build`. En local
+il se résout, parce que `functions/node_modules` existe. Vercel, lui, n'installe que les
+dépendances de la racine : `firebase-functions` et `firebase-admin` n'y sont nulle part.
+Les `implicitly has an 'any' type` qui suivent ne sont que la conséquence des modules
+introuvables, pas des défauts distincts.
+
+**Le remède** est une exclusion, et une seule — celle du fichier concerné, pas du dossier :
+
+```json
+"exclude": ["node_modules", "functions/src/index.ts"]
+```
+
+Exclure `functions/` en bloc aurait été trop large. `functions/src/numerotation.test.ts`
+importe `lib/domain/numerotation.ts` : il compare délibérément la logique du client à
+celle du serveur (D5), il appartient donc au programme de la racine. L'écarter aurait
+privé de contrôle de types un fichier que plus rien n'aurait vérifié — `strict` cesse de
+s'appliquer sans que personne ne le voie.
+
+`index.ts` reste vérifié par `npm run build:functions`, avec le tsconfig et les paquets du
+sous-projet. **Règle à retenir :** tout nouveau fichier de `functions/src` qui importe
+`firebase-functions` ou `firebase-admin` s'ajoute à cette exclusion.
+
+Pour reproduire la condition de Vercel sans attendre un déploiement :
+
+```
+mv functions/node_modules functions/.absent && npx tsc --noEmit; mv functions/.absent functions/node_modules
+```
+
 ### Ce qui est en ligne
 
 Règles Firestore et index · six fonctions en `europe-west1` (`creerGerant`,

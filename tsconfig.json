@@ -30,5 +30,6 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules"]
+  "//": "`functions/src/index.ts` est le seul fichier du depot qui importe les dependances du paquet functions (firebase-functions, firebase-admin). Vercel n'installe que les dependances de la racine : le laisser ici faisait echouer le controle de types de `next build` sur des `Cannot find module`. Il se verifie par `npm run build:functions`, avec son propre tsconfig et ses propres paquets. Une regle a retenir : tout nouveau fichier de `functions/src` qui importe firebase-functions ou firebase-admin s'ajoute a cette liste.",
+  "exclude": ["node_modules", "functions/src/index.ts"]
 }
