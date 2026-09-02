@@ -3,9 +3,9 @@
 import { ChevronRight, LoaderCircle, Settings } from "lucide-react";
 import Link from "next/link";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
-import { LIBELLE_METIER, type Boutique } from "@/lib/domain/boutique";
+import { LIBELLE_METIER, reunirMetiers, type Metier } from "@/lib/domain/boutique";
 import { ESPACES } from "@/lib/domain/espaces";
-import { usePerimetre } from "@/lib/perimetre/perimetre";
+import { CODE_ENTREPRISE, usePerimetre } from "@/lib/perimetre/perimetre";
 
 /**
  * L’entrée de la supervision — le troisième espace (`prompt.md` §1).
@@ -23,13 +23,14 @@ export default function Supervision() {
   const { boutiques, chargement, erreur, choisir } = usePerimetre();
   const actives = boutiques.filter((boutique) => boutique.actif);
   const fermees = boutiques.length - actives.length;
+  const toutesLesMetiers = reunirMetiers(actives);
 
   return (
     <div>
       <h1 className="text-2xl font-semibold tracking-tight text-encre">Supervision</h1>
       <p className="mt-2 max-w-prose text-encre-doux">
-        Vos boutiques, et ce que chacune vend. En ouvrir une la met dans le bandeau, en haut&nbsp;:
-        tout ce que vous saisirez ensuite ira dans celle-là.
+        L’entreprise entière, ou une boutique à la fois. Ce que vous ouvrez ici s’inscrit dans le
+        bandeau, en haut&nbsp;: c’est le périmètre de tout ce que vous verrez et saisirez ensuite.
       </p>
 
       <InvitationBoutique />
@@ -48,10 +49,33 @@ export default function Supervision() {
       ) : actives.length > 0 ? (
         <nav aria-label="Boutiques" className="mt-6">
           <ul className="divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+            {/* L’entreprise entière vient en premier : c’est la vue par défaut du
+                responsable, et choisir une boutique est le geste qui rétrécit. La
+                plaque porte le code de l’entreprise, comme dans le bandeau. */}
+            <li>
+              <Link
+                href={destination(toutesLesMetiers)}
+                onClick={() => choisir(null)}
+                className="flex items-center gap-4 px-4 py-4 hover:bg-fond focus-visible:bg-fond"
+              >
+                <span className="plaque-code flex h-8 shrink-0 items-center rounded-plaque border border-plaque-bord bg-plaque px-2 text-sm leading-none text-encre-fixe">
+                  {CODE_ENTREPRISE}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-medium text-encre">Toutes les boutiques</span>
+                  <span className="block text-sm text-encre-doux">
+                    {actives.length === 1
+                      ? "Une seule boutique pour l’instant"
+                      : `Stock, ventes et paiements des ${actives.length} boutiques réunis`}
+                  </span>
+                </span>
+                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              </Link>
+            </li>
             {actives.map((boutique) => (
               <li key={boutique.id}>
                 <Link
-                  href={destination(boutique)}
+                  href={destination(boutique.metiers)}
                   onClick={() => choisir(boutique.id)}
                   className="flex items-center gap-4 px-4 py-4 hover:bg-fond focus-visible:bg-fond"
                 >
@@ -98,7 +122,16 @@ export default function Supervision() {
   );
 }
 
-/** L’espace sur lequel s’ouvre une boutique : celui de son métier. */
-function destination(boutique: Boutique): string {
-  return boutique.metiers[0] === "pieces" ? ESPACES.pieces.href : ESPACES.motos.href;
+/**
+ * L’espace sur lequel s’ouvre un périmètre : celui de son métier.
+ *
+ * Une boutique de pièces ouvre sur les pièces, tout le reste sur les motos.
+ * Vaut aussi pour l’entreprise entière, dont les métiers sont la réunion des
+ * siens : la garde d’espace refuserait `/motos` à une entreprise qui ne
+ * vendrait que des pièces.
+ */
+function destination(metiers: readonly Metier[]): string {
+  return metiers.length > 0 && !metiers.includes("motos")
+    ? ESPACES.pieces.href
+    : ESPACES.motos.href;
 }

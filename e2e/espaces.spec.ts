@@ -150,4 +150,26 @@ test.describe("le responsable passe d'un espace à l'autre", () => {
     // Le périmètre a suivi : la saisie ira dans cette boutique-là.
     await expect(selecteurPerimetre(page)).toHaveValue(code);
   });
+
+  test("la supervision ramène à l’entreprise entière, sans passer par le bandeau", async ({
+    page,
+  }) => {
+    await seConnecterEtEntrer(page);
+    const code = codeUnique();
+    await creerBoutique(page, code, ["Motos"]);
+
+    // On se met d’abord dans une boutique : c’est l’état d’où l’on veut ressortir.
+    await selecteurPerimetre(page).selectOption(code);
+    await expect(page.getByRole("banner")).toContainText(`Boutique ${code}`);
+
+    await page.goto("/supervision", { waitUntil: "load" });
+    await page
+      .getByRole("navigation", { name: "Boutiques" })
+      .getByRole("link", { name: /Toutes les boutiques/ })
+      .click();
+
+    await page.waitForURL("**/motos");
+    await expect(selecteurPerimetre(page)).toHaveValue("");
+    await expect(page.getByRole("banner")).toContainText("Toutes les boutiques");
+  });
 });

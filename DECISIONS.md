@@ -1176,3 +1176,53 @@ ment.
 elle se déduit du rôle et des métiers du périmètre courant, par une fonction pure
 (`lib/domain/espaces.ts`) partagée par la barre, les gardes de route et les accueils.
 Sans ce point unique, la barre proposerait une entrée que l'écran refuserait ensuite.
+
+---
+
+## D64 — Une boutique existe à l'écran avant d'exister pour le serveur
+
+*Trouvé en S3bis, en cherchant pourquoi un test tombait toujours au même endroit.*
+
+Deux chemins d'écriture coexistent dans l'application, et ils ne voient pas le même monde
+au même instant :
+
+- Une **boutique** s'écrit par le SDK Firestore. Elle est prise par le cache local
+  immédiatement, apparaît dans la liste, et part au serveur quand le réseau le permet.
+  C'est toute la promesse hors-ligne, et c'est délibéré.
+- Un **gérant rattaché à cette boutique** s'écrit par une Cloud Function, parce que le
+  rattachement pose un custom claim que seul le SDK Admin peut poser. Cette fonction lit
+  le **serveur**.
+
+Enchaîner les deux trop vite donne donc `Cette boutique n'existe pas.` — alors que la
+boutique existe, à l'écran, sous les yeux de la personne qui vient de la déclarer. Le
+message accuse l'existence quand la vérité est l'acheminement.
+
+**Ce qui a été fait.** Le helper de test `creerBoutique` attend désormais que le bandeau
+annonce « À jour » avant de rendre la main : c'est le seul signal qui dise que la file
+d'écritures est vidée. Cela a supprimé un échec qu'on attribuait au harnais depuis
+plusieurs specs — il n'en était pas un.
+
+**Ce qui reste ouvert, et qui touche le produit, pas les tests.** Un responsable qui
+déclare une boutique puis crée son gérant dans la foulée, sur une liaison lente, lira ce
+même message trompeur. Deux corrections possibles, à trancher :
+
+1. Dire la vérité dans le message — « Cette boutique n'est pas encore parvenue au serveur.
+   Attendez que le bandeau affiche « À jour ». » Peu coûteux, honnête, mais laisse
+   l'utilisateur attendre sans rien faire.
+2. Désactiver le rattachement d'un gérant tant que la file d'écritures n'est pas vide,
+   avec la raison écrite à l'écran. Plus juste : on n'offre pas une action qui ne peut pas
+   aboutir.
+
+La seconde vaut mieux et coûte peu. Elle n'a pas été faite ici parce qu'elle touche
+l'écran des utilisateurs (S2), hors du périmètre de S3bis — mais elle ne doit pas se
+perdre : **c'est le seul endroit connu où l'application promet une chose que le serveur
+refuse.** Elle est à traiter avec S12, qui repasse sur les frontières client/serveur.
+
+**Une piste voisine, non élucidée.** Deux tests préexistants continuent de tomber, et ils
+ont un point commun : ils **ouvrent une session de gérant juste après avoir créé son
+compte**. L'un voit sa liste de marques rester vide, l'autre reçoit « Vos droits ne
+permettent pas de lire ces données » en ouvrant une vente de sa propre boutique. Les deux
+ressemblent à quelque chose qui n'est pas encore parvenu là où on le lit — un claim, une
+écriture, une écoute. C'est une meilleure piste que « bruit du harnais », et elle n'a pas
+été suivie : elle relève de S2 et de S12. À ne pas reclasser en flakiness sans l'avoir
+regardée — c'est l'erreur que S3bis a failli commettre sur le cas ci-dessus.

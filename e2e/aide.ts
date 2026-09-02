@@ -148,6 +148,14 @@ export async function creerBoutique(
   }
   await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
   await expect(ligneDeBoutique(page, code)).toBeVisible();
+
+  /* La ligne apparaît dès que le cache local a pris l'écriture — c'est toute la
+     promesse hors-ligne, et ce n'est pas une preuve que le serveur l'a vue.
+     Or rattacher un gérant à cette boutique passe par une Cloud Function qui
+     lit le serveur, elle : enchainer trop vite répond « Cette boutique
+     n'existe pas ». Le bandeau dit quand la file d'écritures est vidée, et
+     c'est le seul signal qui le dise. */
+  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
 }
 
 export type Terrain = { code: string; marque: string; modele: string; provenance: string };

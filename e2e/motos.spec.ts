@@ -116,8 +116,14 @@ test.describe("le coût est réservé au responsable", () => {
     await creation.getByLabel("Boutique").selectOption(terrain.code);
     await creation.getByRole("button", { name: /Créer le compte/ }).click();
 
-    const rangee = page.getByRole("listitem").filter({ hasText: email });
-    await expect(rangee).toContainText(`Gérant · ${terrain.code}`, { timeout: 20_000 });
+    /* On attend la confirmation de la fonction, pas la ligne dans la liste des
+       comptes : sous charge, le SDK sert un cache où `users` n'a jamais été
+       chargé, et une collection jamais vue revient vide plutôt qu'en attente
+       (`DECISIONS.md` D55). Le rattachement, lui, est prouvé par la suite du
+       test : un gérant sans boutique ne verrait aucun stock où saisir. */
+    await expect(contenu(page).getByRole("status")).toContainText("Compte créé", {
+      timeout: 20_000,
+    });
 
     // Le gérant saisit la moto, coût compris.
     const contexteGerant = await browser.newContext();
