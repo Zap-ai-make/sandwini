@@ -18,8 +18,13 @@ const PAUSE_SECONDES = 30;
 function messageDErreur(cause: unknown): string {
   const code = (cause as { code?: string }).code ?? "";
   switch (code) {
+    /* Ce code ne dit pas « pas de réseau », il dit « la demande n’a pas
+       abouti ». Un bloqueur de publicités, un pare-feu d’entreprise ou un VPN
+       la retiennent aussi — et le message annonçait alors une cause fausse à
+       quelqu’un dont la connexion marchait, ce qui ne laisse rien à tenter.
+       Constaté sur la préversion, serveur joignable et requête bloquée. */
     case "auth/network-request-failed":
-      return "Pas de réseau. La première connexion sur cet appareil en demande un ; ensuite, l’application fonctionne hors ligne.";
+      return "La demande n’a pas atteint le serveur. Vérifiez votre connexion — la première ouverture sur un appareil en demande une. Si le réseau fonctionne, un bloqueur de publicités, un pare-feu ou un VPN peut retenir la demande.";
     case "auth/user-disabled":
       return "Ce compte a été désactivé. Contactez le responsable.";
     case "auth/too-many-requests":
