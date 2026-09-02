@@ -638,9 +638,94 @@ service cloud.firestore {
              && donnees.statut == 'a_faire';
     }
 
+    // La machine a etats, cote serveur. Elle repete `lib/domain/dossier.ts`, et
+    // cette repetition est voulue : le client decide de ce qu'il PROPOSE, la
+    // base decide de ce qu'elle ACCEPTE (D27). Un appareil dont le code a ete
+    // modifie ne doit pas pouvoir sauter le depot chez le prestataire, sinon la
+    // liste des dossiers ne sait plus qui detient quoi (D65).
+    function arriveDejaFait(type) {
+      return type in ['quittance', 'cmc'];
+    }
+
+    function transitionDossierAutorisee(type, de, vers) {
+      return de == 'a_faire'
+               ? (vers == 'non_applicable'
+                  || vers == (arriveDejaFait(type) ? 'revenu_magasin' : 'chez_prestataire'))
+             : de == 'chez_prestataire'
+               ? (!arriveDejaFait(type) && vers == 'revenu_magasin')
+             : de == 'revenu_magasin'
+               ? vers == 'remis_client'
+             // 'remis_client' et 'non_applicable' ne ressortent jamais.
+             : false;
+    }
+
+    // Les champs du depot et de la remise n'existent pas a la creation : S8
+    // ouvre quatre documents nus. Ils apparaissent au fil du cycle, d'ou un
+    // `hasOnly` plus large que le `hasAll`, qui n'exige que le socle.
+    function champsDossier() {
+      return ['boutiqueId', 'venteId', 'type', 'statut'];
+    }
+
+    function champsDepot() {
+      return ['prestataireId', 'prestataireNom', 'deposeLe', 'avance', 'disponibleLe',
+              'remisLe', 'fichierChemin'];
+    }
+
+    function depotRenseigne(donnees) {
+      return donnees.keys().hasAll(['prestataireId', 'prestataireNom', 'deposeLe', 'avance'])
+             && donnees.prestataireId is string
+             && donnees.prestataireId.size() > 0
+             && texteBorne(donnees.prestataireNom, 80)
+             && dateAppareil(donnees.deposeLe)
+             // Zero est admis — un prestataire peut travailler sans avance — mais
+             // le champ doit avoir ete rempli : c'est ce que le gerant confirme
+             // en deposant. L'encaissement, lui, n'est ecrit que s'il y a un
+             // montant : la caisse refuse une ligne a zero.
+             && montantValide(donnees.avance)
+             && donnees.avance >= 0;
+    }
+
+    function documentDossierMaj(ancien, nouveau, venteId, type) {
+      return nouveau.keys().hasOnly(champsDossier().concat(champsDepot()).concat(champsAudit()))
+             && nouveau.keys().hasAll(champsDossier().concat(champsAudit()))
+             // Ce qui identifie le document ne bouge jamais.
+             && nouveau.boutiqueId == ancien.boutiqueId
+             && nouveau.venteId == venteId
+             && nouveau.type == type
+             && transitionDossierAutorisee(type, ancien.statut, nouveau.statut)
+             && (nouveau.statut != 'chez_prestataire' || depotRenseigne(nouveau))
+             && (nouveau.statut != 'remis_client'
+                 || (nouveau.keys().hasAll(['remisLe']) && dateAppareil(nouveau.remisLe)));
+    }
+
     match /ventesMotos/{venteId}/documents/{type} {
       allow read: if peutVendrePour(resource.data.boutiqueId);
       allow create: if documentDossierValide(request.resource.data, venteId, type)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+      allow update: if documentDossierMaj(resource.data, request.resource.data, venteId, type)
+                    && traceModification(request.resource.data, resource.data)
+                    && peutVendrePour(resource.data.boutiqueId);
+      // Un document de dossier ne se supprime pas : `non_applicable` est la
+      // maniere de l'ecarter, et elle laisse une trace.
+      allow delete: if false;
+    }
+
+    // L'historique de chaque changement de statut (`prompt.md` §3.5). Il
+    // s'ecrit, il ne se reecrit pas : c'est ce qui en fait un historique.
+    match /ventesMotos/{venteId}/documents/{type}/historique/{entree} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+      allow create: if request.resource.data.keys().hasOnly(
+                         ['boutiqueId', 'venteId', 'type', 'de', 'vers', 'le']
+                         .concat(champsAudit()))
+                    && request.resource.data.keys().hasAll(
+                         ['boutiqueId', 'venteId', 'type', 'de', 'vers', 'le']
+                         .concat(champsAudit()))
+                    && request.resource.data.venteId == venteId
+                    && request.resource.data.type == type
+                    && request.resource.data.de is string
+                    && request.resource.data.vers is string
+                    && dateAppareil(request.resource.data.le)
                     && traceCreation(request.resource.data)
                     && peutVendrePour(request.resource.data.boutiqueId);
       allow update, delete: if false;

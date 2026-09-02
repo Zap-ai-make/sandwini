@@ -537,10 +537,16 @@ describe("le dossier naît ouvert, ses quatre documents à faire", () => {
     await assertFails(menteur.commit());
   });
 
-  it("un document de dossier ne se modifie ni ne s’efface avant S11", async () => {
+  /* Le cycle des documents appartient à S11, et se prouve dans
+     `regles/dossier.test.ts`. Ce qui reste ici, c'est ce que S8 doit garantir
+     quoi qu'il arrive ensuite : un dossier ouvert ne se saute pas et ne
+     s'efface pas. */
+  it("un document de dossier ne saute pas d’étape et ne s’efface jamais", async () => {
     await assertFails(
       updateDoc(doc(gerant(), "ventesMotos/vente-ptg/documents/carte_grise"), {
         statut: "remis_client",
+        remisLe: new Date("2026-08-30T09:00:00Z"),
+        ...audit("ger-1"),
       }),
     );
     await assertFails(
