@@ -156,6 +156,55 @@ Pour reproduire la condition de Vercel sans attendre un déploiement :
 mv functions/node_modules functions/.absent && npx tsc --noEmit; mv functions/.absent functions/node_modules
 ```
 
+### Les variables `NEXT_PUBLIC_` ne se déclarent jamais en « Secret »
+
+Symptôme trompeur : **la construction réussit**, le site s'affiche, et l'écran de connexion
+annonce lui-même « Firebase n'est pas configuré sur cet appareil » — alors que les six
+variables sont bel et bien enregistrées dans Vercel.
+
+Vercel propose deux types au moment de la saisie :
+
+| | Lisible après enregistrement | Disponible à la construction |
+|---|---|---|
+| **Secret** | non | non |
+| **Config** | oui | oui |
+
+Or `NEXT_PUBLIC_*` n'a de sens qu'à la construction : Next inscrit ces valeurs **en dur**
+dans le JavaScript envoyé au navigateur. Déclarées « Secret », elles ne sont pas fournies à
+cette étape ; le paquet est construit avec `projectId` vide, et
+`configurationPresente = Boolean(config.projectId)` ([lib/firebase/client.ts:81](lib/firebase/client.ts#L81))
+bascule l'application sur son écran « pas configuré ».
+
+C'est aussi une erreur de fond : ces valeurs partent dans le navigateur de **chaque
+visiteur**. Les traiter en secrets ne protège rien et rend impossible toute vérification —
+une valeur tronquée à la copie ne peut plus être ni relue ni comparée, seulement écrasée.
+Le type **Config** est le bon.
+
+**Deux vérifications sans attendre un déploiement**, une fois le site en ligne :
+
+```
+# 1. La configuration est-elle dans le paquet servi ?
+curl -s <url>/login | grep -oE 'src="[^"]*\.js"'   # puis chercher le projectId dans ces chunks
+
+# 2. Les émulateurs ont-ils fui en production ?
+curl -sI <url>/login | grep -i content-security-policy
+```
+
+Sur la seconde : `next.config.ts` n'ajoute `http://127.0.0.1:*` au `connect-src` que si
+`NEXT_PUBLIC_FIREBASE_EMULATEURS` vaut `1` à la construction. **L'en-tête CSP du site est
+donc un témoin fiable de la valeur qu'avait ce drapeau** — un hôte local dans `connect-src`
+en production signifie que le drapeau a fui, et que l'application cherche Firebase dans le
+téléphone du visiteur.
+
+### Ce que valent les en-têtes en ligne
+
+Vérifié sur le site réel, hors émulateurs, le 2 septembre 2026 : `Content-Security-Policy`
+(sans `unsafe-eval`, sans hôte local), `Strict-Transport-Security` à deux ans avec
+`includeSubDomains; preload`, `X-Frame-Options: DENY`, `frame-ancestors 'none'`,
+`X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`,
+`Permissions-Policy` fermant caméra, micro et géolocalisation. Le reste de la checklist
+`SECURITY.md` §13 demande une session ouverte, donc des variables correctes.
+
 ### Ce qui est en ligne
 
 Règles Firestore et index · six fonctions en `europe-west1` (`creerGerant`,
