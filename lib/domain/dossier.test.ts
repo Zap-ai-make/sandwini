@@ -8,6 +8,8 @@ import {
 import {
   dossierCloturable,
   estEnRetard,
+  estStatutTerminal,
+  passeParUnPrestataire,
   statutsSuivants,
   transitionAutorisee,
   type EtatDossier,
@@ -22,71 +24,126 @@ const etat = (partie: Partial<EtatDossier> = {}): EtatDossier => ({
   ...partie,
 });
 
-describe("transitionAutorisee — le chemin normal", () => {
-  it("suit le cycle du cahier des charges", () => {
-    expect(transitionAutorisee("a_faire", "chez_prestataire")).toBe(true);
-    expect(transitionAutorisee("chez_prestataire", "revenu_magasin")).toBe(true);
-    expect(transitionAutorisee("revenu_magasin", "remis_client")).toBe(true);
-  });
+/** Ceux qui arrivent finis, hors du périmètre de l’entreprise (D65). */
+const ARRIVENT_FAITS = ["quittance", "cmc"] as const;
+/** Ceux qu’un intervenant externe traite. */
+const VIA_PRESTATAIRE = ["carte_grise", "plaque"] as const;
 
-  it("laisse écarter un document que la vente n’inclut pas", () => {
-    expect(transitionAutorisee("a_faire", "non_applicable")).toBe(true);
-  });
-
-  /* La quittance et le CMC se traitent au magasin : les pages prestataire ne
-     listent que carte grise et plaque (§12.2), et un CMC attribué passe
-     directement à « revenu au magasin » (§7.2). Les faire transiter par un
-     prestataire fictif ferait mentir la donnée. */
-  it("laisse un document traité au magasin sauter l’étape du prestataire", () => {
-    expect(transitionAutorisee("a_faire", "revenu_magasin")).toBe(true);
+describe("passeParUnPrestataire", () => {
+  it("distingue ce qui arrive fait de ce qui se confie", () => {
+    for (const type of ARRIVENT_FAITS) expect(passeParUnPrestataire(type), type).toBe(false);
+    for (const type of VIA_PRESTATAIRE) expect(passeParUnPrestataire(type), type).toBe(true);
   });
 });
 
-describe("transitionAutorisee — ce qui est impossible", () => {
-  it("ne saute pas la remise au client", () => {
-    expect(transitionAutorisee("a_faire", "remis_client")).toBe(false);
-    expect(transitionAutorisee("chez_prestataire", "remis_client")).toBe(false);
+describe("la quittance et le CMC arrivent déjà faits", () => {
+  /* Le magasin reçoit le produit fini : la quittance accompagne la moto, et le
+     CMC s’obtient au ministère avec elle. Ni l’une ni l’autre n’est jamais
+     confiée à un prestataire. */
+  it("vont du « à faire » au magasin, sans passer par personne", () => {
+    for (const type of ARRIVENT_FAITS) {
+      expect(transitionAutorisee(type, "a_faire", "revenu_magasin"), type).toBe(true);
+      expect(transitionAutorisee(type, "revenu_magasin", "remis_client"), type).toBe(true);
+    }
+  });
+
+  it("n’ont pas d’étape « chez le prestataire » — personne ne les détient", () => {
+    for (const type of ARRIVENT_FAITS) {
+      expect(transitionAutorisee(type, "a_faire", "chez_prestataire"), type).toBe(false);
+      expect(statutsSuivants(type, "chez_prestataire"), type).toEqual([]);
+    }
+  });
+});
+
+describe("la carte grise et la plaque passent par un prestataire", () => {
+  it("suivent le cycle complet du cahier", () => {
+    for (const type of VIA_PRESTATAIRE) {
+      expect(transitionAutorisee(type, "a_faire", "chez_prestataire"), type).toBe(true);
+      expect(transitionAutorisee(type, "chez_prestataire", "revenu_magasin"), type).toBe(true);
+      expect(transitionAutorisee(type, "revenu_magasin", "remis_client"), type).toBe(true);
+    }
+  });
+
+  /* Sauter le dépôt priverait la liste des dossiers du seul renseignement
+     qu’elle sert à donner : qui détient le document en ce moment (§7.3). */
+  it("ne sautent pas le dépôt : c’est lui qui dit qui détient le document", () => {
+    for (const type of VIA_PRESTATAIRE) {
+      expect(transitionAutorisee(type, "a_faire", "revenu_magasin"), type).toBe(false);
+    }
+  });
+});
+
+describe("ce qui est impossible pour tous les documents", () => {
+  it("laisse écarter un document que la vente n’inclut pas", () => {
+    for (const type of TYPES_DOCUMENT) {
+      expect(transitionAutorisee(type, "a_faire", "non_applicable"), type).toBe(true);
+    }
+  });
+
+  it("ne saute jamais la remise au client", () => {
+    for (const type of TYPES_DOCUMENT) {
+      expect(transitionAutorisee(type, "a_faire", "remis_client"), type).toBe(false);
+    }
   });
 
   it("ne revient jamais en arrière", () => {
-    expect(transitionAutorisee("revenu_magasin", "chez_prestataire")).toBe(false);
-    expect(transitionAutorisee("revenu_magasin", "a_faire")).toBe(false);
-    expect(transitionAutorisee("chez_prestataire", "a_faire")).toBe(false);
+    for (const type of TYPES_DOCUMENT) {
+      expect(transitionAutorisee(type, "revenu_magasin", "a_faire"), type).toBe(false);
+      expect(transitionAutorisee(type, "revenu_magasin", "chez_prestataire"), type).toBe(false);
+    }
   });
 
   it("ne rouvre pas un document remis ou écarté", () => {
-    for (const vers of STATUTS_DOCUMENT) {
-      expect(transitionAutorisee("remis_client", vers), `remis_client → ${vers}`).toBe(false);
-      expect(transitionAutorisee("non_applicable", vers), `non_applicable → ${vers}`).toBe(false);
-    }
-  });
-
-  it("n’écarte pas un document déjà engagé chez un prestataire", () => {
-    expect(transitionAutorisee("chez_prestataire", "non_applicable")).toBe(false);
-  });
-
-  it("ne se rend jamais à soi-même — un changement de statut change le statut", () => {
-    for (const statut of STATUTS_DOCUMENT) {
-      expect(transitionAutorisee(statut, statut), statut).toBe(false);
-    }
-  });
-});
-
-describe("statutsSuivants", () => {
-  it("propose exactement ce que la transition autorise", () => {
-    for (const depart of STATUTS_DOCUMENT) {
-      for (const arrivee of STATUTS_DOCUMENT) {
+    for (const type of TYPES_DOCUMENT) {
+      for (const vers of STATUTS_DOCUMENT) {
+        expect(transitionAutorisee(type, "remis_client", vers), `${type} remis vers ${vers}`).toBe(
+          false,
+        );
         expect(
-          statutsSuivants(depart).includes(arrivee),
-          `${depart} → ${arrivee}`,
-        ).toBe(transitionAutorisee(depart, arrivee));
+          transitionAutorisee(type, "non_applicable", vers),
+          `${type} écarté vers ${vers}`,
+        ).toBe(false);
       }
     }
   });
 
-  it("ne propose rien depuis un statut terminal", () => {
-    expect(statutsSuivants("remis_client")).toEqual([]);
-    expect(statutsSuivants("non_applicable")).toEqual([]);
+  /* Une avance a été versée et un encaissement écrit : écarter le document
+     laisserait de l’argent sorti sans contrepartie. */
+  it("n’écarte pas un document déjà déposé chez un prestataire", () => {
+    for (const type of VIA_PRESTATAIRE) {
+      expect(transitionAutorisee(type, "chez_prestataire", "non_applicable"), type).toBe(false);
+    }
+  });
+
+  it("ne se rend jamais à soi-même — un changement de statut change le statut", () => {
+    for (const type of TYPES_DOCUMENT) {
+      for (const statut of STATUTS_DOCUMENT) {
+        expect(transitionAutorisee(type, statut, statut), `${type} ${statut}`).toBe(false);
+      }
+    }
+  });
+});
+
+describe("statutsSuivants et estStatutTerminal", () => {
+  it("proposent exactement ce que la transition autorise", () => {
+    for (const type of TYPES_DOCUMENT) {
+      for (const depart of STATUTS_DOCUMENT) {
+        for (const arrivee of STATUTS_DOCUMENT) {
+          expect(
+            statutsSuivants(type, depart).includes(arrivee),
+            `${type} ${depart} vers ${arrivee}`,
+          ).toBe(transitionAutorisee(type, depart, arrivee));
+        }
+      }
+    }
+  });
+
+  it("s’arrêtent sur les statuts d’où plus rien ne sort", () => {
+    for (const type of TYPES_DOCUMENT) {
+      expect(estStatutTerminal(type, "remis_client"), type).toBe(true);
+      expect(estStatutTerminal(type, "non_applicable"), type).toBe(true);
+      expect(estStatutTerminal(type, "a_faire"), type).toBe(false);
+    }
   });
 });
 
@@ -116,9 +173,9 @@ describe("dossierCloturable", () => {
         dossierCloturable(
           etat({
             documents: [
-              doc("quittance", statut),
+              doc("quittance", "remis_client"),
               doc("cmc", "remis_client"),
-              doc("carte_grise", "remis_client"),
+              doc("carte_grise", statut),
               doc("plaque", "remis_client"),
             ],
           }),
@@ -139,13 +196,9 @@ describe("dossierCloturable", () => {
     expect(dossierCloturable(etat({ motoRemise: false }))).toBe(false);
   });
 
-  /* Un dossier dont les documents ne sont pas chargés ne doit pas passer pour
-     un dossier complet : quatre documents sont attendus, pas « au moins zéro ». */
   it("ne clôt pas un dossier dont les documents manquent", () => {
     expect(dossierCloturable(etat({ documents: [] }))).toBe(false);
-    expect(
-      dossierCloturable(etat({ documents: [doc("quittance", "remis_client")] })),
-    ).toBe(false);
+    expect(dossierCloturable(etat({ documents: [doc("quittance", "remis_client")] }))).toBe(false);
   });
 });
 
@@ -165,9 +218,6 @@ describe("estEnRetard", () => {
     expect(estEnRetard(null, jour("2026-09-02"))).toBe(false);
   });
 
-  /* Le retard se compare de jour à jour, pas d’instant à instant : une date
-     estimée au 1er n’est pas « en retard » à 8 h le 1er parce qu’elle a été
-     saisie à 14 h la veille. */
   it("compare des jours, pas des heures", () => {
     expect(estEnRetard(new Date("2026-09-02T18:00:00"), new Date("2026-09-02T08:00:00"))).toBe(
       false,

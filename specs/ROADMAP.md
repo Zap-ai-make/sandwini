@@ -47,7 +47,7 @@ avant toute spec post-MVP.
 | S16 | CMC — stock, attribution, remise              | S11         | Le document `cmc` suit déjà son cycle sans gestion du stock physique de cartes. |
 | S17 | Transferts de motos entre boutiques           | S5          | Utile dès qu'il y a plusieurs boutiques actives. |
 | S18 | Échanges / reprises                           | S8          | Cas de vente fréquent mais contournable (vente + entrée en stock séparées). |
-| S19 | Photos de motos                               | S5          | Repoussé pour raison technique, cf. `DECISIONS.md` D14. |
+| S19 | Envois de fichiers — photos et papiers        | S5          | Débloqué par D66 : un champ d'envoi peut exister s'il annonce qu'il demande du réseau. Reste une spec à part parce qu'une file d'attente locale, elle, est un vrai chantier (D14). |
 | S20 | Pièces — catalogue, stock et mouvements       | S4          | Second métier entier ; n'empêche pas de vendre des motos. |
 | S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. |
 | S22 | Caisse — journal et clôture de journée        | S9          | Les encaissements existent dès S9 ; ici on ajoute la lecture et le comptage. |
@@ -55,7 +55,7 @@ avant toute spec post-MVP.
 | S24 | Supervision — les chiffres toutes boutiques   | S9, S11     | Pilotage ; S3bis a posé la section, il reste à la remplir — et il faut que les données à agréger existent d'abord. |
 | S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
-| S27 | Reconnexion immédiate au retour du réseau     | aucune      | Aujourd'hui, la file d'écritures repart quand le SDK Firestore a fini son attente croissante — jusqu'à une minute après le retour du signal. Sur un marché à couverture intermittente, c'est le geste le plus visible du produit. Cf. `DECISIONS.md` D50. |
+| S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). |
 
 ---
 

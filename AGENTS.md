@@ -17,9 +17,11 @@ STACK      : Next.js (App Router) + TypeScript strict + Tailwind + PWA
 LANCER     : npm install && npm run emulators (puis npm run dev)
 TESTER     : npm test (Vitest + règles Firestore) · npm run test:e2e (Playwright, dont hors-ligne)
 PARTICULARITÉS :
-  - Le hors-ligne n'est pas une option. Tout écran de saisie fonctionne sans réseau ; les écritures
-    passent par le SDK Firestore, jamais par une Cloud Function appelée depuis l'UI. Une spec dont
-    la saisie ne marche pas hors ligne n'est pas terminée.
+  - Le hors-ligne se cherche, il ne commande plus. Une saisie fonctionne sans réseau chaque fois
+    que c'est possible — les écritures passent par le SDK Firestore, pas par une Cloud Function
+    appelée depuis l'UI. Là où c'est impossible (envoi de fichier, création de compte), l'écran le
+    **dit** au lieu d'échouer en silence, et la spec reste terminée. Ne pas faire tourner une
+    architecture entière autour de ce point (D66).
   - Interface entièrement en français, montants en FCFA entiers.
   - Coûts et marges cloisonnés hors de portée des gérants via des sous-collections `prive/` (D2) —
     Firestore ne masque pas un champ, c'est le seul moyen. Chaque cloisonnement est prouvé par un

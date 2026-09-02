@@ -5,7 +5,7 @@
 - Lis ce document en entier avant d'écrire du code. Les sections 4 à 12 décrivent les règles métier ; elles priment sur toute intuition technique.
 - Le vocabulaire métier (CMC, quittance, carte grise, plaque, reprise, tranche) est défini en section 13. Utilise ces termes tels quels dans le code (noms de collections, enums, labels UI).
 - Toute l'interface est en **français**. La devise est le **FCFA** (entier, pas de décimales).
-- Le mode hors-ligne n'est pas une option : chaque écran de saisie doit fonctionner sans réseau (voir section 3.4).
+- Le mode hors-ligne est recherché, pas absolu : une saisie doit fonctionner sans réseau chaque fois que c'est possible (section 3.4). Là où la technique ne le permet pas — envoi de fichier, création de compte — l'écran l'annonce clairement plutôt que d'échouer sans explication (`DECISIONS.md` D66).
 - En cas d'ambiguïté non tranchée ici, choisis la solution la plus simple qui respecte les règles métier, et consigne le choix dans un fichier `DECISIONS.md` à la racine du projet.
 - Ordre de réalisation recommandé en section 15.
 
@@ -99,6 +99,8 @@ Contraintes :
 - Les numéros de reçus/factures doivent être uniques et lisibles même sans réseau : format `{CODE_BOUTIQUE}-{AAMM}-{compteur local}` avec réconciliation à la synchro (si collision détectée par une Cloud Function, un suffixe `-B` est ajouté et l'utilisateur est notifié). Documenter le mécanisme choisi.
 
 ### 3.4 Hors-ligne et synchronisation
+
+> **Portée (D66).** Ce qui suit vaut partout où c'est techniquement possible. Deux opérations en sont exclues et le disent à l'écran : l'**envoi de fichier** (Firebase Storage n'a pas de file d'attente hors ligne) et la **création de compte** (elle pose un droit, que seul le serveur peut poser).
 
 - Activer `persistentLocalCache` / `enableIndexedDbPersistence` de Firestore.
 - Toutes les écritures passent par le SDK Firestore (file d'attente automatique). Aucune écriture critique via Cloud Function appelable depuis l'UI de saisie.

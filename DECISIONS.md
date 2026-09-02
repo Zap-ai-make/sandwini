@@ -1229,33 +1229,79 @@ regardée — c'est l'erreur que S3bis a failli commettre sur le cas ci-dessus.
 
 ---
 
-## D65 — Un document traité au magasin ne passe pas par un prestataire fictif
+## D65 — Les quatre documents ne suivent pas le même chemin
 
-Le cahier dessine un cycle linéaire (`prompt.md` §7.1) :
+*Trois versions de cette décision en une journée : la première était une supposition, la
+seconde une demi-correction, celle-ci vient du responsable.*
+
+Le cahier dessine un cycle unique (`prompt.md` §7.1) et l'applique aux quatre documents :
 
 ```
 a_faire → chez_prestataire → revenu_magasin → remis_client
 ```
 
-Appliqué à la lettre, il oblige les quatre documents à transiter par un
-prestataire. Or deux d'entre eux n'en voient jamais : les pages prestataire ne
-listent que la carte grise et la plaque (§12.2), et §7.2 fait passer un CMC
-attribué **directement** à `revenu_magasin`. La quittance, elle, est une
-démarche que le magasin fait lui-même.
+**Ce n'est pas ce que fait la maison.** Le trajet réel se sépare en deux.
 
-**Décision.** `a_faire → revenu_magasin` est autorisé. Sinon il aurait fallu
-inscrire un prestataire qui n'a rien fait pour clore une quittance — et c'est
-précisément le nom du prestataire que la liste des dossiers en attente affiche
-en face de chaque document (§7.3). Une donnée fausse à cet endroit rend l'écran
-inutile.
+| Document | Trajet réel |
+|---|---|
+| **Quittance** | Accompagne la moto à son arrivée. Le magasin reçoit le produit fini. |
+| **CMC** | S'obtient au ministère avec la quittance — démarche menée **hors du périmètre de l'entreprise**. Le magasin reçoit le produit fini. |
+| **Carte grise** | Confiée à un prestataire. |
+| **Plaque** | Confiée à un prestataire. |
 
-**Deux autres passages sont refusés, et méritent d'être dits.**
+**Décision.** Le chemin dépend du **type** de document, pas seulement de son statut.
 
-- `chez_prestataire → non_applicable`. Déposer un document crée un encaissement
-  de sortie pour l'avance versée (§7.1). L'écarter ensuite laisserait de
-  l'argent sorti sans contrepartie. On écarte avant de déposer, pas après.
-- Tout retour en arrière, et toute sortie de `remis_client` ou
-  `non_applicable`. Corriger une erreur de saisie est une opération sensible,
-  journalisée et réservée au responsable : c'est le sujet de **S25**, au même
-  titre que l'annulation d'une vente ou d'un versement (D10, D58). En faire une
-  transition ordinaire la rendrait invisible dans l'historique.
+- Quittance et CMC : `a_faire → revenu_magasin → remis_client`. L'étape
+  `chez_prestataire` n'existe pas pour eux — personne ne les détient jamais, et un nom de
+  prestataire inscrit en face serait faux dans la liste des dossiers en attente (§7.3).
+- Carte grise et plaque : le cycle complet, sans saut possible. C'est le dépôt qui dit qui
+  détient le document ; le sauter priverait cette liste du seul renseignement qu'elle sert
+  à donner.
+
+**Deux passages restent refusés pour tous.**
+
+- `chez_prestataire → non_applicable`. Déposer crée un encaissement de sortie pour l'avance
+  versée (§7.1) ; écarter ensuite laisserait de l'argent sorti sans contrepartie. On écarte
+  avant de déposer.
+- Tout retour en arrière, et toute sortie de `remis_client` ou `non_applicable`. Corriger
+  une erreur de saisie est une opération sensible, journalisée, réservée au responsable :
+  c'est **S25**, au même titre que l'annulation d'une vente ou d'un versement (D10, D58).
+
+**La leçon, qui vaut au-delà de cette décision.** Le cahier des charges décrivait un cycle
+uniforme parce qu'il est plus simple à écrire, pas parce que le métier est ainsi. J'ai
+d'abord comblé l'écart par une supposition plausible — et fausse. Une question posée au
+début de S11 aurait coûté cinq minutes ; la supposition a coûté un module et ses tests,
+écrits deux fois.
+
+---
+
+## D66 — Le hors-ligne se cherche, il ne commande plus
+
+*Arbitrage du responsable, en cours de S11.*
+
+`AGENTS.md` et `prompt.md` §0 posaient le hors-ligne en veto : « tout écran de saisie
+fonctionne sans réseau », et « une spec dont la saisie ne marche pas hors ligne n'est pas
+terminée ». Cette règle a façonné des décisions structurantes — écritures par le SDK
+plutôt que par Cloud Function, agrégats calculés côté client (D53, D56), photos repoussées
+en S19 (D14).
+
+**Ce qui change.** Le hors-ligne reste recherché partout où il est possible, et tout ce qui
+marche aujourd'hui sans réseau continue de marcher. Mais il cesse d'être un veto : là où la
+technique ne le permet pas, l'écran **le dit** et la spec est terminée quand même.
+
+**Ce qui ne change pas.** Les décisions déjà prises restent : une vente, un versement, une
+entrée en stock passent toujours par le SDK. Elles ne coûtent rien à garder et ce sont les
+gestes du comptoir, ceux qu'on fait debout, une main occupée.
+
+**Ce que ça débloque.** L'envoi de fichier (D14). Firebase Storage n'a pas de file d'attente
+hors ligne : un envoi sans réseau échoue. La règle précédente interdisait donc d'ajouter un
+champ d'upload à un formulaire de saisie ; la nouvelle l'autorise, à condition que l'écran
+annonce clairement que ce champ-là demande du réseau. **Deux exigences pratiques :** le
+reste du formulaire s'enregistre sans le fichier, et le fichier reste ajoutable plus tard —
+sans quoi une saisie faite au comptoir sans réseau serait perdue ou incomplète pour
+toujours.
+
+*Conséquence sur S27* (reconnexion immédiate au retour du réseau) : son rang baisse en
+priorité produit, puisque le hors-ligne n'est plus la promesse centrale. Elle garde sa
+valeur pour la **vérification** — c'est le défaut qui rend la suite bout en bout bruitée
+(D55).

@@ -7,52 +7,76 @@
  * telles quelles par la page client (S13) et la page prestataire (S15), qui les
  * appliqueront côté serveur — d'où le fait qu'elles vivent ici, en fonctions
  * pures, plutôt qu'en conditions dispersées dans des composants.
+ *
+ * **Les quatre documents ne suivent pas le même chemin** (`DECISIONS.md` D65).
+ * Deux d'entre eux arrivent déjà faits, deux passent par un prestataire ; le
+ * chemin dépend donc du type, pas seulement du statut de départ.
  */
 
 import { TYPES_DOCUMENT, type StatutDocument, type TypeDocument } from "./vente";
 
 /**
- * Ce que chaque statut autorise comme suite.
+ * Ce qui arrive déjà fait : la **quittance** accompagne la moto, et le **CMC**
+ * s'obtient au ministère avec elle — deux démarches qui se font hors de
+ * l'entreprise. Le magasin reçoit le produit fini, puis le remet au client.
  *
- * Le chemin nominal est celui du cahier :
- * `a_faire → chez_prestataire → revenu_magasin → remis_client`.
- *
- * Deux écarts, tous deux voulus (`DECISIONS.md` D65) :
- *
- * - **`a_faire → revenu_magasin`.** La quittance et le CMC se traitent au
- *   magasin. Les pages prestataire ne listent que la carte grise et la plaque
- *   (§12.2), et un CMC attribué passe directement à « revenu au magasin »
- *   (§7.2). Les faire transiter par un prestataire fictif ferait mentir la
- *   donnée, et le nom d'un prestataire est ce que la liste des dossiers affiche.
- * - **`chez_prestataire ⇏ non_applicable`.** Une avance a été versée et un
- *   encaissement écrit : écarter le document laisserait de l'argent sorti sans
- *   contrepartie. On écarte avant de déposer, pas après.
- *
- * `remis_client` et `non_applicable` sont terminaux. Corriger une erreur de
- * saisie est une opération sensible, journalisée, réservée au responsable —
- * c'est le sujet de S25, pas une transition ordinaire.
+ * `chez_prestataire` n'existe pas pour ces documents : aucun intervenant
+ * externe n'en est jamais chargé, et le nom d'un prestataire inscrit en face
+ * serait faux dans la liste des dossiers en attente (§7.3).
  */
-export const TRANSITIONS: Record<StatutDocument, readonly StatutDocument[]> = {
-  a_faire: ["chez_prestataire", "revenu_magasin", "non_applicable"],
+const CHEMIN_ARRIVE_FAIT: Record<StatutDocument, readonly StatutDocument[]> = {
+  a_faire: ["revenu_magasin", "non_applicable"],
+  chez_prestataire: [],
+  revenu_magasin: ["remis_client"],
+  remis_client: [],
+  non_applicable: [],
+};
+
+/**
+ * Ce qui passe par un prestataire : la **carte grise** et la **plaque**. Le
+ * dépôt exige un prestataire, une date et une avance versée (§7.1), et l'étape
+ * ne se saute pas — c'est elle qui dit qui détient le document.
+ */
+const CHEMIN_PRESTATAIRE: Record<StatutDocument, readonly StatutDocument[]> = {
+  a_faire: ["chez_prestataire", "non_applicable"],
   chez_prestataire: ["revenu_magasin"],
   revenu_magasin: ["remis_client"],
   remis_client: [],
   non_applicable: [],
 };
 
-/** Ce passage est-il permis ? Un statut ne se rend jamais à lui-même. */
-export function transitionAutorisee(de: StatutDocument, vers: StatutDocument): boolean {
-  return TRANSITIONS[de].includes(vers);
+const CHEMIN: Record<TypeDocument, Record<StatutDocument, readonly StatutDocument[]>> = {
+  quittance: CHEMIN_ARRIVE_FAIT,
+  cmc: CHEMIN_ARRIVE_FAIT,
+  carte_grise: CHEMIN_PRESTATAIRE,
+  plaque: CHEMIN_PRESTATAIRE,
+};
+
+/** Ce document est-il confié à un intervenant externe ? */
+export function passeParUnPrestataire(type: TypeDocument): boolean {
+  return CHEMIN[type] === CHEMIN_PRESTATAIRE;
 }
 
-/** Ce qu'on propose à l'écran depuis un statut donné. Vide sur un statut terminal. */
-export function statutsSuivants(de: StatutDocument): readonly StatutDocument[] {
-  return TRANSITIONS[de];
+/** Ce passage est-il permis pour ce type de document ? */
+export function transitionAutorisee(
+  type: TypeDocument,
+  de: StatutDocument,
+  vers: StatutDocument,
+): boolean {
+  return CHEMIN[type][de].includes(vers);
+}
+
+/** Ce qu'on propose à l'écran. Vide sur un statut terminal. */
+export function statutsSuivants(
+  type: TypeDocument,
+  de: StatutDocument,
+): readonly StatutDocument[] {
+  return CHEMIN[type][de];
 }
 
 /** Un statut dont plus rien ne peut sortir : le document a fini sa vie. */
-export function estStatutTerminal(statut: StatutDocument): boolean {
-  return TRANSITIONS[statut].length === 0;
+export function estStatutTerminal(type: TypeDocument, statut: StatutDocument): boolean {
+  return CHEMIN[type][statut].length === 0;
 }
 
 /** Ce que la clôture regarde. Rien d'autre n'entre en compte (§7.1). */
@@ -95,8 +119,8 @@ export function dossierCloturable(etat: EtatDossier): boolean {
  * Comparé de jour à jour, pas d'instant à instant : une carte grise attendue le
  * 2 n'est pas en retard à 8 h le 2 parce qu'elle a été saisie à 14 h la veille.
  *
- * Le calcul est local et prend la date de l'appareil : c'est ce qui le rend
- * juste hors ligne, où aucune horloge serveur n'est joignable.
+ * Le calcul prend l'horloge de l'appareil, ce qui le rend juste même sans
+ * réseau, où aucune horloge serveur n'est joignable.
  */
 export function estEnRetard(estimee: Date | null, aujourdhui: Date): boolean {
   if (!estimee) return false;
