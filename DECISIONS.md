@@ -1355,16 +1355,29 @@ ferait un administrateur en production depuis la console Firebase » : c'était 
 c'est ce qui a masqué le trou.
 
 **La sortie.** Une fonction HTTP `amorcerResponsable`, dans `functions/src/index.ts`,
-qu'on déploie, qu'on appelle une fois, puis qu'on supprime. Deux gardes, qui échouent
-toutes deux **fermé** :
+qu'on déploie, qu'on appelle une fois, puis qu'on supprime. Trois gardes, qui échouent
+toutes **fermé** :
 
-1. elle refuse dès qu'un compte porte un rôle — inerte après le premier succès ;
-2. elle refuse s'il y a plus d'un compte — elle ne choisit jamais qui promouvoir.
+1. l'appelant présente un jeton d'identité valide, et c'est **lui-même** qu'il promeut ;
+2. elle refuse s'il y a plus d'un compte — elle ne choisit jamais qui promouvoir ;
+3. elle refuse dès que ce compte porte un rôle — inerte après le premier succès.
 
-Quelqu'un qui s'inscrirait pour devancer l'administrateur ferait passer le nombre de
-comptes à deux et **bloquerait** l'amorçage au lieu de s'en emparer. Aucun jeton partagé,
-aucun mot de passe à faire circuler, aucune clé de compte de service à télécharger — ce
-qui était l'objectif : `SECURITY.md` §2 interdit qu'une telle clé sorte de Vercel.
+Aucune clé de compte de service à télécharger, ce qui était l'objectif : `SECURITY.md` §2
+interdit qu'une telle clé sorte de Vercel. Le jeton s'obtient par un appel direct à
+Identity Toolkit avec la clé d'API publique ; le mot de passe ne quitte pas la machine de
+l'administrateur.
+
+**La première garde a été ajoutée après coup, et c'est la leçon.** La version d'origine
+n'avait que les deux dernières. Elle n'était pas exploitable telle qu'elle a été employée
+— s'inscrire pour devancer l'administrateur fait passer le nombre de comptes à deux et
+*bloque* l'amorçage. Mais sa sûreté reposait sur l'**ordre des commandes** : créer le
+compte avant de déployer. Déployée d'abord sur un projet vide, elle aurait promu le premier
+inscrit venu, l'inscription par e-mail et mot de passe étant ouverte à quiconque détient la
+clé d'API publique — laquelle part dans chaque navigateur.
+
+Ce que le code n'impose pas, une procédure écrite ne l'impose pas non plus. Sur la
+préversion l'enjeu était nul ; sur la production, avec de vraies données, dépendre d'un
+ordre de commandes n'est pas une protection.
 
 ## D68 bis — Un compte sans rôle est un état, pas une absence de session
 

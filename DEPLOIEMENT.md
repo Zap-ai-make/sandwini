@@ -219,16 +219,26 @@ d'ouvrir. Il faut donc :
 # 2. Deployer la fonction d'amorcage :
 FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy --only functions --project <projet>
 
-# 3. L'appeler une fois — elle promeut le seul compte du projet :
-curl -X POST -H "Content-Type: application/json" -d '{}'   https://europe-west1-<projet>.cloudfunctions.net/amorcerResponsable
+# 3. Obtenir un jeton d'identite pour ce compte. Le mot de passe ne quitte pas votre
+#    machine ; la cle d'API est publique, elle part deja dans chaque navigateur.
+curl "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<API_KEY>" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"...","password":"...","returnSecureToken":true}'
 
-# 4. La supprimer :
+# 4. Appeler l'amorcage avec le champ idToken de la reponse :
+curl -X POST -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <idToken>" -d '{}' \
+  https://europe-west1-<projet>.cloudfunctions.net/amorcerResponsable
+
+# 5. La supprimer :
 npx firebase functions:delete amorcerResponsable --project <projet> --region europe-west1 --force
 ```
 
-`amorcerResponsable` refuse dès qu'un compte porte un rôle, et refuse s'il y a plus d'un
-compte. Elle est donc inerte après son premier succès ; l'étape 4 est de l'hygiène, pas une
-protection. Voir D68 pour le raisonnement.
+`amorcerResponsable` exige un jeton d'identité valide et ne promeut **que l'appelant
+lui-même** ; elle refuse s'il y a plus d'un compte, et refuse dès que ce compte porte un
+rôle. Elle est donc inerte après son premier succès ; l'étape 5 est de l'hygiène, pas une
+protection. Voir D68 pour le raisonnement, et pour ce que la vérification du jeton a
+corrigé.
 
 **Après l'amorçage, il faut se déconnecter et se reconnecter** : le jeton gardé sur
 l'appareil ne porte pas encore le rôle.

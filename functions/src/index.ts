@@ -511,22 +511,50 @@ export const recalculerPaiementsVente = onDocumentCreated(
  * une boucle fermée. `scripts/amorcer.mjs` la casse en local, mais il refuse —
  * à raison — de viser autre chose que les émulateurs.
  *
- * **Ce qui la rend inoffensive**, sans mot de passe ni jeton partagé :
+ * **Trois conditions**, qui échouent toutes **fermé** :
  *
- * 1. Elle refuse dès qu'un compte porte un rôle. Elle ne sert donc qu'une fois
- *    et devient inerte pour toujours après son premier succès.
- * 2. Elle refuse s'il y a plus d'un compte dans le projet. Elle ne choisit
- *    jamais qui promouvoir : elle promeut le seul compte présent, ou personne.
+ * 1. L'appelant présente un jeton d'identité valide, et c'est **lui-même**
+ *    qu'il promeut. Il faut donc connaître le mot de passe du compte.
+ * 2. Elle refuse s'il y a plus d'un compte dans le projet.
+ * 3. Elle refuse dès que ce compte porte un rôle — inerte après le premier
+ *    succès.
  *
- * Les deux conditions échouent **fermé**. Quelqu'un qui s'inscrirait pour
- * devancer l'administrateur ferait passer le nombre de comptes à deux et
- * bloquerait l'amorçage — il ne se donnerait aucun droit.
+ * La première condition est celle qui compte, et elle a été ajoutée après coup.
+ * Sans elle, la sûreté reposait sur l'**ordre des commandes** : créer le compte
+ * administrateur avant de déployer. Déployée d'abord sur un projet vide, la
+ * fonction aurait promu le premier inscrit — l'inscription par e-mail et mot de
+ * passe étant ouverte à quiconque détient la clé d'API publique, qui part dans
+ * chaque navigateur. Une procédure écrite n'est pas une garantie : ce que le
+ * code n'impose pas, personne ne l'impose.
+ *
+ * Le jeton s'obtient sans rien confier à personne :
+ *
+ * ```
+ * curl "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<API_KEY>" \
+ *   -H "Content-Type: application/json" \
+ *   -d '{"email":"...","password":"...","returnSecureToken":true}'
+ * ```
  *
  * Une fois le responsable en place, elle ne peut plus rien faire. La supprimer
  * reste plus propre : `firebase functions:delete amorcerResponsable`.
  */
-export const amorcerResponsable = onRequest({ region: REGION, cors: false }, async (_, reponse) => {
+export const amorcerResponsable = onRequest({ region: REGION, cors: false }, async (requete, reponse) => {
   const { auth, base, horodatage } = await admin();
+
+  const entete = requete.get("authorization") ?? "";
+  const jetonBrut = entete.startsWith("Bearer ") ? entete.slice(7).trim() : "";
+  if (!jetonBrut) {
+    reponse.status(401).json({
+      erreur: "Jeton d'identité requis : en-tête « Authorization: Bearer <idToken> ».",
+    });
+    return;
+  }
+
+  const jeton = await auth.verifyIdToken(jetonBrut).catch(() => null);
+  if (!jeton) {
+    reponse.status(401).json({ erreur: "Jeton d'identité invalide ou expiré." });
+    return;
+  }
 
   /* Deux comptes suffisent à trancher : inutile de lister au-delà. */
   const comptes = await auth.listUsers(2);
@@ -545,6 +573,15 @@ export const amorcerResponsable = onRequest({ region: REGION, cors: false }, asy
   }
 
   const compte = comptes.users[0];
+
+  /* On ne promeut que l'appelant lui-même. Sans cela, la fonction distribuerait
+     un rôle à qui la trouve, au seul motif qu'un compte sans rôle existe. */
+  if (jeton.uid !== compte.uid) {
+    reponse.status(403).json({
+      erreur: "L'amorçage ne promeut que le compte qui l'appelle.",
+    });
+    return;
+  }
   if (compte.customClaims?.role) {
     reponse.status(409).json({
       erreur: `Ce compte porte déjà le rôle « ${compte.customClaims.role} ». L'amorçage est terminé.`,
