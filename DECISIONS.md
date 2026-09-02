@@ -1336,3 +1336,46 @@ firebase firestore:databases:create "(default)" --location eur3 --project <produ
 
 À faire figurer dans la procédure de mise en production, parce que c'est une commande qu'on
 ne peut passer qu'une fois.
+
+---
+
+## D68 — Le premier responsable s'amorce par une fonction jetable
+
+*Constat de mise en ligne, S11.*
+
+Le rôle est un **custom claim**, lu dans le jeton et jamais dans Firestore
+(`lib/auth/session.tsx`). Trois faits s'enchaînent mal :
+
+- la console Firebase crée des comptes, mais **ne sait pas poser de claim** ;
+- `creerGerant` exige déjà un responsable pour en créer un autre ;
+- `scripts/amorcer.mjs` refuse — à raison — de viser autre chose que les émulateurs.
+
+Un projet neuf était donc une boucle fermée. Le commentaire du script disait « comme le
+ferait un administrateur en production depuis la console Firebase » : c'était faux, et
+c'est ce qui a masqué le trou.
+
+**La sortie.** Une fonction HTTP `amorcerResponsable`, dans `functions/src/index.ts`,
+qu'on déploie, qu'on appelle une fois, puis qu'on supprime. Deux gardes, qui échouent
+toutes deux **fermé** :
+
+1. elle refuse dès qu'un compte porte un rôle — inerte après le premier succès ;
+2. elle refuse s'il y a plus d'un compte — elle ne choisit jamais qui promouvoir.
+
+Quelqu'un qui s'inscrirait pour devancer l'administrateur ferait passer le nombre de
+comptes à deux et **bloquerait** l'amorçage au lieu de s'en emparer. Aucun jeton partagé,
+aucun mot de passe à faire circuler, aucune clé de compte de service à télécharger — ce
+qui était l'objectif : `SECURITY.md` §2 interdit qu'une telle clé sorte de Vercel.
+
+## D68 bis — Un compte sans rôle est un état, pas une absence de session
+
+Le défaut trouvé le même jour : la connexion réussissait, `lireUtilisateur` ne trouvait pas
+de rôle, et la session basculait sur `deconnecte`. L'écran de connexion restait donc là,
+inchangé, **sans un mot**. Le mot de passe était bon ; rien ne le disait.
+
+`Session` gagne un état `sans_role`, et l'écran de connexion l'explique. Confondre « mot de
+passe refusé » et « compte à moitié créé » produisait la panne la plus décourageante du
+produit : un formulaire qui accepte la saisie et ne fait rien, sans rien à tenter ensuite.
+
+C'est exactement ce que `DESIGN.md` §10 demande d'éviter, et le rappel que l'inventaire des
+états n'est pas une formalité : celui-ci manquait depuis le début et n'est apparu qu'au
+premier vrai compte, créé à la main.

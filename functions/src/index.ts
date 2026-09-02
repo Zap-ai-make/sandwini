@@ -1,6 +1,6 @@
 import { logger } from "firebase-functions";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
-import { HttpsError, onCall, type CallableRequest } from "firebase-functions/v2/https";
+import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-functions/v2/https";
 import { QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
 import { resoudreCollision, type PieceNumerotee } from "./numerotation";
 
@@ -501,3 +501,81 @@ export const recalculerPaiementsVente = onDocumentCreated(
     });
   },
 );
+
+/**
+ * Amorçage du tout premier responsable, sur un projet réel.
+ *
+ * Le rôle est un custom claim, lu dans le jeton (`lib/auth/session.tsx`). Or la
+ * console Firebase ne sait pas poser de claim, et `creerGerant` exige déjà un
+ * responsable pour en créer un autre : sans cette fonction, un projet neuf est
+ * une boucle fermée. `scripts/amorcer.mjs` la casse en local, mais il refuse —
+ * à raison — de viser autre chose que les émulateurs.
+ *
+ * **Ce qui la rend inoffensive**, sans mot de passe ni jeton partagé :
+ *
+ * 1. Elle refuse dès qu'un compte porte un rôle. Elle ne sert donc qu'une fois
+ *    et devient inerte pour toujours après son premier succès.
+ * 2. Elle refuse s'il y a plus d'un compte dans le projet. Elle ne choisit
+ *    jamais qui promouvoir : elle promeut le seul compte présent, ou personne.
+ *
+ * Les deux conditions échouent **fermé**. Quelqu'un qui s'inscrirait pour
+ * devancer l'administrateur ferait passer le nombre de comptes à deux et
+ * bloquerait l'amorçage — il ne se donnerait aucun droit.
+ *
+ * Une fois le responsable en place, elle ne peut plus rien faire. La supprimer
+ * reste plus propre : `firebase functions:delete amorcerResponsable`.
+ */
+export const amorcerResponsable = onRequest({ region: REGION, cors: false }, async (_, reponse) => {
+  const { auth, base, horodatage } = await admin();
+
+  /* Deux comptes suffisent à trancher : inutile de lister au-delà. */
+  const comptes = await auth.listUsers(2);
+
+  if (comptes.users.length === 0) {
+    reponse.status(412).json({
+      erreur: "Aucun compte n'existe encore. Créez-le d'abord dans la console Firebase, section Authentication.",
+    });
+    return;
+  }
+  if (comptes.users.length > 1) {
+    reponse.status(412).json({
+      erreur: "Plus d'un compte existe : l'amorçage ne choisit pas qui promouvoir.",
+    });
+    return;
+  }
+
+  const compte = comptes.users[0];
+  if (compte.customClaims?.role) {
+    reponse.status(409).json({
+      erreur: `Ce compte porte déjà le rôle « ${compte.customClaims.role} ». L'amorçage est terminé.`,
+    });
+    return;
+  }
+
+  const nom = compte.displayName ?? compte.email ?? "Responsable";
+  await auth.setCustomUserClaims(compte.uid, { role: "responsable", boutiqueId: null });
+  await base.doc(`users/${compte.uid}`).set(
+    {
+      nom,
+      email: compte.email ?? "",
+      role: "responsable",
+      boutiqueId: null,
+      actif: true,
+      createdAt: horodatage,
+      createdBy: "amorcage",
+      createdByName: "Amorçage du premier responsable",
+      updatedAt: horodatage,
+      updatedBy: "amorcage",
+      updatedByName: "Amorçage du premier responsable",
+    },
+    { merge: true },
+  );
+
+  logger.info("Premier responsable amorcé", { uid: compte.uid });
+  reponse.json({
+    fait: true,
+    email: compte.email,
+    message:
+      "Rôle « responsable » posé. Déconnectez-vous et reconnectez-vous : le jeton gardé sur l'appareil ne porte pas encore le rôle.",
+  });
+});

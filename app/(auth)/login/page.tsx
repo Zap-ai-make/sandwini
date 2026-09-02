@@ -4,7 +4,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { CircleAlert, LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useSession } from "@/lib/auth/session";
+import { seDeconnecter, useSession } from "@/lib/auth/session";
 import { accueilDuRole } from "@/lib/domain/espaces";
 import { authentification, configurationPresente } from "@/lib/firebase/client";
 
@@ -101,6 +101,28 @@ export default function Connexion() {
             vers <code className="font-code">.env.local</code>.
           </span>
         </p>
+      ) : session.statut === "sans_role" ? (
+        /* Le mot de passe était bon, et pourtant l’application refuse d’ouvrir.
+           Sans cet écran, le formulaire se contentait de rester là : la panne la
+           plus décourageante du produit, parce qu’elle ne laisse rien à tenter. */
+        <div className="mt-6">
+          <p className="flex gap-3 rounded-plaque border border-bord bg-papier p-4 text-sm text-encre">
+            <CircleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-alerte" />
+            <span>
+              Votre mot de passe est bon, mais ce compte n’a pas encore de rôle&nbsp;: l’application
+              ne sait pas ce que vous avez le droit de voir. Un compte créé directement dans la
+              console Firebase reste dans cet état — le rôle se pose depuis le serveur. Demandez au
+              responsable de terminer la création.
+            </span>
+          </p>
+          <button
+            type="button"
+            onClick={() => void seDeconnecter()}
+            className="mt-4 inline-flex h-11 items-center rounded-plaque border border-bord px-4 text-sm font-medium text-encre hover:bg-papier"
+          >
+            Essayer un autre compte
+          </button>
+        </div>
       ) : (
         <form onSubmit={connecter} className="mt-8 space-y-4" noValidate>
           <div>

@@ -18,6 +18,11 @@ export type Utilisateur = {
 export type Session =
   | { statut: "chargement" }
   | { statut: "deconnecte" }
+  /* Authentifié, mais sans rôle utilisable dans le jeton. Ce n’est pas
+     « déconnecté » : le mot de passe était bon, et confondre les deux produit
+     l’écran le plus décourageant qui soit — un formulaire qui accepte la saisie
+     et ne fait rien. L’état existe pour être expliqué (DESIGN.md §10). */
+  | { statut: "sans_role" }
   | { statut: "connecte"; utilisateur: Utilisateur };
 
 const Contexte = createContext<Session>({ statut: "chargement" });
@@ -59,9 +64,11 @@ export function FournisseurSession({ children }: { children: ReactNode }) {
       }
       const utilisateur = await lireUtilisateur(compte).catch(() => null);
       /* Un compte sans rôle est un compte à moitié créé — la fonction serveur
-         a échoué entre la création et la pose du claim. On refuse d’ouvrir
-         l’application plutôt que d’afficher une interface sans droits. */
-      setSession(utilisateur ? { statut: "connecte", utilisateur } : { statut: "deconnecte" });
+         a échoué entre la création et la pose du claim, ou le compte a été fait
+         à la main dans la console Firebase, qui ne sait pas poser de claim. On
+         refuse d’ouvrir l’application plutôt que d’afficher une interface sans
+         droits, mais on le dit : la connexion, elle, a réussi. */
+      setSession(utilisateur ? { statut: "connecte", utilisateur } : { statut: "sans_role" });
     });
   }, []);
 

@@ -26,8 +26,12 @@ export function GardeSession({ children }: { children: ReactNode }) {
   const session = useSession();
   const router = useRouter();
 
+  /* « sans_role » repart aussi vers la connexion : c’est là qu’on explique le
+     refus, une seule fois, plutôt que dans chaque écran de l’application. */
   useEffect(() => {
-    if (session.statut === "deconnecte") router.replace("/login");
+    if (session.statut === "deconnecte" || session.statut === "sans_role") {
+      router.replace("/login");
+    }
   }, [session.statut, router]);
 
   if (session.statut === "chargement") {
@@ -41,7 +45,7 @@ export function GardeSession({ children }: { children: ReactNode }) {
     );
   }
 
-  if (session.statut === "deconnecte") {
+  if (session.statut !== "connecte") {
     // Le temps que la redirection parte. Pas d’écran vide entre les deux.
     return (
       <div className="flex min-h-dvh items-center justify-center p-8">

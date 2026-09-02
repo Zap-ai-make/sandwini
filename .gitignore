@@ -49,3 +49,6 @@ storage-debug.log*
 
 # --- Captures de revue visuelle (regenerables) ---
 /captures/
+
+.vercel
+.env*

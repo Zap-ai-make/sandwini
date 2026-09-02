@@ -205,6 +205,34 @@ Vérifié sur le site réel, hors émulateurs, le 2 septembre 2026 : `Content-Se
 `Permissions-Policy` fermant caméra, micro et géolocalisation. Le reste de la checklist
 `SECURITY.md` §13 demande une session ouverte, donc des variables correctes.
 
+### Créer le premier responsable : la console ne suffit pas
+
+Symptôme : on saisit ses identifiants, **rien ne se passe**. Pas d'erreur, pas de
+redirection. C'est normal — et ce n'était pas dit avant (D68 bis).
+
+Un compte créé dans la console Firebase n'a **pas de rôle**. Le rôle est un custom claim,
+et la console ne sait pas en poser. La connexion réussit, puis l'application refuse
+d'ouvrir. Il faut donc :
+
+```
+# 1. Créer le compte dans la console Firebase (Authentication), avec son mot de passe.
+# 2. Deployer la fonction d'amorcage :
+FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy --only functions --project <projet>
+
+# 3. L'appeler une fois — elle promeut le seul compte du projet :
+curl -X POST -H "Content-Type: application/json" -d '{}'   https://europe-west1-<projet>.cloudfunctions.net/amorcerResponsable
+
+# 4. La supprimer :
+npx firebase functions:delete amorcerResponsable --project <projet> --region europe-west1 --force
+```
+
+`amorcerResponsable` refuse dès qu'un compte porte un rôle, et refuse s'il y a plus d'un
+compte. Elle est donc inerte après son premier succès ; l'étape 4 est de l'hygiène, pas une
+protection. Voir D68 pour le raisonnement.
+
+**Après l'amorçage, il faut se déconnecter et se reconnecter** : le jeton gardé sur
+l'appareil ne porte pas encore le rôle.
+
 ### Ce qui est en ligne
 
 Règles Firestore et index · six fonctions en `europe-west1` (`creerGerant`,
