@@ -667,8 +667,9 @@ service cloud.firestore {
     }
 
     function champsDepot() {
-      return ['prestataireId', 'prestataireNom', 'deposeLe', 'avance', 'disponibleLe',
-              'remisLe', 'fichierChemin'];
+      // Pas de champ de fichier ici : la quittance et le CMC s'envoient avec la
+      // moto, a l'entree en stock, et non sur la ligne du dossier.
+      return ['prestataireId', 'prestataireNom', 'deposeLe', 'avance', 'disponibleLe', 'remisLe'];
     }
 
     function depotRenseigne(donnees) {

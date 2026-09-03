@@ -136,9 +136,23 @@ export type Versement = {
 
 export type DocumentDossier = {
   id: string;
+  /** Répété sur le document : une requête de groupe de collections ne peut
+      filtrer que sur les champs du document lui-même (S8). */
+  boutiqueId: string;
   venteId: string;
   type: TypeDocument;
   statut: StatutDocument;
+  /* Ce qui suit n'existe qu'à partir du dépôt chez un prestataire (S11). Un
+     document créé par S8 est nu : ces champs y valent tous `null`. */
+  prestataireId: string | null;
+  /** Recopié pour que la liste des dossiers dise qui détient le document sans
+      relire la fiche du prestataire à chaque ligne. */
+  prestataireNom: string;
+  deposeLe: Date | null;
+  avance: number | null;
+  /** La date annoncée. Facultative : c'est elle qui alimente « en retard ». */
+  disponibleLe: Date | null;
+  remisLe: Date | null;
 };
 
 /** Ce que le responsable seul peut lire : le coût figé et la marge (D2, D51). */

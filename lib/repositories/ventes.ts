@@ -158,8 +158,15 @@ function lireDocumentDossier(instantane: QueryDocumentSnapshot<DocumentData>): D
     /* Le parent d'une sous-collection : `ventesMotos/{venteId}/documents/{type}`.
        On remonte de deux crans plutôt que de dénormaliser un champ de plus. */
     venteId: instantane.ref.parent.parent?.id ?? "",
+    boutiqueId: (donnees.boutiqueId as string) ?? "",
     type: (donnees.type as TypeDocument) ?? "quittance",
     statut: (donnees.statut as StatutDocument) ?? "a_faire",
+    prestataireId: (donnees.prestataireId as string) ?? null,
+    prestataireNom: (donnees.prestataireNom as string) ?? "",
+    deposeLe: versDate(donnees.deposeLe),
+    avance: typeof donnees.avance === "number" ? donnees.avance : null,
+    disponibleLe: versDate(donnees.disponibleLe),
+    remisLe: versDate(donnees.remisLe),
   };
 }
 

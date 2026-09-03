@@ -17,6 +17,7 @@ import {
   lireMontant,
   MONTANT_MAX,
   TYPES_DOCUMENT,
+  type MoyenPaiement,
   type StatutDocument,
   type TypeDocument,
 } from "./vente";
@@ -148,9 +149,14 @@ function debutDeJournee(date: Date): number {
  */
 export type SaisieDepot = {
   prestataireId: string;
+  /** Le nom du prestataire choisi, recopié sur le document : la liste des
+      dossiers doit dire qui détient quoi sans relire une fiche par ligne. */
+  prestataireNom: string;
   /** Format de `<input type="date">` : `aaaa-mm-jj`. */
   deposeLe: string;
   avance: string;
+  /** L'avance sort de la caisse : par quel moyen, il faut le dire. */
+  moyenPaiement: MoyenPaiement;
   /** Facultatif. Même format. */
   disponibleLe: string;
 };

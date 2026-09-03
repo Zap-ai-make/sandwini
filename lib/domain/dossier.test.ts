@@ -252,8 +252,10 @@ describe("lireJour", () => {
 describe("validerDepot", () => {
   const depot = (partie: Partial<SaisieDepot> = {}): SaisieDepot => ({
     prestataireId: "prest-1",
+    prestataireNom: "Kaboré Plaques",
     deposeLe: "2026-09-03",
     avance: "15000",
+    moyenPaiement: "especes",
     disponibleLe: "2026-09-10",
     ...partie,
   });
