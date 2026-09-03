@@ -677,12 +677,13 @@ service cloud.firestore {
              && donnees.prestataireId.size() > 0
              && texteBorne(donnees.prestataireNom, 80)
              && dateAppareil(donnees.deposeLe)
-             // Zero est admis — un prestataire peut travailler sans avance — mais
-             // le champ doit avoir ete rempli : c'est ce que le gerant confirme
-             // en deposant. L'encaissement, lui, n'est ecrit que s'il y a un
-             // montant : la caisse refuse une ligne a zero.
+             // Strictement positive. Une avance a zero n'est pas une avance :
+             // c'est un travail confie a credit, et le credit se modelise
+             // ailleurs. Les confondre ferait apparaitre des depots sans
+             // contrepartie en caisse, que rien ne viendrait solder.
+             // Corollaire : l'encaissement de sortie est inconditionnel.
              && montantValide(donnees.avance)
-             && donnees.avance >= 0;
+             && donnees.avance > 0;
     }
 
     function documentDossierMaj(ancien, nouveau, venteId, type) {

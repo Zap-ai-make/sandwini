@@ -13,7 +13,13 @@
  * chemin dépend donc du type, pas seulement du statut de départ.
  */
 
-import { TYPES_DOCUMENT, type StatutDocument, type TypeDocument } from "./vente";
+import {
+  lireMontant,
+  MONTANT_MAX,
+  TYPES_DOCUMENT,
+  type StatutDocument,
+  type TypeDocument,
+} from "./vente";
 
 /**
  * Ce qui arrive déjà fait : la **quittance** accompagne la moto, et le **CMC**
@@ -129,4 +135,66 @@ export function estEnRetard(estimee: Date | null, aujourdhui: Date): boolean {
 
 function debutDeJournee(date: Date): number {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/* --- Le dépôt chez un prestataire ---------------------------------------- */
+
+/**
+ * Ce que le gérant saisit en confiant un document à un prestataire (§7.2).
+ *
+ * `disponibleLe` est la seule ligne facultative : c'est une estimation, et le
+ * prestataire ne la donne pas toujours. Son absence ne bloque rien — elle prive
+ * seulement le dossier du filtre « en retard », ce que la liste dit elle-même.
+ */
+export type SaisieDepot = {
+  prestataireId: string;
+  /** Format de `<input type="date">` : `aaaa-mm-jj`. */
+  deposeLe: string;
+  avance: string;
+  /** Facultatif. Même format. */
+  disponibleLe: string;
+};
+
+/** Un jour saisi dans un `<input type="date">`, à midi pour échapper aux fuseaux. */
+export function lireJour(brut: string): Date | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(brut)) return null;
+  const [annee, mois, jour] = brut.split("-").map(Number);
+  const date = new Date(annee, mois - 1, jour, 12);
+  /* `new Date(2026, 1, 31)` donne le 3 mars sans se plaindre. On refuse plutôt
+     que d'enregistrer une date que personne n'a voulue. */
+  if (date.getFullYear() !== annee || date.getMonth() !== mois - 1 || date.getDate() !== jour) {
+    return null;
+  }
+  return date;
+}
+
+export function validerDepot(saisie: SaisieDepot): string | null {
+  if (!saisie.prestataireId) {
+    return "Choisissez le prestataire à qui vous confiez le document.";
+  }
+
+  const depose = lireJour(saisie.deposeLe);
+  if (!depose) return "Indiquez la date du dépôt.";
+
+  const montant = lireMontant(saisie.avance);
+  if (montant === null) {
+    return "L’avance doit être un montant en francs, sans virgule ni centimes.";
+  }
+  /* Zéro n'est pas une avance : c'est un travail confié à crédit, et le crédit
+     se modélise ailleurs (§13). Les confondre ferait apparaître des documents
+     déposés sans contrepartie en caisse, que rien ne viendrait solder. */
+  if (montant <= 0) {
+    return "Une avance est un premier versement : sans montant, le travail est confié à crédit.";
+  }
+  if (montant > MONTANT_MAX) return "L’avance dépasse le maximum admis.";
+
+  if (saisie.disponibleLe) {
+    const disponible = lireJour(saisie.disponibleLe);
+    if (!disponible) return "La date de disponibilité annoncée n’est pas une date.";
+    if (disponible < depose) {
+      return "La date annoncée est antérieure au dépôt.";
+    }
+  }
+
+  return null;
 }

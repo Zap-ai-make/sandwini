@@ -9,10 +9,13 @@ import {
   dossierCloturable,
   estEnRetard,
   estStatutTerminal,
+  lireJour,
   passeParUnPrestataire,
   statutsSuivants,
   transitionAutorisee,
+  validerDepot,
   type EtatDossier,
+  type SaisieDepot,
 } from "./dossier";
 
 const doc = (type: TypeDocument, statut: StatutDocument) => ({ type, statut });
@@ -222,5 +225,77 @@ describe("estEnRetard", () => {
     expect(estEnRetard(new Date("2026-09-02T18:00:00"), new Date("2026-09-02T08:00:00"))).toBe(
       false,
     );
+  });
+});
+
+describe("lireJour", () => {
+  it("lit un jour saisi dans un champ de date", () => {
+    expect(lireJour("2026-09-03")?.getFullYear()).toBe(2026);
+    expect(lireJour("2026-09-03")?.getMonth()).toBe(8);
+    expect(lireJour("2026-09-03")?.getDate()).toBe(3);
+  });
+
+  /* `new Date(2026, 1, 31)` rend le 3 mars sans se plaindre. Enregistrer une
+     date que personne n'a voulue est pire que refuser la saisie. */
+  it("refuse un jour qui n’existe pas, plutôt que de le décaler", () => {
+    expect(lireJour("2026-02-31")).toBeNull();
+    expect(lireJour("2026-13-01")).toBeNull();
+  });
+
+  it("refuse ce qui n’a pas la forme d’une date", () => {
+    for (const brut of ["", "03/09/2026", "2026-9-3", "hier"]) {
+      expect(lireJour(brut), brut).toBeNull();
+    }
+  });
+});
+
+describe("validerDepot", () => {
+  const depot = (partie: Partial<SaisieDepot> = {}): SaisieDepot => ({
+    prestataireId: "prest-1",
+    deposeLe: "2026-09-03",
+    avance: "15000",
+    disponibleLe: "2026-09-10",
+    ...partie,
+  });
+
+  it("accepte un dépôt complet", () => {
+    expect(validerDepot(depot())).toBeNull();
+  });
+
+  it("accepte un dépôt sans date annoncée — le prestataire ne la donne pas toujours", () => {
+    expect(validerDepot(depot({ disponibleLe: "" }))).toBeNull();
+  });
+
+  it("exige de savoir à qui le document est confié", () => {
+    expect(validerDepot(depot({ prestataireId: "" }))).toMatch(/prestataire/i);
+  });
+
+  it("exige la date du dépôt", () => {
+    expect(validerDepot(depot({ deposeLe: "" }))).toMatch(/date du dépôt/i);
+  });
+
+  /* Une avance à zéro n'est pas une avance : c'est un crédit, et le crédit est
+     déjà modélisé. Les confondre laisserait des documents déposés sans
+     contrepartie en caisse. */
+  it("refuse une avance nulle — sans montant, le travail est confié à crédit", () => {
+    for (const avance of ["0", "00"]) {
+      expect(validerDepot(depot({ avance })), avance).toMatch(/crédit/i);
+    }
+  });
+
+  it("refuse un montant qui n’en est pas un", () => {
+    for (const avance of ["", "-500", "15 000,50", "beaucoup"]) {
+      expect(validerDepot(depot({ avance })), avance).not.toBeNull();
+    }
+  });
+
+  it("refuse une date annoncée antérieure au dépôt", () => {
+    expect(validerDepot(depot({ deposeLe: "2026-09-03", disponibleLe: "2026-09-02" }))).toMatch(
+      /antérieure/i,
+    );
+  });
+
+  it("accepte une disponibilité le jour même du dépôt", () => {
+    expect(validerDepot(depot({ deposeLe: "2026-09-03", disponibleLe: "2026-09-03" }))).toBeNull();
   });
 });

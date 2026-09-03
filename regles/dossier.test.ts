@@ -156,28 +156,21 @@ describe("la carte grise et la plaque, qui passent par un prestataire", () => {
     }
   });
 
-  it("acceptent une avance nulle — un prestataire peut travailler sans acompte", async () => {
-    await poser({ carte_grise: {} });
-    await assertSucceeds(
-      updateDoc(doc(gerant(), chemin("carte_grise")), {
-        statut: "chez_prestataire",
-        ...DEPOT,
-        avance: 0,
-        ...traceMaj,
-      }),
-    );
-  });
-
-  it("refusent une avance négative", async () => {
-    await poser({ carte_grise: {} });
-    await assertFails(
-      updateDoc(doc(gerant(), chemin("carte_grise")), {
-        statut: "chez_prestataire",
-        ...DEPOT,
-        avance: -1,
-        ...traceMaj,
-      }),
-    );
+  /* Une avance a zero n'est pas une avance : c'est un travail confie a credit,
+     et le credit se modelise ailleurs. Les confondre ferait apparaitre des
+     depots sans contrepartie en caisse, que rien ne viendrait solder. */
+  it("refusent une avance nulle ou negative — sinon ce n’est plus une avance", async () => {
+    for (const avance of [0, -1]) {
+      await poser({ carte_grise: {} });
+      await assertFails(
+        updateDoc(doc(gerant(), chemin("carte_grise")), {
+          statut: "chez_prestataire",
+          ...DEPOT,
+          avance,
+          ...traceMaj,
+        }),
+      );
+    }
   });
 });
 
