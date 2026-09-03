@@ -12,16 +12,15 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { DossierDocuments } from "@/components/DossierDocuments";
 import { useSession } from "@/lib/auth/session";
 import { formaterTelephone, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { identifiantRecu, rangInscrit } from "@/lib/domain/recu";
 import {
-  LIBELLE_DOCUMENT,
   LIBELLE_MODE,
   LIBELLE_MOYEN,
-  LIBELLE_STATUT_DOCUMENT,
   LIBELLE_STATUT_PAIEMENT,
   MOYENS_PAIEMENT,
   SAISIE_VERSEMENT_VIDE,
@@ -392,29 +391,13 @@ function FicheClient({ client }: { client: Client }) {
 }
 
 /**
- * Le dossier. S8 le crée, S11 le fera vivre — l'écran le dit plutôt que de
- * faire croire à des boutons qui n'existent pas encore.
+ * Le dossier. S8 l'ouvre, S11 le fait vivre : les boutons d'avancement, le
+ * dépôt chez un prestataire et son avance vivent dans `DossierDocuments`.
  */
 function Dossier({ documents }: { documents: DocumentDossier[] | null }) {
   return (
     <Bloc titre="Le dossier">
-      {documents === null ? (
-        <p className="px-4 py-3 text-sm text-encre-doux">Chargement du dossier…</p>
-      ) : documents.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-encre-doux">
-          Aucun document n’est encore parvenu au serveur pour cette vente.
-        </p>
-      ) : (
-        <dl className="divide-y divide-bord">
-          {documents.map((document) => (
-            <Ligne
-              key={document.id}
-              titre={LIBELLE_DOCUMENT[document.type]}
-              valeur={LIBELLE_STATUT_DOCUMENT[document.statut]}
-            />
-          ))}
-        </dl>
-      )}
+      <DossierDocuments documents={documents} />
     </Bloc>
   );
 }
