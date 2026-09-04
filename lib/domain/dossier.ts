@@ -17,8 +17,10 @@ import {
   lireMontant,
   MONTANT_MAX,
   TYPES_DOCUMENT,
+  type DocumentDossier,
   type MoyenPaiement,
   type StatutDocument,
+  type StatutDossier,
   type TypeDocument,
 } from "./vente";
 
@@ -203,4 +205,108 @@ export function validerDepot(saisie: SaisieDepot): string | null {
   }
 
   return null;
+}
+
+/* --- La liste des dossiers en attente (§7.3) ------------------------------ */
+
+/** Un dossier ouvert, réduit à ce que la liste doit montrer. */
+export type DossierEnAttente = {
+  venteId: string;
+  numero: string;
+  boutiqueId: string;
+  clientId: string;
+  date: Date | null;
+  /** Les documents qui restent à traiter, dans l'ordre de `TYPES_DOCUMENT`. */
+  enCours: readonly DocumentDossier[];
+  /** Au moins un document est chez un prestataire au-delà de la date annoncée. */
+  enRetard: boolean;
+};
+
+/** Ce qu'un dossier a besoin de porter pour entrer dans la liste. */
+export type VenteDuDossier = {
+  id: string;
+  numero: string;
+  boutiqueId: string;
+  clientId: string;
+  date: Date | null;
+  statutDossier: StatutDossier;
+};
+
+export type FiltresDossiers = {
+  /** Vide : toutes les boutiques du périmètre. */
+  boutiqueId: string;
+  /** Vide : tous les prestataires. */
+  prestataireId: string;
+  /** Vide : tous les types de document. */
+  type: TypeDocument | "";
+  enRetardSeulement: boolean;
+};
+
+export const FILTRES_DOSSIERS_VIDES: FiltresDossiers = {
+  boutiqueId: "",
+  prestataireId: "",
+  type: "",
+  enRetardSeulement: false,
+};
+
+/**
+ * Les dossiers ouverts, du plus ancien au plus récent (§7.3).
+ *
+ * Du plus ancien d'abord, et non l'inverse : cette liste n'est pas un journal
+ * qu'on parcourt, c'est une file d'attente qu'on vide. Ce qui traîne depuis le
+ * plus longtemps est ce qu'il faut traiter en premier — et c'est aussi le client
+ * qui a le plus de raisons d'appeler.
+ *
+ * **Le filtre « en retard » est calculé ici, pas demandé à Firestore.** Il
+ * dépend de la date du jour : une requête figée serait fausse dès le lendemain.
+ * Le calcul local reste juste sans réseau, où aucune horloge serveur n'est
+ * joignable (D38) — et le nombre de dossiers ouverts reste modeste par
+ * construction : un dossier ouvert est un dossier vivant.
+ */
+export function dossiersEnAttente(
+  ventes: readonly VenteDuDossier[],
+  documents: readonly DocumentDossier[],
+  filtres: FiltresDossiers,
+  aujourdhui: Date,
+): DossierEnAttente[] {
+  const parVente = new Map<string, DocumentDossier[]>();
+  for (const document of documents) {
+    const liste = parVente.get(document.venteId);
+    if (liste) liste.push(document);
+    else parVente.set(document.venteId, [document]);
+  }
+
+  return ventes
+    .filter((vente) => vente.statutDossier === "ouvert")
+    .filter((vente) => !filtres.boutiqueId || vente.boutiqueId === filtres.boutiqueId)
+    .map((vente) => {
+      const enCours = (parVente.get(vente.id) ?? [])
+        .filter((document) => !estRegle(document.statut))
+        .sort((a, b) => TYPES_DOCUMENT.indexOf(a.type) - TYPES_DOCUMENT.indexOf(b.type));
+      return {
+        venteId: vente.id,
+        numero: vente.numero,
+        boutiqueId: vente.boutiqueId,
+        clientId: vente.clientId,
+        date: vente.date,
+        enCours,
+        enRetard: enCours.some((document) => estEnRetard(document.disponibleLe, aujourdhui)),
+      };
+    })
+    /* Un dossier sans document en cours n'a rien à faire dans une file
+       d'attente. Il n'est pas encore clos — la clôture demande aussi le
+       paiement soldé et la moto remise — mais côté documents, il n'attend
+       plus rien. */
+    .filter((dossier) => dossier.enCours.length > 0)
+    .filter(
+      (dossier) =>
+        !filtres.prestataireId ||
+        dossier.enCours.some((document) => document.prestataireId === filtres.prestataireId),
+    )
+    .filter(
+      (dossier) =>
+        !filtres.type || dossier.enCours.some((document) => document.type === filtres.type),
+    )
+    .filter((dossier) => !filtres.enRetardSeulement || dossier.enRetard)
+    .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0));
 }

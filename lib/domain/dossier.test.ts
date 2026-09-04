@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   STATUTS_DOCUMENT,
   TYPES_DOCUMENT,
+  type DocumentDossier,
   type StatutDocument,
   type TypeDocument,
 } from "./vente";
@@ -14,8 +15,12 @@ import {
   statutsSuivants,
   transitionAutorisee,
   validerDepot,
+  dossiersEnAttente,
+  FILTRES_DOSSIERS_VIDES,
   type EtatDossier,
+  type FiltresDossiers,
   type SaisieDepot,
+  type VenteDuDossier,
 } from "./dossier";
 
 const doc = (type: TypeDocument, statut: StatutDocument) => ({ type, statut });
@@ -299,5 +304,157 @@ describe("validerDepot", () => {
 
   it("accepte une disponibilité le jour même du dépôt", () => {
     expect(validerDepot(depot({ deposeLe: "2026-09-03", disponibleLe: "2026-09-03" }))).toBeNull();
+  });
+});
+
+describe("dossiersEnAttente", () => {
+  const AUJOURDHUI = new Date("2026-09-03T10:00:00");
+
+  const vente = (partie: Partial<VenteDuDossier> = {}): VenteDuDossier => ({
+    id: "v1",
+    numero: "PTG-2609-0001",
+    boutiqueId: "PTG",
+    clientId: "c1",
+    date: new Date("2026-09-01T10:00:00"),
+    statutDossier: "ouvert",
+    ...partie,
+  });
+
+  const document = (partie: Partial<DocumentDossier> = {}): DocumentDossier => ({
+    id: "carte_grise",
+    boutiqueId: "PTG",
+    venteId: "v1",
+    type: "carte_grise",
+    statut: "a_faire",
+    prestataireId: null,
+    prestataireNom: "",
+    deposeLe: null,
+    avance: null,
+    disponibleLe: null,
+    remisLe: null,
+    ...partie,
+  });
+
+  const lister = (
+    ventes: VenteDuDossier[],
+    documents: DocumentDossier[],
+    filtres: Partial<FiltresDossiers> = {},
+  ) =>
+    dossiersEnAttente(
+      ventes,
+      documents,
+      { ...FILTRES_DOSSIERS_VIDES, ...filtres },
+      AUJOURDHUI,
+    );
+
+  it("ne garde que les dossiers ouverts", () => {
+    const liste = lister(
+      [vente(), vente({ id: "v2", statutDossier: "clos" })],
+      [document(), document({ venteId: "v2" })],
+    );
+    expect(liste.map((d) => d.venteId)).toEqual(["v1"]);
+  });
+
+  /* Ce n'est pas un journal qu'on parcourt, c'est une file qu'on vide : ce qui
+     traîne depuis le plus longtemps passe en premier. */
+  it("range du plus ancien au plus récent", () => {
+    const liste = lister(
+      [
+        vente({ id: "recent", date: new Date("2026-09-02T10:00:00") }),
+        vente({ id: "ancien", date: new Date("2026-08-01T10:00:00") }),
+      ],
+      [document({ venteId: "recent" }), document({ venteId: "ancien" })],
+    );
+    expect(liste.map((d) => d.venteId)).toEqual(["ancien", "recent"]);
+  });
+
+  it("écarte un dossier dont tous les documents sont réglés", () => {
+    const liste = lister(
+      [vente()],
+      [
+        document({ id: "quittance", type: "quittance", statut: "remis_client" }),
+        document({ id: "cmc", type: "cmc", statut: "non_applicable" }),
+      ],
+    );
+    expect(liste).toEqual([]);
+  });
+
+  it("ne montre que les documents qui restent à traiter, dans l’ordre du cahier", () => {
+    const liste = lister(
+      [vente()],
+      [
+        document({ id: "plaque", type: "plaque" }),
+        document({ id: "quittance", type: "quittance", statut: "remis_client" }),
+        document({ id: "cmc", type: "cmc" }),
+      ],
+    );
+    expect(liste[0].enCours.map((d) => d.type)).toEqual(["cmc", "plaque"]);
+  });
+
+  it("signale le retard d’après la date annoncée, jamais d’après une requête figée", () => {
+    const enRetard = lister(
+      [vente()],
+      [
+        document({
+          statut: "chez_prestataire",
+          disponibleLe: new Date("2026-09-01T10:00:00"),
+        }),
+      ],
+    );
+    expect(enRetard[0].enRetard).toBe(true);
+
+    const aLHeure = lister(
+      [vente()],
+      [
+        document({
+          statut: "chez_prestataire",
+          disponibleLe: new Date("2026-09-10T10:00:00"),
+        }),
+      ],
+    );
+    expect(aLHeure[0].enRetard).toBe(false);
+  });
+
+  it("ne signale aucun retard sans date annoncée — on n’a rien promis", () => {
+    const liste = lister([vente()], [document({ statut: "chez_prestataire" })]);
+    expect(liste[0].enRetard).toBe(false);
+  });
+
+  describe("les quatre filtres", () => {
+    const ventes = [vente(), vente({ id: "v2", boutiqueId: "KDG" })];
+    const documents = [
+      document({
+        statut: "chez_prestataire",
+        prestataireId: "p1",
+        disponibleLe: new Date("2026-09-01T10:00:00"),
+      }),
+      document({ id: "plaque", type: "plaque", venteId: "v2", boutiqueId: "KDG" }),
+    ];
+
+    it("par boutique", () => {
+      expect(lister(ventes, documents, { boutiqueId: "KDG" }).map((d) => d.venteId)).toEqual([
+        "v2",
+      ]);
+    });
+
+    it("par prestataire", () => {
+      expect(lister(ventes, documents, { prestataireId: "p1" }).map((d) => d.venteId)).toEqual([
+        "v1",
+      ]);
+    });
+
+    it("par type de document", () => {
+      expect(lister(ventes, documents, { type: "plaque" }).map((d) => d.venteId)).toEqual(["v2"]);
+    });
+
+    it("par retard", () => {
+      expect(lister(ventes, documents, { enRetardSeulement: true }).map((d) => d.venteId)).toEqual(
+        ["v1"],
+      );
+    });
+
+    it("se combinent, et peuvent ne rien rendre", () => {
+      expect(lister(ventes, documents, { boutiqueId: "KDG", enRetardSeulement: true })).toEqual([]);
+    });
   });
 });
