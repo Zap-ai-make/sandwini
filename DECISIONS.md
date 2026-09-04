@@ -1213,6 +1213,16 @@ même message trompeur. Deux corrections possibles, à trancher :
    avec la raison écrite à l'écran. Plus juste : on n'offre pas une action qui ne peut pas
    aboutir.
 
+**Tranché en S12 : la seconde.** `useAcheminementBoutiques` dans l'écran des utilisateurs
+lit l'état du réseau et de la file, désactive le rattachement et le choix de boutique à la
+création d'un gérant, et écrit la raison — combien de saisies restent à partir, ou que
+l'opération demande le serveur. Corriger le message aurait suffi à ne plus mentir ; refuser
+le geste évite en plus de le faire échouer.
+
+Le formulaire de création reste utilisable **sans** boutique pendant ce temps : un compte
+peut être créé maintenant et rattaché plus tard. Bloquer les deux aurait transformé une
+attente de quelques secondes en impasse.
+
 La seconde vaut mieux et coûte peu. Elle n'a pas été faite ici parce qu'elle touche
 l'écran des utilisateurs (S2), hors du périmètre de S3bis — mais elle ne doit pas se
 perdre : **c'est le seul endroit connu où l'application promet une chose que le serveur

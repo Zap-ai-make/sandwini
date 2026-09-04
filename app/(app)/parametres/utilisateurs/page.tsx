@@ -9,6 +9,7 @@ import type { Boutique } from "@/lib/domain/boutique";
 import { LIBELLE_ROLE } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { attribuerBoutique } from "@/lib/repositories/boutiques";
+import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 import {
   changerActivation,
   creerGerant,
@@ -171,6 +172,36 @@ function LigneUtilisateur({
 }
 
 /**
+ * Pourquoi le rattachement d’une boutique est momentanément impossible (D64).
+ *
+ * Deux chemins d’écriture coexistent et ne voient pas le même monde au même
+ * instant. Une **boutique** s’écrit par le SDK Firestore : elle est prise par le
+ * cache, apparaît dans la liste, et part au serveur quand le réseau le permet.
+ * Un **rattachement** passe par une Cloud Function, parce qu’il pose un custom
+ * claim — et cette fonction lit le serveur.
+ *
+ * Enchaîner les deux trop vite donnait « Cette boutique n’existe pas », alors
+ * qu’elle existe, à l’écran, sous les yeux de qui vient de la déclarer. Le
+ * message accusait l’existence quand la vérité était l’acheminement.
+ *
+ * On n’offre donc pas l’action tant que la file d’écritures n’est pas vidée, et
+ * on écrit pourquoi. Corriger le message aurait suffi à ne plus mentir ; refuser
+ * le geste évite en plus de le faire échouer.
+ *
+ * Renvoie `null` quand tout est acheminé, sinon la phrase à afficher.
+ */
+function useAcheminementBoutiques(): string | null {
+  const { etat, enAttente } = useEtatReseau();
+  if (etat === "a_jour") return null;
+  if (etat === "hors_ligne") {
+    return "Rattacher une boutique demande le serveur, qui vérifie qu’elle existe. Sans réseau, l’opération ne peut pas aboutir : elle attendra le retour de la connexion.";
+  }
+  return enAttente === 1
+    ? "Une saisie n’est pas encore parvenue au serveur. Le rattachement se rouvrira dès qu’elle sera partie."
+    : `${enAttente} saisies ne sont pas encore parvenues au serveur. Le rattachement se rouvrira dès qu’elles seront parties.`;
+}
+
+/**
  * Rattacher un gérant à une boutique.
  *
  * Ce n’est pas un réglage d’affichage : le périmètre vit dans le jeton du
@@ -189,6 +220,7 @@ function Rattachement({
   utilisateur: FicheUtilisateur;
   boutiques: Boutique[];
 }) {
+  const acheminement = useAcheminementBoutiques();
   const actuelle = utilisateur.boutiqueId ?? "";
   const [ouvert, setOuvert] = useState(false);
   const [choix, setChoix] = useState(actuelle);
@@ -282,7 +314,7 @@ function Rattachement({
       <button
         type="button"
         onClick={enregistrer}
-        disabled={enCours || choix === actuelle}
+        disabled={enCours || choix === actuelle || acheminement !== null}
         className="inline-flex h-11 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-3 text-sm font-semibold text-encre-fixe disabled:opacity-60"
       >
         {enCours && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
@@ -297,6 +329,10 @@ function Rattachement({
       >
         Annuler
       </button>
+
+      {acheminement && (
+        <p className="w-full text-sm text-encre-doux">{acheminement}</p>
+      )}
 
       <p className="w-full text-sm text-encre-doux">
         Changer de boutique ferme la session du gérant&nbsp;: il devra se reconnecter pour voir la
@@ -313,6 +349,7 @@ function Rattachement({
 }
 
 function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
+  const acheminement = useAcheminementBoutiques();
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
   const [motDePasse, setMotDePasse] = useState("");
@@ -444,9 +481,13 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
         </p>
       )}
 
+      {acheminement && boutiqueId !== "" && (
+        <p className="mt-3 text-sm text-encre-doux">{acheminement}</p>
+      )}
+
       <button
         type="submit"
-        disabled={envoi}
+        disabled={envoi || (acheminement !== null && boutiqueId !== "")}
         className="mt-3 inline-flex h-12 items-center justify-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe disabled:opacity-60"
       >
         {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
