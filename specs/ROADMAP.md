@@ -30,7 +30,7 @@ Tout ce qui sert le confort, le pilotage ou un second métier (pièces détaché
 | S10 | Reçus imprimables hors-ligne                  | S8, S9           | MVP       | terminée |
 | S3bis | Les trois espaces — métiers et supervision   | S3               | MVP       | terminée |
 | S11 | Dossier documents — cycle de vie et suivi     | S4, S8           | MVP       | terminée |
-| S12 | Règles Firestore — durcissement et tests      | S1 → S11         | MVP       | à faire |
+| S12 | Règles Firestore — durcissement et tests      | S1 → S11         | MVP       | terminée |
 
 **MVP gate** (`WORKFLOW.md` §6) après S12 : démonstration, checklist `SECURITY.md` §13, feu vert
 avant toute spec post-MVP.

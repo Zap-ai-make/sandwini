@@ -153,6 +153,32 @@ La sécurité se joue à trois moments, pas seulement à la fin :
 - [ ] Sauvegardes automatiques et testées.
 - [ ] Fichiers d'agent (`CLAUDE.md`/MCP/hooks) sans secret ; MCP réduits au nécessaire.
 
+
+### Résultat de la passe S12 — 4 septembre 2026
+
+Relevé sur le dépôt et sur le site réel `https://sandwini-vr9q.vercel.app`, pas seulement
+sur les émulateurs.
+
+| Point | Verdict | Preuve |
+|---|---|---|
+| Aucun secret dans git | **vert** | `git ls-files` ne suit ni `.env`, ni `.env.local`, ni clé de service. `.gitignore:2` et `:54`. |
+| Environnements distincts | **vert** | `sdi-dev` (émulateurs) et `sandwini` (préversion). Aucune donnée client réelle. Production non créée. |
+| Mots de passe, limitation, sessions | **vert** | Firebase Auth hache et limite côté serveur ; l'écran de connexion s'impose en plus une pause après cinq échecs (D26) ; les jetons expirent en une heure. |
+| Droits vérifiés côté serveur, pas d'IDOR | **vert** | 230 tests de règles, dont `regles/durcissement.test.ts` : identifiant deviné, boutique d'autrui, élévation de rôle, fiche d'un autre compte. |
+| Entrées validées, CSP posée | **vert** | Validateurs de domaine + règles Firestore aux deux bouts. CSP relevée sur le site en ligne. |
+| Envois : type réel et taille | **vert** | `storage.rules` borne à 5 Mo et aux images ou PDF ; `validerFichierPapier` refuse avant d'user la connexion. |
+| HTTPS, en-têtes | **vert** | Relevés sur le site : HSTS deux ans `preload`, `frame-ancestors 'none'`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`. |
+| Rien de sensible en clair | **nuancé** | Le mot de passe provisoire d'un gérant s'affiche en clair, **délibérément** : le responsable le dicte. Il ne transite ni ne se stocke ailleurs. |
+| Erreurs génériques, journaux sans secrets | **vert** | Aucun `console.log` hors tests. La connexion ne distingue jamais e-mail inconnu de mot de passe faux (§8). Les déclencheurs journalisent des compteurs, jamais des montants. |
+| Dépendances | **vert en production** | `npm audit --omit=dev` : **0 vulnérabilité**. 15 en développement, dont 2 graves, toutes issues de `browserslist` via `@serwist/next` — croissance mémoire à la **construction**, rien qui parte dans le navigateur. |
+| Sauvegardes | **rouge** | **Aucune sauvegarde automatique n'est configurée sur Firestore.** À traiter avant la mise en production, pas avant la préversion, dont les données sont jetables. |
+| Fichiers d'agent sans secret | **vert** | `AGENTS.md`, `CLAUDE.md` et les specs ne contiennent aucune valeur secrète. |
+
+**Le seul point rouge est celui des sauvegardes**, et il est volontairement laissé ouvert :
+la préversion est jetable (`DEPLOIEMENT.md` §4). Il devient bloquant le jour où une vraie
+boutique saisit sa première vente — une base sans sauvegarde est une base dont chaque
+incident est définitif.
+
 ---
 
 ## 14. Outillage
