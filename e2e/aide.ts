@@ -300,3 +300,24 @@ export async function encaisser(page: Page, montant: string) {
   await page.getByLabel("Montant reçu").fill(montant);
   await page.getByRole("button", { name: "Enregistrer le versement" }).click();
 }
+
+/**
+ * Déclare un prestataire qui traite la carte grise et la plaque.
+ *
+ * Attend la synchronisation : la liste du formulaire de dépôt lit le serveur,
+ * et un prestataire encore dans la file d'écriture n'y apparaît pas (D64).
+ */
+export async function creerPrestataire(page: Page, nom: string) {
+  await page.goto("/parametres/prestataires", { waitUntil: "load" });
+  const formulaire = page.locator("form").filter({ hasText: "Ajouter un prestataire" });
+  await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
+  await formulaire.getByLabel("Téléphone").fill("70112233");
+  await formulaire.getByLabel("Carte grise").check();
+  await formulaire.getByLabel("Plaque").check();
+  await formulaire.getByRole("button", { name: "Enregistrer le prestataire" }).click();
+  /* Sur le message de confirmation, pas sur la liste : le nom apparaît aux deux
+     endroits, et Playwright refuse l'ambiguïté. Même piège qu'en D55, et même
+     remède — viser le `role="status"`, qui n'existe qu'une fois. */
+  await expect(contenu(page).getByRole("status")).toContainText("est enregistré");
+  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+}

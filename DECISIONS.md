@@ -1392,3 +1392,42 @@ produit : un formulaire qui accepte la saisie et ne fait rien, sans rien à tent
 C'est exactement ce que `DESIGN.md` §10 demande d'éviter, et le rappel que l'inventaire des
 états n'est pas une formalité : celui-ci manquait depuis le début et n'est apparu qu'au
 premier vrai compte, créé à la main.
+
+---
+
+## D55 — cinquième mesure : distinguer l'émulateur muet du défaut de produit
+
+*Ajout lors de S11.*
+
+Un test de `e2e/dossier.spec.ts` échouait sur « Hors ligne · 1 saisie en attente » là où il
+attendait « À jour ». Deux échecs de suite : de quoi conclure à un défaut. C'était faux, et
+la méthode qui l'a montré vaut d'être notée.
+
+**Ce qui a tranché, c'est la trace.** `npx playwright show-trace` contient les messages de
+console du navigateur :
+
+```
+@firebase/firestore: Could not reach Cloud Firestore backend.
+Backend didn't respond within 10 seconds.
+```
+
+Un refus de règles arrive en `permission-denied` et se lit dans cette même console. Il n'y
+en avait aucun, et les 434 appels HTTP étaient en 200. Ce n'était donc pas une écriture
+refusée mais un **transport muet** : l'émulateur avait cessé de répondre après avoir encaissé
+la suite de règles complète.
+
+**Trois vérifications, dans cet ordre**, avant d'accuser le produit :
+
+1. Reproduire l'écriture exacte dans un test de règles — le lot entier, pas une écriture
+   isolée : un `writeBatch` est accepté ou refusé en bloc. Ici il passait.
+2. Lire les messages de console dans la trace. `permission-denied` accuse le code ;
+   `Backend didn't respond` accuse la machine.
+3. Rejouer sur un émulateur **fraîchement redémarré**. Ici : trois tests, 4,6 minutes,
+   tous verts.
+
+**Ce que l'épisode a quand même corrigé.** L'assertion fautive attendait « À jour » sur le
+bandeau — c'est-à-dire l'indicateur de synchronisation, pas le comportement de S11. Elle a
+été remplacée par un rechargement de page suivi d'une relecture de l'état : cela prouve que
+le dépôt a survécu, ce que l'affichage optimiste seul ne prouvait pas. **Une assertion sur
+un indicateur d'infrastructure n'a pas sa place dans un test de comportement métier** — elle
+importe le bruit de D55 dans des suites qui n'ont rien à y voir.

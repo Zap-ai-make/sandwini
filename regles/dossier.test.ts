@@ -5,7 +5,7 @@ import {
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
-import { doc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 /**
@@ -38,6 +38,16 @@ const auditFige = {
   updatedAt: new Date("2026-08-01T08:00:00Z"),
   updatedBy: "ger-1",
   updatedByName: "Auteur",
+};
+
+/** Ce qu’une création doit porter pour passer `traceCreation`. */
+const traceCreation = {
+  createdAt: serverTimestamp(),
+  createdBy: "ger-1",
+  createdByName: "Gérant",
+  updatedAt: serverTimestamp(),
+  updatedBy: "ger-1",
+  updatedByName: "Gérant",
 };
 
 /** Ce qu’une modification doit porter pour passer `traceModification`. */
@@ -279,5 +289,52 @@ describe("qui a le droit de faire avancer un document", () => {
     await assertFails(
       updateDoc(doc(gerant(), chemin("quittance")), { statut: "revenu_magasin" }),
     );
+  });
+});
+
+/**
+ * Le lot exact que `lib/repositories/dossier.ts` envoie au dépôt.
+ *
+ * Les cas ci-dessus valident l'`update` **seul**. Or le produit n'envoie jamais
+ * cet update seul : il part avec sa ligne d'historique et la sortie de caisse
+ * de l'avance, dans un `writeBatch`. Et un lot est accepté ou refusé **en
+ * bloc** — une seule des trois écritures refusée, et le dépôt entier reste
+ * coincé dans la file, sans erreur visible à l'écran puisque l'affichage
+ * optimiste, lui, a déjà montré le résultat.
+ *
+ * C'est exactement la panne trouvée en bout-en-bout : « Hors ligne · 1 saisie
+ * en attente », avec un dépôt affiché qui n'était jamais parti.
+ */
+describe("le lot complet du dépôt", () => {
+  it("passe : le statut, l’historique et la sortie de caisse ensemble", async () => {
+    await poser({ carte_grise: {} });
+    const base = gerant();
+    const document = doc(base, chemin("carte_grise"));
+    const lot = writeBatch(base);
+
+    lot.update(document, { statut: "chez_prestataire", ...DEPOT, ...traceMaj });
+    lot.set(doc(collection(document, "historique")), {
+      boutiqueId: "PTG",
+      venteId: "vente-ptg",
+      type: "carte_grise",
+      de: "a_faire",
+      vers: "chez_prestataire",
+      le: new Date("2026-08-20T09:00:00Z"),
+      ...traceCreation,
+    });
+    lot.set(doc(collection(base, "encaissements")), {
+      boutiqueId: "PTG",
+      date: new Date("2026-08-20T09:00:00Z"),
+      sens: "sortie",
+      montant: 15_000,
+      moyenPaiement: "especes",
+      origine: "avance_prestataire",
+      origineRefId: "vente-ptg",
+      libelle: "Avance Kaboré Plaques — Carte grise",
+      categorieTranches: false,
+      ...traceCreation,
+    });
+
+    await assertSucceeds(lot.commit());
   });
 });
