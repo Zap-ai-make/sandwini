@@ -243,11 +243,42 @@ corrigé.
 **Après l'amorçage, il faut se déconnecter et se reconnecter** : le jeton gardé sur
 l'appareil ne porte pas encore le rôle.
 
+### Storage doit être activé à la main avant son premier déploiement
+
+```
+Error: Firebase Storage has not been set up on project 'sandwini'.
+Go to https://console.firebase.google.com/project/<projet>/storage
+and click 'Get Started'.
+```
+
+Contrairement à Firestore, dont la base se crée au premier déploiement de règles,
+**Storage exige un clic dans la console** avant que ses règles puissent être publiées. Tant
+que ce n'est pas fait, l'envoi des scans de quittance et de CMC (S11) est refusé — le reste
+de l'application fonctionne.
+
+Une fois activé :
+
+```
+npx firebase deploy --only storage --project <projet>
+```
+
+**Déployer les fonctions par leur nom**, et non en bloc, quand le dépôt contient une
+fonction qu'on ne veut pas remettre en ligne — `amorcerResponsable` en particulier, qui se
+supprime après usage :
+
+```
+npx firebase deploy --only functions:cloturerSurVente,functions:cloturerSurDocument --project <projet>
+```
+
 ### Ce qui est en ligne
 
-Règles Firestore et index · six fonctions en `europe-west1` (`creerGerant`,
+Règles Firestore et index · huit fonctions en `europe-west1` (`creerGerant`,
 `changerActivationUtilisateur`, `attribuerBoutique`, `reconcilierNumeroVente`,
-`figerMargeVente`, `recalculerPaiementsVente`) · politique de nettoyage à 3 jours.
+`figerMargeVente`, `recalculerPaiementsVente`, `cloturerSurVente`, `cloturerSurDocument`) ·
+politique de nettoyage à 3 jours.
+
+**Pas encore en ligne :** les règles Storage, faute d'avoir activé Storage dans la console
+(voir ci-dessus). L'envoi de scans y est donc refusé.
 
 Base Firestore en `nam5` — voir `DECISIONS.md` D67 : à ne pas reproduire en production,
 où l'emplacement se choisit explicitement, une seule fois, avant tout.
