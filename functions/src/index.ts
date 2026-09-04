@@ -1,5 +1,5 @@
 import { logger } from "firebase-functions";
-import { onDocumentCreated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-functions/v2/https";
 import { QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
 import { resoudreCollision, type PieceNumerotee } from "./numerotation";
@@ -616,3 +616,76 @@ export const amorcerResponsable = onRequest({ region: REGION, cors: false }, asy
       "Rôle « responsable » posé. Déconnectez-vous et reconnectez-vous : le jeton gardé sur l'appareil ne porte pas encore le rôle.",
   });
 });
+
+/* --- Clôture automatique du dossier (§7.1) -------------------------------- */
+
+const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise", "plaque"] as const;
+
+/**
+ * Le dossier est-il fini ?
+ *
+ * Réplique de `dossierCloturable` dans `lib/domain/dossier.ts`. La duplication
+ * est le prix du cloisonnement des paquets : `functions/` a son propre
+ * `tsconfig` et ses propres dépendances, et n'importe pas le code de
+ * l'application web. La règle tient en trois lignes et ne bouge pas — c'est ce
+ * qui rend le coût acceptable. Les deux copies sont couvertes par des tests.
+ */
+async function dossierFini(
+  base: FirebaseFirestore.Firestore,
+  venteId: string,
+  vente: FirebaseFirestore.DocumentData,
+): Promise<boolean> {
+  if (vente.statutPaiement !== "solde" || vente.motoRemise !== true) return false;
+
+  const documents = await base.collection(`ventesMotos/${venteId}/documents`).get();
+  const parType = new Map(documents.docs.map((doc) => [doc.get("type"), doc.get("statut")]));
+  return TYPES_DOCUMENT.every((type) => {
+    const statut = parType.get(type);
+    return statut === "remis_client" || statut === "non_applicable";
+  });
+}
+
+/**
+ * Clôt le dossier dès que tout est réglé.
+ *
+ * Trois écritures peuvent achever un dossier — le dernier document remis, le
+ * dernier versement, la remise de la moto — et elles se font sur trois écrans
+ * différents. Évaluer la condition dans chacun d'eux, c'est trois occasions de
+ * l'oublier ; on l'évalue donc une fois, ici, sur écriture.
+ *
+ * **La boucle est bornée par la condition elle-même** : on n'écrit que si le
+ * dossier est encore `ouvert`. L'écriture de clôture rappelle la fonction, qui
+ * voit `clos` et s'arrête. Sans cette garde, un déclencheur qui écrit sur le
+ * document qui le déclenche tourne indéfiniment — et se facture.
+ */
+async function cloturerSiFini(venteId: string): Promise<void> {
+  const { base, horodatage } = await admin();
+  const reference = base.doc(`ventesMotos/${venteId}`);
+  const vente = await reference.get();
+  if (!vente.exists || vente.get("statutDossier") !== "ouvert") return;
+
+  if (!(await dossierFini(base, venteId, vente.data() as FirebaseFirestore.DocumentData))) return;
+
+  await reference.update({
+    statutDossier: "clos",
+    dateClotureDossier: horodatage,
+    updatedAt: horodatage,
+    /* Personne n'a décidé cette clôture : elle découle de trois faits déjà
+       saisis par d'autres. Recopier l'auteur du dernier geste lui attribuerait
+       une décision qu'il n'a pas prise. */
+    updatedBy: "systeme",
+    updatedByName: "Clôture automatique",
+  });
+
+  logger.info("Dossier clos", { vente: venteId });
+}
+
+export const cloturerSurDocument = onDocumentWritten(
+  { region: REGION, document: "ventesMotos/{venteId}/documents/{type}" },
+  async (evenement) => cloturerSiFini(evenement.params.venteId),
+);
+
+export const cloturerSurVente = onDocumentWritten(
+  { region: REGION, document: "ventesMotos/{venteId}" },
+  async (evenement) => cloturerSiFini(evenement.params.venteId),
+);

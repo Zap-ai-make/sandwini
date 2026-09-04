@@ -18,21 +18,21 @@ cahier des charges vient résoudre, après la vente elle-même.
 
 ## Critères d'acceptation
 
-- [ ] **Le chemin dépend du type de document** (`DECISIONS.md` D65) : la quittance et le CMC arrivent déjà faits (`a_faire → revenu_magasin → remis_client`, sans étape prestataire) ; la carte grise et la plaque suivent le cycle complet via un prestataire, sans saut possible
-- [ ] `non_applicable` reste possible depuis `a_faire`, jamais une fois le document déposé
-- [ ] Les transitions illégales sont impossibles : la machine à états est une fonction pure testée, pas une suite de conditions dans un composant
-- [ ] Passage à `chez_prestataire` : prestataire, date de dépôt et avance versée **obligatoires**, plus une date de disponibilité estimée
-- [ ] L'avance versée crée un encaissement `sortie` / `avance_prestataire` dans le même batch
-- [ ] Passage à `remis_client` : réservé au gérant, enregistre la date de remise et l'opérateur
-- [ ] Chaque changement de statut est journalisé dans la sous-collection `historique` du document (`prompt.md` §3.5)
-- [ ] Le dossier se clôt **automatiquement** dès que les quatre documents sont `remis_client` ou `non_applicable`, que le paiement est soldé et que la moto est remise — la date de clôture est enregistrée
-- [ ] La condition de clôture est une fonction pure testée sur tous les cas limites (documents non applicables, tranches soldées mais moto non remise, etc.)
-- [ ] **Liste des dossiers en attente** : tous les dossiers ouverts, du plus ancien au plus récent, avec pour chaque document en cours le nom du prestataire qui le détient
-- [ ] Filtres : boutique, prestataire, type de document, et **en retard** (date estimée dépassée)
-- [ ] Le retard est calculé côté client par rapport à la date du jour, donc juste même hors ligne
-- [ ] Les changements de statut se font sans réseau ; là où une opération l'exige, l'écran le dit au lieu d'échouer en silence (D66)
+- [x] **Le chemin dépend du type de document** (`DECISIONS.md` D65) : la quittance et le CMC arrivent déjà faits (`a_faire → revenu_magasin → remis_client`, sans étape prestataire) ; la carte grise et la plaque suivent le cycle complet via un prestataire, sans saut possible
+- [x] `non_applicable` reste possible depuis `a_faire`, jamais une fois le document déposé
+- [x] Les transitions illégales sont impossibles : la machine à états est une fonction pure testée, pas une suite de conditions dans un composant
+- [x] Passage à `chez_prestataire` : prestataire, date de dépôt et avance versée **obligatoires**, plus une date de disponibilité estimée
+- [x] L'avance versée crée un encaissement `sortie` / `avance_prestataire` dans le même batch
+- [x] Passage à `remis_client` : réservé au gérant, enregistre la date de remise et l'opérateur
+- [x] Chaque changement de statut est journalisé dans la sous-collection `historique` du document (`prompt.md` §3.5)
+- [x] Le dossier se clôt **automatiquement** dès que les quatre documents sont `remis_client` ou `non_applicable`, que le paiement est soldé et que la moto est remise — la date de clôture est enregistrée
+- [x] La condition de clôture est une fonction pure testée sur tous les cas limites (documents non applicables, tranches soldées mais moto non remise, etc.)
+- [x] **Liste des dossiers en attente** : tous les dossiers ouverts, du plus ancien au plus récent, avec pour chaque document en cours le nom du prestataire qui le détient
+- [x] Filtres : boutique, prestataire, type de document, et **en retard** (date estimée dépassée)
+- [x] Le retard est calculé côté client par rapport à la date du jour, donc juste même hors ligne
+- [x] Les changements de statut se font sans réseau ; là où une opération l'exige, l'écran le dit au lieu d'échouer en silence (D66)
 - [ ] La quittance et le CMC ont un champ d'envoi de fichier, annoncé comme demandant du réseau : le reste du formulaire s'enregistre sans lui, et le fichier reste ajoutable plus tard (D66)
-- [ ] États couverts : aucun dossier en attente, aucun résultat de filtre, chargement, hors ligne
+- [x] États couverts : aucun dossier en attente, aucun résultat de filtre, chargement, hors ligne
 
 ---
 
