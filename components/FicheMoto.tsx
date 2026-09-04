@@ -3,6 +3,7 @@
 import { ArrowLeft, Lock, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useCallback } from "react";
+import { PapiersMoto } from "@/components/PapiersMoto";
 import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import { LIBELLE_ETAT, LIBELLE_STATUT, type CoutMoto, type Moto } from "@/lib/domain/moto";
@@ -99,6 +100,8 @@ export function FicheMoto({ id }: { id: string }) {
               </ul>
             </section>
           )}
+
+          <PapiersMoto moto={moto} />
 
           {estResponsable ? <Cout id={id} catalogue={catalogue} /> : <CoutMasque />}
         </>

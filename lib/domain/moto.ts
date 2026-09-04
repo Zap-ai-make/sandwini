@@ -48,7 +48,49 @@ export type Moto = {
   photos: string[];
   statut: StatutMoto;
   dateEntree: Date | null;
+  /* Les scans de la quittance et du CMC (D66). Chemins Storage, pas URL : une
+     URL de téléchargement se redemande à chaque lecture et finit par expirer.
+     Nuls tant que personne n'a envoyé le fichier — ce qui reste possible plus
+     tard, l'envoi étant la seule opération de S11 qui exige du réseau. */
+  quittanceChemin: string | null;
+  cmcChemin: string | null;
 };
+
+/** Les deux papiers qu'une moto peut porter en pièce jointe (D66). */
+export const PAPIERS_MOTO = ["quittance", "cmc"] as const;
+export type PapierMoto = (typeof PAPIERS_MOTO)[number];
+
+export const LIBELLE_PAPIER: Record<PapierMoto, string> = {
+  quittance: "Quittance",
+  cmc: "CMC",
+};
+
+export const CHAMP_PAPIER: Record<PapierMoto, "quittanceChemin" | "cmcChemin"> = {
+  quittance: "quittanceChemin",
+  cmc: "cmcChemin",
+};
+
+/** 5 Mo : au-delà, un envoi depuis un téléphone en 3G n'aboutit pas. */
+export const TAILLE_FICHIER_MAX = 5 * 1024 * 1024;
+
+export const TYPES_FICHIER_ADMIS = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
+
+/**
+ * Le fichier est-il envoyable ? Renvoie le refus, ou `null`.
+ *
+ * Vérifié ici **et** dans les règles Storage : ce contrôle-ci évite d'user une
+ * connexion faible pour rien, celui des règles est le seul qui protège.
+ */
+export function validerFichierPapier(fichier: { type: string; size: number }): string | null {
+  if (!TYPES_FICHIER_ADMIS.includes(fichier.type)) {
+    return "Envoyez une photo (JPEG, PNG, WebP) ou un PDF.";
+  }
+  if (fichier.size > TAILLE_FICHIER_MAX) {
+    return "Ce fichier dépasse 5 Mo. Photographiez le document plutôt que de le scanner en haute définition.";
+  }
+  if (fichier.size === 0) return "Ce fichier est vide.";
+  return null;
+}
 
 /** Une ligne de frais d'entrée : remise en état, transport, commission… */
 export type FraisEntree = {

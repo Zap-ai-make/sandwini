@@ -12,6 +12,7 @@ import {
   validerMoto,
   type Moto,
   type SaisieMoto,
+  validerFichierPapier,
 } from "./moto";
 
 const saisie = (partie: Partial<SaisieMoto> = {}): SaisieMoto => ({
@@ -27,6 +28,8 @@ const saisie = (partie: Partial<SaisieMoto> = {}): SaisieMoto => ({
 const moto = (partie: Partial<Moto> = {}): Moto => ({
   id: "1",
   boutiqueId: "PTG",
+  quittanceChemin: null,
+  cmcChemin: null,
   etat: "neuve",
   marqueId: "m1",
   modeleId: "mo1",
@@ -216,5 +219,37 @@ describe("chassisDejaPris", () => {
 
   it("ne se signale pas à soi-même lors d’une correction", () => {
     expect(chassisDejaPris("AAA111", stock, "1")).toBeUndefined();
+  });
+});
+
+describe("validerFichierPapier", () => {
+  const fichier = (type: string, size: number) => ({ type, size });
+
+  it("accepte une photo ou un PDF", () => {
+    for (const type of ["image/jpeg", "image/png", "image/webp", "application/pdf"]) {
+      expect(validerFichierPapier(fichier(type, 500_000)), type).toBeNull();
+    }
+  });
+
+  it("refuse ce qui n’est ni une image ni un PDF", () => {
+    for (const type of ["application/x-msdownload", "text/html", ""]) {
+      expect(validerFichierPapier(fichier(type, 1000)), type).toMatch(/photo|PDF/i);
+    }
+  });
+
+  /* Cinq mégaoctets : au-delà, un envoi depuis un téléphone en 3G n'aboutit
+     pas, et l'échec arrive après une longue attente. Mieux vaut le dire avant. */
+  it("refuse un fichier trop lourd, en disant quoi faire", () => {
+    const message = validerFichierPapier(fichier("image/jpeg", 6 * 1024 * 1024));
+    expect(message).toMatch(/5 Mo/);
+    expect(message).toMatch(/[Pp]hotographiez/);
+  });
+
+  it("accepte exactement cinq mégaoctets", () => {
+    expect(validerFichierPapier(fichier("image/jpeg", 5 * 1024 * 1024))).toBeNull();
+  });
+
+  it("refuse un fichier vide", () => {
+    expect(validerFichierPapier(fichier("image/jpeg", 0))).toMatch(/vide/i);
   });
 });

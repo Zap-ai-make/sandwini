@@ -5,12 +5,13 @@ import {
   query,
   serverTimestamp,
   Timestamp,
+  updateDoc,
   where,
   writeBatch,
   type DocumentData,
   type DocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
+import { db, stockage } from "@/lib/firebase/client";
 import {
   coutTotal,
   lireEntier,
@@ -21,10 +22,13 @@ import {
   type Moto,
   type SaisieMoto,
   type StatutMoto,
+  CHAMP_PAPIER,
+  validerFichierPapier,
+  type PapierMoto,
 } from "@/lib/domain/moto";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
-import { traceCreation, type Auteur } from "./referentiels";
+import { traceCreation, traceModification, type Auteur } from "./referentiels";
 
 /**
  * Le stock de motos.
@@ -56,6 +60,8 @@ function lireMoto(instantane: DocumentSnapshot<DocumentData>): Moto {
     photos: Array.isArray(donnees.photos) ? donnees.photos : [],
     statut: (donnees.statut as StatutMoto) ?? "en_stock",
     dateEntree: dateEntree instanceof Timestamp ? dateEntree.toDate() : null,
+    quittanceChemin: (donnees.quittanceChemin as string) ?? null,
+    cmcChemin: (donnees.cmcChemin as string) ?? null,
   };
 }
 
@@ -214,4 +220,54 @@ export function messageErreurMoto(cause: unknown): string {
   if (code.includes("not-found")) return "Cette moto n’existe plus.";
   if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
   return "L’enregistrement n’a pas abouti.";
+}
+
+/**
+ * Envoie le scan d'un papier et l'attache à la moto (S11, D66).
+ *
+ * **C'est la seule opération du produit qui exige du réseau**, et c'est assumé :
+ * Firebase Storage n'a pas de file d'attente hors ligne, contrairement à
+ * Firestore. Un envoi sans réseau échoue — l'écran l'annonce avant, plutôt que
+ * de laisser croire à une file qui n'existe pas.
+ *
+ * Ce qui reste vrai hors ligne : la moto s'enregistre sans son scan, et le scan
+ * s'ajoute plus tard. Une entrée en stock faite au comptoir sans réseau n'est
+ * donc jamais perdue ni incomplète pour toujours (les deux conditions posées à
+ * D66).
+ *
+ * On garde le **chemin**, pas l'URL de téléchargement : une URL se redemande à
+ * chaque lecture et finit par expirer. Le chemin, lui, ne périme pas.
+ */
+export async function envoyerPapierMoto(
+  motoId: string,
+  papier: PapierMoto,
+  fichier: File,
+  auteur: Auteur,
+): Promise<string> {
+  const probleme = validerFichierPapier(fichier);
+  if (probleme) throw new Error(probleme);
+
+  const extension = fichier.type === "application/pdf" ? "pdf" : fichier.type.split("/")[1];
+  const chemin = `motos/${motoId}/papiers/${papier}-${Date.now()}.${extension}`;
+
+  const { ref, uploadBytes } = await import("firebase/storage");
+  await uploadBytes(ref(stockage(), chemin), fichier, { contentType: fichier.type });
+
+  /* L'attache suit l'envoi, jamais l'inverse : un chemin écrit vers un fichier
+     qui n'est pas arrivé donnerait une pièce jointe morte, visible et
+     inouvrable. */
+  await suivreEcriture(
+    updateDoc(doc(db(), "motos", motoId), {
+      [CHAMP_PAPIER[papier]]: chemin,
+      ...traceModification(auteur),
+    }),
+  );
+
+  return chemin;
+}
+
+/** L'URL de lecture d'un papier. Demande du réseau : le cache ne la fabrique pas. */
+export async function lireUrlPapier(chemin: string): Promise<string> {
+  const { getDownloadURL, ref } = await import("firebase/storage");
+  return getDownloadURL(ref(stockage(), chemin));
 }

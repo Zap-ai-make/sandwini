@@ -31,7 +31,7 @@ cahier des charges vient résoudre, après la vente elle-même.
 - [x] Filtres : boutique, prestataire, type de document, et **en retard** (date estimée dépassée)
 - [x] Le retard est calculé côté client par rapport à la date du jour, donc juste même hors ligne
 - [x] Les changements de statut se font sans réseau ; là où une opération l'exige, l'écran le dit au lieu d'échouer en silence (D66)
-- [ ] La quittance et le CMC ont un champ d'envoi de fichier, annoncé comme demandant du réseau : le reste du formulaire s'enregistre sans lui, et le fichier reste ajoutable plus tard (D66)
+- [x] La quittance et le CMC ont un champ d'envoi de fichier, annoncé comme demandant du réseau : le reste du formulaire s'enregistre sans lui, et le fichier reste ajoutable plus tard (D66)
 - [x] États couverts : aucun dossier en attente, aucun résultat de filtre, chargement, hors ligne
 
 ---

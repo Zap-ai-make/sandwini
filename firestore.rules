@@ -279,11 +279,19 @@ service cloud.firestore {
       return valeur is int && valeur >= 0 && valeur <= 1000000000;
     }
 
+    // Un chemin de fichier absent ou nul est normal : le scan s'ajoute plus tard.
+    function cheminFichier(donnees, champ) {
+      return !donnees.keys().hasAny([champ])
+             || donnees[champ] == null
+             || texteBorne(donnees[champ], 300);
+    }
+
     function motoValide(donnees) {
       return donnees.keys().hasOnly(['boutiqueId', 'etat', 'marqueId', 'modeleId', 'couleur',
                                      'annee', 'numeroChassis', 'numeroMoteur',
                                      'prixVenteConseille', 'provenanceId', 'papiersFournis',
-                                     'photos', 'statut', 'dateEntree'].concat(champsAudit()))
+                                     'photos', 'statut', 'dateEntree',
+                                     'quittanceChemin', 'cmcChemin'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'etat', 'marqueId', 'modeleId',
                                        'numeroChassis', 'provenanceId', 'photos', 'statut',
                                        'dateEntree'].concat(champsAudit()))
@@ -310,6 +318,12 @@ service cloud.firestore {
              // Les photos arrivent avec S19 : la liste existe et reste vide.
              && donnees.photos is list
              && donnees.photos.size() == 0
+             // Les scans de la quittance et du CMC (S11, D66). Absents a la
+             // creation : ils s'ajoutent quand il y a du reseau, et le
+             // formulaire s'enregistre sans eux. Ce sont des chemins Storage,
+             // pas des URL : l'URL se redemande a chaque lecture et expire.
+             && cheminFichier(donnees, 'quittanceChemin')
+             && cheminFichier(donnees, 'cmcChemin')
              // La date d'entrée vient de l'appareil (D38), on la borne seulement
              // contre une horloge déréglée.
              && donnees.dateEntree is timestamp
