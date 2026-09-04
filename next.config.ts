@@ -105,6 +105,7 @@ const ECRANS_HORS_LIGNE = [
   "/motos",
   "/motos/nouvelle",
   "/motos/ventes",
+  "/motos/dossiers",
   "/motos/ventes/nouvelle",
   "/motos/paiements",
   "/motos/recus",

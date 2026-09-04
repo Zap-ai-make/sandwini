@@ -103,6 +103,12 @@ function Stock() {
             Ventes
           </Link>
           <Link
+            href="/motos/dossiers"
+            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          >
+            Dossiers
+          </Link>
+          <Link
             href="/motos/nouvelle"
             className="inline-flex h-12 items-center gap-2 rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
           >

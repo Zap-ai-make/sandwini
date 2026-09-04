@@ -175,3 +175,30 @@ test.describe("écarter un document", () => {
     await expect(cmc.getByRole("button")).toHaveCount(0);
   });
 });
+
+test.describe("la liste des dossiers en attente", () => {
+  test("montre le dossier, qui le détient, et disparaît quand tout est réglé", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    const prestataire = nomUnique("Compaoré");
+    await creerPrestataire(page, prestataire);
+    const { numero } = await vendre(page, {
+      mode: "Crédit",
+      prix: "1200000",
+      encaisse: "400000",
+    });
+
+    /* Une vente fraîche ouvre quatre documents : le dossier attend forcément. */
+    await page.goto("/motos/dossiers", { waitUntil: "load" });
+    const dossier = contenu(page).locator("li").filter({ hasText: numero }).first();
+    await expect(dossier).toContainText("Carte grise");
+
+    /* Le filtre par prestataire ne doit rien rendre tant que rien n'est déposé :
+       personne ne détient encore quoi que ce soit. */
+    await contenu(page).getByLabel("Prestataire").selectOption({ label: prestataire });
+    await expect(contenu(page)).toContainText("Aucun dossier ne correspond");
+
+    await contenu(page).getByLabel("Prestataire").selectOption({ label: "Tous" });
+    await contenu(page).getByLabel("Document").selectOption({ label: "Plaque" });
+    await expect(dossier).toBeVisible();
+  });
+});
