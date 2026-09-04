@@ -21,6 +21,16 @@ const hotesFirebase = [
   "https://*.firebaseio.com",
   "wss://*.firebaseio.com",
   "https://*.firebaseapp.com",
+  /* Les fonctions appelables. Le SDK les joint sur
+     `https://{region}-{projet}.cloudfunctions.net/{nom}`, qui n'appartient à
+     aucun des domaines ci-dessus — et sans cette ligne le navigateur coupe
+     l'appel avant qu'il parte. L'application n'en voyait qu'un « le serveur n'a
+     pas répondu », ce qui accusait le réseau alors que la demande n'avait
+     jamais quitté la page.
+
+     Invisible sur les émulateurs, qui répondent sur 127.0.0.1, lui autorisé
+     plus bas : la panne n'apparaissait donc qu'en ligne. */
+  "https://*.cloudfunctions.net",
 ].join(" ");
 const hotesEmulateurs =
   enDev || surEmulateurs

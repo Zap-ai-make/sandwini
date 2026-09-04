@@ -84,6 +84,17 @@ test.describe("en-têtes de sécurité", () => {
        voit pas à l’œil, d’où ce test. */
     expect(csp, "unsafe-eval ne doit jamais sortir du développement").not.toContain("unsafe-eval");
 
+    /* Le miroir du test précédent, et il a manqué longtemps : une CSP **trop
+       stricte** ne se voit pas davantage à l'œil. Faute de ce domaine, le
+       navigateur coupait tous les appels aux fonctions appelables — créer un
+       gérant, le rattacher, désactiver un compte — avant même qu'ils partent.
+       L'application n'en voyait qu'un « le serveur n'a pas répondu », qui
+       accusait le réseau. Invisible sur les émulateurs, qui répondent sur
+       127.0.0.1 : la panne n'existait qu'en ligne. */
+    expect(csp, "les fonctions appelables doivent rester joignables").toContain(
+      "https://*.cloudfunctions.net",
+    );
+
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("object-src 'none'");
     expect(csp).toContain("frame-ancestors 'none'");

@@ -1441,3 +1441,31 @@ bandeau — c'est-à-dire l'indicateur de synchronisation, pas le comportement d
 le dépôt a survécu, ce que l'affichage optimiste seul ne prouvait pas. **Une assertion sur
 un indicateur d'infrastructure n'a pas sa place dans un test de comportement métier** — elle
 importe le bruit de D55 dans des suites qui n'ont rien à y voir.
+
+---
+
+## D69 — Une CSP trop stricte est une panne, et rien ne la surveillait
+
+*Trouvé par le responsable, sur le projet réel, en essayant de créer un gérant.*
+
+`connect-src` autorisait `googleapis.com`, `firebaseio.com` et `firebaseapp.com`. Les
+fonctions appelables, elles, répondent sur `{region}-{projet}.cloudfunctions.net` — aucun
+de ces trois. Le navigateur coupait donc **tous** les appels serveur avant qu'ils partent :
+créer un gérant, le rattacher à une boutique, désactiver un compte.
+
+**Ce que l'utilisateur lisait :** « Le serveur n'a pas répondu. Cette action demande du
+réseau — réessayez une fois connecté. » Le message accusait le réseau, alors que la demande
+n'avait jamais quitté la page.
+
+**Pourquoi personne ne l'a vu pendant onze specs.** Les émulateurs répondent sur
+`127.0.0.1`, explicitement autorisé quand `NEXT_PUBLIC_FIREBASE_EMULATEURS=1`. La panne
+n'existait donc qu'en ligne, et rien ne tournait en ligne avant cette semaine.
+
+**La leçon, qui dépasse le cas.** `e2e/socle.spec.ts` vérifiait depuis S1 que la CSP ne
+**relâche** rien — pas d'`unsafe-eval`, `object-src 'none'`, `frame-ancestors 'none'`. Une
+CSP trop **stricte** n'était surveillée par personne, alors qu'elle casse le produit tout
+aussi sûrement. Un durcissement ne se teste que dans un sens par réflexe ; les deux sens
+comptent. L'assertion miroir est ajoutée.
+
+*Conséquence sur S12 :* la passe de durcissement devra vérifier chaque restriction dans les
+deux sens — ce qui est refusé, et ce qui doit rester possible.
