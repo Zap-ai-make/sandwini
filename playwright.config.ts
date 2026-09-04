@@ -1,4 +1,41 @@
 import { defineConfig, devices } from "@playwright/test";
+import { existsSync, readFileSync } from "node:fs";
+
+/**
+ * Garde-fou : la suite ne tourne QUE sur les émulateurs.
+ *
+ * Ces tests créent des comptes, des boutiques, des motos et des ventes, puis
+ * vident la base. Pointés sur un vrai projet Firebase, ils détruiraient des
+ * données réelles — et personne ne s'en apercevrait avant de les chercher.
+ *
+ * Le contrôle lit les fichiers d'environnement plutôt que `process.env` : Next
+ * les charge lui-même au démarrage du serveur de test, et ce processus-ci ne
+ * les voit pas. C'est le même fichier qui décidera dans quelques secondes à
+ * quel projet l'application parle.
+ */
+const SAUT = String.fromCharCode(10);
+
+function exigerLesEmulateurs(): void {
+  const fichier = [".env.local", ".env"].find((nom) => existsSync(nom));
+  const contenu = fichier ? readFileSync(fichier, "utf8") : "";
+  const surEmulateurs = /^NEXT_PUBLIC_FIREBASE_EMULATEURS\s*=\s*1\s*$/m.test(contenu);
+  if (surEmulateurs) return;
+
+  throw new Error(
+    [
+      "Les tests bout en bout refusent de tourner hors des émulateurs.",
+      "",
+      `Le fichier « ${fichier ?? "(aucun)"} » ne pose pas NEXT_PUBLIC_FIREBASE_EMULATEURS=1 :`,
+      "l'application viserait un vrai projet Firebase, et cette suite y créerait",
+      "puis effacerait des comptes, des boutiques et des ventes.",
+      "",
+      "Pour lancer les tests, remettez la configuration des émulateurs :",
+      "  mv .env.local.emulateurs .env.local",
+    ].join(SAUT),
+  );
+}
+
+exigerLesEmulateurs();
 
 /* Le hors-ligne ne se verifie que sur un build reel : en developpement, le
    service worker est desactive (cf. next.config.ts). D'ou `npm run build` puis
