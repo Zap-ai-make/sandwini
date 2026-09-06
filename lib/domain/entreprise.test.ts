@@ -1,111 +1,66 @@
 import { describe, expect, it } from "vitest";
 import {
-  ENTREPRISE_VIDE,
-  LOGO_OCTETS_MAX,
+  IDENTITE,
+  IDENTITE_A_CONFIRMER,
+  LIBELLE_IDENTITE,
+  REGLAGES_DEFAUT,
   SEUIL_INACTIVITE_DEFAUT,
   SEUIL_INACTIVITE_MAX,
   SEUIL_INACTIVITE_MIN,
-  entrepriseComplete,
-  estLogoValide,
-  normaliserEntreprise,
-  validerEntreprise,
-  type Entreprise,
+  validerReglages,
 } from "./entreprise";
 
-const entreprise = (partie: Partial<Entreprise> = {}): Entreprise => ({
-  ...ENTREPRISE_VIDE,
-  nom: "Sandwidi et frère",
-  adresse: "Pouytenga, marché central",
-  telephone: "70 00 00 00",
-  ...partie,
-});
-
-const logo = (octets: number) =>
-  `data:image/png;base64,${"A".repeat(Math.max(0, octets - "data:image/png;base64,".length))}`;
-
-describe("validerEntreprise", () => {
-  it("accepte une fiche renseignée", () => {
-    expect(validerEntreprise(entreprise())).toBeNull();
-  });
-
-  it("exige le nom — c’est lui qui s’imprime en haut du reçu", () => {
-    expect(validerEntreprise(entreprise({ nom: "   " }))).toMatch(/nom/i);
-  });
-
-  it("accepte une fiche encore incomplète pour tout le reste", () => {
-    expect(validerEntreprise(entreprise({ adresse: "", telephone: "", identifiant: "" }))).toBeNull();
-  });
-
-  it("refuse les textes trop longs plutôt que de les couper", () => {
-    expect(validerEntreprise(entreprise({ nom: "n".repeat(81) }))).toMatch(/nom/i);
-    expect(validerEntreprise(entreprise({ adresse: "a".repeat(201) }))).toMatch(/adresse/i);
-    expect(validerEntreprise(entreprise({ telephone2: "0".repeat(41) }))).toMatch(/téléphone/i);
-    expect(validerEntreprise(entreprise({ identifiant: "x".repeat(41) }))).toMatch(/identification/i);
-  });
-});
-
-describe("logo", () => {
-  it("reconnaît les trois formats que le navigateur sait réduire", () => {
-    for (const type of ["png", "jpeg", "webp"]) {
-      expect(estLogoValide(`data:image/${type};base64,AAAA`), type).toBe(true);
+/**
+ * L'identité est une constante depuis D71 : il n'y a plus de validation de
+ * saisie à éprouver, puisqu'il n'y a plus de saisie. Ce qui reste à protéger,
+ * c'est qu'elle soit **complète** — un reçu sans mention légale n'est pas
+ * conforme, et le défaut ne se verrait qu'à l'impression.
+ */
+describe("l’identité de l’entreprise", () => {
+  it("porte toutes ses mentions, aucune vide", () => {
+    for (const [champ, valeur] of Object.entries(IDENTITE)) {
+      expect(valeur.trim(), champ).not.toBe("");
     }
   });
 
-  it("refuse ce qui n’est pas une image encodée", () => {
-    for (const valeur of [
-      "https://exemple.test/logo.png",
-      "data:text/html;base64,AAAA",
-      "data:image/svg+xml;base64,AAAA",
-      "AAAA",
-      "",
+  it("nomme chacune de ses mentions, pour que l’écran puisse les lire", () => {
+    for (const champ of Object.keys(IDENTITE)) {
+      expect(LIBELLE_IDENTITE[champ as keyof typeof IDENTITE], champ).toBeTruthy();
+    }
+  });
+
+  /* Ce test échouera le jour où quelqu'un ajoutera un champ « à confirmer » qui
+     n'existe pas, ou renommera un champ sans toucher la liste — c'est-à-dire au
+     moment où l'avertissement rouge de l'écran cesserait de désigner quoi que
+     ce soit. */
+  it("ne déclare à confirmer que des mentions qui existent", () => {
+    for (const champ of IDENTITE_A_CONFIRMER) {
+      expect(IDENTITE[champ], champ).toBeTruthy();
+    }
+  });
+});
+
+describe("validerReglages", () => {
+  it("accepte le défaut du cahier des charges", () => {
+    expect(validerReglages(REGLAGES_DEFAUT)).toBeNull();
+    expect(REGLAGES_DEFAUT.seuilInactiviteTranches).toBe(SEUIL_INACTIVITE_DEFAUT);
+  });
+
+  it("accepte les deux bornes", () => {
+    expect(validerReglages({ seuilInactiviteTranches: SEUIL_INACTIVITE_MIN })).toBeNull();
+    expect(validerReglages({ seuilInactiviteTranches: SEUIL_INACTIVITE_MAX })).toBeNull();
+  });
+
+  it("refuse en dessous, au-dessus, et ce qui n’est pas un nombre de jours", () => {
+    for (const seuil of [
+      SEUIL_INACTIVITE_MIN - 1,
+      SEUIL_INACTIVITE_MAX + 1,
+      0,
+      -30,
+      12.5,
+      Number.NaN,
     ]) {
-      expect(estLogoValide(valeur), valeur).toBe(false);
-    }
-  });
-
-  it("accepte un logo sous la limite", () => {
-    expect(validerEntreprise(entreprise({ logo: logo(LOGO_OCTETS_MAX - 100) }))).toBeNull();
-  });
-
-  it("refuse un logo qui ferait grossir le document au-delà du raisonnable", () => {
-    expect(validerEntreprise(entreprise({ logo: logo(LOGO_OCTETS_MAX + 1) }))).toMatch(/trop lourd/);
-  });
-
-  it("accepte l’absence de logo — toutes les entreprises n’en ont pas", () => {
-    expect(validerEntreprise(entreprise({ logo: null }))).toBeNull();
-  });
-});
-
-describe("normaliserEntreprise", () => {
-  it("met la saisie sous la forme exacte qui part en base", () => {
-    expect(
-      normaliserEntreprise(entreprise({ nom: "  Sandwidi  ", telephone: " 70 11 22 33 " })),
-    ).toMatchObject({ nom: "Sandwidi", telephone: "70 11 22 33" });
-  });
-});
-
-describe("entrepriseComplete", () => {
-  it("demande au moins un nom et un téléphone pour qu’un reçu soit présentable", () => {
-    expect(entrepriseComplete(entreprise())).toBe(true);
-    expect(entrepriseComplete(entreprise({ telephone: "" }))).toBe(false);
-    expect(entrepriseComplete(ENTREPRISE_VIDE)).toBe(false);
-  });
-});
-
-describe("seuil d’inactivité des tranches", () => {
-  it("vaut trente jours par défaut, comme le cahier des charges", () => {
-    expect(ENTREPRISE_VIDE.seuilInactiviteTranches).toBe(SEUIL_INACTIVITE_DEFAUT);
-  });
-
-  it("accepte les bornes", () => {
-    for (const seuil of [SEUIL_INACTIVITE_MIN, 30, SEUIL_INACTIVITE_MAX]) {
-      expect(validerEntreprise(entreprise({ seuilInactiviteTranches: seuil }))).toBeNull();
-    }
-  });
-
-  it("refuse hors bornes, ou pas un entier de jours", () => {
-    for (const seuil of [0, -1, 366, 15.5, Number.NaN]) {
-      expect(validerEntreprise(entreprise({ seuilInactiviteTranches: seuil }))).toMatch(/seuil/i);
+      expect(validerReglages({ seuilInactiviteTranches: seuil }), String(seuil)).toMatch(/jours/i);
     }
   });
 });

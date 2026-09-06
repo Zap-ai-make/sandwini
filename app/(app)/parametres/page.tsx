@@ -72,9 +72,9 @@ export default function Reglages() {
               >
                 <Building2 aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">Entreprise</span>
+                  <span className="block font-medium text-encre">Identité de l’entreprise</span>
                   <span className="block text-sm text-encre-doux">
-                    Nom, adresse, téléphones et logo imprimés sur les reçus
+                    L’en-tête imprimé sur les reçus, et le délai des tranches inactives
                   </span>
                 </span>
                 <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />

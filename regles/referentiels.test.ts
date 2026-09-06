@@ -105,12 +105,7 @@ beforeEach(async () => {
       ...creationFigee,
     });
     await setDoc(doc(base, "entreprise/profil"), {
-      nom: "Sandwidi et frère",
-      adresse: "Pouytenga",
-      telephone: "70 00 00 00",
-      telephone2: "",
-      identifiant: "",
-      logo: null,
+      seuilInactiviteTranches: 30,
       updatedAt: new Date("2026-01-01T08:00:00Z"),
       updatedBy: "resp-1",
       updatedByName: "Responsable SDI",
@@ -308,54 +303,50 @@ describe("prestataires", () => {
 });
 
 describe("entreprise", () => {
+  /* Depuis D71 ce document ne porte plus l'identité — raison sociale, siège,
+     IFU, RCCM et logo sont une constante du code. Il ne lui reste qu'un
+     entier, et ces tests prouvent que la règle refuse tout le reste : sans
+     eux, rien n'empêcherait une version future de réintroduire par la fenêtre
+     le champ que la décision a fait sortir par la porte. */
   const profil = (partie: Record<string, unknown> = {}) => ({
-    nom: "Sandwidi et frère",
-    adresse: "Pouytenga, marché central",
-    telephone: "70 00 00 00",
-    telephone2: "",
-    identifiant: "",
-    logo: null,
+    seuilInactiviteTranches: 30,
     updatedAt: serverTimestamp(),
     updatedBy: "resp-1",
     updatedByName: "Responsable SDI",
     ...partie,
   });
 
-  it("le responsable enregistre les coordonnées", async () => {
-    await assertSucceeds(setDoc(doc(responsable(), "entreprise/profil"), profil(), { merge: true }));
+  it("le responsable enregistre le seuil d’inactivité", async () => {
+    await assertSucceeds(setDoc(doc(responsable(), "entreprise/profil"), profil()));
   });
 
-  it("le responsable dépose un logo encodé dans le document", async () => {
-    await assertSucceeds(
+  it("refuse le nom de l’entreprise — il n’est plus un réglage (D71)", async () => {
+    await assertFails(
+      setDoc(doc(responsable(), "entreprise/profil"), profil({ nom: "Autre enseigne" })),
+    );
+  });
+
+  it("refuse un logo dans le document — la marque vient du code, pas de la base", async () => {
+    await assertFails(
       setDoc(
         doc(responsable(), "entreprise/profil"),
         profil({ logo: `data:image/png;base64,${"A".repeat(5_000)}` }),
-        { merge: true },
       ),
     );
   });
 
-  it("refuse un logo qui n’est pas une image encodée — pas d’URL distante", async () => {
+  it("refuse un numéro d’identification écrit en base — l’IFU s’imprime, il ne se saisit pas", async () => {
     await assertFails(
-      setDoc(doc(responsable(), "entreprise/profil"), profil({ logo: "https://exemple.test/l.png" }), {
-        merge: true,
-      }),
+      setDoc(doc(responsable(), "entreprise/profil"), profil({ identifiant: "IFU-000" })),
     );
   });
 
-  it("refuse un logo qui ferait exploser le document", async () => {
+  it("refuse un seuil hors des bornes", async () => {
     await assertFails(
-      setDoc(
-        doc(responsable(), "entreprise/profil"),
-        profil({ logo: `data:image/png;base64,${"A".repeat(220_000)}` }),
-        { merge: true },
-      ),
+      setDoc(doc(responsable(), "entreprise/profil"), profil({ seuilInactiviteTranches: 0 })),
     );
-  });
-
-  it("refuse une entreprise sans nom — c’est lui qui s’imprime sur le reçu", async () => {
     await assertFails(
-      setDoc(doc(responsable(), "entreprise/profil"), profil({ nom: "" }), { merge: true }),
+      setDoc(doc(responsable(), "entreprise/profil"), profil({ seuilInactiviteTranches: 400 })),
     );
   });
 
@@ -366,7 +357,7 @@ describe("entreprise", () => {
   it("le gérant lit mais n’écrit pas", async () => {
     await assertSucceeds(getDoc(doc(gerant(), "entreprise/profil")));
     await assertFails(
-      setDoc(doc(gerant(), "entreprise/profil"), profil({ updatedBy: "ger-1" }), { merge: true }),
+      setDoc(doc(gerant(), "entreprise/profil"), profil({ updatedBy: "ger-1" })),
     );
   });
 

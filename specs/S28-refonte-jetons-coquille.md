@@ -54,8 +54,11 @@ coquille sans avoir été réécrits.
       `navigation` « Navigation principale », `status`, `alert`, `article`, le `combobox`
       « Boutique affichée ». Tout libellé changé est mis à jour dans `e2e/` **dans le même
       commit**.
-- [ ] `npm test` : 315 unitaires, 230 règles, 21 déclencheurs passent. `npm run test:e2e`
-      passe.
+- [ ] `npm test` et `npm run test:e2e` passent. Le compte de 315 tests unitaires n'est pas
+      un critère : retirer la saisie de l'identité (D71) retire aussi les tests qui la
+      validaient, et un compte qui ne bouge jamais serait le signe qu'on a gardé du code
+      mort. Ce qui compte, c'est qu'aucun test ne tombe **et** que chaque comportement
+      supprimé le soit délibérément.
 - [ ] `node scripts/captures.mjs` : les captures sont regardées, mobile et bureau, clair et
       sombre.
 - [ ] La branche principale reste déployable à chaque commit (`ARCHITECTURE.md` §11).

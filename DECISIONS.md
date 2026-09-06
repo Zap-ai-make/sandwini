@@ -166,6 +166,11 @@ un détail d'un formulaire.
 ## D15 — Identité de l'entreprise : paramètre, pas constante
 `prompt.md` §10
 
+> **Renversée par D71** (revue des maquettes, S28). Le responsable ne veut pas
+> saisir son identité : elle est désormais une constante de
+> `lib/domain/entreprise.ts`. Ce qui suit décrit l'état antérieur, gardé parce
+> qu'une décision effacée ne s'apprend pas.
+
 Le nom de l'entreprise, son logo, ses adresses et téléphones sont saisis dans les paramètres par le
 responsable, comme le cahier des charges l'exige. Aucun nom commercial n'est écrit en dur dans le
 code ou l'interface.
@@ -1551,6 +1556,12 @@ reçu qui vienne du compte connecté, et le seul réglage que l'application dema
 quelqu'un. Il répond au défaut signalé pendant S12 : l'application imprimait l'adresse
 e-mail à la place du nom. On l'atteint par le bloc de compte en bas de la navigation, là où
 l'on lit déjà qui est connecté sur un poste partagé — pas par une entrée de menu de plus.
+
+**Ce qu'elle renverse.** D15 disait « paramètre, pas constante », et l'avait
+tranché depuis `prompt.md` §10. Cette lecture n'était pas fausse : le cahier des
+charges demandait bien un écran de saisie. C'est le commanditaire qui a changé
+d'avis en voyant les maquettes, et son avis prime sur une lecture de son propre
+cahier.
 
 **Ce que ça change pour la phase 2 :** l'écran `/parametres/entreprise` cesse d'être un
 formulaire et devient une carte en lecture seule. Les tests bout en bout qui remplissent ce

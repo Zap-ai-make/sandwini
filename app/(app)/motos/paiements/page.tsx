@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import { formaterAnciennete, formaterDateCourte, formaterMontant } from "@/lib/domain/format";
-import { SEUIL_INACTIVITE_DEFAUT, type Entreprise } from "@/lib/domain/entreprise";
+import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
 import type { Moto } from "@/lib/domain/moto";
 import {
   dettes,
@@ -21,7 +21,7 @@ import {
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
-import { ecouterEntreprise } from "@/lib/repositories/entreprise";
+import { ecouterReglages } from "@/lib/repositories/entreprise";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/ventes";
@@ -87,16 +87,16 @@ export default function PagePaiements() {
   );
   const { valeur: stock } = useAbonnement(souscrireStock, "Le stock n’a pas pu être chargé.");
 
-  const souscrireEntreprise = useCallback(
-    (auChangement: (entreprise: Entreprise) => void, enErreur: (cause: unknown) => void) =>
-      ecouterEntreprise(auChangement, enErreur),
+  const souscrireReglages = useCallback(
+    (auChangement: (reglages: ReglagesEntreprise) => void, enErreur: (cause: unknown) => void) =>
+      ecouterReglages(auChangement, enErreur),
     [],
   );
-  const { valeur: entreprise } = useAbonnement(
-    souscrireEntreprise,
+  const { valeur: reglages } = useAbonnement(
+    souscrireReglages,
     "Le seuil d’inactivité n’a pas pu être lu.",
   );
-  const seuil = entreprise?.seuilInactiviteTranches ?? SEUIL_INACTIVITE_DEFAUT;
+  const seuil = reglages?.seuilInactiviteTranches ?? SEUIL_INACTIVITE_DEFAUT;
 
   const lignes = useMemo(
     () => suivrePaiements(ventes ?? [], versements ?? [], new Date()),
