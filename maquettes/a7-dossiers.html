@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dossiers en attente — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+</head>
+<body>
+
+<!-- Le seul endroit où le dégradé du monogramme sort du logo. -->
+<div class="coquille-filet" aria-hidden="true"></div>
+<a class="sr" href="#travail">Aller au contenu</a>
+
+<div class="appli">
+
+<nav class="rail" aria-label="Espaces">
+  <a class="rail-marque" href="index.html" aria-label="SDI — retour à la galerie">
+    <img src="../design/marque/monogramme-se.svg" alt="">
+  </a>
+  <a class="rail-lien" href="a3-accueil-gerant.html"><span data-icone="accueil"></span><span>Accueil</span></a>
+  <a class="rail-lien" href="a4-stock-motos.html" aria-current="page"><span data-icone="moto"></span><span>Motos</span></a>
+  <a class="rail-lien" href="c1-pieces.html"><span data-icone="piece"></span><span>Pièces</span></a>
+  <a class="rail-lien" href="c2-caisse.html"><span data-icone="caisse"></span><span>Caisse</span></a>
+  <a class="rail-lien" href="a9-reglages.html"><span data-icone="reglages"></span><span>Réglages</span></a>
+  <div class="rail-pied">
+    <button class="rail-lien" type="button" data-bascule-theme aria-pressed="false"><span data-icone="soleil"></span><span data-bascule-texte>Thème clair</span></button>
+    <a class="rail-lien" href="a1-connexion.html"><span data-icone="sortir"></span><span>Se déconnecter</span></a>
+  </div>
+</nav>
+
+<nav class="colonne" id="colonne-ecrans" aria-label="Navigation principale">
+  <p class="colonne-espace"><span>Motos</span></p>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Vendre</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="a5-nouvelle-vente.html"><span data-icone="plus"></span><span>Nouvelle vente</span></a></li>
+      <li><a class="colonne-lien" href="#"><span data-icone="camion"></span><span>Faire entrer une moto</span></a></li>
+    </ul>
+  </div>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Suivre</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="a4-stock-motos.html"><span data-icone="stock"></span><span>Stock motos</span></a></li>
+      <li><a class="colonne-lien" href="a6-ventes.html"><span data-icone="vente"></span><span>Ventes</span></a></li>
+      <li><a class="colonne-lien" href="a8-paiements.html"><span data-icone="paiement"></span><span>Paiements</span><span class="colonne-compte">12<span class="sr"> à traiter</span></span></a></li>
+      <li><a class="colonne-lien" href="a7-dossiers.html" aria-current="page"><span data-icone="dossier"></span><span>Dossiers</span><span class="colonne-compte">7<span class="sr"> à traiter</span></span></a></li>
+      <li><a class="colonne-lien" href="#"><span data-icone="imprimer"></span><span>Reçus</span></a></li>
+    </ul>
+  </div>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Le fichier</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="#"><span data-icone="client"></span><span>Clients</span></a></li>
+    </ul>
+  </div>
+  <button class="colonne-pied" type="button" data-ouvre="mon-nom" id="btn-mon-nom">
+    <span data-icone="utilisateur"></span>
+    <span><span class="colonne-pied-nom">Ousmane Sawadogo</span><br>Gérant · Pouytenga</span>
+  </button>
+</nav>
+
+  <div class="travail">
+<header class="banniere" role="banner" data-reseau="a-jour">
+  <button class="plier" type="button" data-plier aria-expanded="true"
+          aria-controls="colonne-ecrans" title="Replier la navigation (Ctrl B)">
+    <span data-icone="plier"></span>
+    <span class="sr" data-plier-texte>Replier la navigation</span>
+  </button>
+  <span class="plaque">PTG</span>
+  <span class="banniere-nom" id="nom-boutique">Pouytenga</span>
+  <span class="banniere-espace"></span>
+  <button class="recherche" type="button" data-ouvre="palette" id="btn-recherche">
+    <span data-icone="chercher"></span>
+    <span>Chercher une moto, une vente, un client…</span>
+    <kbd class="touche">Ctrl K</kbd>
+  </button>
+  <span class="etat" role="status" data-etat="a-jour"><span data-icone="coche"></span>À jour</span>
+</header>
+    <main class="page" id="travail" tabindex="-1">
+      
+      <div class="page-large">
+        <div class="tete">
+          <div class="tete-texte">
+            <p class="sur-titre">Motos · Pouytenga</p>
+            <h1>Dossiers en attente</h1>
+            <p class="aide">Les quatre documents ne suivent pas le même chemin. Un dossier se ferme quand les quatre sont remis, ou déclarés sans objet.</p>
+          </div>
+        </div>
+
+        <div class="avis avis-erreur" role="alert" style="margin-bottom:var(--e5)">
+          <span data-icone="alerte"></span>
+          <div>
+            <h2>Un document dépasse le délai</h2>
+            <p>La carte grise de <span class="code">PTG-2607-0031</span> est chez
+               Zongo Prestations depuis 38 jours. Le délai habituel est de 21 jours.</p>
+          </div>
+        </div>
+
+        <div class="cadre">
+          <div class="cadre-tete">
+            <label class="sr" for="qd">Chercher un dossier</label>
+            <input class="recherche" id="qd" type="search" placeholder="Numéro, client, prestataire…">
+            <div class="filtres" role="group" aria-label="Filtrer les dossiers">
+              <button class="filtre" type="button" aria-pressed="true">Ouverts</button>
+              <button class="filtre" type="button" aria-pressed="false">En retard</button>
+              <button class="filtre" type="button" aria-pressed="false">Chez un prestataire</button>
+              <button class="filtre" type="button" aria-pressed="false">À remettre</button>
+            </div>
+            <p class="cadre-compte"><strong>7</strong> dossiers ouverts · 1 en retard</p>
+          </div>
+
+          <div class="cadre-defilant">
+          <table class="repli tableau-dossiers">
+            <caption class="sr">
+              Dossiers ouverts : pour chaque vente, où en est chacun des quatre documents
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Pièce</th>
+                <th scope="col">Client</th>
+                <th scope="col">Quittance</th>
+                <th scope="col">CMC</th>
+                <th scope="col">Carte grise</th>
+                <th scope="col">Plaque</th>
+                <th scope="col">Chez qui, depuis</th>
+              </tr>
+            </thead>
+            <tbody>
+                <tr class="ligne-retard">
+                  <td data-col="Pièce"><a class="lien-ligne code" href="a6-ventes.html">PTG-2607-0031</a></td>
+                  <td data-col="Client" class="principal">Salifou Kaboré</td>
+                  <td data-col="Quittance"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="CMC"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="Carte grise"><span class="pastille pastille-retard">En retard</span></td>
+                  <td data-col="Plaque"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="Chez, depuis">Zongo Prestations · <span class="code">38 jours</span></td>
+                </tr>
+                <tr>
+                  <td data-col="Pièce"><a class="lien-ligne code" href="a6-ventes.html">PTG-2609-0042</a></td>
+                  <td data-col="Client" class="principal">Rasmané Nikiéma</td>
+                  <td data-col="Quittance"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="CMC"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="Carte grise"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="Plaque"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="Chez, depuis">aucun</td>
+                </tr>
+                <tr>
+                  <td data-col="Pièce"><a class="lien-ligne code" href="a6-ventes.html">PTG-2608-0224</a></td>
+                  <td data-col="Client" class="principal">Aminata Ouédraogo</td>
+                  <td data-col="Quittance"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="CMC"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="Carte grise"><span class="pastille pastille-transit">Chez le prestataire</span></td>
+                  <td data-col="Plaque"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="Chez, depuis">Zongo Prestations · <span class="code">12 jours</span></td>
+                </tr>
+                <tr>
+                  <td data-col="Pièce"><a class="lien-ligne code" href="a6-ventes.html">PTG-2608-0219</a></td>
+                  <td data-col="Client" class="principal">Boukary Sawadogo</td>
+                  <td data-col="Quittance"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="CMC"><span class="pastille pastille-transit">Chez le prestataire</span></td>
+                  <td data-col="Carte grise"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="Plaque"><span class="pastille pastille-neutre">À faire</span></td>
+                  <td data-col="Chez, depuis">Nikiéma Services · <span class="code">6 jours</span></td>
+                </tr>
+                <tr>
+                  <td data-col="Pièce"><a class="lien-ligne code" href="a6-ventes.html">PTG-2608-0210</a></td>
+                  <td data-col="Client" class="principal">Mariam Zongo</td>
+                  <td data-col="Quittance"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="CMC"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="Carte grise"><span class="pastille pastille-solde">Revenu au magasin</span></td>
+                  <td data-col="Plaque"><span class="pastille pastille-transit">Chez le prestataire</span></td>
+                  <td data-col="Chez, depuis">Nikiéma Services · <span class="code">9 jours</span></td>
+                </tr>
+                <tr>
+                  <td data-col="Pièce"><a class="lien-ligne code" href="a6-ventes.html">PTG-2606-0018</a></td>
+                  <td data-col="Client" class="principal">Ousséni Bado</td>
+                  <td data-col="Quittance"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="CMC"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="Carte grise"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="Plaque"><span class="pastille pastille-solde">Revenu au magasin</span></td>
+                  <td data-col="Chez, depuis"><span class="muet">au magasin</span></td>
+                </tr>
+                <tr>
+                  <td data-col="Pièce"><a class="lien-ligne code" href="a6-ventes.html">PTG-2605-0012</a></td>
+                  <td data-col="Client" class="principal">Fatimata Sana</td>
+                  <td data-col="Quittance"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="CMC"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="Carte grise"><span class="pastille pastille-solde">Remis au client</span></td>
+                  <td data-col="Plaque"><span class="pastille pastille-neutre">Sans objet</span></td>
+                  <td data-col="Chez, depuis"><span class="muet">au magasin</span></td>
+                </tr>
+            </tbody>
+          </table>
+          </div>
+        </div>
+
+        <!-- Le relais d'un document : les quatre étapes du parcours physique
+             d'un papier entre le magasin et le prestataire. L'ordre porte une
+             information vraie — c'est ce qui autorise une suite numérotée. -->
+        <section class="bloc" style="margin-top:var(--e7)">
+          <div class="bloc-tete">
+            <h2>Carte grise de <span class="code">PTG-2607-0031</span></h2>
+            <span class="pastille pastille-retard" data-etat-dossier>En retard de 17 jours</span>
+          </div>
+          <div class="cadre" style="padding:var(--e5)">
+            <ol class="relais" id="relais-carte-grise">
+              <li data-etape="fait"><span class="relais-rang">1</span>
+                <span class="relais-nom">À faire</span>
+                <span class="relais-quand">créé le 12/07/26</span></li>
+              <li data-etape="cours"><span class="relais-rang">2</span>
+                <span class="relais-nom">Chez le prestataire</span>
+                <span class="relais-quand">Zongo Prestations, déposé le 29/07/26</span></li>
+              <li data-etape="attente"><span class="relais-rang">3</span>
+                <span class="relais-nom">Revenu au magasin</span>
+                <span class="relais-quand">attendu</span></li>
+              <li data-etape="attente"><span class="relais-rang">4</span>
+                <span class="relais-nom">Remis au client</span>
+                <span class="relais-quand">—</span></li>
+            </ol>
+            <div class="barre-boutons">
+              <button class="btn btn-principal" type="button"
+                      data-avancer="#relais-carte-grise"
+                      data-quand="revenu aujourd’hui">Arrivé au magasin</button>
+              <button class="btn" type="button" data-suite aria-disabled="true"
+                      data-avancer="#relais-carte-grise"
+                      data-quand="remis aujourd’hui">Remettre au client</button>
+              <button class="btn btn-discret" type="button">Déposer chez un prestataire</button>
+              <button class="btn btn-discret" type="button">Non concerné par cette vente</button>
+            </div>
+            <p class="aide" style="margin-top:var(--e3)">
+              « Remettre au client » attend que le document soit revenu au magasin.
+            </p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- La palette de commandes : Ctrl K, ou « / ». Sur un poste utilisé huit
+     heures par jour, c'est ce qui sépare un outil d'un formulaire. -->
+<div id="palette" class="voile" data-panneau data-piege hidden>
+  <div class="palette-boite" role="dialog" aria-modal="true" aria-label="Chercher">
+    <div class="palette-champ">
+      <span data-icone="chercher" class="muet"></span>
+      <label class="sr" for="palette-q">Chercher une moto, une vente ou un client</label>
+      <input id="palette-q" type="search" value="hao">
+      <button class="btn btn-discret" type="button" data-ferme>Échap</button>
+    </div>
+    <ul class="palette-liste">
+      <li><a href="#"><span data-icone="moto"></span>
+        <span><strong>Haojue HJ 150-9A</strong> · <span class="code">LC6PCJL57M0043118</span></span>
+        <span class="pastille pastille-transit">Réservée</span></a></li>
+      <li><a href="#"><span data-icone="moto"></span>
+        <span><strong>Haojue HJ 125-11</strong> · <span class="code">LC6PCJL51M0042980</span></span>
+        <span class="pastille pastille-neutre">Vendue</span></a></li>
+      <li><a href="a6-ventes.html"><span data-icone="vente"></span>
+        <span>Vente <span class="code">PTG-2608-0231</span> · Haojue HJ 125-11 · Salifou Kaboré</span></a></li>
+    </ul>
+    <p class="palette-pied aide">
+      <kbd class="touche">↑</kbd> <kbd class="touche">↓</kbd> pour parcourir ·
+      <kbd class="touche">Entrée</kbd> pour ouvrir ·
+      <kbd class="touche">Échap</kbd> pour fermer
+    </p>
+  </div>
+</div>
+
+<div id="mon-nom" class="voile" data-panneau data-piege hidden>
+  <div class="palette-boite" role="dialog" aria-modal="true" aria-labelledby="titre-mon-nom">
+    <form class="dialogue" action="#" method="post">
+      <h2 id="titre-mon-nom">Mon nom affiché</h2>
+      <p class="aide">C’est ce nom qui s’imprime au bas des reçus que vous remettez,
+         à la ligne « Le gérant ». Sans lui, l’application imprime votre adresse
+         e-mail — ce qu’un client n’a pas à lire.</p>
+      <div class="champ">
+        <label for="nom-affiche">Nom affiché</label>
+        <input id="nom-affiche" type="text" value="Ousmane Sawadogo" autocomplete="name">
+        <p class="champ-aide">Nom et prénom, tels que vous voulez les voir sur le papier.</p>
+      </div>
+      <div class="dialogue-pied">
+        <button class="btn" type="button" data-ferme>Annuler</button>
+        <button class="btn btn-principal" type="submit">Enregistrer le nom</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Ce qui change sans que la page change : un lecteur d'écran doit l'entendre.
+     Une animation ne remplace jamais une annonce. -->
+<p id="annonce" role="status" aria-live="polite" class="sr"></p>
+
+<script src="coquille.js"></script>
+</body>
+</html>

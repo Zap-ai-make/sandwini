@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hors ligne — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+</head>
+<body>
+
+<!-- Le seul endroit où le dégradé du monogramme sort du logo. -->
+<div class="coquille-filet" aria-hidden="true"></div>
+<a class="sr" href="#travail">Aller au contenu</a>
+
+<div class="appli">
+
+<nav class="rail" aria-label="Espaces">
+  <a class="rail-marque" href="index.html" aria-label="SDI — retour à la galerie">
+    <img src="../design/marque/monogramme-se.svg" alt="">
+  </a>
+  <a class="rail-lien" href="a3-accueil-gerant.html"><span data-icone="accueil"></span><span>Accueil</span></a>
+  <a class="rail-lien" href="a4-stock-motos.html" aria-current="page"><span data-icone="moto"></span><span>Motos</span></a>
+  <a class="rail-lien" href="c1-pieces.html"><span data-icone="piece"></span><span>Pièces</span></a>
+  <a class="rail-lien" href="c2-caisse.html"><span data-icone="caisse"></span><span>Caisse</span></a>
+  <a class="rail-lien" href="a9-reglages.html"><span data-icone="reglages"></span><span>Réglages</span></a>
+  <div class="rail-pied">
+    <button class="rail-lien" type="button" data-bascule-theme aria-pressed="false"><span data-icone="soleil"></span><span data-bascule-texte>Thème clair</span></button>
+    <a class="rail-lien" href="a1-connexion.html"><span data-icone="sortir"></span><span>Se déconnecter</span></a>
+  </div>
+</nav>
+
+<nav class="colonne" id="colonne-ecrans" aria-label="Navigation principale">
+  <p class="colonne-espace"><span>Motos</span></p>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Vendre</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="a5-nouvelle-vente.html" aria-current="page"><span data-icone="plus"></span><span>Nouvelle vente</span></a></li>
+      <li><a class="colonne-lien" href="#"><span data-icone="camion"></span><span>Faire entrer une moto</span></a></li>
+    </ul>
+  </div>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Suivre</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="a4-stock-motos.html"><span data-icone="stock"></span><span>Stock motos</span></a></li>
+      <li><a class="colonne-lien" href="a6-ventes.html"><span data-icone="vente"></span><span>Ventes</span></a></li>
+      <li><a class="colonne-lien" href="a8-paiements.html"><span data-icone="paiement"></span><span>Paiements</span><span class="colonne-compte">12<span class="sr"> à traiter</span></span></a></li>
+      <li><a class="colonne-lien" href="a7-dossiers.html"><span data-icone="dossier"></span><span>Dossiers</span><span class="colonne-compte">7<span class="sr"> à traiter</span></span></a></li>
+      <li><a class="colonne-lien" href="#"><span data-icone="imprimer"></span><span>Reçus</span></a></li>
+    </ul>
+  </div>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Le fichier</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="#"><span data-icone="client"></span><span>Clients</span></a></li>
+    </ul>
+  </div>
+  <button class="colonne-pied" type="button" data-ouvre="mon-nom" id="btn-mon-nom">
+    <span data-icone="utilisateur"></span>
+    <span><span class="colonne-pied-nom">Ousmane Sawadogo</span><br>Gérant · Pouytenga</span>
+  </button>
+</nav>
+
+  <div class="travail">
+<header class="banniere" role="banner" data-reseau="hors-ligne">
+  <button class="plier" type="button" data-plier aria-expanded="true"
+          aria-controls="colonne-ecrans" title="Replier la navigation (Ctrl B)">
+    <span data-icone="plier"></span>
+    <span class="sr" data-plier-texte>Replier la navigation</span>
+  </button>
+  <span class="plaque">PTG</span>
+  <span class="banniere-nom" id="nom-boutique">Pouytenga</span>
+  <span class="banniere-espace"></span>
+  <button class="recherche" type="button" data-ouvre="palette" id="btn-recherche">
+    <span data-icone="chercher"></span>
+    <span>Chercher une moto, une vente, un client…</span>
+    <kbd class="touche">Ctrl K</kbd>
+  </button>
+  <span class="etat" role="status" data-etat="hors-ligne"><span data-icone="horsligne"></span>Hors ligne · 3 saisies en attente</span>
+</header>
+    <main class="page" id="travail" tabindex="-1">
+      
+      <div class="page-large">
+        <div class="tete">
+          <div class="tete-texte">
+            <p class="sur-titre">Motos · Pouytenga</p>
+            <h1>Nouvelle vente</h1>
+          </div>
+        </div>
+
+        <div class="avis avis-plaque" role="status" style="margin-bottom:var(--e5)">
+          <span data-icone="horsligne"></span>
+          <div>
+            <h2>Hors ligne — vous pouvez continuer</h2>
+            <p>Trois saisies attendent déjà sur cet ordinateur. Celle-ci s’ajoutera
+               à la file et partira seule dès le retour du réseau. Le numéro de la
+               pièce est attribué ici, pas sur le serveur.</p>
+          </div>
+        </div>
+
+        <form class="avec-recap" action="#" method="post">
+          <div class="formulaire">
+            <fieldset>
+              <legend>Le client</legend>
+              <div class="champ">
+                <label for="client3">Chercher un client</label>
+                <input id="client3" type="search" value="Salamata Kaboré">
+                <p class="champ-aide">Le fichier client est sur cet ordinateur :
+                   la recherche fonctionne sans réseau.</p>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>La moto</legend>
+              <div class="champ">
+                <label for="chassis3">Numéro de châssis</label>
+                <input class="code" id="chassis3" type="search" value="LRPKGKL07N0770845">
+              </div>
+              <div class="choisi">
+                <span data-icone="moto" class="muet"></span>
+                <div>
+                  <p class="principal">Rato RT 125 · Orange · 2025</p>
+                  <p class="aide"><span class="code">LRPKGKL07N0770845</span> · Neuve</p>
+                </div>
+                <button class="btn btn-discret" type="button">Changer</button>
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend>Les papiers de la moto</legend>
+              <!-- Le seul geste de cet écran qui exige vraiment le réseau. Il le
+                   dit AVANT, pas après l'échec : c'est le modèle de
+                   components/PapiersMoto.tsx. -->
+              <div class="avis" role="note">
+                <span data-icone="info"></span>
+                <div>
+                  <h3>L’envoi d’un scan attend le réseau</h3>
+                  <p>Vous pouvez enregistrer la vente maintenant. La photo de la
+                     quittance s’enverra plus tard, depuis la fiche de la moto.</p>
+                </div>
+              </div>
+              <p style="margin-top:var(--e3)">
+                <button class="btn" type="button" aria-disabled="true">
+                  <span data-icone="prestataire"></span>Envoyer un scan</button>
+                <span class="aide"> — indisponible hors ligne</span>
+              </p>
+            </fieldset>
+          </div>
+
+          <aside class="recap-carte" aria-label="Ce qui attend sur cet ordinateur">
+            <h2>En attente d’envoi</h2>
+            <ul class="attente">
+              <li><span data-icone="vente"></span>
+                <span>Vente <span class="code">PTG-2609-0042</span></span>
+                <span class="aide">14:48</span></li>
+              <li><span data-icone="paiement"></span>
+                <span>Versement <span class="montant">150 000 FCFA</span></span>
+                <span class="aide">15:12</span></li>
+              <li><span data-icone="camion"></span>
+                <span>Entrée en stock · Sanili SL 125</span>
+                <span class="aide">11:30</span></li>
+            </ul>
+            <p class="aide" style="margin-top:var(--e3)">
+              Rien n’est perdu : ces trois écritures sont sur cet ordinateur et
+              partiront dans l’ordre.</p>
+          </aside>
+
+          <div class="barre-action">
+            <p class="recap"><span class="muet">Enregistré sur cet ordinateur</span></p>
+            <span class="pousse"></span>
+            <button class="btn" type="button">Annuler</button>
+            <button class="btn btn-principal" type="submit">Enregistrer la vente</button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- La palette de commandes : Ctrl K, ou « / ». Sur un poste utilisé huit
+     heures par jour, c'est ce qui sépare un outil d'un formulaire. -->
+<div id="palette" class="voile" data-panneau data-piege hidden>
+  <div class="palette-boite" role="dialog" aria-modal="true" aria-label="Chercher">
+    <div class="palette-champ">
+      <span data-icone="chercher" class="muet"></span>
+      <label class="sr" for="palette-q">Chercher une moto, une vente ou un client</label>
+      <input id="palette-q" type="search" value="hao">
+      <button class="btn btn-discret" type="button" data-ferme>Échap</button>
+    </div>
+    <ul class="palette-liste">
+      <li><a href="#"><span data-icone="moto"></span>
+        <span><strong>Haojue HJ 150-9A</strong> · <span class="code">LC6PCJL57M0043118</span></span>
+        <span class="pastille pastille-transit">Réservée</span></a></li>
+      <li><a href="#"><span data-icone="moto"></span>
+        <span><strong>Haojue HJ 125-11</strong> · <span class="code">LC6PCJL51M0042980</span></span>
+        <span class="pastille pastille-neutre">Vendue</span></a></li>
+      <li><a href="a6-ventes.html"><span data-icone="vente"></span>
+        <span>Vente <span class="code">PTG-2608-0231</span> · Haojue HJ 125-11 · Salifou Kaboré</span></a></li>
+    </ul>
+    <p class="palette-pied aide">
+      <kbd class="touche">↑</kbd> <kbd class="touche">↓</kbd> pour parcourir ·
+      <kbd class="touche">Entrée</kbd> pour ouvrir ·
+      <kbd class="touche">Échap</kbd> pour fermer
+    </p>
+  </div>
+</div>
+
+<div id="mon-nom" class="voile" data-panneau data-piege hidden>
+  <div class="palette-boite" role="dialog" aria-modal="true" aria-labelledby="titre-mon-nom">
+    <form class="dialogue" action="#" method="post">
+      <h2 id="titre-mon-nom">Mon nom affiché</h2>
+      <p class="aide">C’est ce nom qui s’imprime au bas des reçus que vous remettez,
+         à la ligne « Le gérant ». Sans lui, l’application imprime votre adresse
+         e-mail — ce qu’un client n’a pas à lire.</p>
+      <div class="champ">
+        <label for="nom-affiche">Nom affiché</label>
+        <input id="nom-affiche" type="text" value="Ousmane Sawadogo" autocomplete="name">
+        <p class="champ-aide">Nom et prénom, tels que vous voulez les voir sur le papier.</p>
+      </div>
+      <div class="dialogue-pied">
+        <button class="btn" type="button" data-ferme>Annuler</button>
+        <button class="btn btn-principal" type="submit">Enregistrer le nom</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Ce qui change sans que la page change : un lecteur d'écran doit l'entendre.
+     Une animation ne remplace jamais une annonce. -->
+<p id="annonce" role="status" aria-live="polite" class="sr"></p>
+
+<script src="coquille.js"></script>
+</body>
+</html>
