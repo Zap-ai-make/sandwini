@@ -1574,3 +1574,44 @@ contrat de test (`CAHIER-UI.md` §12).
 marquées « à confirmer » dans l'écran des réglages et dans la galerie. **Elles ne partent
 pas en production telles quelles** — un numéro fiscal faux sur un reçu est un problème
 juridique, pas un détail d'affichage.
+
+---
+
+## D72 — Pas de bibliothèque de composants : `<dialog>` suffit
+
+*S28, commit de la coquille. `CAHIER-UI.md` §13 autorisait shadcn/ui sous trois
+conditions et demandait que la décision soit consignée — elle l'est ici, y
+compris parce qu'elle est négative.*
+
+Le cahier de la refonte avait raison de poser la question : un logiciel de
+bureau a besoin de menus, de dialogues et d'une palette de commandes
+**réellement accessibles**, et les écrire à la main est le mauvais calcul
+classique — pièges de focus, ARIA, navigation clavier, retour du focus au
+déclencheur.
+
+**Ce que le chantier a réellement demandé.** Un seul composant de ce genre : la
+palette de commandes. Pas de menu déroulant, pas d'onglets, pas de tiroir — la
+coquille est une grille CSS, et le sélecteur de périmètre est un `<select>`
+natif depuis S3.
+
+**Ce que `<dialog>` donne gratuitement**, avec `showModal()` : le piège de
+focus, la fermeture par Échap, le fond inerte, le retour du focus au bouton qui
+l'a ouvert, et le placement dans la couche supérieure sans `z-index` à
+arbitrer. C'est-à-dire l'intégralité de ce pour quoi on aurait installé Radix.
+
+**La décision.** Aucune bibliothèque de composants. `ARCHITECTURE.md` §1 :
+le meilleur code est celui qu'on n'écrit pas — et une dépendance qu'on n'ajoute
+pas est aussi une dépendance qu'on ne suit pas, qu'on ne met pas à jour, et dont
+l'identité visuelle ne vient pas contaminer la nôtre.
+
+**Ce qui ferait rouvrir la question**, et il faut le dire pour que la décision
+ne se pétrifie pas : un menu contextuel à navigation clavier (les flèches dans
+un `role="menu"`), une liste déroulante avec recherche, ou un tiroir redimensionnable.
+Aucun n'est au programme de S29. Le jour où l'un le devient, on installe les
+composants concernés — pas le catalogue — et on les réhabille avec les jetons du
+projet.
+
+**Une réserve honnête.** `<dialog>` demande `showModal()` en JavaScript : sans
+lui, la palette ne s'ouvre pas. Ce n'est pas une régression d'accessibilité —
+elle double la navigation, elle ne la remplace pas : tout ce qu'elle atteint est
+dans la colonne de gauche, en HTML, sans script.

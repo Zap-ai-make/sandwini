@@ -28,6 +28,7 @@ import {
   ESPACES,
   INTENTIONS,
   LIBELLE_INTENTION,
+  ecranCourant,
   ecransVisibles,
   espaceDuChemin,
   espacesVisibles,
@@ -76,10 +77,6 @@ const ICONE_ECRAN: Record<string, Icone> = {
   "/parametres/prestataires": HardHat,
   "/diagnostic": RefreshCw,
 };
-
-function estActive(chemin: string, href: string): boolean {
-  return chemin === href || chemin.startsWith(`${href}/`);
-}
 
 /**
  * La navigation principale — un rail d'espaces, et la colonne des écrans de
@@ -187,6 +184,7 @@ function Colonne({
   role: Parameters<typeof ecransVisibles>[1];
 }) {
   const ecrans = ecransVisibles(espace, role);
+  const courant = ecranCourant(espace, role, chemin);
   const repliee = useRepli();
 
   return (
@@ -222,7 +220,7 @@ function Colonne({
             <ul>
               {groupe.map(({ href, libelle }) => {
                 const Icone = ICONE_ECRAN[href] ?? Activity;
-                const active = estActive(chemin, href);
+                const active = href === courant;
                 return (
                   <li key={href}>
                     <Link

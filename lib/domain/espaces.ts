@@ -228,6 +228,26 @@ export function espaceDuChemin(chemin: string, ouverts: readonly Espace[]): Espa
   return null;
 }
 
+/**
+ * L'écran de la colonne que ce chemin désigne — un seul, jamais deux.
+ *
+ * Marquer « actif » toute entrée dont le lien est un préfixe du chemin en
+ * allumait deux à la fois : `/motos/dossiers` commence par `/motos`, donc
+ * « Stock motos » se croyait courante en même temps que « Dossiers en attente ».
+ * Un repère qui désigne deux écrans ne désigne plus rien. On garde donc le lien
+ * le plus long qui corresponde — la même règle que pour l'espace, et pour la
+ * même raison.
+ */
+export function ecranCourant(espace: Espace, role: Role, chemin: string): string | null {
+  let trouve: string | null = null;
+  for (const { href } of ecransVisibles(espace, role)) {
+    if (sousChemin(chemin, href) && (trouve === null || href.length > trouve.length)) {
+      trouve = href;
+    }
+  }
+  return trouve;
+}
+
 function sousChemin(chemin: string, href: string): boolean {
   return chemin === href || chemin.startsWith(`${href}/`);
 }

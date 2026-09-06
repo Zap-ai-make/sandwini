@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   accedeEspace,
   accueilDuRole,
+  ecranCourant,
   ecransVisibles,
   espaceDuChemin,
   espacesVisibles,
@@ -144,5 +145,29 @@ describe("le second niveau de navigation", () => {
       "supervision",
     );
     expect(espaceDuChemin("/supervision", espacesVisibles("gerant", ["motos"]))).toBeNull();
+  });
+});
+
+describe("ecranCourant", () => {
+  /* Deux entrées allumées, c'est zéro repère : `/motos/dossiers` commence par
+     `/motos`, et « Stock motos » se croyait courante en même temps que
+     « Dossiers en attente ». Vu sur une capture, pas déduit. */
+  it("n’allume qu’une entrée, la plus précise", () => {
+    expect(ecranCourant("motos", "gerant", "/motos/dossiers")).toBe("/motos/dossiers");
+    expect(ecranCourant("motos", "gerant", "/motos")).toBe("/motos");
+    expect(ecranCourant("motos", "gerant", "/motos/ventes/nouvelle")).toBe(
+      "/motos/ventes/nouvelle",
+    );
+  });
+
+  it("n’allume rien quand le chemin ne fait partie d’aucun écran de l’espace", () => {
+    expect(ecranCourant("motos", "gerant", "/parametres/boutiques")).toBeNull();
+  });
+
+  it("n’allume pas un écran que la personne ne peut pas ouvrir", () => {
+    expect(ecranCourant("reglages", "gerant", "/parametres/utilisateurs")).toBeNull();
+    expect(ecranCourant("reglages", "responsable", "/parametres/utilisateurs")).toBe(
+      "/parametres/utilisateurs",
+    );
   });
 });
