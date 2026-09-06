@@ -27,8 +27,17 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       qui dit la situation, une phrase qui dit quoi tenter, et un ton qui dit de quelle nature
       elle est — rouge pour ce qui est refusé, bleu de la goutte pour le compte qui attend son
       rôle, jaune de plaque pour le réseau absent (D70). Le patron `Avis` naît ici.
-- [ ] **A2 Supervision** — le choix du périmètre d'abord, l'état réel ensuite. **Aucune
-      carte de chiffre à zéro** tant que S24 n'existe pas (D63).
+- [x] **A2 Supervision** — le choix du périmètre d'abord, en cartes qu'on balaie d'un
+      regard ; « ce qui demande une décision » ensuite, en lignes nommées et ouvrables.
+      **Aucune carte de chiffre à zéro** (D63) : quand rien n'attend, l'écran l'écrit en
+      toutes lettres plutôt que d'afficher « 0 ». La maquette portait une troisième sorte de
+      retard, « crédit échu » : elle n'a pas été construite, parce qu'une vente à crédit n'a
+      pas de date d'échéance dans ce produit et qu'en fixer une au bout de N jours serait
+      inventer une règle de gestion qui revient au responsable.
+      **Reste à photographier** : la section peuplée. Il faut pour cela un dossier déposé chez
+      un prestataire avec une date dépassée — c'est-à-dire le chemin d'écriture cassé décrit
+      plus bas. Le rendu vide et le rendu en attente ont été vus ; les lignes reposent sur
+      `dossiersEnAttente` et `estInactive`, deux fonctions pures déjà couvertes par des tests.
 - [ ] **A3 Accueil gérant** — l'action du jour atteignable en un clic.
 - [ ] **A4 Stock motos** — tableau pleine largeur, en-têtes collés, filtres persistants,
       comptage des résultats, « Faire entrer une moto » comme action principale. **C'est ici
