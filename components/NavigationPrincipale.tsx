@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useSyncExternalStore, type ComponentType } from "react";
 import { ICONE_ECRAN } from "@/components/icones-ecrans";
+import { Monogramme } from "@/components/Monogramme";
 import { useSession } from "@/lib/auth/session";
 import {
   ESPACES,
@@ -120,17 +121,7 @@ function Marque() {
       className="mb-3 block w-10 text-coquille-encre max-md:hidden"
       title="Sandwidi et Frères"
     >
-      <svg viewBox="0 0 546 402" className="block w-full">
-        <path
-          fill="currentColor"
-          fillOpacity="0.55"
-          d="M6 126C3 160 4 210 20 246C36 285 75 315 151 334C190 331 221 314 221 286C200 258 130 236 60 212C30 196 12 162 6 126Z"
-        />
-        <path
-          fill="currentColor"
-          d="M204 4H540C540 44 518 74 467 94L387 98V156H514C514 192 492 228 451 242L387 246V304L468 308C512 318 538 344 540 391V396H219C270 374 303 330 307 276C307 248 293 228 273 206C240 186 185 166 128 152C105 142 96 124 96 106C96 84 130 74 165 78C195 82 220 96 246 114L250 119L253 113L293 57C265 38 235 20 204 4Z"
-        />
-      </svg>
+      <Monogramme className="block w-full" />
     </span>
   );
 }

@@ -5,6 +5,7 @@ import type { Boutique } from "@/lib/domain/boutique";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_TYPE_RECU, type ContenuRecu } from "@/lib/domain/recu";
 import { LIBELLE_MODE, LIBELLE_MOYEN } from "@/lib/domain/vente";
+import { Monogramme } from "@/components/Monogramme";
 
 /**
  * Le reçu tel qu'il sort de l'imprimante (`prompt.md` §10).
@@ -65,7 +66,7 @@ export function Recu({
     >
       <header className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <Monogramme />
+          <Monogramme className="mt-0.5 h-8 w-auto shrink-0 text-encre" />
           <div className="min-w-0">
             <p className="font-display text-lg leading-tight font-bold tracking-tight">
               {IDENTITE.raisonSociale}
@@ -233,22 +234,3 @@ function Signature({ titre }: { titre: string }) {
  * qui annoncerait la raison sociale deux fois ne rendrait service à
  * personne.
  */
-function Monogramme() {
-  return (
-    <svg
-      viewBox="0 0 546 402"
-      aria-hidden="true"
-      className="mt-0.5 h-8 w-auto shrink-0 text-encre"
-    >
-      <path
-        fill="currentColor"
-        fillOpacity="0.55"
-        d="M6 126C3 160 4 210 20 246C36 285 75 315 151 334C190 331 221 314 221 286C200 258 130 236 60 212C30 196 12 162 6 126Z"
-      />
-      <path
-        fill="currentColor"
-        d="M204 4H540C540 44 518 74 467 94L387 98V156H514C514 192 492 228 451 242L387 246V304L468 308C512 318 538 344 540 391V396H219C270 374 303 330 307 276C307 248 293 228 273 206C240 186 185 166 128 152C105 142 96 124 96 106C96 84 130 74 165 78C195 82 220 96 246 114L250 119L253 113L293 57C265 38 235 20 204 4Z"
-      />
-    </svg>
-  );
-}

@@ -21,8 +21,12 @@ n'a plus besoin qu'on lui explique quoi faire en ouvrant un écran.
 
 Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI.md` §9 :
 
-- [ ] **A1 Connexion** — et ses trois refus distincts : identifiants faux, compte sans rôle,
+- [x] **A1 Connexion** — et ses trois refus distincts : identifiants faux, compte sans rôle,
       réseau absent. Un mot de passe faux ne dit jamais « pas de réseau » (leçon du projet).
+      Chaque refus est désormais **nommé puis expliqué** au lieu d'une ligne rouge : un titre
+      qui dit la situation, une phrase qui dit quoi tenter, et un ton qui dit de quelle nature
+      elle est — rouge pour ce qui est refusé, bleu de la goutte pour le compte qui attend son
+      rôle, jaune de plaque pour le réseau absent (D70). Le patron `Avis` naît ici.
 - [ ] **A2 Supervision** — le choix du périmètre d'abord, l'état réel ensuite. **Aucune
       carte de chiffre à zéro** tant que S24 n'existe pas (D63).
 - [ ] **A3 Accueil gérant** — l'action du jour atteignable en un clic.

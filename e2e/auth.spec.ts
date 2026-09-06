@@ -30,12 +30,16 @@ test.describe("accès", () => {
 
   test("un mot de passe faux ne dit pas si le compte existe", async ({ page }) => {
     await seConnecter(page, RESPONSABLE.email, MOT_DE_PASSE_FAUX);
-    await expect(messageErreur(page)).toHaveText("Adresse e-mail ou mot de passe incorrect.");
+    await expect(messageErreur(page)).toContainText("Adresse e-mail ou mot de passe incorrect");
+    const surCompteConnu = await messageErreur(page).textContent();
 
     // Exactement le même message pour une adresse inconnue : sinon le
-    // formulaire devient un annuaire des comptes existants.
+    // formulaire devient un annuaire des comptes existants. On compare les deux
+    // textes plutôt que d'en écrire un en dur — c'est l'égalité qui protège,
+    // pas la formulation, et elle doit survivre à une reformulation.
     await seConnecter(page, "personne@sdi.test", MOT_DE_PASSE_FAUX);
-    await expect(messageErreur(page)).toHaveText("Adresse e-mail ou mot de passe incorrect.");
+    await expect(messageErreur(page)).toContainText("Adresse e-mail ou mot de passe incorrect");
+    expect(await messageErreur(page).textContent()).toBe(surCompteConnu);
   });
 
   test("le responsable se connecte et arrive sur sa supervision", async ({ page }) => {
