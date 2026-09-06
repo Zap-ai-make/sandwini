@@ -427,6 +427,156 @@
     }
   }
 
+  /* ==========================================================================
+     LES SURFACES ET LES BOUTONS
+
+     Ces classes-là ne sont pas des composants : elles n'ont ni structure ni
+     comportement, seulement une apparence, et l'élément qui les porte change
+     d'un endroit à l'autre — `ul`, `dl`, `div`, `section`. Un composant aurait
+     demandé un `as` générique pour ne rendre qu'une chaîne de classes :
+     `ARCHITECTURE.md` §1, échelle 5, « la version juste ».
+
+     Le compte qui justifie leur existence : le cadre était recopié cent fois,
+     le bouton de plaque quarante-cinq. Ce qui a une structure — les états, la
+     tête d'écran, le champ, le hub — est un composant, dans `patrons/`.
+     ========================================================================== */
+
+  /* La feuille : ce sur quoi on écrit, posé sur le fond. */
+  .cadre {
+    border: 1px solid var(--color-bord);
+    border-radius: var(--radius-champ);
+    background: var(--color-papier);
+  }
+
+  /* Le cadre qui porte une liste : les filets entre les lignes viennent avec,
+     et les coins rognent ce qui dépasse — le survol d'une ligne, sinon, déborde
+     de l'arrondi. Le rognage s'arrête là : sur une carte de formulaire il
+     couperait le halo de focus des champs qu'elle contient (`DESIGN.md` §11). */
+  .cadre-liste {
+    overflow: hidden;
+  }
+
+  .cadre-liste > * + * {
+    border-top: 1px solid var(--color-bord);
+  }
+
+  /* L'encadré pointillé : ce qui n'est pas encore là. Le trait interrompu dit
+     « place réservée » sans le mot, et il ne se confond avec aucune surface. */
+  .encadre-vide {
+    border: 1px dashed var(--color-bord);
+    border-radius: var(--radius-champ);
+    padding: 1rem;
+  }
+
+  /* La saisie.
+
+     La bordure prend `--color-bord-fort` et non `--color-bord` : le filet des
+     séparations est à 1,3:1 sur le papier, ce qui est invisible dès qu'il y a
+     du soleil sur l'écran. Le bord d'un champ doit se voir — c'est le contour
+     de la zone où l'on écrit, pas une décoration (`DESIGN.md` §11, 3:1 pour
+     un élément d'interface). Le jeton existait déjà et portait ce calcul dans
+     son commentaire ; il n'était employé nulle part.
+
+     La hauteur reste celle d'aujourd'hui (48 px, la cible tactile). Les
+     maquettes descendent à 38 px pour la densité bureau : c'est une reprise
+     de chaque formulaire, donc S29, pas ici. */
+  .saisie {
+    height: 3rem;
+    width: 100%;
+    /* Un champ ne gagne rien à dépasser 32 rem, et il y perd : l'œil ne
+       retrouve plus le début de la ligne. La borne est ici, sur le champ, et
+       pas sur la colonne — la zone de travail n'est plus bornée à 768 px
+       depuis la refonte de la coquille, et sans cette limite un champ « Nom »
+       s'étirait sur 950 px. Vu sur la capture de `/parametres/prestataires`.
+
+       Ce n'est pas la réponse complète : les écrans de formulaire ont besoin
+       que leur colonne entière soit tenue, pas seulement leurs champs. C'est
+       le travail d'A5 et d'A9 dans S29, et c'est noté là-bas. */
+    max-width: 32rem;
+    padding-inline: 0.75rem;
+    border: 1px solid var(--color-bord-fort);
+    border-radius: var(--radius-champ);
+    background: var(--color-papier);
+    color: var(--color-encre);
+  }
+
+  /* Une zone de texte grandit avec son contenu : la hauteur fixe du champ n'a
+     pas de sens ici, et le texte doit respirer du haut. */
+  textarea.saisie {
+    height: auto;
+    padding-block: 0.5rem;
+  }
+
+  .saisie[aria-invalid="true"] {
+    border-color: var(--color-alerte);
+    border-width: 2px;
+  }
+
+  /* --------------------------------------------------------------------------
+     Les boutons.
+
+     Quatre tons, et pas un de plus : la plaque pour le geste principal de
+     l'écran, le neutre pour les autres, le discret pour ce qui accompagne, le
+     destructif pour ce qui ne se rattrape pas. `h-11` (44 px) est le minimum
+     tactile de `DESIGN.md` §11 ; les gestes de comptoir gardent `h-12`.
+     -------------------------------------------------------------------------- */
+  .bouton {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    height: 3rem;
+    padding-inline: 1rem;
+    border: 1px solid transparent;
+    border-radius: var(--radius-champ);
+    font-weight: 500;
+    white-space: nowrap;
+    transition: background-color var(--duree-reponse) var(--ease-sortie);
+  }
+
+  .bouton-plaque {
+    border-color: var(--color-plaque-bord);
+    background: var(--color-plaque);
+    padding-inline: 1.25rem;
+    color: var(--color-encre-fixe);
+    font-weight: 600;
+  }
+
+  .bouton-neutre {
+    border-color: var(--color-bord);
+    background: var(--color-papier);
+    color: var(--color-encre);
+  }
+
+  .bouton-neutre:hover {
+    background: var(--color-survol);
+  }
+
+  .bouton-discret {
+    height: 2.75rem;
+    color: var(--color-encre-doux);
+  }
+
+  .bouton-discret:hover {
+    background: var(--color-survol);
+    color: var(--color-encre);
+  }
+
+  .bouton-destructif {
+    border-color: var(--color-alerte);
+    background: var(--color-papier);
+    color: var(--color-alerte);
+  }
+
+  .bouton-destructif:hover {
+    background: var(--color-alerte-surface);
+  }
+
+  .bouton:disabled,
+  .bouton[aria-disabled="true"] {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
   /* La signature du produit : le bandeau dessiné comme une plaque.
      Utilisé au repos (discret) et en alerte (jaune plein) — cf. BandeauEtat. */
   .plaque-code {

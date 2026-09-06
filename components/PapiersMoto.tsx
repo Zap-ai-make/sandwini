@@ -13,6 +13,7 @@ import {
 } from "@/lib/domain/moto";
 import { envoyerPapierMoto, lireUrlPapier } from "@/lib/repositories/motos";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
+import { EtatErreur } from "@/components/patrons/Etats";
 
 /**
  * La quittance et le CMC scannés, joints à la moto (S11, D66).
@@ -34,7 +35,7 @@ export function PapiersMoto({ moto }: { moto: Moto }) {
       <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
         Documents scannés
       </h2>
-      <ul className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+      <ul className="mt-2 cadre cadre-liste">
         {PAPIERS_MOTO.map((papier) => (
           <li key={papier} className="px-4 py-3">
             <LignePapier moto={moto} papier={papier} />
@@ -139,11 +140,7 @@ function LignePapier({ moto, papier }: { moto: Moto; papier: PapierMoto }) {
         </p>
       )}
 
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
     </>
   );
 }

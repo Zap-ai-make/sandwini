@@ -1,11 +1,12 @@
 "use client";
 
-import { LoaderCircle, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { PanneauRecu } from "@/components/PanneauRecu";
-import { useSession } from "@/lib/auth/session";
+import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { normaliserNom } from "@/lib/domain/client";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import {
@@ -111,16 +112,19 @@ function Recus() {
     [lignes, recherche, du, au],
   );
 
-  if (perimetre.type === "aucune") return <SansBoutique />;
+  if (perimetre.type === "aucune")
+    return (
+      <SansBoutique
+        titre="Reçus"
+        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : un reçu n’a pas encore d’en-tête à porter."
+      />
+    );
 
   const chargement = (ventes === null || versements === null) && !erreur && !erreurVersements;
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Reçus</h1>
-      <p className="mt-1 text-sm text-encre-doux">
-        {perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
-      </p>
+      <TetePage titre="Reçus" sousTitre={perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom} />
 
       <div className="mt-6">
         <label htmlFor="recherche-recu" className="block text-sm font-medium text-encre">
@@ -139,7 +143,7 @@ function Recus() {
             placeholder="Numéro du reçu ou nom du client"
             value={recherche}
             onChange={(evenement) => setRecherche(evenement.target.value)}
-            className="h-12 w-full rounded-plaque border border-bord bg-papier pr-3 pl-9 text-encre placeholder:text-encre-doux"
+            className="saisie pr-3 pl-9 placeholder:text-encre-doux"
           />
         </div>
       </div>
@@ -157,37 +161,30 @@ function Recus() {
               setDu("");
               setAu("");
             }}
-            className="mt-6 inline-flex h-12 items-center rounded-plaque border border-bord px-4 text-sm font-medium text-encre hover:bg-papier"
+            className="mt-6 bouton bouton-neutre"
           >
             Toutes les dates
           </button>
         )}
       </div>
 
-      {(erreur || erreurVersements) && (
-        <p role="alert" className="mt-4 text-sm text-alerte">
-          {erreur ?? erreurVersements}
-        </p>
-      )}
+      <EtatErreur message={erreur ?? erreurVersements} className="mt-4" />
 
       {chargement ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement des reçus…
-        </p>
+        <EtatChargement className="mt-6">Chargement des reçus…</EtatChargement>
       ) : lignes.length === 0 ? (
         <AucunRecu perimetreEnCours={perimetreEnCours} />
       ) : resultats.length === 0 ? (
-        <p className="mt-6 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-6">
           Aucun reçu ne correspond. Essayez le nom du client, ou élargissez les dates.
-        </p>
+        </EtatSansResultat>
       ) : (
         <>
           <p className="mt-6 text-sm text-encre-doux">
             {resultats.length === 1 ? "1 reçu" : `${resultats.length} reçus`}
             {resultats.length !== lignes.length && ` sur ${lignes.length}`}
           </p>
-          <ul className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+          <ul className="mt-2 cadre cadre-liste">
             {resultats.map((ligne) => (
               <li key={ligne.recu.cle}>
                 <LigneRecu recu={ligne.recu} nomClient={ligne.nomClient} />
@@ -221,7 +218,7 @@ function ChampDate({
         type="date"
         value={valeur}
         onChange={(evenement) => changer(evenement.target.value)}
-        className="mt-1.5 h-12 rounded-plaque border border-bord bg-papier px-3 text-encre"
+        className="saisie mt-1.5 w-auto"
       />
     </div>
   );
@@ -262,41 +259,17 @@ function LigneRecu({ recu, nomClient }: { recu: ContenuRecu; nomClient: string }
 function AucunRecu({ perimetreEnCours }: { perimetreEnCours: boolean }) {
   if (perimetreEnCours) return null;
   return (
-    <div className="mt-6 rounded-plaque border border-dashed border-bord p-4">
-      <p className="text-encre">Aucun reçu pour l’instant.</p>
-      <p className="mt-1 max-w-prose text-sm text-encre-doux">
-        Un reçu naît d’une vente : le premier apparaîtra ici dès qu’une moto sera vendue.
-      </p>
-      <Link
-        href="/motos/ventes/nouvelle"
-        className="mt-4 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-      >
-        Enregistrer une vente
-      </Link>
-    </div>
-  );
-}
-
-function SansBoutique() {
-  const session = useSession();
-  const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
-
-  return (
-    <div className="max-w-prose">
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Reçus</h1>
-      <p className="mt-3 text-encre-doux">
-        {estResponsable
-          ? "Aucune boutique n’est déclarée : un reçu n’a pas encore d’en-tête à porter."
-          : "Aucune boutique ne vous est attribuée. Vos écrans resteront vides tant que le responsable ne vous en aura pas donné une."}
-      </p>
-      {estResponsable && (
-        <Link
-          href="/parametres/boutiques"
-          className="mt-6 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
-        >
-          Créer une boutique
+    <EtatVide
+      titre="Aucun reçu pour l’instant."
+      className="mt-6"
+      action={
+        <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+          Enregistrer une vente
         </Link>
-      )}
-    </div>
+      }
+    >
+      Un reçu naît d’une vente : le premier apparaîtra ici dès qu’une moto sera vendue.
+    </EtatVide>
   );
 }
+

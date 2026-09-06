@@ -1,6 +1,6 @@
 "use client";
 
-import { LoaderCircle, Plus } from "lucide-react";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -9,6 +9,7 @@ import {
   validerNom,
   type Referentiel,
 } from "@/lib/domain/referentiel";
+import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
 
 /**
  * Une liste de référentiel : un nom, un état, rien de plus.
@@ -69,23 +70,16 @@ export function ListeReferentiel({
         actions={actions}
       />
 
-      {erreur && (
-        <p role="alert" className="mt-3 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-3" />
 
       {chargement ? (
-        <p className="mt-3 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement…
-        </p>
+        <EtatChargement className="mt-3">Chargement…</EtatChargement>
       ) : entrees.length === 0 && !erreur ? (
-        <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-3">
           Aucune entrée pour l’instant. Ajoutez celles que vous utilisez vraiment&nbsp;: {exemples}.
-        </p>
+        </EtatSansResultat>
       ) : (
-        <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-3 cadre cadre-liste">
           {entrees.map((entree) => (
             <Ligne
               key={entree.id}
@@ -155,7 +149,7 @@ function Ajout({
           maxLength={LONGUEUR_NOM_MAX}
           placeholder={exemples}
           onChange={(evenement) => setNom(evenement.target.value)}
-          className="h-12 min-w-0 flex-1 rounded-plaque border border-bord bg-papier px-3 text-encre placeholder:text-encre-doux"
+          className="saisie min-w-0 flex-1 placeholder:text-encre-doux"
         />
         <button
           type="submit"
@@ -165,9 +159,7 @@ function Ajout({
           Ajouter
         </button>
       </div>
-      <p role="alert" aria-live="assertive" className="mt-1 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-1" />
     </form>
   );
 }
@@ -235,7 +227,7 @@ function Ligne({
             value={nom}
             maxLength={LONGUEUR_NOM_MAX}
             onChange={(evenement) => setNom(evenement.target.value)}
-            className="h-11 min-w-0 flex-1 rounded-plaque border border-bord bg-papier px-3 text-encre"
+            className="saisie h-11 min-w-0 flex-1"
           />
           <button
             type="submit"
@@ -287,11 +279,7 @@ function Ligne({
         </div>
       )}
 
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
     </li>
   );
 }

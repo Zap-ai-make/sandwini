@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, type ComponentType } from "react";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import { accedeEspace, accueilDuRole, type Espace } from "@/lib/domain/espaces";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -96,16 +97,20 @@ export default function Accueil() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Accueil</h1>
-      <p className="mt-2 max-w-prose text-encre-doux">
-        Vous pouvez travailler sans réseau : vos saisies sont gardées sur l’appareil et partent
-        seules dès que la connexion revient. Le bandeau en haut dit toujours où en est l’envoi.
-      </p>
+      <TetePage
+        titre="Accueil"
+        sousTitre={
+          <>
+            Vous pouvez travailler sans réseau : vos saisies sont gardées sur l’appareil et partent
+            seules dès que la connexion revient. Le bandeau en haut dit toujours où en est l’envoi.
+          </>
+        }
+      />
 
       <InvitationBoutique />
 
       <nav aria-label="Espaces de travail" className="mt-6">
-        <ul className="divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="cadre cadre-liste">
           {espaces.map(({ href, libelle, role: sousTitre, Icone }) => (
             <li key={href}>
               <Link

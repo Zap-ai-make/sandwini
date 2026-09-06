@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  ECRANS_DE,
   accedeEspace,
   accueilDuRole,
   ecranCourant,
@@ -169,5 +170,30 @@ describe("ecranCourant", () => {
     expect(ecranCourant("reglages", "responsable", "/parametres/utilisateurs")).toBe(
       "/parametres/utilisateurs",
     );
+  });
+});
+
+/**
+ * Le hub des réglages lit `ECRANS_DE.reglages` et n'affiche que les entrées qui
+ * portent une phrase (`app/(app)/parametres/page.tsx`). Sans ce test, un écran
+ * d'administration ajouté à la colonne disparaîtrait silencieusement du hub —
+ * une seule des deux listes s'ouvrirait dessus, et la panne serait invisible
+ * jusqu'à ce que quelqu'un cherche l'écran là où il l'attend.
+ */
+describe("les écrans d’administration", () => {
+  it("expliquent tous ce qu’on y fait", () => {
+    const administration = ECRANS_DE.reglages.filter(({ capacite }) => capacite);
+    expect(administration.length).toBeGreaterThan(0);
+    for (const ecran of administration) {
+      expect(ecran.quoi, ecran.href).toBeTruthy();
+    }
+  });
+
+  /* « Synchronisation » n'est pas une administration : elle ne demande aucun
+     droit, elle décrit l'état de l'appareil. Elle vit dans la colonne et pas
+     dans le hub, et c'est voulu. */
+  it("laissent la synchronisation hors du hub", () => {
+    const diagnostic = ECRANS_DE.reglages.find(({ href }) => href === "/diagnostic");
+    expect(diagnostic?.quoi).toBeUndefined();
   });
 });

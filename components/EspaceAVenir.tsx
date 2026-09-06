@@ -48,7 +48,7 @@ export function EspaceAVenir({
       </ul>
       <Link
         href={accueilDuRole(session.utilisateur.role)}
-        className="mt-6 inline-flex h-11 items-center rounded-plaque border border-bord px-4 text-sm font-medium text-encre hover:bg-fond"
+        className="mt-6 bouton bouton-neutre"
       >
         Revenir à l’accueil
       </Link>

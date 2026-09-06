@@ -1,9 +1,11 @@
 "use client";
 
-import { ArrowLeft, LoaderCircle, TriangleAlert } from "lucide-react";
-import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { Champ } from "@/components/patrons/Champ";
+import { EtatChargement, EtatErreur, EtatErreurSaisie } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import { formaterTelephone } from "@/lib/domain/client";
 import {
@@ -55,7 +57,7 @@ function Identite() {
   const aConfirmer = new Set<string>(IDENTITE_A_CONFIRMER);
 
   return (
-    <section className="rounded-plaque border border-bord bg-papier p-4">
+    <section className="cadre p-4">
       <h2 className="font-semibold text-encre">Ce qui s’imprime en tête de chaque reçu</h2>
       <p className="mt-1 max-w-prose text-sm text-encre-doux">
         Ces informations font partie du logiciel. Elles ne se saisissent pas, et elles ne peuvent
@@ -136,18 +138,13 @@ function Reglages() {
 
   if (erreurLecture) {
     return (
-      <p role="alert" className="mt-6 text-alerte">
-        {erreurLecture}
-      </p>
+      <EtatErreur message={erreurLecture} className="mt-6" />
     );
   }
 
   if (!saisie) {
     return (
-      <p className="mt-6 flex items-center gap-3 text-encre-doux">
-        <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-        Chargement du réglage…
-      </p>
+      <EtatChargement className="mt-6">Chargement du réglage…</EtatChargement>
     );
   }
 
@@ -172,7 +169,7 @@ function Reglages() {
 
   return (
     <form onSubmit={soumettre} className="mt-6" noValidate>
-      <div className="rounded-plaque border border-bord bg-papier p-4">
+      <div className="cadre p-4">
         <h2 className="font-semibold text-encre">Tranches inactives</h2>
         <p className="mt-1 max-w-prose text-sm text-encre-doux">
           Une vente en tranches dont le client n’a rien versé depuis ce nombre de jours est
@@ -181,10 +178,7 @@ function Reglages() {
         </p>
 
         <div className="mt-4 flex flex-wrap items-end gap-3">
-          <div>
-            <label htmlFor="seuil-inactivite" className="block text-sm font-medium text-encre">
-              Signaler après
-            </label>
+          <Champ id="seuil-inactivite" libelle="Signaler après">
             <input
               id="seuil-inactivite"
               type="number"
@@ -204,26 +198,22 @@ function Reglages() {
                   seuilInactiviteTranches: brut === "" ? Number.NaN : Number(brut),
                 });
               }}
-              className="mt-1.5 h-12 w-28 rounded-plaque border border-bord bg-papier px-3 text-encre tabular-nums"
+              className="saisie w-28 tabular-nums"
+              aria-invalid={erreur ? true : undefined}
             />
-          </div>
+          </Champ>
           <span className="pb-3 text-encre-doux">jours sans versement</span>
         </div>
       </div>
 
-      <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-3" />
       {succes && (
         <p role="status" aria-live="polite" className="text-sm text-solde">
           {succes}
         </p>
       )}
 
-      <button
-        type="submit"
-        className="mt-3 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
-      >
+      <button type="submit" className="bouton bouton-plaque mt-3">
         Enregistrer le réglage
       </button>
     </form>
@@ -233,16 +223,10 @@ function Reglages() {
 function Cadre({ children }: { children: React.ReactNode }) {
   return (
     <div>
-      <Link
-        href="/parametres"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Réglages
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">
-        Identité de l’entreprise
-      </h1>
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Réglages" }}
+        titre="Identité de l’entreprise"
+      />
       <p className="mt-2 mb-6 max-w-prose text-encre-doux">
         L’en-tête de chaque reçu remis à un client, et le seul réglage qui l’accompagne.
       </p>

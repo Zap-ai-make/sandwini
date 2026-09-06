@@ -1,9 +1,11 @@
 "use client";
 
-import { ArrowLeft, CircleAlert, LoaderCircle, UserCheck, UserX } from "lucide-react";
+import { CircleAlert, LoaderCircle, UserCheck, UserX } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
 import { LIBELLE_ROLE } from "@/lib/domain/roles";
@@ -46,14 +48,10 @@ function Utilisateurs() {
 
   return (
     <div>
-      <Link
-        href="/parametres"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Réglages
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Utilisateurs</h1>
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Réglages" }}
+        titre="Utilisateurs"
+      />
 
       <FormulaireGerant boutiques={ouvertes} />
 
@@ -64,16 +62,13 @@ function Utilisateurs() {
       {erreurLecture && <p className="mt-3 text-sm text-alerte">{erreurLecture}</p>}
 
       {liste === null ? (
-        <p className="mt-3 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement des comptes…
-        </p>
+        <EtatChargement className="mt-3">Chargement des comptes…</EtatChargement>
       ) : liste.length === 0 && !erreurLecture ? (
-        <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-3">
           Aucun compte pour l’instant. Le formulaire ci-dessus crée le premier gérant.
-        </p>
+        </EtatSansResultat>
       ) : (
-        <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-3 cadre cadre-liste">
           {liste.map((utilisateur) => (
             <LigneUtilisateur
               key={utilisateur.uid}
@@ -281,11 +276,7 @@ function Rattachement({
             {succes}
           </p>
         )}
-        {erreur && (
-          <p role="alert" className="mt-1 text-sm text-alerte">
-            {erreur}
-          </p>
-        )}
+        <EtatErreur message={erreur} className="mt-1" />
       </div>
     );
   }
@@ -300,7 +291,7 @@ function Rattachement({
           id={idSelect}
           value={choix}
           onChange={(evenement) => setChoix(evenement.target.value)}
-          className="mt-1 h-11 rounded-plaque border border-bord bg-papier px-2 text-sm text-encre"
+          className="mt-1 h-11 cadre px-2 text-sm text-encre"
         >
           <option value="">Aucune</option>
           {boutiques.map((boutique) => (
@@ -339,11 +330,7 @@ function Rattachement({
         nouvelle.
       </p>
 
-      {erreur && (
-        <p role="alert" className="w-full text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="w-full" />
     </div>
   );
 }
@@ -386,7 +373,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
   return (
     <form
       onSubmit={soumettre}
-      className="mt-6 rounded-plaque border border-bord bg-papier p-4"
+      className="mt-6 cadre p-4"
       noValidate
     >
       <h2 className="font-semibold text-encre">Créer un gérant</h2>
@@ -405,7 +392,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
             required
             value={nom}
             onChange={(e) => setNom(e.target.value)}
-            className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+            className="saisie mt-1.5"
           />
         </div>
         <div>
@@ -419,7 +406,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+            className="saisie mt-1.5"
           />
         </div>
         <div>
@@ -433,7 +420,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
             minLength={10}
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 font-code text-encre"
+            className="saisie mt-1.5 font-code"
           />
           <p className="mt-1 text-sm text-encre-doux">
             Au moins 10 caractères. Il est affiché en clair pour que vous puissiez le dicter.
@@ -447,7 +434,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
             id="boutique-gerant"
             value={boutiqueId}
             onChange={(e) => setBoutiqueId(e.target.value)}
-            className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+            className="saisie mt-1.5"
           >
             <option value="">Aucune pour l’instant</option>
             {boutiques.map((boutique) => (
@@ -472,9 +459,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
         </div>
       </div>
 
-      <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-3" />
       {succes && (
         <p role="status" aria-live="polite" className="text-sm text-solde">
           {succes}

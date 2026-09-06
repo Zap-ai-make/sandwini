@@ -1615,3 +1615,45 @@ projet.
 lui, la palette ne s'ouvre pas. Ce n'est pas une régression d'accessibilité —
 elle double la navigation, elle ne la remplace pas : tout ce qu'elle atteint est
 dans la colonne de gauche, en HTML, sans script.
+
+---
+
+## D73 — Un patron est un composant s'il a une structure, une classe s'il n'a qu'une apparence
+
+*S28, commit des patrons. La spec demandait « les patrons écrits une fois, en
+composants réutilisables ». Écrits une fois, oui ; en composants, pas toujours.*
+
+**Ce que le dépôt répétait.** Cent cadres blancs bordés, quarante-cinq boutons
+de plaque, trente-deux champs de saisie, vingt-sept attentes, vingt-cinq
+encadrés pointillés, et quatre copies mot pour mot du même refus de périmètre.
+Ce n'est pas une abstraction spéculative qu'on va chercher : c'est de la
+déduplication, échelle 2 d'`ARCHITECTURE.md` §1.
+
+**La ligne de partage.** Un composant quand il y a une structure ou un
+comportement à tenir — les états, la tête d'écran, le hub, le champ. Une classe
+CSS quand il n'y a qu'une apparence et que l'élément qui la porte change d'un
+appel à l'autre : `.cadre` habille tour à tour un `ul`, un `dl`, un `div`, une
+`section`. Un composant l'aurait obligé à recevoir un `as` générique pour ne
+rendre au bout du compte qu'une chaîne de classes — de la cérémonie autour du
+vide.
+
+**Ce que la ligne a rapporté, en plus du volume.** Trois défauts sont sortis du
+bois au moment où la forme unique s'est écrite :
+
+1. La bordure des champs prenait `--color-bord`, à 1,3:1 sur le papier. Le
+   jeton `--color-bord-fort` existait, portait le calcul de contraste dans son
+   commentaire, et n'était employé nulle part. `.saisie` le prend.
+2. Le hub des réglages gardait sa propre copie des six écrans d'administration
+   et les cloisonnait tous derrière `gerer_utilisateurs`, là où la colonne de
+   gauche cloisonne chacun par sa propre capacité. Deux listes finissent
+   toujours par répondre deux choses ; il n'y en a plus qu'une, dans
+   `ECRANS_DE`.
+3. Sans le `max-w-3xl` retiré au commit de la coquille, un champ « Nom »
+   s'étirait sur 950 px. Vu sur une capture, pas déduit.
+
+**Ce qu'on n'a pas écrit, et pourquoi.** Le tableau et le panneau latéral. Les
+maquettes en fixent le dessin, mais aucun écran n'en a aujourd'hui — les écrire
+ici aurait été deviner leur interface sans un seul appelant pour la démentir.
+S29 les crée dans `components/patrons/` au premier écran qui les demande (A4 et
+A6), et sa spec le dit noir sur blanc pour que le huitième écran ne redessine
+pas le sien.

@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowLeft, Check, LoaderCircle, Printer, Share2 } from "lucide-react";
+import { ArrowLeft, Check, Printer, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Recu } from "@/components/Recu";
+import { EtatChargement, EtatErreur, EtatVide } from "@/components/patrons/Etats";
 import { IDENTITE } from "@/lib/domain/entreprise";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
@@ -116,14 +117,9 @@ export function PanneauRecu({ cle }: { cle: string }) {
       </div>
 
       {erreur ? (
-        <p role="alert" className="mt-6 text-alerte">
-          {erreur}
-        </p>
+        <EtatErreur message={erreur} className="mt-6" />
       ) : enCours ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement du reçu…
-        </p>
+        <EtatChargement className="mt-6">Chargement du reçu…</EtatChargement>
       ) : !contenu ? (
         <Introuvable />
       ) : (
@@ -192,7 +188,7 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
         <button
           type="button"
           onClick={() => window.print()}
-          className="inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="bouton bouton-plaque"
         >
           <Printer aria-hidden="true" className="size-4" />
           Imprimer le reçu
@@ -200,14 +196,14 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
         <button
           type="button"
           onClick={partager}
-          className="inline-flex h-12 items-center gap-2 rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          className="bouton bouton-neutre"
         >
           <Share2 aria-hidden="true" className="size-4" />
           Partager le récapitulatif
         </button>
         <Link
           href={`/motos/ventes?vente=${venteId}`}
-          className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          className="bouton bouton-neutre"
         >
           Ouvrir la vente
         </Link>
@@ -224,11 +220,7 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
           {message}
         </p>
       )}
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
     </div>
   );
 }
@@ -240,18 +232,17 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
  */
 function Introuvable() {
   return (
-    <div className="mt-6 max-w-prose rounded-plaque border border-dashed border-bord p-4">
-      <p className="text-encre">Ce reçu est introuvable.</p>
-      <p className="mt-1 text-sm text-encre-doux">
-        Le lien ne correspond à aucun reçu de cette vente. Si le versement a été encaissé sur un
-        autre appareil, il apparaîtra ici dès que la synchronisation l’aura apporté.
-      </p>
-      <Link
-        href="/motos/recus"
-        className="mt-4 inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-      >
-        Revenir aux reçus
-      </Link>
-    </div>
+    <EtatVide
+      titre="Ce reçu est introuvable."
+      className="mt-6 max-w-prose"
+      action={
+        <Link href="/motos/recus" className="bouton bouton-neutre">
+          Revenir aux reçus
+        </Link>
+      }
+    >
+      Le lien ne correspond à aucun reçu de cette vente. Si le versement a été encaissé sur un
+      autre appareil, il apparaîtra ici dès que la synchronisation l’aura apporté.
+    </EtatVide>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, FolderCheck, LoaderCircle, TriangleAlert } from "lucide-react";
+import { CircleAlert, FolderCheck, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import {
@@ -23,6 +23,8 @@ import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
+import { EtatChargement } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 
 /**
  * Les dossiers en attente (§7.3).
@@ -92,11 +94,15 @@ export default function PageDossiers() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Dossiers en attente</h1>
-      <p className="mt-2 max-w-prose text-sm text-encre-doux">
-        Les dossiers dont un document reste à traiter, du plus ancien au plus récent. Le retard
-        se calcule sur l’horloge de cet appareil&nbsp;: il reste juste sans réseau.
-      </p>
+      <TetePage
+        titre="Dossiers en attente"
+        sousTitre={
+          <>
+            Les dossiers dont un document reste à traiter, du plus ancien au plus récent. Le retard
+            se calcule sur l’horloge de cet appareil&nbsp;: il reste juste sans réseau.
+          </>
+        }
+      />
 
       <Filtres
         filtres={filtres}
@@ -108,7 +114,7 @@ export default function PageDossiers() {
       {erreur && (
         <p
           role="alert"
-          className="mt-4 flex items-center gap-3 rounded-plaque border border-bord bg-papier p-4 text-sm text-encre"
+          className="mt-4 flex items-center gap-3 cadre p-4 text-sm text-encre"
         >
           <TriangleAlert aria-hidden="true" className="size-5 shrink-0 text-alerte" />
           {erreur}
@@ -116,19 +122,16 @@ export default function PageDossiers() {
       )}
 
       {chargement ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
-          Lecture des dossiers…
-        </p>
+        <EtatChargement className="mt-6">Lecture des dossiers…</EtatChargement>
       ) : dossiers.length === 0 ? (
-        <p className="mt-6 flex items-start gap-3 rounded-plaque border border-bord bg-papier p-4 text-sm text-encre">
+        <p className="mt-6 flex items-start gap-3 cadre p-4 text-sm text-encre">
           <FolderCheck aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-encre-doux" />
           {filtreActif
             ? "Aucun dossier ne correspond à ces filtres. Élargissez-les pour voir le reste."
             : "Aucun dossier n’attend. Tous les documents des ventes en cours sont remis ou écartés."}
         </p>
       ) : (
-        <ul className="mt-6 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-6 cadre cadre-liste">
           {dossiers.map((dossier) => (
             <li key={dossier.venteId}>
               <Link
@@ -209,7 +212,7 @@ function Filtres({
             onChange={(evenement) =>
               changer({ boutiqueId: evenement.target.value.trim().toUpperCase() })
             }
-            className="plaque-code mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+            className="plaque-code saisie mt-1.5"
           />
         </div>
       )}
@@ -222,7 +225,7 @@ function Filtres({
           id="filtre-prestataire"
           value={filtres.prestataireId}
           onChange={(evenement) => changer({ prestataireId: evenement.target.value })}
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         >
           <option value="">Tous</option>
           {prestataires.map((prestataire) => (
@@ -243,7 +246,7 @@ function Filtres({
           onChange={(evenement) =>
             changer({ type: evenement.target.value as TypeDocument | "" })
           }
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         >
           <option value="">Tous</option>
           {TYPES_DOCUMENT.map((type) => (

@@ -40,7 +40,7 @@ export function InvitationBoutique() {
       {estResponsable && (
         <Link
           href="/parametres/boutiques"
-          className="mt-4 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="mt-4 bouton bouton-plaque"
         >
           Créer une boutique
         </Link>

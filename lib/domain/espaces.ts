@@ -112,6 +112,17 @@ export type EcranDEspace = {
   intention: Intention;
   /** Sans elle, l'entrée est ouverte à tous les rôles qui voient l'espace. */
   capacite?: Capacite;
+  /**
+   * Ce qu'on y fait, en une ligne — pour les écrans où le libellé seul ne
+   * suffit pas à choisir.
+   *
+   * La colonne de gauche ne l'affiche pas : 224 px n'expliquent rien. C'est le
+   * hub des réglages qui la lit (`components/patrons/Hub.tsx`), là où
+   * « Référentiels » et « Catalogue » sont deux mots que seul leur auteur
+   * distingue. Elle vit ici pour que la navigation et le hub ne puissent pas
+   * diverger : ce sont les mêmes écrans, avec les mêmes droits.
+   */
+  quoi?: string;
 };
 
 /**
@@ -147,36 +158,42 @@ export const ECRANS_DE: Record<Espace, readonly EcranDEspace[]> = {
       libelle: "Identité de l’entreprise",
       intention: "administrer",
       capacite: "gerer_referentiels",
+      quoi: "L’en-tête imprimé sur les reçus, et le délai des tranches inactives",
     },
     {
       href: "/parametres/boutiques",
       libelle: "Boutiques",
       intention: "administrer",
       capacite: "gerer_boutiques",
+      quoi: "Déclarer un point de vente, son code et ses coordonnées",
     },
     {
       href: "/parametres/utilisateurs",
       libelle: "Utilisateurs",
       intention: "administrer",
       capacite: "gerer_utilisateurs",
+      quoi: "Créer un gérant, désactiver un compte",
     },
     {
       href: "/parametres/catalogue",
       libelle: "Marques et modèles",
       intention: "administrer",
       capacite: "gerer_referentiels",
+      quoi: "Ce que vous vendez",
     },
     {
       href: "/parametres/referentiels",
       libelle: "Provenances et frais",
       intention: "administrer",
       capacite: "gerer_referentiels",
+      quoi: "D’où viennent les motos, ce qui s’ajoute à leur prix d’achat",
     },
     {
       href: "/parametres/prestataires",
       libelle: "Prestataires",
       intention: "administrer",
       capacite: "gerer_referentiels",
+      quoi: "Qui traite les cartes grises et les plaques",
     },
     { href: "/diagnostic", libelle: "Synchronisation", intention: "suivre" },
   ],

@@ -9,6 +9,8 @@ import { prochainNumero } from "@/lib/numerotation/compteur";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
+import { EtatSansResultat } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 
 type Essai = { id: string; ecritA: Date; etat: "en_attente" | "confirme" | "refuse"; motif?: string };
 
@@ -52,8 +54,8 @@ export default function Diagnostic() {
   if (!configurationPresente) {
     return (
       <section className="max-w-prose">
-        <h1 className="text-2xl font-semibold tracking-tight text-encre">Synchronisation</h1>
-        <p className="mt-4 flex gap-3 rounded-plaque border border-bord bg-papier p-4 text-encre">
+        <TetePage titre="Synchronisation" />
+        <p className="mt-4 flex gap-3 cadre p-4 text-encre">
           <CircleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-alerte" />
           <span>
             Firebase n’est pas configuré sur cet appareil. Copiez <code className="font-code">.env.example</code>{" "}
@@ -67,11 +69,15 @@ export default function Diagnostic() {
 
   return (
     <section>
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Synchronisation</h1>
-      <p className="mt-2 max-w-prose text-encre-doux">
-        Cet écran écrit un document sans importance pour montrer le trajet d’une saisie. Coupez le
-        réseau&nbsp;: l’écriture est acceptée tout de suite et part d’elle-même au retour.
-      </p>
+      <TetePage
+        titre="Synchronisation"
+        sousTitre={
+          <>
+            Cet écran écrit un document sans importance pour montrer le trajet d’une saisie. Coupez le
+            réseau&nbsp;: l’écriture est acceptée tout de suite et part d’elle-même au retour.
+          </>
+        }
+      />
 
       <dl className="mt-6 grid grid-cols-2 gap-px overflow-hidden rounded-plaque border border-bord bg-bord">
         <div className="bg-papier p-4">
@@ -89,7 +95,7 @@ export default function Diagnostic() {
       <button
         type="button"
         onClick={ecrireUnEssai}
-        className="mt-4 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe hover:brightness-95"
+        className="mt-4 bouton bouton-plaque hover:brightness-95"
       >
         Écrire un test de synchronisation
       </button>
@@ -100,11 +106,11 @@ export default function Diagnostic() {
         Tests de cette session
       </h2>
       {essais.length === 0 ? (
-        <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-3">
           Aucun test pour l’instant. Le bouton ci-dessus en écrit un.
-        </p>
+        </EtatSansResultat>
       ) : (
-        <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-3 cadre cadre-liste">
           {essais.map((essai) => (
             <li key={essai.id} className="flex items-center gap-3 px-4 py-3">
               {essai.etat === "confirme" ? (
@@ -161,7 +167,7 @@ function Numerotation() {
     return (
       <section className="mt-8">
         <TitreNumerotation />
-        <p className="mt-3 rounded-plaque border border-bord bg-papier p-4 text-encre-doux">
+        <p className="mt-3 cadre p-4 text-encre-doux">
           Chargement des boutiques…
         </p>
       </section>
@@ -193,7 +199,7 @@ function Numerotation() {
   return (
     <section className="mt-8">
       <TitreNumerotation />
-      <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-plaque border border-bord bg-papier p-4">
+      <p className="mt-3 flex flex-wrap items-baseline gap-x-3 gap-y-1 cadre p-4">
         <span className="text-sm text-encre-doux">{perimetre.nom}</span>
         <span data-test="prochain-numero" className="plaque-code text-lg font-semibold text-encre">
           {numero}

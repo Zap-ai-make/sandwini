@@ -1,10 +1,9 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
-import Link from "next/link";
 import { useCallback } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
 import { ListeReferentiel, type ActionsReferentiel } from "@/components/ListeReferentiel";
+import { TetePage } from "@/components/patrons/Page";
 import type { Referentiel } from "@/lib/domain/referentiel";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import {
@@ -63,16 +62,10 @@ function Referentiels() {
 
   return (
     <div>
-      <Link
-        href="/parametres"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Réglages
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">
-        Provenances et frais
-      </h1>
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Réglages" }}
+        titre="Provenances et frais"
+      />
       <p className="mt-2 max-w-prose text-encre-doux">
         D’où viennent les motos, et quels frais s’ajoutent à leur prix d’achat. Ces deux listes
         alimenteront le formulaire d’entrée en stock.

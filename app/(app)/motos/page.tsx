@@ -1,11 +1,12 @@
 "use client";
 
-import { LoaderCircle, Plus, Receipt, Search } from "lucide-react";
+import { Plus, Receipt, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheMoto } from "@/components/FicheMoto";
-import { useSession } from "@/lib/auth/session";
+import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import {
   ETATS,
@@ -75,48 +76,40 @@ function Stock() {
     ? catalogue.modeles.filter((modele) => modele.marqueId === filtres.marqueId)
     : catalogue.modeles;
 
-  if (sansPerimetre) return <SansBoutique />;
+  if (sansPerimetre)
+    return (
+      <SansBoutique
+        titre="Stock motos"
+        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : le stock n’a pas encore d’endroit où exister."
+      />
+    );
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-encre">Stock motos</h1>
-          <p className="mt-1 text-sm text-encre-doux">
-            {perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
-          </p>
-        </div>
-        {/* Vendre est le geste quotidien, faire entrer une moto l’exception :
-            c’est la vente qui porte l’accent de plaque. */}
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <Link
-            href="/motos/ventes/nouvelle"
-            className="inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-          >
-            <Receipt aria-hidden="true" className="size-4" />
-            Nouvelle vente
-          </Link>
-          <Link
-            href="/motos/ventes"
-            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-          >
-            Ventes
-          </Link>
-          <Link
-            href="/motos/dossiers"
-            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-          >
-            Dossiers
-          </Link>
-          <Link
-            href="/motos/nouvelle"
-            className="inline-flex h-12 items-center gap-2 rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Faire entrer une moto
-          </Link>
-        </div>
-      </div>
+      <TetePage
+        titre="Stock motos"
+        sousTitre={perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
+        actions={
+          /* Vendre est le geste quotidien, faire entrer une moto l’exception :
+             c’est la vente qui porte l’accent de plaque. */
+          <>
+            <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+              <Receipt aria-hidden="true" className="size-4" />
+              Nouvelle vente
+            </Link>
+            <Link href="/motos/ventes" className="bouton bouton-neutre">
+              Ventes
+            </Link>
+            <Link href="/motos/dossiers" className="bouton bouton-neutre">
+              Dossiers
+            </Link>
+            <Link href="/motos/nouvelle" className="bouton bouton-neutre">
+              <Plus aria-hidden="true" className="size-4" />
+              Faire entrer une moto
+            </Link>
+          </>
+        }
+      />
 
       <Recherche filtres={filtres} changer={setFiltres} />
 
@@ -147,30 +140,23 @@ function Stock() {
         />
       </div>
 
-      {erreur && (
-        <p role="alert" className="mt-4 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-4" />
 
       {stock === null && !erreur ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement du stock…
-        </p>
+        <EtatChargement className="mt-6">Chargement du stock…</EtatChargement>
       ) : (stock ?? []).length === 0 && !erreur ? (
         <StockVide perimetreEnCours={perimetreEnCours} />
       ) : resultats.length === 0 ? (
-        <p className="mt-6 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
-          Aucune moto ne correspond. Vérifiez le châssis saisi, ou élargissez les filtres.
-        </p>
+        <EtatSansResultat className="mt-6">
+            Aucune moto ne correspond. Vérifiez le châssis saisi, ou élargissez les filtres.
+          </EtatSansResultat>
       ) : (
         <>
           <p className="mt-6 text-sm text-encre-doux">
             {resultats.length === 1 ? "1 moto" : `${resultats.length} motos`}
             {resultats.length !== (stock ?? []).length && ` sur ${(stock ?? []).length}`}
           </p>
-          <ul className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+          <ul className="cadre cadre-liste mt-2">
             {resultats.map((moto) => (
               <li key={moto.id}>
                 <Link
@@ -242,7 +228,7 @@ function Recherche({
           onChange={(evenement) =>
             changer((actuel) => ({ ...actuel, recherche: evenement.target.value }))
           }
-          className="plaque-code h-12 w-full rounded-plaque border border-bord bg-papier pr-3 pl-9 text-encre placeholder:font-sans placeholder:tracking-normal placeholder:text-encre-doux"
+          className="plaque-code saisie pr-3 pl-9 placeholder:font-sans placeholder:tracking-normal placeholder:text-encre-doux"
         />
       </div>
     </div>
@@ -273,7 +259,7 @@ function Filtre({
         id={id}
         value={valeur}
         onChange={(evenement) => changer(evenement.target.value)}
-        className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+        className="saisie mt-1.5"
       >
         <option value="">{tous}</option>
         {options.map((option) => (
@@ -289,43 +275,20 @@ function Filtre({
 function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
   if (perimetreEnCours) return null;
   return (
-    <div className="mt-6 rounded-plaque border border-dashed border-bord p-4">
-      <p className="text-encre">Aucune moto en stock pour l’instant.</p>
-      <p className="mt-1 max-w-prose text-sm text-encre-doux">
+    <div className="mt-6">
+      <EtatVide
+        titre="Aucune moto en stock pour l’instant."
+        action={
+          <Link href="/motos/nouvelle" className="bouton bouton-plaque">
+            <Plus aria-hidden="true" className="size-4" />
+            Faire entrer une moto
+          </Link>
+        }
+      >
         La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se
         déclarent dans les réglages.
-      </p>
-      <Link
-        href="/motos/nouvelle"
-        className="mt-4 inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-      >
-        <Plus aria-hidden="true" className="size-4" />
-        Faire entrer une moto
-      </Link>
+      </EtatVide>
     </div>
   );
 }
 
-function SansBoutique() {
-  const session = useSession();
-  const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
-
-  return (
-    <div className="max-w-prose">
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Stock motos</h1>
-      <p className="mt-3 text-encre-doux">
-        {estResponsable
-          ? "Aucune boutique n’est déclarée : le stock n’a pas encore d’endroit où exister."
-          : "Aucune boutique ne vous est attribuée. Vos écrans resteront vides tant que le responsable ne vous en aura pas donné une."}
-      </p>
-      {estResponsable && (
-        <Link
-          href="/parametres/boutiques"
-          className="mt-6 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
-        >
-          Créer une boutique
-        </Link>
-      )}
-    </div>
-  );
-}

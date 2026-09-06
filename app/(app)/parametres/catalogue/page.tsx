@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, LoaderCircle, Plus } from "lucide-react";
-import Link from "next/link";
+import { Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
 import { ListeReferentiel, type ActionsReferentiel } from "@/components/ListeReferentiel";
+import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
   LONGUEUR_NOM_MAX,
@@ -75,14 +76,10 @@ function Catalogue() {
 
   return (
     <div>
-      <Link
-        href="/parametres"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Réglages
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Marques et modèles</h1>
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Réglages" }}
+        titre="Marques et modèles"
+      />
       <p className="mt-2 max-w-prose text-encre-doux">
         Ce que vous vendez. Une moto entrée en stock choisira sa marque puis son modèle dans ces
         listes — jamais en texte libre, sinon le même modèle finit écrit de trois façons.
@@ -133,9 +130,9 @@ function Modeles({
     return (
       <section>
         <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Modèles</h2>
-        <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-3">
           Ajoutez d’abord une marque&nbsp;: un modèle n’existe pas tout seul.
-        </p>
+        </EtatSansResultat>
       </section>
     );
   }
@@ -178,7 +175,7 @@ function Modeles({
           id="marque-active"
           value={marqueActive?.id ?? ""}
           onChange={(evenement) => choisir(evenement.target.value)}
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         >
           {marques.map((marque) => (
             <option key={marque.id} value={marque.id}>
@@ -199,38 +196,29 @@ function Modeles({
             maxLength={LONGUEUR_NOM_MAX}
             placeholder="Crux, YBR 125, Star 110"
             onChange={(evenement) => setNom(evenement.target.value)}
-            className="h-12 min-w-0 flex-1 rounded-plaque border border-bord bg-papier px-3 text-encre placeholder:text-encre-doux"
+            className="saisie min-w-0 flex-1 placeholder:text-encre-doux"
           />
           <button
             type="submit"
-            className="inline-flex h-12 shrink-0 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
+            className="bouton bouton-plaque"
           >
             <Plus aria-hidden="true" className="size-4" />
             Ajouter
           </button>
         </div>
-        <p role="alert" aria-live="assertive" className="mt-1 min-h-5 text-sm text-alerte">
-          {erreurSaisie ?? ""}
-        </p>
+        <EtatErreurSaisie message={erreurSaisie} className="mt-1" />
       </form>
 
-      {erreur && (
-        <p role="alert" className="mt-3 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-3" />
 
       {modeles === null && !erreur ? (
-        <p className="mt-3 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement…
-        </p>
+        <EtatChargement className="mt-3">Chargement…</EtatChargement>
       ) : deLaMarque.length === 0 && !erreur ? (
-        <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-3">
           Aucun modèle chez {marqueActive?.nom}. Ajoutez ceux que vous vendez réellement.
-        </p>
+        </EtatSansResultat>
       ) : (
-        <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-3 cadre cadre-liste">
           {deLaMarque.map((modele) => (
             <LigneModele key={modele.id} modele={modele} freres={deLaMarque} />
           ))}
@@ -285,7 +273,7 @@ function LigneModele({ modele, freres }: { modele: Modele; freres: Modele[] }) {
             value={nom}
             maxLength={LONGUEUR_NOM_MAX}
             onChange={(evenement) => setNom(evenement.target.value)}
-            className="h-11 min-w-0 flex-1 rounded-plaque border border-bord bg-papier px-3 text-encre"
+            className="saisie h-11 min-w-0 flex-1"
           />
           <button
             type="submit"
@@ -342,11 +330,7 @@ function LigneModele({ modele, freres }: { modele: Modele; freres: Modele[] }) {
         </div>
       )}
 
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
     </li>
   );
 }

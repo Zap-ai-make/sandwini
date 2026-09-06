@@ -24,6 +24,7 @@ import { useAbonnement } from "@/lib/repositories/abonnement";
 import { avancerDocument } from "@/lib/repositories/dossier";
 import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 import { jourLocal } from "@/lib/domain/recu";
+import { EtatErreur } from "@/components/patrons/Etats";
 
 /**
  * Le dossier d'une vente, et ce qu'on peut y faire (S11).
@@ -115,11 +116,7 @@ function LigneDocument({ document }: { document: DocumentDossier }) {
         </p>
       )}
 
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
 
       {suivants.length > 0 && !depotOuvert && (
         <div className="mt-2 flex flex-wrap gap-2">
@@ -256,7 +253,7 @@ function FormulaireDepot({
                   prestataireNom: choisi?.nom ?? "",
                 });
               }}
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="saisie mt-1.5"
             >
               <option value="">Choisissez…</option>
               {candidats.map((prestataire) => (
@@ -277,7 +274,7 @@ function FormulaireDepot({
                 type="date"
                 value={saisie.deposeLe}
                 onChange={(evenement) => changer({ deposeLe: evenement.target.value })}
-                className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+                className="saisie mt-1.5"
               />
             </div>
             <div>
@@ -291,7 +288,7 @@ function FormulaireDepot({
                 value={saisie.disponibleLe}
                 min={saisie.deposeLe}
                 onChange={(evenement) => changer({ disponibleLe: evenement.target.value })}
-                className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+                className="saisie mt-1.5"
               />
             </div>
           </div>
@@ -306,7 +303,7 @@ function FormulaireDepot({
                 inputMode="numeric"
                 value={saisie.avance}
                 onChange={(evenement) => changer({ avance: evenement.target.value })}
-                className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-lg text-encre"
+                className="saisie mt-1.5 text-lg"
               />
             </div>
             <div>
@@ -319,7 +316,7 @@ function FormulaireDepot({
                 onChange={(evenement) =>
                   changer({ moyenPaiement: evenement.target.value as MoyenPaiement })
                 }
-                className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+                className="saisie mt-1.5"
               >
                 {MOYENS_PAIEMENT.map((moyen) => (
                   <option key={moyen} value={moyen}>
@@ -336,17 +333,13 @@ function FormulaireDepot({
             L’avance est enregistrée comme une sortie de caisse, en même temps que le dépôt.
           </p>
 
-          {probleme && (
-            <p role="alert" className="mt-3 text-sm text-alerte">
-              {probleme}
-            </p>
-          )}
+          <EtatErreur message={probleme} className="mt-3" />
 
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="submit"
               disabled={envoi}
-              className="inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe disabled:opacity-60"
+              className="bouton bouton-plaque disabled:opacity-60"
             >
               {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Enregistrer le dépôt
@@ -354,7 +347,7 @@ function FormulaireDepot({
             <button
               type="button"
               onClick={onAnnuler}
-              className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+              className="bouton bouton-neutre"
             >
               Annuler
             </button>

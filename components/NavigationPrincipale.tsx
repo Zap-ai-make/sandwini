@@ -1,28 +1,10 @@
 "use client";
 
-import {
-  Activity,
-  Bike,
-  Building2,
-  Coins,
-  FolderCheck,
-  HardHat,
-  LayoutGrid,
-  PanelLeft,
-  Plus,
-  Printer,
-  Receipt,
-  RefreshCw,
-  Settings,
-  Store,
-  Tags,
-  UserCheck,
-  Users,
-  Wrench,
-} from "lucide-react";
+import { Activity, Bike, Building2, Coins, LayoutGrid, PanelLeft, Settings, Wrench } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useSyncExternalStore, type ComponentType } from "react";
+import { ICONE_ECRAN } from "@/components/icones-ecrans";
 import { useSession } from "@/lib/auth/session";
 import {
   ESPACES,
@@ -56,27 +38,6 @@ const ICONE_ESPACE: Record<Espace, Icone> = {
 /* L'icône de chaque écran, par sa route. Elle ne porte aucun sens à elle
    seule — le libellé est toujours là — sauf colonne repliée, où elle devient le
    seul repère : d'où le fait que chaque entrée en ait une, et une seule fois. */
-const ICONE_ECRAN: Record<string, Icone> = {
-  "/supervision": Activity,
-  "/dashboard": LayoutGrid,
-  "/motos/ventes/nouvelle": Plus,
-  "/motos": Bike,
-  "/motos/nouvelle": Store,
-  "/motos/ventes": Receipt,
-  "/motos/paiements": Coins,
-  "/motos/dossiers": FolderCheck,
-  "/motos/recus": Printer,
-  "/clients": Users,
-  "/pieces": Wrench,
-  "/caisse": Coins,
-  "/parametres/entreprise": Building2,
-  "/parametres/boutiques": Store,
-  "/parametres/utilisateurs": UserCheck,
-  "/parametres/catalogue": Tags,
-  "/parametres/referentiels": Activity,
-  "/parametres/prestataires": HardHat,
-  "/diagnostic": RefreshCw,
-};
 
 /**
  * La navigation principale — un rail d'espaces, et la colonne des écrans de

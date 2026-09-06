@@ -61,7 +61,7 @@ export function Recu({
        serait illisible sur un comptoir. */
     <article
       aria-label={`${LIBELLE_TYPE_RECU[contenu.type]} ${contenu.numero}`}
-      className="mx-auto max-w-[148mm] rounded-plaque border border-bord bg-papier p-6 text-encre print:rounded-none print:border-0 print:p-0"
+      className="mx-auto max-w-[148mm] cadre p-6 text-encre print:rounded-none print:border-0 print:p-0"
     >
       <header className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">

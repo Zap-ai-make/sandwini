@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowLeft, LoaderCircle, Phone } from "lucide-react";
-import Link from "next/link";
+import { Phone } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
   LIBELLE_TYPE_DOCUMENT,
@@ -57,14 +58,10 @@ function Prestataires() {
 
   return (
     <div>
-      <Link
-        href="/parametres"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Réglages
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Prestataires</h1>
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Réglages" }}
+        titre="Prestataires"
+      />
       <p className="mt-2 max-w-prose text-encre-doux">
         Ceux à qui vous confiez les cartes grises et les plaques. Ils apparaîtront au moment de
         déposer un dossier, filtrés selon ce qu’ils traitent.
@@ -76,24 +73,17 @@ function Prestataires() {
         Prestataires enregistrés
       </h2>
 
-      {erreur && (
-        <p role="alert" className="mt-3 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-3" />
 
       {valeur === null && !erreur ? (
-        <p className="mt-3 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement des prestataires…
-        </p>
+        <EtatChargement className="mt-3">Chargement des prestataires…</EtatChargement>
       ) : (valeur ?? []).length === 0 && !erreur ? (
-        <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-3">
           Aucun prestataire pour l’instant. Tant qu’il n’y en a pas, un dossier ne peut pas être
           marqué comme déposé.
-        </p>
+        </EtatSansResultat>
       ) : (
-        <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-3 cadre cadre-liste">
           {(valeur ?? []).map((prestataire) => (
             <Ligne key={prestataire.id} prestataire={prestataire} />
           ))}
@@ -159,7 +149,7 @@ function Champs({
           value={saisie.nom}
           maxLength={LONGUEUR_NOM_MAX}
           onChange={(evenement) => changer({ nom: evenement.target.value })}
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         />
       </div>
 
@@ -174,7 +164,7 @@ function Champs({
           value={saisie.telephone}
           maxLength={LONGUEUR_TELEPHONE_MAX}
           onChange={(evenement) => changer({ telephone: evenement.target.value })}
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         />
       </div>
 
@@ -217,7 +207,7 @@ function Formulaire() {
   return (
     <form
       onSubmit={soumettre}
-      className="mt-6 rounded-plaque border border-bord bg-papier p-4"
+      className="mt-6 cadre p-4"
       noValidate
     >
       <h2 className="font-semibold text-encre">Ajouter un prestataire</h2>
@@ -228,9 +218,7 @@ function Formulaire() {
         prefixe="nouveau"
       />
 
-      <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-3" />
       {succes && (
         <p role="status" aria-live="polite" className="text-sm text-solde">
           {succes}
@@ -239,7 +227,7 @@ function Formulaire() {
 
       <button
         type="submit"
-        className="mt-3 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+        className="mt-3 bouton bouton-plaque"
       >
         Enregistrer le prestataire
       </button>
@@ -327,11 +315,7 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
         </span>
       </div>
 
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
 
       {edition && (
         <form
@@ -347,7 +331,7 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
           />
           <button
             type="submit"
-            className="mt-4 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+            className="mt-4 bouton bouton-plaque"
           >
             Enregistrer
           </button>

@@ -24,6 +24,7 @@ import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
 import { ecouterStock, entrerEnStock, messageErreurMoto } from "@/lib/repositories/motos";
+import { EtatErreurSaisie } from "@/components/patrons/Etats";
 
 /**
  * L'entrée en stock.
@@ -114,16 +115,10 @@ export default function PageNouvelleMoto() {
           la même marque finit écrite de trois façons.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Link
-            href="/parametres/catalogue"
-            className="inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-          >
+          <Link href="/parametres/catalogue" className="bouton bouton-plaque">
             Déclarer une marque
           </Link>
-          <Link
-            href="/parametres/referentiels"
-            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-          >
+          <Link href="/parametres/referentiels" className="bouton bouton-neutre">
             Déclarer une provenance
           </Link>
         </div>
@@ -161,7 +156,7 @@ export default function PageNouvelleMoto() {
       )}
 
       <form onSubmit={soumettre} noValidate>
-        <fieldset className="rounded-plaque border border-bord bg-papier p-4">
+        <fieldset className="cadre p-4">
           <legend className="px-1 font-semibold text-encre">La moto</legend>
 
           <div className="mt-2">
@@ -221,7 +216,7 @@ export default function PageNouvelleMoto() {
               autoCapitalize="characters"
               autoComplete="off"
               onChange={(evenement) => changer({ numeroChassis: evenement.target.value })}
-              className="plaque-code mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="plaque-code saisie mt-1.5"
             />
             <p className="mt-1 text-sm text-encre-doux">
               Relevé sur le cadre. Les espaces et la casse n’ont pas d’importance.
@@ -239,7 +234,7 @@ export default function PageNouvelleMoto() {
               autoCapitalize="characters"
               autoComplete="off"
               onChange={(evenement) => changer({ numeroMoteur: evenement.target.value })}
-              className="plaque-code mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="plaque-code saisie mt-1.5"
             />
           </div>
 
@@ -253,7 +248,7 @@ export default function PageNouvelleMoto() {
                 value={saisie.couleur}
                 maxLength={LONGUEUR_TEXTE_MAX}
                 onChange={(evenement) => changer({ couleur: evenement.target.value })}
-                className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+                className="saisie mt-1.5"
               />
             </div>
             <div>
@@ -266,7 +261,7 @@ export default function PageNouvelleMoto() {
                 value={saisie.annee}
                 maxLength={4}
                 onChange={(evenement) => changer({ annee: evenement.target.value })}
-                className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+                className="saisie mt-1.5"
               />
             </div>
           </div>
@@ -281,7 +276,7 @@ export default function PageNouvelleMoto() {
                 rows={3}
                 value={saisie.papiersFournis}
                 onChange={(evenement) => changer({ papiersFournis: evenement.target.value })}
-                className="mt-1.5 w-full rounded-plaque border border-bord bg-papier px-3 py-2 text-encre"
+                className="saisie mt-1.5"
               />
               <p className="mt-1 text-sm text-encre-doux">
                 Un par ligne : ce qui accompagne la moto au moment où elle entre.
@@ -290,7 +285,7 @@ export default function PageNouvelleMoto() {
           )}
         </fieldset>
 
-        <fieldset className="mt-6 rounded-plaque border border-bord bg-papier p-4">
+        <fieldset className="mt-6 cadre p-4">
           <legend className="px-1 font-semibold text-encre">Ce qu’elle a coûté</legend>
           <p className="mt-1 flex gap-2 text-sm text-encre-doux">
             <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
@@ -315,7 +310,7 @@ export default function PageNouvelleMoto() {
               inputMode="numeric"
               value={saisie.prixAchat}
               onChange={(evenement) => changer({ prixAchat: evenement.target.value })}
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="saisie mt-1.5"
             />
           </div>
 
@@ -340,7 +335,7 @@ export default function PageNouvelleMoto() {
               inputMode="numeric"
               value={saisie.prixVenteConseille}
               onChange={(evenement) => changer({ prixVenteConseille: evenement.target.value })}
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="saisie mt-1.5"
             />
             <p className="mt-1 text-sm text-encre-doux">
               Celui-ci reste visible du gérant : c’est un repère de vente, pas un coût.
@@ -348,13 +343,11 @@ export default function PageNouvelleMoto() {
           </div>
         </fieldset>
 
-        <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-          {erreur ?? ""}
-        </p>
+        <EtatErreurSaisie message={erreur} className="mt-3" />
 
         <button
           type="submit"
-          className="mt-3 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="mt-3 bouton bouton-plaque"
         >
           Faire entrer en stock
         </button>
@@ -408,7 +401,7 @@ function Selection({
         value={valeur}
         disabled={desactive}
         onChange={(evenement) => changer(evenement.target.value)}
-        className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre disabled:opacity-60"
+        className="saisie mt-1.5 disabled:opacity-60"
       >
         <option value="">{invite}</option>
         {options.map((option) => (
@@ -459,7 +452,7 @@ function Frais({
                       ),
                     )
                   }
-                  className="h-11 min-w-0 flex-1 rounded-plaque border border-bord bg-papier px-2 text-sm text-encre"
+                  className="h-11 min-w-0 flex-1 cadre px-2 text-sm text-encre"
                 >
                   <option value="">Type</option>
                   {types.map((type) => (
@@ -484,7 +477,7 @@ function Frais({
                       ),
                     )
                   }
-                  className="h-11 w-32 rounded-plaque border border-bord bg-papier px-2 text-sm text-encre"
+                  className="h-11 w-32 cadre px-2 text-sm text-encre"
                 />
 
                 <button
@@ -512,7 +505,7 @@ function Frais({
                     ),
                   )
                 }
-                className="mt-2 h-11 w-full rounded-plaque border border-bord bg-papier px-2 text-sm text-encre"
+                className="saisie mt-2 h-11 px-2 text-corps"
               />
             </div>
           ))}

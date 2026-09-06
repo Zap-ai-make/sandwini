@@ -1,8 +1,10 @@
 "use client";
 
-import { LoaderCircle, Phone, Plus, Search, UserPlus } from "lucide-react";
+import { Phone, Plus, Search, UserPlus } from "lucide-react";
 import { useMemo, useState } from "react";
 import { FormulaireClient } from "@/components/FormulaireClient";
+import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { chercherClients, formaterTelephone, type Client } from "@/lib/domain/client";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 
@@ -29,27 +31,29 @@ export default function PageClients() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-encre">Clients</h1>
-          <p className="mt-1 text-sm text-encre-doux">Commun à toutes les boutiques</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setCreation((ouvert) => !ouvert);
-            setConfirmation(null);
-          }}
-          aria-expanded={creation}
-          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-        >
-          <UserPlus aria-hidden="true" className="size-4" />
-          {creation ? "Fermer" : "Nouveau client"}
-        </button>
-      </div>
+      <TetePage
+        titre="Clients"
+        sousTitre="Commun à toutes les boutiques"
+        actions={
+          <>
+            <button
+              type="button"
+              onClick={() => {
+                setCreation((ouvert) => !ouvert);
+                setConfirmation(null);
+              }}
+              aria-expanded={creation}
+              className="bouton bouton-plaque"
+            >
+              <UserPlus aria-hidden="true" className="size-4" />
+              {creation ? "Fermer" : "Nouveau client"}
+            </button>
+          </>
+        }
+      />
 
       {creation && (
-        <section className="mt-6 rounded-plaque border border-bord bg-papier p-4">
+        <section className="mt-6 cadre p-4">
           <h2 className="font-semibold text-encre">Nouveau client</h2>
           <div className="mt-4">
             <FormulaireClient
@@ -87,48 +91,39 @@ export default function PageClients() {
             placeholder="Un numéro, ou le début d’un nom"
             value={recherche}
             onChange={(evenement) => setRecherche(evenement.target.value)}
-            className="h-12 w-full rounded-plaque border border-bord bg-papier pr-3 pl-9 text-encre placeholder:text-encre-doux"
+            className="saisie pr-3 pl-9 placeholder:text-encre-doux"
           />
         </div>
       </div>
 
-      {erreur && (
-        <p role="alert" className="mt-4 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-4" />
 
       {chargement ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement du fichier…
-        </p>
+        <EtatChargement className="mt-6">Chargement du fichier…</EtatChargement>
       ) : clients.length === 0 && !erreur ? (
-        <div className="mt-6 rounded-plaque border border-dashed border-bord p-4">
-          <p className="text-encre">Aucun client pour l’instant.</p>
-          <p className="mt-1 max-w-prose text-sm text-encre-doux">
-            Ils se créent ici, ou au moment d’une vente — sans quitter l’écran de vente.
-          </p>
-          <button
-            type="button"
-            onClick={() => setCreation(true)}
-            className="mt-4 inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Créer le premier
-          </button>
-        </div>
+        <EtatVide
+          titre="Aucun client pour l’instant."
+          className="mt-6"
+          action={
+            <button type="button" onClick={() => setCreation(true)} className="bouton bouton-plaque">
+              <Plus aria-hidden="true" className="size-4" />
+              Créer le premier
+            </button>
+          }
+        >
+          Ils se créent ici, ou au moment d’une vente — sans quitter l’écran de vente.
+        </EtatVide>
       ) : resultats.length === 0 ? (
-        <p className="mt-6 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-6">
           Personne ne correspond. Vérifiez le numéro, ou créez la fiche.
-        </p>
+        </EtatSansResultat>
       ) : (
         <>
           <p className="mt-6 text-sm text-encre-doux">
             {resultats.length === 1 ? "1 client" : `${resultats.length} clients`}
             {resultats.length !== clients.length && ` sur ${clients.length}`}
           </p>
-          <ul className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+          <ul className="mt-2 cadre cadre-liste">
             {resultats.map((client) => (
               <LigneClient
                 key={client.id}

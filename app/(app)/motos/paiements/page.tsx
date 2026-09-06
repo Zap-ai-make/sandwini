@@ -1,9 +1,8 @@
 "use client";
 
-import { ArrowLeft, Clock, LoaderCircle } from "lucide-react";
+import { ArrowLeft, Clock } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { useSession } from "@/lib/auth/session";
 import { formaterAnciennete, formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
 import type { Moto } from "@/lib/domain/moto";
@@ -25,6 +24,8 @@ import { ecouterReglages } from "@/lib/repositories/entreprise";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/ventes";
+import { EtatChargement, EtatErreur, EtatSansResultat, SansBoutique } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 
 /**
  * Le suivi des paiements — les trois listes du §6.3.
@@ -119,7 +120,13 @@ export default function PagePaiements() {
     [stock],
   );
 
-  if (perimetre.type === "aucune") return <SansBoutique />;
+  if (perimetre.type === "aucune")
+    return (
+      <SansBoutique
+        titre="Paiements"
+        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : il n’y a encore ni dette ni tranche à suivre."
+      />
+    );
 
   const chargement = (ventes === null || versements === null) && !erreur && !erreurVersements;
   const liste =
@@ -144,10 +151,7 @@ export default function PagePaiements() {
         Ventes
       </Link>
 
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Paiements</h1>
-      <p className="mt-1 text-sm text-encre-doux">
-        {perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
-      </p>
+      <TetePage titre="Paiements" sousTitre={perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom} />
 
       {/* Trois listes, une à la fois : au comptoir on cherche une réponse
           précise, pas un tableau de bord à faire défiler.
@@ -184,24 +188,17 @@ export default function PagePaiements() {
         })}
       </div>
 
-      {(erreur || erreurVersements) && (
-        <p role="alert" className="mt-4 text-sm text-alerte">
-          {erreur ?? erreurVersements}
-        </p>
-      )}
+      <EtatErreur message={erreur ?? erreurVersements} className="mt-4" />
 
       {chargement ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement des paiements…
-        </p>
+        <EtatChargement className="mt-6">Chargement des paiements…</EtatChargement>
       ) : (
         <>
           <EnTete vue={vue} liste={liste} seuil={seuil} />
           {liste.length === 0 ? (
             <Vide vue={vue} perimetreEnCours={perimetreEnCours} seuil={seuil} />
           ) : (
-            <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+            <ul className="mt-3 cadre cadre-liste">
               {liste.map((ligne) => (
                 <li key={ligne.vente.id}>
                   <LignePaiementVue
@@ -365,32 +362,9 @@ function Vide({
   };
 
   return (
-    <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+    <EtatSansResultat className="mt-3">
       {texte[vue]}
-    </p>
+    </EtatSansResultat>
   );
 }
 
-function SansBoutique() {
-  const session = useSession();
-  const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
-
-  return (
-    <div className="max-w-prose">
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Paiements</h1>
-      <p className="mt-3 text-encre-doux">
-        {estResponsable
-          ? "Aucune boutique n’est déclarée : il n’y a encore ni dette ni tranche à suivre."
-          : "Aucune boutique ne vous est attribuée. Vos écrans resteront vides tant que le responsable ne vous en aura pas donné une."}
-      </p>
-      {estResponsable && (
-        <Link
-          href="/parametres/boutiques"
-          className="mt-6 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
-        >
-          Créer une boutique
-        </Link>
-      )}
-    </div>
-  );
-}

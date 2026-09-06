@@ -4,6 +4,7 @@ import { ArrowLeft, Lock, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useCallback } from "react";
 import { PapiersMoto } from "@/components/PapiersMoto";
+import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import { LIBELLE_ETAT, LIBELLE_STATUT, type CoutMoto, type Moto } from "@/lib/domain/moto";
@@ -49,14 +50,9 @@ export function FicheMoto({ id }: { id: string }) {
       </Link>
 
       {erreur ? (
-        <p role="alert" className="mt-6 text-alerte">
-          {erreur}
-        </p>
+        <EtatErreur message={erreur} className="mt-6" />
       ) : moto === null ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement de la fiche…
-        </p>
+        <EtatChargement className="mt-6">Chargement de la fiche…</EtatChargement>
       ) : (
         <>
           <span className="plaque-code mt-3 inline-block rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe">
@@ -66,7 +62,7 @@ export function FicheMoto({ id }: { id: string }) {
             {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
           </h1>
 
-          <dl className="mt-6 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+          <dl className="mt-6 cadre cadre-liste">
             <Ligne titre="État" valeur={LIBELLE_ETAT[moto.etat]} />
             <Ligne titre="Statut" valeur={LIBELLE_STATUT[moto.statut]} />
             <Ligne titre="Boutique" valeur={moto.boutiqueId} code />
@@ -91,7 +87,7 @@ export function FicheMoto({ id }: { id: string }) {
               <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
                 Papiers fournis
               </h2>
-              <ul className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+              <ul className="mt-2 cadre cadre-liste">
                 {moto.papiersFournis.map((papier) => (
                   <li key={papier} className="px-4 py-2.5 text-encre">
                     {papier}
@@ -141,16 +137,14 @@ function Cout({ id, catalogue }: { id: string; catalogue: Catalogue }) {
       </h2>
 
       {erreur ? (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
+        <EtatErreur message={erreur} className="mt-2" />
       ) : cout === null ? (
         <p className="mt-2 flex items-center gap-3 text-sm text-encre-doux">
           <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
           Chargement…
         </p>
       ) : (
-        <dl className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <dl className="mt-2 cadre cadre-liste">
           <Ligne titre="Prix d’achat" valeur={formaterMontant(cout.prixAchat)} />
           {cout.fraisEntree.map((frais, index) => (
             <Ligne
