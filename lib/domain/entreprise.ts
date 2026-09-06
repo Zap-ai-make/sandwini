@@ -28,32 +28,39 @@
  * seule qui change d'une personne à l'autre.
  */
 export const IDENTITE = {
-  raisonSociale: "Sandwidi et frère",
+  /* Le nom légal, tel qu'il figure sur l'acte — « FRERES » au pluriel, et le
+     préfixe « ETS ». Les maquettes portaient « Sandwidi et frère » au
+     singulier : c'est le nom d'usage, et il n'a rien à faire en tête d'un
+     document commercial. Seule la casse est adoucie, l'acte étant en
+     capitales par convention de formulaire, pas par choix de nom. */
+  raisonSociale: "ETS Sandwidi et Frères",
   activite: "Vente de motos et pièces détachées",
-  siege: "Pouytenga, province du Kouritenga",
-  telephone: "70124588",
-  ifu: "00071842 R",
-  rccm: "BF-OUA-01-2016-A12-00847",
+  siege: "BP 41 — Pouytenga",
+  telephone: "70284650",
+  email: "sandwidimoustapha72@gmail.com",
+  ifu: "00084905D",
+  rccm: "BFTNK2016A495",
 } as const;
 
 /**
- * Les valeurs encore provisoires, et le fait qu'elles le sont.
+ * Les mentions encore provisoires, et le fait qu'elles le sont.
  *
- * L'IFU et le RCCM ci-dessus sont au bon format mais **n'ont pas été fournis** :
- * ils viennent des maquettes. Cette liste n'est pas un commentaire — l'écran
- * des réglages la lit et l'affiche en rouge, pour que personne ne remette un
- * reçu portant un numéro fiscal inventé sans l'avoir vu écrit.
- *
- * Vider ce tableau est le geste qui clôt le sujet, une fois les vrais numéros
- * communiqués par le responsable.
+ * **Ce tableau est vide, et c'est une bonne nouvelle** : l'IFU et le RCCM
+ * portés ci-dessus viennent de l'acte fourni par le responsable, et non plus
+ * des maquettes.
+ * Il reste en place parce que le mécanisme, lui, doit survivre : le jour où une
+ * mention devient douteuse — un déménagement de siège, un numéro qui change —
+ * l'y inscrire suffit à ce que l'écran des réglages l'affiche en rouge, plutôt
+ * qu'à espérer que quelqu'un relise ce fichier avant le prochain contrôle.
  */
-export const IDENTITE_A_CONFIRMER: readonly (keyof typeof IDENTITE)[] = ["ifu", "rccm"];
+export const IDENTITE_A_CONFIRMER: readonly (keyof typeof IDENTITE)[] = [];
 
 export const LIBELLE_IDENTITE: Record<keyof typeof IDENTITE, string> = {
   raisonSociale: "Raison sociale",
   activite: "Activité",
   siege: "Siège",
   telephone: "Téléphone",
+  email: "E-mail",
   ifu: "IFU",
   rccm: "RCCM",
 };

@@ -65,7 +65,9 @@ export function Recu({
             <p className="text-sm text-encre-doux">{IDENTITE.activite}</p>
             {boutique && <p className="text-sm text-encre-doux">{boutique.nom}</p>}
             <p className="text-sm text-encre-doux">{adresse}</p>
-            <p className="text-sm text-encre-doux">{telephone}</p>
+            <p className="text-sm text-encre-doux">
+              {telephone} · {IDENTITE.email}
+            </p>
           </div>
         </div>
 
@@ -221,7 +223,7 @@ function Signature({ titre }: { titre: string }) {
  * sans dégradé — il prend l'encre du texte courant, donc le noir du papier.
  *
  * `aria-hidden` : la raison sociale est écrite juste à côté. Un lecteur d'écran
- * qui annoncerait « Sandwidi et frère » deux fois ne rendrait service à
+ * qui annoncerait la raison sociale deux fois ne rendrait service à
  * personne.
  */
 function Monogramme() {

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { IDENTITE } from "@/lib/domain/entreprise";
 import {
   contenu,
   emailUnique,
@@ -35,7 +36,8 @@ test.describe("identité de l’entreprise", () => {
       .waitFor();
 
     const identite = contenu(page).getByRole("region").or(contenu(page)).first();
-    await expect(identite).toContainText("Sandwidi et frère");
+    await expect(identite).toContainText(IDENTITE.raisonSociale);
+    await expect(identite).toContainText(IDENTITE.ifu);
     await expect(identite).toContainText("IFU");
     await expect(identite).toContainText("RCCM");
 
