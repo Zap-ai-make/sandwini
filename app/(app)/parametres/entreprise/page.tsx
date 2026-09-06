@@ -68,7 +68,9 @@ function Identite() {
             <dt className="text-sm text-encre-doux">{LIBELLE_IDENTITE[champ]}</dt>
             <dd className="text-right text-encre">
               <span className={aConfirmer.has(champ) ? "plaque-code" : undefined}>
-                {champ === "telephone" ? formaterTelephone(IDENTITE[champ]) : IDENTITE[champ]}
+                {champ === "telephones"
+                  ? IDENTITE.telephones.map((numero) => formaterTelephone(numero)).join(" · ")
+                  : IDENTITE[champ]}
               </span>
               {aConfirmer.has(champ) && (
                 <span className="ml-2 text-sm font-semibold text-alerte">à confirmer</span>

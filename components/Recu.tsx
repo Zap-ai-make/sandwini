@@ -44,7 +44,15 @@ export function Recu({
      acheté, pas au siège social. C'est l'adresse et le téléphone de ce
      comptoir-là qu'il doit trouver sur son papier. */
   const adresse = boutique?.adresse || IDENTITE.siege;
-  const telephone = formaterTelephone(boutique?.telephone || IDENTITE.telephone);
+  /* Les quatre numéros de l'entreprise, plus celui du comptoir s'il en a un qui
+     lui est propre. Le doublon est écarté : un même numéro imprimé deux fois
+     ferait douter le client qu'il a bien lu. */
+  const telephones = [
+    ...IDENTITE.telephones,
+    ...(boutique?.telephone && !IDENTITE.telephones.includes(boutique.telephone.replace(/\s/g, ""))
+      ? [boutique.telephone]
+      : []),
+  ].map((numero) => formaterTelephone(numero));
 
   return (
     /* `bg-papier` et pas `bg-white` : à l'écran le reçu suit le thème comme le
@@ -65,9 +73,8 @@ export function Recu({
             <p className="text-sm text-encre-doux">{IDENTITE.activite}</p>
             {boutique && <p className="text-sm text-encre-doux">{boutique.nom}</p>}
             <p className="text-sm text-encre-doux">{adresse}</p>
-            <p className="text-sm text-encre-doux">
-              {telephone} · {IDENTITE.email}
-            </p>
+            <p className="text-sm text-encre-doux">{telephones.join(" · ")}</p>
+            <p className="text-sm text-encre-doux">{IDENTITE.email}</p>
           </div>
         </div>
 

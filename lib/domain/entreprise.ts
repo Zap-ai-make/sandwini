@@ -36,7 +36,15 @@ export const IDENTITE = {
   raisonSociale: "ETS Sandwidi et Frères",
   activite: "Vente de motos et pièces détachées",
   siege: "BP 41 — Pouytenga",
-  telephone: "70284650",
+  /* Les quatre numéros professionnels de l'entreprise, désignés comme tels par
+     le responsable. Ils valent pour toutes les boutiques — d'où le pluriel, et
+     d'où le fait qu'ils s'impriment sur chaque reçu : un client qui rappelle ne
+     doit pas dépendre du fait que la ligne d'un comptoir sonne ce jour-là.
+
+     Celui de l'acte scanné (70 28 46 50) n'y figure pas : il n'a pas été redit
+     dans cette liste, et un numéro qui ne répond plus est pire qu'un numéro
+     absent. L'y remettre est une ligne, s'il est toujours en service. */
+  telephones: ["72946323", "76217668", "70246397", "57069794"] as readonly string[],
   email: "sandwidimoustapha72@gmail.com",
   ifu: "00084905D",
   rccm: "BFTNK2016A495",
@@ -59,7 +67,7 @@ export const LIBELLE_IDENTITE: Record<keyof typeof IDENTITE, string> = {
   raisonSociale: "Raison sociale",
   activite: "Activité",
   siege: "Siège",
-  telephone: "Téléphone",
+  telephones: "Téléphones",
   email: "E-mail",
   ifu: "IFU",
   rccm: "RCCM",

@@ -19,7 +19,15 @@ import {
 describe("l’identité de l’entreprise", () => {
   it("porte toutes ses mentions, aucune vide", () => {
     for (const [champ, valeur] of Object.entries(IDENTITE)) {
-      expect(valeur.trim(), champ).not.toBe("");
+      const ecrit = typeof valeur === "string" ? valeur : valeur.join("");
+      expect(ecrit.trim(), champ).not.toBe("");
+    }
+  });
+
+  it("porte au moins un numéro joignable", () => {
+    expect(IDENTITE.telephones.length).toBeGreaterThan(0);
+    for (const numero of IDENTITE.telephones) {
+      expect(numero.replace(/\D/g, "").length, numero).toBeGreaterThanOrEqual(8);
     }
   });
 
