@@ -1,17 +1,46 @@
 "use client";
 
-import { Bike, Building2, Coins, LayoutGrid, Settings, Wrench } from "lucide-react";
+import {
+  Activity,
+  Bike,
+  Building2,
+  Coins,
+  FolderCheck,
+  HardHat,
+  LayoutGrid,
+  PanelLeft,
+  Plus,
+  Printer,
+  Receipt,
+  RefreshCw,
+  Settings,
+  Store,
+  Tags,
+  UserCheck,
+  Users,
+  Wrench,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { ComponentType } from "react";
+import { useCallback, useEffect, useSyncExternalStore, type ComponentType } from "react";
 import { useSession } from "@/lib/auth/session";
-import { ESPACES, espacesVisibles, type Espace } from "@/lib/domain/espaces";
+import {
+  ESPACES,
+  INTENTIONS,
+  LIBELLE_INTENTION,
+  ecransVisibles,
+  espaceDuChemin,
+  espacesVisibles,
+  type Espace,
+} from "@/lib/domain/espaces";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 
-/* L’icône de chaque espace. Le reste — route et intitulé — vit dans
+type Icone = ComponentType<{ className?: string }>;
+
+/* L'icône de chaque espace. Le reste — route et intitulé — vit dans
    `lib/domain/espaces.ts`, avec la règle qui décide qui voit quoi ; ici on ne
    garde que ce qui relève du rendu. */
-const ICONE: Record<Espace, ComponentType<{ className?: string }>> = {
+const ICONE_ESPACE: Record<Espace, Icone> = {
   /* L'entreprise, pas un radar : la supervision est le niveau au-dessus des
      boutiques, pas un poste de surveillance. Le même pictogramme désigne déjà
      l'entreprise dans les réglages. */
@@ -23,20 +52,51 @@ const ICONE: Record<Espace, ComponentType<{ className?: string }>> = {
   reglages: Settings,
 };
 
+/* L'icône de chaque écran, par sa route. Elle ne porte aucun sens à elle
+   seule — le libellé est toujours là — sauf colonne repliée, où elle devient le
+   seul repère : d'où le fait que chaque entrée en ait une, et une seule fois. */
+const ICONE_ECRAN: Record<string, Icone> = {
+  "/supervision": Activity,
+  "/dashboard": LayoutGrid,
+  "/motos/ventes/nouvelle": Plus,
+  "/motos": Bike,
+  "/motos/nouvelle": Store,
+  "/motos/ventes": Receipt,
+  "/motos/paiements": Coins,
+  "/motos/dossiers": FolderCheck,
+  "/motos/recus": Printer,
+  "/clients": Users,
+  "/pieces": Wrench,
+  "/caisse": Coins,
+  "/parametres/entreprise": Building2,
+  "/parametres/boutiques": Store,
+  "/parametres/utilisateurs": UserCheck,
+  "/parametres/catalogue": Tags,
+  "/parametres/referentiels": Activity,
+  "/parametres/prestataires": HardHat,
+  "/diagnostic": RefreshCw,
+};
+
 function estActive(chemin: string, href: string): boolean {
   return chemin === href || chemin.startsWith(`${href}/`);
 }
 
 /**
- * Navigation principale.
+ * La navigation principale — un rail d'espaces, et la colonne des écrans de
+ * l'espace courant.
  *
- * En bas sur téléphone : c’est la zone du pouce, et l’application s’utilise
- * debout, une main occupée par le client ou la moto. Sur grand écran elle passe
- * en rail vertical à gauche, où le regard la cherche.
+ * **C'est ici que disparaît le défaut n°1 du diagnostic.** La barre portait
+ * cinq liens et 90 % de vide vertical, pendant que sept écrans de l'espace
+ * motos n'apparaissaient dans aucune navigation. Le rail garde les espaces ; la
+ * colonne porte le second niveau, groupé par intention du métier.
  *
- * Ses entrées ne sont pas une liste figée : elles se déduisent du rôle et des
- * métiers de la boutique en cours (D62). Un gérant de boutique motos n’a pas
- * d’onglet « Pièces », parce que le lui montrer serait promettre un écran que
+ * Sur téléphone, la colonne s'efface et le rail passe en bas, dans la zone du
+ * pouce : c'est l'acquis du produit et il ne régresse pas. Les écrans du second
+ * niveau restent atteignables depuis les pages, comme aujourd'hui.
+ *
+ * Les entrées ne sont pas une liste figée : elles se déduisent du rôle et des
+ * métiers de la boutique en cours (D62). Un gérant de boutique motos n'a pas
+ * d'onglet « Pièces », parce que le lui montrer serait promettre un écran que
  * la garde refuserait ensuite.
  */
 export function NavigationPrincipale() {
@@ -45,61 +105,229 @@ export function NavigationPrincipale() {
   const { perimetre } = usePerimetre();
 
   if (session.statut !== "connecte") return null;
-  const entrees = espacesVisibles(session.utilisateur.role, perimetre.metiers);
+  const role = session.utilisateur.role;
+  const espaces = espacesVisibles(role, perimetre.metiers);
+  const courant = espaceDuChemin(chemin, espaces) ?? espaces[0] ?? null;
+
+  return (
+    <>
+      <span aria-hidden="true" className="coquille-filet print:hidden" />
+
+      <nav
+        aria-label="Navigation principale"
+        className="rail flex flex-col items-center gap-1 px-0 pt-4 pb-3 max-md:flex-row max-md:justify-around max-md:pt-1 print:hidden"
+      >
+        <Marque />
+        {espaces.map((espace) => {
+          const { href, libelle } = ESPACES[espace];
+          const Icone = ICONE_ESPACE[espace];
+          const active = espace === courant;
+          return (
+            <Link
+              key={href}
+              href={href}
+              aria-current={active ? "page" : undefined}
+              className={[
+                /* « Se déconnecter » et « Supervision » débordaient du rail : le
+                   mot le plus long commande la largeur, pas l'inverse. */
+                "grid w-[62px] justify-items-center gap-[3px] rounded-champ px-0.5 pt-2 pb-1 text-center text-[10px] leading-tight",
+                "[overflow-wrap:anywhere] max-md:h-14 max-md:w-auto max-md:flex-1 max-md:content-center",
+                active
+                  ? "bg-nuit-3 font-semibold text-coquille-encre"
+                  : "text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
+              ].join(" ")}
+            >
+              <Icone className="size-5" />
+              {libelle}
+            </Link>
+          );
+        })}
+      </nav>
+
+      {courant && <Colonne espace={courant} chemin={chemin} role={role} />}
+    </>
+  );
+}
+
+/**
+ * Le monogramme en tête du rail.
+ *
+ * Il ne renvoie nulle part : un logo cliquable promet un « accueil » qui
+ * n'existe pas ici — chaque rôle a le sien, et il est déjà dans le rail.
+ */
+function Marque() {
+  return (
+    <span
+      aria-hidden="true"
+      className="mb-3 block w-10 text-coquille-encre max-md:hidden"
+      title="Sandwidi et Frères"
+    >
+      <svg viewBox="0 0 546 402" className="block w-full">
+        <path
+          fill="currentColor"
+          fillOpacity="0.55"
+          d="M6 126C3 160 4 210 20 246C36 285 75 315 151 334C190 331 221 314 221 286C200 258 130 236 60 212C30 196 12 162 6 126Z"
+        />
+        <path
+          fill="currentColor"
+          d="M204 4H540C540 44 518 74 467 94L387 98V156H514C514 192 492 228 451 242L387 246V304L468 308C512 318 538 344 540 391V396H219C270 374 303 330 307 276C307 248 293 228 273 206C240 186 185 166 128 152C105 142 96 124 96 106C96 84 130 74 165 78C195 82 220 96 246 114L250 119L253 113L293 57C265 38 235 20 204 4Z"
+        />
+      </svg>
+    </span>
+  );
+}
+
+function Colonne({
+  espace,
+  chemin,
+  role,
+}: {
+  espace: Espace;
+  chemin: string;
+  role: Parameters<typeof ecransVisibles>[1];
+}) {
+  const ecrans = ecransVisibles(espace, role);
+  const repliee = useRepli();
 
   return (
     <nav
-      aria-label="Navigation principale"
-      className={[
-        // `print:hidden` : la navigation ne sort pas sur le papier (S10).
-        "sticky bottom-0 z-30 border-t border-bord bg-papier print:hidden",
-        // Placée après le contenu dans le DOM (cf. (app)/layout.tsx) : elle est
-        // donc en bas sur téléphone, et repasse à gauche sur grand écran.
-        "sm:sticky sm:top-0 sm:order-first sm:h-dvh sm:w-56 sm:shrink-0 sm:border-t-0 sm:border-r",
-      ].join(" ")}
+      aria-label={`Écrans de l’espace ${ESPACES[espace].libelle}`}
+      className="colonne flex flex-col px-3 pt-4 pb-3 max-md:hidden print:hidden"
     >
-      <ul
-        className={[
-          "flex items-stretch justify-between",
-          "sm:h-full sm:flex-col sm:justify-start sm:gap-1 sm:p-2",
-        ].join(" ")}
-      >
-        {entrees.map((espace) => {
-          const { href, libelle } = ESPACES[espace];
-          const Icone = ICONE[espace];
-          const active = estActive(chemin, href);
-          return (
-            <li key={href} className="flex-1 sm:flex-none">
-              <Link
-                href={href}
-                aria-current={active ? "page" : undefined}
-                className={[
-                  // 56 px de haut : une cible tactile confortable, pas le
-                  // minimum syndical de 44 (DESIGN.md §11).
-                  "flex h-14 flex-col items-center justify-center gap-1 text-xs font-medium",
-                  "sm:h-11 sm:flex-row sm:justify-start sm:gap-3 sm:rounded-plaque sm:px-3 sm:text-sm",
-                  active ? "text-encre" : "text-encre-doux hover:text-encre",
-                  active ? "sm:bg-fond" : "",
-                ].join(" ")}
-              >
-                {/* L’onglet actif se signale par un trait de plaque, pas par la
-                    seule couleur : lisible en plein soleil et sans distinguer
-                    les nuances (DESIGN.md §5). */}
-                <span className="relative flex items-center justify-center">
-                  <Icone className="size-5" />
-                  {active && (
-                    <span
-                      aria-hidden="true"
-                      className="absolute -bottom-1.5 h-0.5 w-5 rounded-full bg-accent-actif sm:hidden"
-                    />
-                  )}
-                </span>
-                {libelle}
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="mb-4 flex items-center gap-2">
+        <h2 className="colonne-libelle font-display text-bloc font-bold tracking-tight text-coquille-encre">
+          {ESPACES[espace].libelle}
+        </h2>
+        <BoutonRepli repliee={repliee} />
+      </div>
+
+      {INTENTIONS.map((intention) => {
+        const groupe = ecrans.filter((ecran) => ecran.intention === intention);
+        if (groupe.length === 0) return null;
+        return (
+          <section key={intention} className="pt-4 first-of-type:pt-0">
+            {/* Le groupe dit une intention du métier — vendre, suivre,
+                administrer — et non un type d'objet. C'est ce qui rend la
+                colonne lisible sans la lire. Replié, il ne reste que le filet :
+                un sur-titre de onze pixels écrasé à 64 px de large ne dirait
+                plus rien. */}
+            <h3
+              className={[
+                "px-2 pb-2 text-micro font-bold tracking-[0.09em] text-coquille-muet uppercase",
+                repliee ? "sr-only" : "",
+              ].join(" ")}
+            >
+              {LIBELLE_INTENTION[intention]}
+            </h3>
+            <ul>
+              {groupe.map(({ href, libelle }) => {
+                const Icone = ICONE_ECRAN[href] ?? Activity;
+                const active = estActive(chemin, href);
+                return (
+                  <li key={href}>
+                    <Link
+                      href={href}
+                      aria-current={active ? "page" : undefined}
+                      title={repliee ? libelle : undefined}
+                      className={[
+                        "flex items-center gap-2 rounded-champ border-l-2 px-2 py-[7px]",
+                        repliee ? "justify-center px-0" : "",
+                        /* Jamais la couleur seule : l'écran courant est marqué
+                           par le fond, le filet, la graisse et `aria-current`. */
+                        active
+                          ? "border-l-coquille-encre bg-nuit-3 font-semibold text-coquille-encre"
+                          : "border-l-transparent text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
+                      ].join(" ")}
+                    >
+                      <Icone className="size-4 shrink-0 opacity-85" />
+                      <span className="colonne-libelle">{libelle}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        );
+      })}
     </nav>
+  );
+}
+
+/**
+ * Le repli de la colonne.
+ *
+ * L'état vit sur `<html>` plutôt que dans React : c'est lui que le CSS lit pour
+ * animer la grille, et c'est lui qu'un script d'amorçage pose avant le premier
+ * rendu pour que la colonne ne s'ouvre pas puis ne se referme sous les yeux de
+ * l'utilisateur (cf. `app/layout.tsx`).
+ */
+const CLE_REPLI = "sdi.nav.repliee";
+
+/* `useSyncExternalStore` et non un `useState` synchronisé par effet : l'état
+   vit hors de React — c'est un attribut du DOM, posé avant le premier rendu par
+   le script d'amorçage et lu par le CSS. Le synchroniser dans un effet
+   provoquerait un second rendu à chaque montage, pour une valeur qu'on peut
+   simplement lire. Côté serveur, on rend la colonne dépliée : c'est l'état par
+   défaut, et le script corrige avant la peinture. */
+function useRepli(): boolean {
+  return useSyncExternalStore(souscrireAuRepli, lireLeRepli, () => false);
+}
+
+function souscrireAuRepli(auChangement: () => void): () => void {
+  const observateur = new MutationObserver(auChangement);
+  observateur.observe(document.documentElement, {
+    attributes: true,
+    attributeFilter: ["data-nav"],
+  });
+  return () => observateur.disconnect();
+}
+
+function lireLeRepli(): boolean {
+  return document.documentElement.dataset.nav === "repliee";
+}
+
+function basculerRepli() {
+  const racine = document.documentElement;
+  const repliee = racine.dataset.nav === "repliee";
+  if (repliee) delete racine.dataset.nav;
+  else racine.dataset.nav = "repliee";
+  try {
+    localStorage.setItem(CLE_REPLI, repliee ? "0" : "1");
+  } catch {
+    /* Navigation privée, stockage plein : le repli marche quand même, il ne
+       survit simplement pas au rechargement. Ce n'est pas une panne. */
+  }
+}
+
+function BoutonRepli({ repliee }: { repliee: boolean }) {
+  const basculer = useCallback(() => basculerRepli(), []);
+
+  /* `Ctrl B` : le raccourci que les éditeurs ont appris à tout le monde pour ce
+     geste exact. Sur un poste utilisé huit heures par jour, replier au clavier
+     évite d'aller chercher un bouton de seize pixels. */
+  useEffect(() => {
+    function auClavier(evenement: KeyboardEvent) {
+      if (!(evenement.ctrlKey || evenement.metaKey) || evenement.altKey) return;
+      if (evenement.key.toLowerCase() !== "b") return;
+      evenement.preventDefault();
+      basculerRepli();
+    }
+    window.addEventListener("keydown", auClavier);
+    return () => window.removeEventListener("keydown", auClavier);
+  }, []);
+
+  return (
+    <button
+      type="button"
+      onClick={basculer}
+      aria-expanded={!repliee}
+      title={`${repliee ? "Déplier" : "Replier"} la navigation (Ctrl B)`}
+      className="ml-auto grid size-7 shrink-0 place-items-center rounded-champ text-coquille-muet hover:bg-nuit-3 hover:text-coquille-encre"
+    >
+      <PanelLeft aria-hidden="true" className="size-4" />
+      <span className="sr-only">
+        {repliee ? "Déplier la navigation" : "Replier la navigation"}
+      </span>
+    </button>
   );
 }

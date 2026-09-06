@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { accedeEspace, accueilDuRole, espacesVisibles } from "./espaces";
+import {
+  accedeEspace,
+  accueilDuRole,
+  ecransVisibles,
+  espaceDuChemin,
+  espacesVisibles,
+} from "./espaces";
 
 describe("espacesVisibles — le gérant", () => {
   it("ne voit que l’espace du métier de sa boutique", () => {
@@ -88,5 +94,55 @@ describe("accueilDuRole", () => {
   it("envoie le responsable à la supervision et le gérant à son accueil", () => {
     expect(accueilDuRole("responsable")).toBe("/supervision");
     expect(accueilDuRole("gerant")).toBe("/dashboard");
+  });
+});
+
+describe("le second niveau de navigation", () => {
+  it("met les huit écrans de l’espace motos à portée, groupés par intention", () => {
+    const ecrans = ecransVisibles("motos", "gerant");
+    expect(ecrans).toHaveLength(8);
+    expect(ecrans.map((e) => e.href)).toEqual(
+      expect.arrayContaining([
+        "/motos",
+        "/motos/nouvelle",
+        "/motos/ventes",
+        "/motos/ventes/nouvelle",
+        "/motos/paiements",
+        "/motos/dossiers",
+        "/motos/recus",
+      ]),
+    );
+    expect(new Set(ecrans.map((e) => e.intention))).toEqual(
+      new Set(["vendre", "suivre", "administrer"]),
+    );
+  });
+
+  it("cache au gérant les écrans d’administration qu’une garde lui refuserait", () => {
+    const hrefs = ecransVisibles("reglages", "gerant").map((e) => e.href);
+    expect(hrefs).toEqual(["/diagnostic"]);
+    expect(ecransVisibles("reglages", "responsable").length).toBeGreaterThan(6);
+  });
+
+  it("désigne l’écran le plus précis, pas le préfixe le plus court", () => {
+    const ouverts = espacesVisibles("gerant", ["motos"]);
+    expect(espaceDuChemin("/motos/ventes/nouvelle", ouverts)).toBe("motos");
+    expect(espaceDuChemin("/motos", ouverts)).toBe("motos");
+  });
+
+  /* `/clients` est un fichier commun (D16) : il vit dans plusieurs espaces à la
+     fois. Sans la contrainte des espaces ouverts, un gérant y voyait la colonne
+     de la supervision — et un lien que sa propre garde lui aurait refusé.
+
+     Entre les espaces qui restent, on prend le premier de la liste, c'est-à-dire
+     celui où la personne atterrit en se connectant : sa journée pour un gérant,
+     la supervision pour un responsable. Ce n'est pas le seul choix défendable —
+     garder l'espace d'où l'on vient en serait un autre — mais c'est le seul qui
+     donne la même réponse quel que soit le chemin parcouru pour arriver là. */
+  it("ne déduit jamais un espace fermé à cette personne", () => {
+    expect(espaceDuChemin("/clients", espacesVisibles("gerant", ["motos"]))).toBe("accueil");
+    expect(espaceDuChemin("/clients", espacesVisibles("responsable", ["motos"]))).toBe(
+      "supervision",
+    );
+    expect(espaceDuChemin("/supervision", espacesVisibles("gerant", ["motos"]))).toBeNull();
   });
 });

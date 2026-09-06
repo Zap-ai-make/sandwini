@@ -292,6 +292,141 @@
 }
 
 @layer components {
+  /* ==========================================================================
+     LA COQUILLE
+
+     Un rail d'espaces étroit, une colonne d'écrans groupés par intention, et la
+     zone de travail qui prend tout le reste. C'est la réponse au « la barre
+     latérale est vide » : le second niveau vit à gauche, en permanence, au lieu
+     de n'exister nulle part.
+
+     Écrit en CSS et non en classes utilitaires pour une seule raison : la
+     colonne doit **s'animer**, et une largeur animable demande une variable
+     typée (`@property --colonne`, plus haut). Tailwind ne sait pas exprimer ça.
+     ========================================================================== */
+  .appli {
+    display: grid;
+    grid-template-columns: var(--rail) var(--colonne) minmax(0, 1fr);
+    grid-template-rows: 100dvh;
+    min-height: 100dvh;
+    /* C'est la grille elle-même qui morphe : le tableau s'élargit dans le même
+       geste, au lieu d'être recouvert par un calque puis redessiné. */
+    transition: --colonne var(--duree-repli) var(--ease-sortie);
+  }
+  :root[data-nav="repliee"] .appli {
+    --colonne: 64px;
+  }
+
+  .rail {
+    grid-column: 1;
+    grid-row: 1;
+    background-color: var(--color-nuit);
+    border-right: 1px solid var(--color-nuit-filet);
+    overflow-y: auto; /* un écran court ne coupe pas la déconnexion */
+    /* Dans la coquille, l'anneau de focus s'inverse. */
+    --color-focus-trait: #ffffff;
+    --color-focus-halo: var(--color-nuit);
+  }
+
+  .colonne {
+    grid-column: 2;
+    grid-row: 1;
+    background-color: var(--color-nuit-2);
+    border-right: 1px solid var(--color-nuit-filet);
+    overflow-x: hidden; /* pendant le repli, rien ne dépasse */
+    overflow-y: auto;
+    --color-focus-trait: #ffffff;
+    --color-focus-halo: var(--color-nuit-2);
+  }
+
+  .travail {
+    grid-column: 3;
+    grid-row: 1;
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+  }
+
+  /* Les libellés s'effacent **avant** que la place ne se referme, et reviennent
+     après qu'elle existe. Sans ce décalage, le texte est écrasé pendant la
+     transition — c'est ce détail qui sépare un repli soigné d'une largeur
+     animée. */
+  .colonne-libelle {
+    display: block;
+    max-width: 14rem;
+    overflow: hidden;
+    white-space: nowrap;
+    opacity: 1;
+    transition:
+      opacity calc(var(--duree-repli) / 2) var(--ease-sortie)
+        calc(var(--duree-repli) / 2),
+      max-width var(--duree-repli) var(--ease-sortie);
+  }
+  :root[data-nav="repliee"] .colonne-libelle {
+    max-width: 0;
+    opacity: 0;
+    transition:
+      opacity calc(var(--duree-repli) / 2) var(--ease-sortie),
+      max-width var(--duree-repli) var(--ease-sortie);
+  }
+
+  /* Le seul endroit où le dégradé du monogramme sort du logo : un filet de deux
+     pixels en tête de coquille. `CAHIER-UI.md` §4 interdit le dégradé en fond de
+     section — il est ici un trait, pas une surface. */
+  .coquille-filet {
+    position: fixed;
+    z-index: 60;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: linear-gradient(
+      90deg,
+      var(--color-or),
+      var(--color-orange) 55%,
+      var(--color-rouge)
+    );
+  }
+
+  /* Le mobile garde son acquis : la navigation passe en bas, dans la zone du
+     pouce, et la colonne disparaît — ses écrans restent atteignables par les
+     pages elles-mêmes. Le placement est explicite pour que l'ordre visuel ne
+     dépende pas de l'ordre du DOM : la navigation vient en premier dans le
+     document, où les lecteurs d'écran la cherchent. */
+  @media (max-width: 767px) {
+    .appli {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: minmax(0, 1fr) auto;
+    }
+    /* Le masquage de la colonne vit sur l'élément (`max-md:hidden`) et non ici :
+       une utilitaire Tailwind `flex` l'emporte sur la couche `components`, et
+       la colonne restait affichée sur téléphone — la moitié de l'écran perdue,
+       vu sur la capture et non deviné. */
+    .travail {
+      grid-column: 1;
+      grid-row: 1;
+    }
+    .rail {
+      grid-column: 1;
+      grid-row: 2;
+      border-right: 0;
+      border-top: 1px solid var(--color-nuit-filet);
+      overflow-x: auto;
+      overflow-y: visible;
+    }
+  }
+
+  /* Sur le papier, la coquille n'existe pas : il ne reste que le document. */
+  @media print {
+    .appli {
+      display: block;
+      min-height: 0;
+    }
+    .rail,
+    .colonne,
+    .coquille-filet {
+      display: none;
+    }
+  }
+
   /* La signature du produit : le bandeau dessiné comme une plaque.
      Utilisé au repos (discret) et en alerte (jaune plein) — cf. BandeauEtat. */
   .plaque-code {
