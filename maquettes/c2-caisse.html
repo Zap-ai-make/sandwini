@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Journal du jour — caisse — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+</head>
+<body>
+
+<!-- Le seul endroit où le dégradé du monogramme sort du logo. -->
+<div class="coquille-filet" aria-hidden="true"></div>
+<a class="sr" href="#travail">Aller au contenu</a>
+
+<div class="appli">
+
+<nav class="rail" aria-label="Espaces">
+  <a class="rail-marque" href="index.html" aria-label="SDI — retour à la galerie">
+    <img src="../design/marque/monogramme-se.svg" alt="">
+  </a>
+  <a class="rail-lien" href="a3-accueil-gerant.html"><span data-icone="accueil"></span><span>Accueil</span></a>
+  <a class="rail-lien" href="a4-stock-motos.html"><span data-icone="moto"></span><span>Motos</span></a>
+  <a class="rail-lien" href="c1-pieces.html"><span data-icone="piece"></span><span>Pièces</span></a>
+  <a class="rail-lien" href="c2-caisse.html" aria-current="page"><span data-icone="caisse"></span><span>Caisse</span></a>
+  <a class="rail-lien" href="a9-reglages.html"><span data-icone="reglages"></span><span>Réglages</span></a>
+  <div class="rail-pied">
+    <button class="rail-lien" type="button" data-bascule-theme aria-pressed="false"><span data-icone="soleil"></span><span data-bascule-texte>Thème clair</span></button>
+    <a class="rail-lien" href="a1-connexion.html"><span data-icone="sortir"></span><span>Se déconnecter</span></a>
+  </div>
+</nav>
+
+<nav class="colonne" id="colonne-ecrans" aria-label="Navigation principale">
+  <p class="colonne-espace"><span>Caisse</span></p>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Aujourd’hui</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="c2-caisse.html" aria-current="page"><span data-icone="caisse"></span><span>Journal du jour</span></a></li>
+      <li><a class="colonne-lien" href="#"><span data-icone="coche"></span><span>Clôturer</span></a></li>
+    </ul>
+  </div>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>L’historique</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="#"><span data-icone="calendrier"></span><span>Clôtures passées</span></a></li>
+    </ul>
+  </div>
+  <button class="colonne-pied" type="button" data-ouvre="mon-nom" id="btn-mon-nom">
+    <span data-icone="utilisateur"></span>
+    <span><span class="colonne-pied-nom">Ousmane Sawadogo</span><br>Gérant · Pouytenga</span>
+  </button>
+</nav>
+
+  <div class="travail">
+<header class="banniere" role="banner" data-reseau="a-jour">
+  <button class="plier" type="button" data-plier aria-expanded="true"
+          aria-controls="colonne-ecrans" title="Replier la navigation (Ctrl B)">
+    <span data-icone="plier"></span>
+    <span class="sr" data-plier-texte>Replier la navigation</span>
+  </button>
+  <span class="plaque">PTG</span>
+  <span class="banniere-nom" id="nom-boutique">Pouytenga</span>
+  <span class="banniere-espace"></span>
+  <button class="recherche" type="button" data-ouvre="palette" id="btn-recherche">
+    <span data-icone="chercher"></span>
+    <span>Chercher une moto, une vente, un client…</span>
+    <kbd class="touche">Ctrl K</kbd>
+  </button>
+  <span class="etat" role="status" data-etat="a-jour"><span data-icone="coche"></span>À jour</span>
+</header>
+    <main class="page" id="travail" tabindex="-1">
+      <p class="ruban-apercu" role="note">Aperçu — cet écran n’est pas implémenté dans cette refonte. Il montre la place que prendra la suite (specs S20 à S24).</p>
+      <div class="page-large">
+        <div class="tete">
+          <div class="tete-texte">
+            <p class="sur-titre">Caisse · Pouytenga</p>
+            <h1>Journal du jour</h1>
+            <p class="aide">Vendredi 5 septembre 2026 · ouverte à 08:00 par Ousmane Sawadogo</p>
+          </div>
+          <button class="btn btn-principal" type="button">Clôturer la journée</button>
+        </div>
+
+        <div class="deux-colonnes">
+          <div class="cadre">
+            <div class="cadre-tete">
+              <h2>Les mouvements</h2>
+              <p class="cadre-compte">6 mouvements</p>
+            </div>
+            <table class="repli">
+              <caption class="sr">Mouvements de caisse du 5 septembre 2026</caption>
+              <thead>
+                <tr>
+                  <th scope="col" class="num">Heure</th><th scope="col">Pièce</th>
+                  <th scope="col">Nature</th><th scope="col">Qui</th>
+                  <th scope="col">Moyen</th><th scope="col" class="num">Montant</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td data-col="Heure" class="code">09:20</td>
+                  <td data-col="Pièce"><span class="code">PTG-2609-0037</span></td>
+                  <td data-col="Nature">Versement</td>
+                  <td data-col="Qui" class="principal">Boukary Sawadogo</td>
+                  <td data-col="Moyen">Espèces</td>
+                  <td data-col="Montant" class="num">100 000</td>
+                </tr>
+                <tr>
+                  <td data-col="Heure" class="code">10:05</td>
+                  <td data-col="Pièce"><span class="code">PTG-2609-0041</span></td>
+                  <td data-col="Nature">Vente</td>
+                  <td data-col="Qui" class="principal">Idrissa Ouattara</td>
+                  <td data-col="Moyen">Espèces</td>
+                  <td data-col="Montant" class="num">585 000</td>
+                </tr>
+                <tr>
+                  <td data-col="Heure" class="code">11:42</td>
+                  <td data-col="Pièce"><span class="code">PTG-2609-0044</span></td>
+                  <td data-col="Nature">Pièces</td>
+                  <td data-col="Qui" class="principal">Comptoir</td>
+                  <td data-col="Moyen">Espèces</td>
+                  <td data-col="Montant" class="num">22 000</td>
+                </tr>
+                <tr>
+                  <td data-col="Heure" class="code">13:15</td>
+                  <td data-col="Pièce"><span class="code">—</span></td>
+                  <td data-col="Nature">Sortie</td>
+                  <td data-col="Qui" class="principal">Carburant groupe</td>
+                  <td data-col="Moyen">Espèces</td>
+                  <td data-col="Montant" class="num">−15 000</td>
+                </tr>
+                <tr>
+                  <td data-col="Heure" class="code">14:48</td>
+                  <td data-col="Pièce"><span class="code">PTG-2609-0042</span></td>
+                  <td data-col="Nature">Vente</td>
+                  <td data-col="Qui" class="principal">Rasmané Nikiéma</td>
+                  <td data-col="Moyen">Orange Money</td>
+                  <td data-col="Montant" class="num">150 000</td>
+                </tr>
+                <tr>
+                  <td data-col="Heure" class="code">15:12</td>
+                  <td data-col="Pièce"><span class="code">PTG-2609-0043</span></td>
+                  <td data-col="Nature">Versement</td>
+                  <td data-col="Qui" class="principal">Rasmané Nikiéma</td>
+                  <td data-col="Moyen">Orange Money</td>
+                  <td data-col="Montant" class="num">150 000</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="cadre" style="padding:var(--e5);align-self:start">
+            <h2>La clôture</h2>
+            <dl class="faits" style="margin:var(--e4) 0">
+              <dt>Fonds d’ouverture</dt><dd class="montant">50 000 FCFA</dd>
+              <dt>Espèces encaissées</dt><dd class="montant">707 000 FCFA</dd>
+              <dt>Sorties d’espèces</dt><dd class="montant">−15 000 FCFA</dd>
+              <dt>Orange Money</dt><dd class="montant">300 000 FCFA</dd>
+            </dl>
+            <p class="recap-total"><span>Espèces attendues en caisse</span>
+              <span class="montant">742 000 FCFA</span></p>
+            <div class="champ" style="margin-top:var(--e5)">
+              <label for="compte">Espèces comptées</label>
+              <input id="compte" type="text" inputmode="numeric" value="742 000">
+              <p class="champ-aide">Comptez avant de clôturer : l’écart est enregistré
+                 avec la clôture et ne se corrige plus après.</p>
+            </div>
+            <button class="btn btn-principal btn-large" type="button">Clôturer la journée</button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- La palette de commandes : Ctrl K, ou « / ». Sur un poste utilisé huit
+     heures par jour, c'est ce qui sépare un outil d'un formulaire. -->
+<div id="palette" class="voile" data-panneau data-piege hidden>
+  <div class="palette-boite" role="dialog" aria-modal="true" aria-label="Chercher">
+    <div class="palette-champ">
+      <span data-icone="chercher" class="muet"></span>
+      <label class="sr" for="palette-q">Chercher une moto, une vente ou un client</label>
+      <input id="palette-q" type="search" value="hao">
+      <button class="btn btn-discret" type="button" data-ferme>Échap</button>
+    </div>
+    <ul class="palette-liste">
+      <li><a href="#"><span data-icone="moto"></span>
+        <span><strong>Haojue HJ 150-9A</strong> · <span class="code">LC6PCJL57M0043118</span></span>
+        <span class="pastille pastille-transit">Réservée</span></a></li>
+      <li><a href="#"><span data-icone="moto"></span>
+        <span><strong>Haojue HJ 125-11</strong> · <span class="code">LC6PCJL51M0042980</span></span>
+        <span class="pastille pastille-neutre">Vendue</span></a></li>
+      <li><a href="a6-ventes.html"><span data-icone="vente"></span>
+        <span>Vente <span class="code">PTG-2608-0231</span> · Haojue HJ 125-11 · Salifou Kaboré</span></a></li>
+    </ul>
+    <p class="palette-pied aide">
+      <kbd class="touche">↑</kbd> <kbd class="touche">↓</kbd> pour parcourir ·
+      <kbd class="touche">Entrée</kbd> pour ouvrir ·
+      <kbd class="touche">Échap</kbd> pour fermer
+    </p>
+  </div>
+</div>
+
+<div id="mon-nom" class="voile" data-panneau data-piege hidden>
+  <div class="palette-boite" role="dialog" aria-modal="true" aria-labelledby="titre-mon-nom">
+    <form class="dialogue" action="#" method="post">
+      <h2 id="titre-mon-nom">Mon nom affiché</h2>
+      <p class="aide">C’est ce nom qui s’imprime au bas des reçus que vous remettez,
+         à la ligne « Le gérant ». Sans lui, l’application imprime votre adresse
+         e-mail — ce qu’un client n’a pas à lire.</p>
+      <div class="champ">
+        <label for="nom-affiche">Nom affiché</label>
+        <input id="nom-affiche" type="text" value="Ousmane Sawadogo" autocomplete="name">
+        <p class="champ-aide">Nom et prénom, tels que vous voulez les voir sur le papier.</p>
+      </div>
+      <div class="dialogue-pied">
+        <button class="btn" type="button" data-ferme>Annuler</button>
+        <button class="btn btn-principal" type="submit">Enregistrer le nom</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Ce qui change sans que la page change : un lecteur d'écran doit l'entendre.
+     Une animation ne remplace jamais une annonce. -->
+<p id="annonce" role="status" aria-live="polite" class="sr"></p>
+
+<script src="coquille.js"></script>
+</body>
+</html>

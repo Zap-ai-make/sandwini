@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 546 402" role="img" aria-labelledby="titre-se-mono">
+  <title id="titre-se-mono">Sandwidi et frère</title>
+  <!--
+    Variante monochrome du monogramme — pour l'en-tête du reçu imprimé et le
+    favicon. Même tracé que `monogramme-se.svg`, sans dégradé : elle prend la
+    couleur du texte courant (`currentColor`), donc l'encre du reçu sur le
+    papier et le blanc sur la coquille sombre.
+
+    La goutte est posée à 55 % : à plat, elle se confondrait avec le S qu'elle
+    touche, et le monogramme deviendrait une tache. C'est la seule différence
+    avec la version couleur, où c'est le bleu qui fait ce travail.
+  -->
+  <path fill="currentColor" fill-opacity="0.55" d="M6 126
+    C3 160 4 210 20 246
+    C36 285 75 315 151 334
+    C190 331 221 314 221 286
+    C200 258 130 236 60 212
+    C30 196 12 162 6 126 Z"/>
+  <path fill="currentColor" d="M204 4
+    H540
+    C540 44 518 74 467 94
+    L387 98 V156
+    H514
+    C514 192 492 228 451 242
+    L387 246 V304
+    L468 308
+    C512 318 538 344 540 391
+    V396 H219
+    C270 374 303 330 307 276
+    C307 248 293 228 273 206
+    C240 186 185 166 128 152
+    C105 142 96 124 96 106
+    C96 84 130 74 165 78
+    C195 82 220 96 246 114
+    L250 119 L253 113
+    L293 57
+    C265 38 235 20 204 4 Z"/>
+</svg>

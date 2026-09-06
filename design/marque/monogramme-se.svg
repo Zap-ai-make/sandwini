@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 546 402" role="img" aria-labelledby="titre-se">
+  <title id="titre-se">Sandwidi et frère</title>
+  <!--
+    Monogramme SE, redessiné d'après design/marque/logo-se-fond-sombre.jpg.
+
+    Le scan a été relevé au balayage de lignes (bords gauche et droit de la
+    forme tous les quelques pixels), puis régularisé : les extrémités des trois
+    barres sont des ogives, pas des biseaux droits — c'est ce qui donne au S et
+    au E leur fusion liquide, et un biseau droit fait aussitôt logotype bon
+    marché. Les teintes du dégradé sont celles du fichier, remontées en clarté :
+    un scan sous-exposé n'est pas une couleur de marque. L'or tient toute la
+    moitié gauche avant de virer, comme sur l'original.
+
+    Deux formes, deux chemins : la goutte (dessous), puis le S et le E fondus
+    en une seule silhouette qui partage la barre haute et la barre basse.
+    Le dégradé appartient à ce fichier et ne s'étale nulle part ailleurs
+    (CAHIER-UI.md §4).
+  -->
+  <defs>
+    <linearGradient id="se-metal" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#E0A81A"/>
+      <stop offset="0.50" stop-color="#DFA01C"/>
+      <stop offset="0.63" stop-color="#DD7A28"/>
+      <stop offset="0.82" stop-color="#D3592C"/>
+      <stop offset="1" stop-color="#C93C2E"/>
+    </linearGradient>
+    <linearGradient id="se-goutte" x1="0.1" y1="0" x2="0.9" y2="1">
+      <stop offset="0" stop-color="#2E9BC4"/>
+      <stop offset="1" stop-color="#1F52A8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- La goutte : la trace, ce qui file vers la gauche. Un croissant, pointe en haut. -->
+  <path fill="url(#se-goutte)" d="M6 126
+    C3 160 4 210 20 246
+    C36 285 75 315 151 334
+    C190 331 221 314 221 286
+    C200 258 130 236 60 212
+    C30 196 12 162 6 126 Z"/>
+
+  <!-- Le S et le E fondus : ils partagent la barre haute et la barre basse. -->
+  <path fill="url(#se-metal)" d="M204 4
+    H540
+    C540 44 518 74 467 94
+    L387 98 V156
+    H514
+    C514 192 492 228 451 242
+    L387 246 V304
+    L468 308
+    C512 318 538 344 540 391
+    V396 H219
+    C270 374 303 330 307 276
+    C307 248 293 228 273 206
+    C240 186 185 166 128 152
+    C105 142 96 124 96 106
+    C96 84 130 74 165 78
+    C195 82 220 96 246 114
+    L250 119 L253 113
+    L293 57
+    C265 38 235 20 204 4 Z"/>
+</svg>

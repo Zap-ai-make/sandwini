@@ -59,6 +59,24 @@ avant toute spec post-MVP.
 
 ---
 
+## Chantier de refonte d'interface
+
+Cadré par `CAHIER-UI.md`, pas par `prompt.md` : ce n'est pas une fonctionnalité de plus, c'est la
+forme qui rend les douze specs livrées évidentes. La phase 1 (maquettes statiques) a été validée
+par le commanditaire ; la phase 2 s'exécute comme deux specs normales.
+
+| ID  | Spec                                              | Dépend de | Périmètre | Statut  |
+|-----|---------------------------------------------------|-----------|-----------|---------|
+| S28 | Refonte de l'interface — jetons, coquille, patrons | S12       | post-MVP  | à faire |
+| S29 | Refonte de l'interface — les écrans                | S28       | post-MVP  | à faire |
+
+La coupure entre les deux n'est pas administrative : à la fin de S28 l'application tourne dans la
+nouvelle coquille avec ses écrans d'aujourd'hui. Le défaut n°1 du diagnostic — le rail vide et le
+`max-w-3xl` — est corrigé et déployable **avant** qu'un seul écran métier soit réécrit. Si le
+chantier devait s'arrêter là, le produit y aurait déjà gagné.
+
+---
+
 ## Ce que le MVP ne fait volontairement pas
 
 Espace pièces détachées · inventaires · caisse et clôture · chiffres de la supervision · pages publiques

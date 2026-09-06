@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="titre-se-favicon">
+  <title id="titre-se-favicon">SDI — Sandwidi et frère</title>
+  <!--
+    Favicon : le monogramme sur le nuit de la marque, dans un carré arrondi.
+    À 16 px, le dégradé ne se lit plus et la goutte se ferme ; on garde donc
+    l'or plein et on écarte le monogramme du bord pour qu'il reste un signe
+    reconnaissable plutôt qu'une bouillie.
+  -->
+  <rect width="64" height="64" rx="12" fill="#14142B"/>
+  <g transform="translate(9 15) scale(0.0842)">
+    <path fill="#1F52A8" d="M6 126
+    C3 160 4 210 20 246
+    C36 285 75 315 151 334
+    C190 331 221 314 221 286
+    C200 258 130 236 60 212
+    C30 196 12 162 6 126 Z"/>
+    <path fill="#E0A81A" d="M204 4
+    H540
+    C540 44 518 74 467 94
+    L387 98 V156
+    H514
+    C514 192 492 228 451 242
+    L387 246 V304
+    L468 308
+    C512 318 538 344 540 391
+    V396 H219
+    C270 374 303 330 307 276
+    C307 248 293 228 273 206
+    C240 186 185 166 128 152
+    C105 142 96 124 96 106
+    C96 84 130 74 165 78
+    C195 82 220 96 246 114
+    L250 119 L253 113
+    L293 57
+    C265 38 235 20 204 4 Z"/>
+  </g>
+</svg>

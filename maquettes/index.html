@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SDI — maquettes de la refonte</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+</head>
+<body class="galerie">
+
+<div class="coquille-filet" aria-hidden="true"></div>
+<a class="sr" href="#travail">Aller au contenu</a>
+
+<header class="galerie-tete">
+  <img class="galerie-logo" src="../design/marque/monogramme-se.svg" alt="">
+  <div>
+    <p class="sur-titre" style="color:var(--coquille-doux)">Sandwidi et frère · phase 1</p>
+    <h1>Les maquettes de la refonte</h1>
+    <p class="galerie-mots">
+      Vingt-cinq écrans HTML, à ouvrir dans le navigateur. Rien n’est branché : ce sont
+      des dessins, avec des données inventées mais plausibles. Commentez écran par écran ;
+      rien ne passe à l’implémentation sans votre accord.
+    </p>
+  </div>
+  <button class="btn galerie-theme" type="button" data-bascule-theme aria-pressed="false">
+    <span data-icone="soleil"></span><span data-bascule-texte>Thème clair</span>
+  </button>
+</header>
+
+<main id="travail" tabindex="-1" class="galerie-corps">
+
+  <section class="galerie-bloc">
+    <h2>La direction</h2>
+    <p class="aide prose">Le bloc que <span class="code">DESIGN.md</span> §2 exige avant
+       de dessiner un seul écran. C’est la référence de tous les écrans qui suivent.</p>
+    <pre class="direction">SUJET      SDI — le logiciel de comptoir de Sandwidi et frère, vendeur de motos au
+           Burkina Faso. Deux personnes s’en servent : le gérant, debout derrière son
+           comptoir avec un client en face de lui toute la journée, et le responsable,
+           qui arbitre entre les boutiques. Le job de chaque écran est de répondre sans
+           lire à quatre questions : où j’écris · où je peux aller · ce que je fais
+           maintenant · si c’est parti.
+
+PALETTE    Nuit #14142B — la coquille, et le fond du monogramme.
+           Plaque #F5C518 — SIGNAL, deux emplois : la boutique, et le hors-ligne.
+           Goutte #1F52A8 — ce qui est parti et n’est pas revenu : un papier chez le
+           prestataire, une saisie en cours d’envoi. C’est la goutte du logo.
+           Braise #C2372A — le retard et l’irréversible. C’est la fin du dégradé du logo.
+           Plus l’encre, le papier, le fond et les bords. Toutes les valeurs et leurs
+           contrastes sont vérifiés plus bas.
+
+TYPO       Archivo, déjà installée : 700 resserrée en capitales pour les titres d’écran
+           et les intitulés du rail — une graisse de signalétique, pas de magazine ;
+           400 pour le corps. IBM Plex Mono pour ce qui se dicte au téléphone ou se lit
+           sur du métal : numéro de pièce, châssis, moteur, code boutique. Jamais de la
+           prose. Les deux fichiers sont dans le répertoire : rien ne part sur le réseau.
+
+LAYOUT     Un rail d’espaces étroit et une colonne d’écrans groupés par intention
+           tiennent la gauche en permanence ; la zone de travail prend tout le reste,
+           bornée à 1600 px. La colonne se replie sur ses icônes (Ctrl B) sans rien
+           rendre inaccessible : les huit écrans restent atteignables repliés.
+
+           ┌────┬───────────────┬─────────────────────────────────────────────────┐
+           │ SE │ MOTOS         │ ▮PTG  Pouytenga     Chercher  Ctrl K     À jour │
+           │    ├───────────────┼─────────────────────────────────────────────────┤
+           │ ▣  │ VENDRE        │ STOCK MOTOS              [ Faire entrer une … ] │
+           │Acc.│  Nouvelle …   │ ─────────────────────────────────────────────── │
+           │ ▣  │  Faire entrer │ Tout · Neuve · Occasion          128 motos      │
+           │Moto│ SUIVRE        │ ┌─────────────────────────────────────────────┐ │
+           │ ▣  │  Stock motos  │ │ CHÂSSIS      MARQUE   ÉTAT   PRIX    STATUT │ │
+           │Pièc│  Ventes       │ │ …tableau pleine largeur, en-têtes collés…   │ │
+           │ ▣  │  Paiements 12 │ └─────────────────────────────────────────────┘ │
+           │Cais│  Dossiers   7 │                                                 │
+           │ ▣  │  Reçus        │                                                 │
+           │Régl│ LE FICHIER    │                                                 │
+           │    │  Clients      │                                                 │
+           └────┴───────────────┴─────────────────────────────────────────────────┘
+             72px     224px                   le reste, borné à 1600 px
+
+SIGNATURE  La souche. Chaque pièce du magasin porte un numéro que le gérant dicte au
+           téléphone : PTG-2609-0042 — code boutique, année et mois, rang dans le mois.
+           L’interface en fait un objet : un pavé détaché, bord cranté à gauche comme
+           une souche arrachée du carnet, le code en pavé plein et le numéro en Plex
+           Mono lettré. Il ouvre chaque fiche et chaque reçu. C’est la seule forme
+           découpée de l’interface ; tout le reste est droit, dense et calme.</pre>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>La marque</h2>
+    <p class="aide prose">
+      Le monogramme est redessiné en SVG à partir de votre scan : un chemin par forme,
+      les dégradés en <span class="code">linearGradient</span>. Les teintes sont celles
+      du fichier, relevées à la pipette et remontées en clarté — un scan sous-exposé
+      n’est pas une couleur de marque. Les extrémités des barres sont des ogives, comme
+      sur l’original : un biseau droit ferait aussitôt logotype bon marché.
+    </p>
+    <div class="marques">
+      <figure class="marque marque-nuit">
+        <img src="../design/marque/monogramme-se.svg" alt="Monogramme SE en couleur">
+        <figcaption>Couleur — la coquille et l’écran de connexion</figcaption>
+      </figure>
+      <figure class="marque marque-papier">
+        <img src="../design/marque/monogramme-se-mono.svg" alt="Monogramme SE monochrome">
+        <figcaption>Monochrome — l’en-tête du reçu imprimé</figcaption>
+      </figure>
+      <figure class="marque marque-nuit">
+        <img class="marque-petit" src="../design/marque/monogramme-se-favicon.svg"
+             alt="Favicon SE">
+        <figcaption>Favicon — 64 px, et l’onglet du navigateur</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>L’arbitrage du jaune</h2>
+    <p class="prose">
+      Le jaune de plaque et le dégradé or du logo se disputaient le même registre.
+      <strong>La marque prend la coquille ; le jaune redevient un signal.</strong>
+      Le nuit du logo habille le rail, l’en-tête et l’écran de connexion. Le
+      <span class="code">#F5C518</span> ne sert plus qu’à deux choses : dire quelle
+      boutique, et dire hors ligne. Un signal qui n’apparaît qu’à deux endroits reste
+      un signal ; un signal partout n’est plus qu’une couleur.
+    </p>
+    <p class="prose">
+      Ce que cela ouvre : <em>hors ligne</em> se lit en jaune plein, et
+      <em>en attente d’envoi alors que le réseau est là</em> se lit en bleu — la goutte
+      du logo. Le produit fait déjà cette distinction sans la rendre lisible.
+      La décision est consignée en <span class="code">D70</span> dans
+      <span class="code">DECISIONS.md</span>.
+    </p>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>La palette, et ses contrastes</h2>
+    <p class="aide prose">
+      Chaque paire texte/fond est calculée. Le seuil est 4,5:1 pour du texte normal
+      et 3:1 pour une bordure de champ (WCAG AA). Ces valeurs seront transcrites telles
+      quelles dans <span class="code">app/globals.css</span> à la phase 2.
+    </p>
+
+    <h3 class="sur-titre" style="margin-top:var(--e5)">Thème clair</h3>
+    <ul class="jetons">
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#14142b"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Nuit <span class="code muet">#14142B</span></p>
+                <p class="aide">La coquille : rail, colonne, connexion. C’est le fond du monogramme.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>texte blanc dessus</span><span class="code">18,03:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#0f1720"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Encre <span class="code muet">#0F1720</span></p>
+                <p class="aide">Le texte.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">18,05:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur fond</span><span class="code">15,93:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#5a6672"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Encre douce <span class="code muet">#5A6672</span></p>
+                <p class="aide">Le texte secondaire, les légendes.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">5,87:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur fond</span><span class="code">5,18:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#ffffff"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Papier <span class="code muet">#FFFFFF</span></p>
+                <p class="aide">La feuille : la zone de travail.</p>
+                
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#eef1f5"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Fond <span class="code muet">#EEF1F5</span></p>
+                <p class="aide">Ce qui n’est pas la feuille.</p>
+                
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#7c8894"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Bord fort <span class="code muet">#7C8894</span></p>
+                <p class="aide">La bordure d’un champ — elle doit se voir.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">3,62:1</span><span class="muet">seuil 3,00</span></li><li class="preuve preuve-ok"><span>sur fond</span><span class="code">3,19:1</span><span class="muet">seuil 3,00</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#f5c518"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Plaque <span class="code muet">#F5C518</span></p>
+                <p class="aide">SIGNAL. Deux emplois : la boutique, et le hors-ligne.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>encre dessus</span><span class="code">11,07:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#c2372a"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Braise <span class="code muet">#C2372A</span></p>
+                <p class="aide">Le retard et l’irréversible. La fin du dégradé du logo.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">5,42:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur sa surface</span><span class="code">4,74:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#1f52a8"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Goutte <span class="code muet">#1F52A8</span></p>
+                <p class="aide">Ce qui est parti et n’est pas revenu. La goutte du logo.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">7,42:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur sa surface</span><span class="code">6,48:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#1b6b4a"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Soldé <span class="code muet">#1B6B4A</span></p>
+                <p class="aide">Ce qui est réglé.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">6,46:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur sa surface</span><span class="code">5,68:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+    </ul>
+
+    <h3 class="sur-titre" style="margin-top:var(--e6)">Thème sombre</h3>
+    <ul class="jetons">
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#e8ecef"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Encre <span class="code muet">#E8ECEF</span></p>
+                <p class="aide">Le texte.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">14,45:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur fond</span><span class="code">16,18:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#97a3af"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Encre douce <span class="code muet">#97A3AF</span></p>
+                <p class="aide">Le texte secondaire.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">6,68:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#151c24"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Papier <span class="code muet">#151C24</span></p>
+                <p class="aide">La zone de travail.</p>
+                
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#0b0f14"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Fond <span class="code muet">#0B0F14</span></p>
+                <p class="aide">Ce qui n’est pas la feuille.</p>
+                
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#6a7783"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Bord fort <span class="code muet">#6A7783</span></p>
+                <p class="aide">La bordure d’un champ.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">3,74:1</span><span class="muet">seuil 3,00</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#f5c518"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Plaque <span class="code muet">#F5C518</span></p>
+                <p class="aide">Inchangée : une plaque réelle ne change pas de couleur la nuit.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>encre dessus</span><span class="code">11,07:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#ff8a7a"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Braise <span class="code muet">#FF8A7A</span></p>
+                <p class="aide">Le retard, éclairci pour tenir le contraste.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">7,49:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur sa surface</span><span class="code">6,47:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#7fb2ec"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Goutte <span class="code muet">#7FB2EC</span></p>
+                <p class="aide">Ce qui est en transit, éclairci.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">7,75:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur sa surface</span><span class="code">7,10:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+            <li class="jeton">
+              <span class="jeton-pastille" style="background:#56c08d"></span>
+              <div class="jeton-texte">
+                <p class="jeton-nom">Soldé <span class="code muet">#56C08D</span></p>
+                <p class="aide">Ce qui est réglé, éclairci.</p>
+                <ul class="preuves"><li class="preuve preuve-ok"><span>sur papier</span><span class="code">7,62:1</span><span class="muet">seuil 4,50</span></li><li class="preuve preuve-ok"><span>sur sa surface</span><span class="code">6,84:1</span><span class="muet">seuil 4,50</span></li></ul>
+              </div>
+            </li>
+    </ul>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>Groupe A — les neuf écrans à valider</h2>
+    <p class="aide prose">Ce sont eux qui décident. Vus à 1440 px de large.</p>
+    <ul class="ecrans">
+            <li class="ecran">
+              <a class="ecran-lien" href="a1-connexion.html">
+                <span class="ecran-cle code">A1</span>
+                <span class="ecran-titre">Connexion</span>
+              </a>
+              <p class="aide">Entrer, et comprendre un refus : identifiants faux, compte sans rôle, réseau absent. Premier contact avec la marque.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a2-supervision.html">
+                <span class="ecran-cle code">A2</span>
+                <span class="ecran-titre">Supervision</span>
+              </a>
+              <p class="aide">Choisir ce que je regarde — toutes les boutiques ou une seule — et voir ce qui demande une décision. Sans vignettes de chiffres inventées.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a3-accueil-gerant.html">
+                <span class="ecran-cle code">A3</span>
+                <span class="ecran-titre">Accueil du gérant</span>
+              </a>
+              <p class="aide">Savoir ce que je fais aujourd’hui, et atteindre le geste du jour en un clic.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a4-stock-motos.html">
+                <span class="ecran-cle code">A4</span>
+                <span class="ecran-titre">Stock motos</span>
+              </a>
+              <p class="aide">Retrouver une moto, savoir ce qui est disponible, en faire entrer une. Aucun prix d’achat, aucune marge : ils sont hors de portée d’un gérant.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a5-nouvelle-vente.html">
+                <span class="ecran-cle code">A5</span>
+                <span class="ecran-titre">Nouvelle vente</span>
+              </a>
+              <p class="aide">Le geste central : client, moto, prix, mode de paiement, premier versement. Long, mais la conséquence du mode est annoncée avant la validation.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a6-ventes.html">
+                <span class="ecran-cle code">A6</span>
+                <span class="ecran-titre">Ventes et fiche de vente</span>
+              </a>
+              <p class="aide">Retrouver une vente, voir ce qui reste dû, encaisser, imprimer. La fiche s’ouvre en panneau et garde la liste visible.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a7-dossiers.html">
+                <span class="ecran-cle code">A7</span>
+                <span class="ecran-titre">Dossiers en attente</span>
+              </a>
+              <p class="aide">Savoir qui détient quel papier, et ce qui est en retard. Les quatre documents et leur parcours entre le magasin et le prestataire.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a8-paiements.html">
+                <span class="ecran-cle code">A8</span>
+                <span class="ecran-titre">Paiements — dettes et tranches</span>
+              </a>
+              <p class="aide">Deux tableaux qui ne se mélangent jamais : crédit, la moto est partie et le client doit ; tranches, la moto reste au magasin et le magasin détient l’argent.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="a9-reglages.html">
+                <span class="ecran-cle code">A9</span>
+                <span class="ecran-titre">Réglages</span>
+              </a>
+              <p class="aide">Atteindre les sept écrans d’administration sans les chercher.</p>
+            </li>
+    </ul>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>Groupe B — la coquille et les états</h2>
+    <p class="aide prose">
+      Ce ne sont pas d’autres écrans : ce sont ceux du groupe A dans les états qu’ils
+      prendront réellement au comptoir. Un écran n’est pas fini tant que le vide, le
+      chargement, l’erreur, le refus et le hors-ligne ne sont pas dessinés.
+    </p>
+    <ul class="ecrans">
+            <li class="ecran">
+              <a class="ecran-lien" href="b1-rail-gerant.html">
+                <span class="ecran-cle code">B1</span>
+                <span class="ecran-titre">Barre latérale complète — gérant</span>
+              </a>
+              <p class="aide">L’écran « Reçus », le septième de l’espace motos : depuis lui, les six autres sont à un clic. C’est la preuve que la barre porte le second niveau.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b2-rail-responsable.html">
+                <span class="ecran-cle code">B2</span>
+                <span class="ecran-titre">Barre latérale — responsable, toutes les boutiques</span>
+              </a>
+              <p class="aide">Le même espace vu d’un périmètre multiple : la plaque devient un sélecteur et une colonne « Boutique » apparaît dans le tableau.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b3-hors-ligne.html">
+                <span class="ecran-cle code">B3</span>
+                <span class="ecran-titre">Hors ligne, trois saisies en attente</span>
+              </a>
+              <p class="aide">Le cas normal, pas une avarie. La bannière devient la plaque pleine, rien n’est bloqué, et le seul geste qui exige le réseau le dit avant qu’on le tente.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b4-vide.html">
+                <span class="ecran-cle code">B4</span>
+                <span class="ecran-titre">Vide</span>
+              </a>
+              <p class="aide">Le stock sans moto, l’entreprise sans boutique, le gérant sans boutique attribuée. Trois vides qui invitent à agir plutôt que de laisser un trou.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b5-chargement.html">
+                <span class="ecran-cle code">B5</span>
+                <span class="ecran-titre">Chargement</span>
+              </a>
+              <p class="aide">Pas d’écran blanc, pas de saut de mise en page : l’en-tête et les colonnes sont posés avant les données.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b6-erreur.html">
+                <span class="ecran-cle code">B6</span>
+                <span class="ecran-titre">Erreur de lecture</span>
+              </a>
+              <p class="aide">Elle dit ce qui s’est passé, ce qui reste possible, et n’accuse aucune cause qu’elle n’a pas vérifiée.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b7-refus.html">
+                <span class="ecran-cle code">B7</span>
+                <span class="ecran-titre">Refus d’accès expliqué</span>
+              </a>
+              <p class="aide">Un gérant devant la supervision. L’écran explique pourquoi et propose une sortie, sans laisser croire qu’un déblocage est possible.</p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b8-mobile-accueil.html">
+                <span class="ecran-cle code">B8</span>
+                <span class="ecran-titre">Mobile 390 px — accueil</span>
+              </a>
+              <p class="aide">Le bureau replié, pas un téléphone étiré. Navigation basse dans la zone du pouce. · <a href="b8-mobile-stock.html">et le stock motos en cartes</a></p>
+            </li>
+            <li class="ecran">
+              <a class="ecran-lien" href="b9-sombre-supervision.html">
+                <span class="ecran-cle code">B9</span>
+                <span class="ecran-titre">Thème sombre — supervision</span>
+              </a>
+              <p class="aide">Un vrai mode : la coquille bouge à peine, les surfaces de travail se réétagent, la plaque reste jaune. · <a href="b9-sombre-stock.html">et le stock motos en sombre</a></p>
+            </li>
+    </ul>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>Groupe C — aperçu de la suite</h2>
+    <p class="avis avis-transit" role="note" style="max-width:68ch">
+      <span data-icone="info"></span>
+      <span><strong>Aperçu, non implémenté dans cette refonte.</strong>
+      Ces écrans montrent la place que prendra la suite (specs S20 à S24). Ils ne sont
+      pas du travail livré, et chacun porte le même avertissement en tête.</span>
+    </p>
+    <ul class="ecrans">
+            <li class="ecran ecran-apercu">
+              <a class="ecran-lien" href="c1-pieces.html">
+                <span class="ecran-cle code">C1</span>
+                <span class="ecran-titre">Espace pièces — vente au comptoir</span>
+              </a>
+              <p class="aide">Catalogue et panier. Specs S20 et S21.</p>
+            </li>
+            <li class="ecran ecran-apercu">
+              <a class="ecran-lien" href="c2-caisse.html">
+                <span class="ecran-cle code">C2</span>
+                <span class="ecran-titre">Caisse — journal du jour et clôture</span>
+              </a>
+              <p class="aide">Les mouvements de la journée et le comptage des espèces. Spec S22.</p>
+            </li>
+            <li class="ecran ecran-apercu">
+              <a class="ecran-lien" href="c3-supervision-chiffres.html">
+                <span class="ecran-cle code">C3</span>
+                <span class="ecran-titre">Supervision avec ses chiffres</span>
+              </a>
+              <p class="aide">Le seul écran où les indicateurs agrégés apparaissent. Spec S24.</p>
+            </li>
+            <li class="ecran ecran-apercu">
+              <a class="ecran-lien" href="c4-recu.html">
+                <span class="ecran-cle code">C4</span>
+                <span class="ecran-titre">Le reçu, rendu papier</span>
+              </a>
+              <p class="aide">Existant, revu : la souche ouvre le document et le monogramme passe en monochrome. Ouvrez-le et lancez l’aperçu avant impression.</p>
+            </li>
+    </ul>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>Le mouvement</h2>
+    <p class="aide prose">
+      Sept animations, pas une de plus. Chacune répond à une question que l’utilisateur
+      se pose à cet instant précis ; tout le reste de l’interface est immobile. Sur un
+      poste de comptoir utilisé huit heures par jour, une animation de trop n’est pas
+      un défaut de goût : c’est du temps perdu devant un client qui attend.
+    </p>
+
+    <ol class="mouvements">
+      <li>
+        <p class="mouvement-nom">Le repli de la navigation
+          <span class="touche">Ctrl B</span></p>
+        <p>Le seul grand mouvement de l’interface, 320 ms. La colonne ne disparaît pas :
+           elle se réduit à ses icônes, et les huit écrans de l’espace restent
+           atteignables. C’est la grille elle-même qui morphe — le tableau s’élargit
+           dans le même geste, au lieu d’être recouvert puis redessiné. Les libellés
+           s’effacent avant que la place ne se referme, et reviennent après qu’elle
+           existe : sans ce décalage, le texte est écrasé pendant la transition.
+           <a href="a4-stock-motos.html">À essayer sur le stock</a>.</p>
+      </li>
+      <li>
+        <p class="mouvement-nom">La fiche entre par la droite</p>
+        <p>220 ms, d’où elle vient. Elle ne tombe pas du ciel et ne grandit pas depuis
+           son centre — la liste reste en place, on n’a pas perdu sa ligne.
+           <a href="a6-ventes.html">Sur les ventes</a>.</p>
+      </li>
+      <li>
+        <p class="mouvement-nom">La palette de commandes
+          <span class="touche">Ctrl K</span></p>
+        <p>Le voile s’assombrit, la boîte descend de six pixels : elle vient du clavier,
+           pas d’un clic quelque part sur la page.</p>
+      </li>
+      <li>
+        <p class="mouvement-nom">La bascule hors ligne</p>
+        <p>Le changement le plus lourd de conséquences du produit. Le fond passe à la
+           plaque jaune en 220 ms — assez pour se voir du coin de l’œil, assez court
+           pour ne jamais clignoter sous les yeux de quelqu’un qui compte de l’argent.
+           <a href="b3-hors-ligne.html">L’écran hors ligne</a>.</p>
+      </li>
+      <li>
+        <p class="mouvement-nom">La coche « À jour » se trace</p>
+        <p>Une fois, quand la file d’envoi finit de se vider. C’est la réponse à
+           « est-ce que c’est parti » : elle mérite d’être vue une seconde.</p>
+      </li>
+      <li>
+        <p class="mouvement-nom">Le relais du dossier avance</p>
+        <p>La seule animation qui raconte quelque chose du métier : un papier passe du
+           prestataire au magasin. Le trait se remplit dans le sens du parcours, puis la
+           pastille se pose. <a href="a7-dossiers.html">Cliquez « Arrivé au magasin »</a>
+           sur l’écran des dossiers.</p>
+      </li>
+      <li>
+        <p class="mouvement-nom">Une saisie quitte la file</p>
+        <p>Elle ne s’évapore pas : la ligne se referme, pour qu’on voie qu’il en reste
+           deux et non trois.</p>
+      </li>
+    </ol>
+
+    <div class="avis" role="note" style="margin-top:var(--e5);max-width:74ch">
+      <span data-icone="info"></span>
+      <div>
+        <h3>Ce que je ne fais pas, et volontairement</h3>
+        <p>Aucune transition entre pages, aucune révélation au défilement, aucune entrée
+           en cascade des lignes de tableau, aucun compteur qui s’incrémente. Ce sont les
+           tics qui font « généré par IA », et ici ils ne feraient que retarder la lecture
+           d’un chiffre. Un ordinateur qui a réglé son système sur « animations réduites »
+           n’en voit aucune : tout devient instantané, et rien ne cesse de fonctionner.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>Ce que vous avez tranché</h2>
+    <p class="aide prose">Les six questions ouvertes de la première revue, et ce que
+       j’en ai fait dans les maquettes.</p>
+    <ol class="questions">
+      <li>
+        <p class="question-titre">Le nom — confirmé</p>
+        <p>Le monogramme SE est la marque, « SDI » reste le nom de l’application,
+           « Sandwidi et frère » est la raison sociale et n’apparaît qu’à la connexion et
+           en tête du reçu.</p>
+      </li>
+      <li>
+        <p class="question-titre">Le nom affiché du gérant — confirmé</p>
+        <p>C’est désormais <strong>le seul réglage que l’application demande à quelqu’un</strong>,
+           et il est individuel. On l’atteint par le bloc de compte, en bas de la
+           navigation : sur un poste partagé, c’est là qu’on lit qui est connecté, donc là
+           qu’on va corriger son nom. Aucune entrée de menu en plus.
+           <a href="a3-accueil-gerant.html">Cliquez votre nom en bas à gauche</a>.</p>
+      </li>
+      <li>
+        <p class="question-titre">Poste partagé au comptoir — confirmé</p>
+        <p>« Se déconnecter » est en bas du rail, atteignable depuis n’importe quel écran,
+           et le nom du gérant connecté est écrit juste au-dessus.</p>
+      </li>
+      <li>
+        <p class="question-titre">Le thème suit l’ordinateur — confirmé</p>
+        <p>Aucun réglage de thème dans le produit. Le bouton présent dans ces maquettes
+           existe seulement pour que vous puissiez voir le mode sombre.</p>
+      </li>
+      <li>
+        <p class="question-titre">La densité — vous m’avez laissé choisir</p>
+        <p>Je garde la densité bureau : lignes de tableau à 40 px, corps à 14 px. Elle
+           met douze motos à l’écran sans défilement là où le réglage tactile actuel en
+           montrait six. Les cibles cliquables restent à 30 px de haut au minimum, et le
+           mobile garde ses cibles confortables — c’est un réglage de deux valeurs, pas
+           une refonte, si vous le trouvez trop serré à l’usage.</p>
+      </li>
+      <li>
+        <p class="question-titre">Le repère de boutique — les trois lettres</p>
+        <p>Pas de signe distinctif par boutique. La plaque jaune porte <span class="code">PTG</span>,
+           <span class="code">KDG</span> ou <span class="code">OUA</span>, et rien d’autre.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>L’identité de l’entreprise, posée en dur</h2>
+    <p class="prose">
+      Vous ne voulez pas avoir à la saisir : elle est écrite dans le produit. Raison
+      sociale, activité, siège, téléphone, IFU, RCCM et logo s’impriment en tête de
+      chaque reçu sans qu’aucun écran ne les demande. En phase 2 ils vivront dans une
+      constante du code, pas dans la base — une donnée qui ne change jamais n’a rien à
+      faire dans une collection modifiable, et un champ modifiable ne servirait qu’à la
+      casser.
+    </p>
+    <div class="avis avis-erreur" role="note" style="max-width:74ch">
+      <span data-icone="alerte"></span>
+      <div>
+        <h3>Deux valeurs me manquent</h3>
+        <p>L’IFU et le numéro RCCM. Ceux qui figurent sur les maquettes
+           (<span class="code">00071842 R</span> et
+           <span class="code">BF-OUA-01-2016-A12-00847</span>) sont au bon format mais
+           <strong>inventés</strong> : ils s’impriment sur un document commercial, ils ne
+           s’improvisent pas. Communiquez-les-moi et je les pose.
+           <a href="a9-reglages.html">Où ils apparaissent</a> ·
+           <a href="c4-recu.html">sur le reçu</a>.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="galerie-bloc">
+    <h2>Comment commenter</h2>
+    <p class="prose">
+      Écran par écran, avec son code (A4, B3…). Tout est ouvert : la disposition, les
+      couleurs, les mots, l’ordre de la navigation, le nom d’un intitulé. Ce qui ne bouge
+      pas : les règles métier, le cloisonnement des coûts et des marges hors de portée des
+      gérants, le fonctionnement hors ligne, et le fait qu’un écran doit rester lisible en
+      plein soleil sur un écran bon marché.
+    </p>
+    <p class="prose">
+      Je ne défends pas une décision que vous rejetez deux fois.
+    </p>
+  </section>
+</main>
+
+<script src="coquille.js"></script>
+</body>
+</html>

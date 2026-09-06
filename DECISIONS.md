@@ -1469,3 +1469,97 @@ comptent. L'assertion miroir est ajoutée.
 
 *Conséquence sur S12 :* la passe de durcissement devra vérifier chaque restriction dans les
 deux sens — ce qui est refusé, et ce qui doit rester possible.
+
+---
+
+## D70 — La marque prend la coquille, le jaune redevient un signal
+
+*Arbitrage demandé par `CAHIER-UI.md` §4, tranché à la phase 1 de la refonte d'interface.*
+
+Le produit avait une direction assumée depuis le socle : le monde du sujet est la plaque
+d'immatriculation, caractères noirs sur fond jaune, et l'accent `#f5c518` en découlait.
+Le client a ensuite fourni son logo — un monogramme « SE » sur un bleu nuit profond, rempli
+d'un dégradé or → orange → rouge, avec une goutte cyan → bleu. **Les deux se disputaient le
+même registre** : un jaune d'accent partout, et un or de marque qui n'apparaissait nulle
+part, puisque le logo était absent de l'interface.
+
+**La décision.** La marque tient la coquille : le nuit `#14142b` habille le rail, la colonne
+de navigation, l'en-tête de la galerie et l'écran de connexion. Le dégradé or → rouge reste
+enfermé dans le monogramme, à une exception près — un filet de 2 px en tête de coquille.
+Il n'apparaît jamais en fond de section : c'est précisément le tic que `DESIGN.md` §1
+interdit.
+
+Le `#f5c518` cesse d'être une couleur de marque et **redevient un signal, à deux emplois
+seulement** : le repère de boutique (le code à trois lettres, en pavé plein aux proportions
+d'une plaque) et l'état hors ligne (la bannière devient la plaque pleine). Un signal qui
+n'apparaît qu'à deux endroits reste un signal ; un signal partout n'est plus qu'une couleur.
+
+**Ce que l'arbitrage a ouvert, et qui n'était pas cherché.** Le logo porte *deux* dégradés,
+et le produit a *deux* notions de choses en transit. On leur a donné un emploi chacun :
+
+- la **goutte** (cyan → bleu, `#1f52a8`) dit *ce qui est parti et n'est pas revenu* — un
+  papier chez le prestataire, une saisie en cours d'envoi ;
+- la **braise** (fin du dégradé, `#c2372a`) dit *le retard et l'irréversible*.
+
+Cela rend lisible une distinction que `BandeauEtat.tsx` faisait déjà sans la montrer :
+**hors ligne** (aucun réseau, jaune plein) n'est pas **en attente d'envoi** (le réseau est
+là, la file se vide, bleu). Le premier est un mode de travail normal ; le second est
+transitoire. Les confondre coûtait une inquiétude injustifiée au comptoir.
+
+**Ce qui ne change pas.** Le jaune et son encre ne basculent toujours pas avec le thème :
+une plaque réelle ne change pas de couleur la nuit, et un `encre` inversé dessus produisait
+du jaune clair sur jaune (acquis de S10, conservé). La braise `#c2372a` est le rouge du logo
+assombri de justesse pour tenir 4,5:1 sur blanc **et** sur sa propre surface teintée ; le
+logo, lui, garde son `#c93c2e` exact.
+
+**Conséquence sur la signature.** La plaque était la signature visuelle du produit. Deux
+signatures n'en font aucune : elle est rétrogradée en signal pur, et la signature devient
+**la souche** — le numéro de pièce (`PTG-2609-0042`) dessiné comme un pavé arraché du
+carnet, bord cranté. Il vient du métier — c'est le numéro que le gérant dicte au téléphone —
+et non d'une bibliothèque de composants.
+
+*À vérifier en phase 2 :* la transcription de ces jetons dans le bloc `@theme` de
+`app/globals.css` doit être suivie d'une capture sous média `print`. Le reçu est le seul
+rendu du produit qui devient un objet physique, et aucune capture d'écran ordinaire ne le
+montre (leçon de S10).
+
+---
+
+## D71 — L'identité de l'entreprise est une constante, pas un réglage
+
+*Demandé par le responsable pendant la revue des maquettes de la phase 1.*
+
+Le produit prévoyait un écran « Entreprise » où le commanditaire saisirait sa raison
+sociale, son adresse et ce qui s'imprime en tête des reçus. Il n'en veut pas : « je ne veux
+pas que le réglage soit fait par le client, je veux qu'on le fasse dès à présent ».
+
+**La décision.** Raison sociale, activité, siège, téléphone, IFU, RCCM et logo sont posés
+en dur. En phase 2 ils vivent dans une constante de `lib/domain/entreprise.ts`, **pas dans
+Firestore**. Trois raisons, dans cet ordre :
+
+1. **Ça ne change pas.** Une raison sociale et un numéro RCCM sont fixés à la création de
+   l'entreprise. Une donnée qui ne change jamais n'a rien à faire dans une collection
+   modifiable — elle y gagne seulement la possibilité d'être cassée.
+2. **Ça s'imprime sur un document commercial.** L'IFU et le RCCM sont obligatoires en tête
+   d'une facture ou d'un reçu au Burkina Faso. Un champ que quelqu'un peut vider un
+   vendredi soir produit le lundi des reçus non conformes, sans que rien n'alerte.
+3. **Ça supprime un écran, une règle Firestore et un test.** `ARCHITECTURE.md` §1 : le
+   meilleur code est celui qu'on n'écrit pas.
+
+**Ce qui reste réglable, et c'est tout.** Le **nom affiché du gérant** — la seule donnée du
+reçu qui vienne du compte connecté, et le seul réglage que l'application demande encore à
+quelqu'un. Il répond au défaut signalé pendant S12 : l'application imprimait l'adresse
+e-mail à la place du nom. On l'atteint par le bloc de compte en bas de la navigation, là où
+l'on lit déjà qui est connecté sur un poste partagé — pas par une entrée de menu de plus.
+
+**Ce que ça change pour la phase 2 :** l'écran `/parametres/entreprise` cesse d'être un
+formulaire et devient une carte en lecture seule. Les tests bout en bout qui remplissent ce
+formulaire sont à retirer dans le même commit, et le titre de niveau 1 « Entreprise »
+devient « Identité de l'entreprise » — un changement de libellé, donc un changement de
+contrat de test (`CAHIER-UI.md` §12).
+
+**Ce qui manque encore.** L'IFU et le numéro RCCM réels. Les maquettes portent
+`00071842 R` et `BF-OUA-01-2016-A12-00847` : format correct, valeurs inventées. Elles sont
+marquées « à confirmer » dans l'écran des réglages et dans la galerie. **Elles ne partent
+pas en production telles quelles** — un numéro fiscal faux sur un reçu est un problème
+juridique, pas un détail d'affichage.

@@ -1,0 +1,1644 @@
+/* =============================================================================
+   SDI — socle des maquettes (phase 1)
+
+   Ce fichier EST la proposition de jetons. À la phase 2 il est transcrit dans
+   le bloc `@theme` de `app/globals.css` : rien ici n'est une valeur jetable.
+
+   Direction (CAHIER-UI.md §5) :
+     la marque tient la coquille, le jaune de plaque redevient un signal.
+     Le dégradé or → rouge reste enfermé dans le monogramme, sauf un filet de
+     2 px en tête de coquille. Les deux dégradés du logo donnent deux mots du
+     métier : la goutte bleue = ce qui est parti et n'est pas revenu ; la
+     braise = le retard et l'irréversible.
+
+   Contrastes : toutes les paires texte/fond sont calculées et reportées dans
+   `index.html`. Aucune sous 4,5:1 en texte normal, 3:1 en grand ou en UI.
+============================================================================= */
+
+/* --- Polices ---------------------------------------------------------------
+   Déposées dans le répertoire : les maquettes s'ouvrent en avion, sans CDN.
+   Ce sont les fichiers exacts servis par l'application (sous-ensemble latin,
+   `next/font`), pour que ce que le client juge ici soit ce qu'il aura. */
+/* `--colonne` doit s'animer : une variable CSS ne le fait pas, sauf si son type
+   est déclaré. C'est ce qui permet de replier la navigation en morphant la
+   grille elle-même, plutôt qu'en faisant glisser un calque par-dessus. */
+@property --colonne {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 224px;
+}
+
+@font-face {
+  font-family: "Archivo";
+  src: url("polices/archivo-latin.woff2") format("woff2");
+  font-weight: 100 900;           /* fonte variable : un seul fichier */
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plex Mono";
+  src: url("polices/plex-mono-latin-400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Plex Mono";
+  src: url("polices/plex-mono-latin-500.woff2") format("woff2");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* --- Jetons ---------------------------------------------------------------- */
+:root {
+  /* Marque — relevés à la pipette sur design/marque/logo-se-fond-sombre.jpg,
+     remontés en clarté (un scan sous-exposé n'est pas une couleur de marque). */
+  --nuit: #14142b;              /* la coquille, et le fond du monogramme */
+  --nuit-2: #191a32;            /* la colonne des écrans, un cran au-dessus */
+  --nuit-3: #22243f;            /* l'élément actif dans la coquille */
+  --nuit-filet: #2b2d4a;        /* les séparations internes à la coquille */
+  --or: #e0a81a;
+  --orange: #dd7a28;
+  --rouge: #c93c2e;
+  --cyan: #2e9bc4;
+  --bleu: #1f52a8;
+
+  /* Surfaces et texte */
+  --encre: #0f1720;
+  --encre-doux: #5a6672;
+  --papier: #ffffff;            /* la feuille : la zone de travail */
+  --fond: #eef1f5;              /* ce qui n'est pas la feuille */
+  --bord: #d5dae0;              /* filets et séparations */
+  --bord-fort: #7c8894;         /* bordure de champ — doit se voir : 3,6:1 */
+  --survol: #f4f6f9;
+
+  /* Texte dans la coquille sombre */
+  --coquille-encre: #ffffff;
+  --coquille-doux: #c4c9e0;
+  --coquille-muet: #8289ad;
+
+  /* SIGNAL — la plaque. Deux emplois, pas trois : la boutique, et le hors-ligne.
+     Ses couleurs ne basculent pas avec le thème : une plaque réelle ne change
+     pas de couleur la nuit (reprise de `app/globals.css`, acquis de S10). */
+  --plaque: #f5c518;
+  --plaque-bord: #8a6d05;
+  --encre-fixe: #0f1720;
+
+  /* Sémantiques — dérivées des deux dégradés du logo, un emploi chacune. */
+  --braise: #c2372a;            /* retard, erreur, irréversible */
+  --braise-surface: #fdecea;
+  --goutte: #1f52a8;            /* parti et pas revenu : chez le prestataire,
+                                   saisie en cours d'envoi */
+  --goutte-surface: #eaf0fb;
+  --solde: #1b6b4a;             /* réglé */
+  --solde-surface: #e7f3ed;
+
+  /* Anneau de focus : un trait et son halo, pour tenir sur le blanc, sur le
+     nuit et sur la plaque jaune. Redéfini dans la coquille. */
+  --focus-trait: #0f1720;
+  --focus-halo: #ffffff;
+
+  /* Typographie */
+  --f-titre: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --f-corps: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --f-code: "Plex Mono", ui-monospace, "Cascadia Mono", monospace;
+
+  --t-micro: 0.6875rem;   /* 11 px — sur-titres, intitulés de groupe */
+  --t-petit: 0.78125rem;  /* 12,5 px — légendes, aides */
+  --t-base: 0.875rem;     /* 14 px — le corps, densité bureau */
+  --t-moyen: 0.9375rem;   /* 15 px — champs de saisie */
+  --t-grand: 1.125rem;    /* 18 px — titres de bloc */
+  --t-titre: 1.5rem;      /* 24 px — titre d'écran */
+  --t-chiffre: 1.75rem;   /* 28 px — un montant qu'on lit de loin */
+
+  /* Espacement — une seule échelle, pas de valeur magique */
+  --e1: 4px;  --e2: 8px;  --e3: 12px; --e4: 16px;
+  --e5: 20px; --e6: 24px; --e7: 32px; --e8: 40px; --e9: 64px;
+
+  /* Rayons */
+  --r-plaque: 4px;   /* l'objet plaque */
+  --r-1: 6px;        /* boutons, champs */
+  --r-2: 10px;       /* cartes, panneaux */
+
+  /* Ombres — deux, pas plus. Une ombre partout est un tic. */
+  --ombre-panneau: -8px 0 24px -12px rgb(15 23 32 / 0.28);
+  --ombre-menu: 0 8px 24px -8px rgb(15 23 32 / 0.24);
+
+  /* Mouvement — DESIGN.md §9 : il sert le sujet, il ne le décore pas.
+     Trois durées, deux courbes, et c'est tout. Une application de comptoir
+     utilisée huit heures par jour ne supporte pas d'être ralentie pour faire
+     joli : la plus longue des trois est réservée au seul grand mouvement de
+     l'interface, le repli de la navigation. */
+  --duree-reponse: 120ms;   /* survol, pression : la réponse doit être immédiate */
+  --duree-apparition: 220ms;/* panneaux, palette, bascule d'état */
+  --duree-repli: 320ms;     /* le repli de la colonne, et rien d'autre */
+  --sortie: cubic-bezier(0.32, 0.72, 0, 1);  /* décélération franche, sans rebond */
+  --entree: cubic-bezier(0.4, 0, 1, 1);
+
+  /* Coquille */
+  --rail: 72px;
+  --colonne: 224px;
+  --banniere: 52px;
+  --travail-max: 1600px;
+
+  color-scheme: light;
+}
+
+/* --- Mode sombre : un vrai mode, pas une inversion ---------------------------
+   La coquille ne bouge presque pas — elle est déjà nuit, c'est l'avantage de
+   cette direction. Ce sont les surfaces de travail qui se réétagent, et les
+   deux sémantiques qui s'éclaircissent pour tenir le contraste.
+
+   Trois écritures parce qu'un basculeur explicite doit gagner dans les deux
+   sens : le réglage système, puis le forçage clair, puis le forçage sombre. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="clair"]) {
+    color-scheme: dark;
+    --encre: #e8ecef;
+    --encre-doux: #97a3af;
+    --papier: #151c24;
+    --fond: #0b0f14;
+    --bord: #2a343f;
+    --bord-fort: #6a7783;
+    --survol: #1c242e;
+    --braise: #ff8a7a;      --braise-surface: #3a211e;
+    --goutte: #7fb2ec;      --goutte-surface: #16233a;
+    --solde: #56c08d;       --solde-surface: #12291f;
+    --focus-trait: #ffffff; --focus-halo: #0b0f14;
+  }
+}
+:root[data-theme="sombre"] {
+  color-scheme: dark;
+  --encre: #e8ecef;
+  --encre-doux: #97a3af;
+  --papier: #151c24;
+  --fond: #0b0f14;
+  --bord: #2a343f;
+  --bord-fort: #6a7783;
+  --survol: #1c242e;
+  --braise: #ff8a7a;      --braise-surface: #3a211e;
+  --goutte: #7fb2ec;      --goutte-surface: #16233a;
+  --solde: #56c08d;       --solde-surface: #12291f;
+  --focus-trait: #ffffff; --focus-halo: #0b0f14;
+}
+
+/* --- Base ------------------------------------------------------------------ */
+*, *::before, *::after { box-sizing: border-box; }
+
+/* `[hidden]` ne pèse rien face à un `display` posé en style en ligne : un
+   panneau masqué restait à l'écran. La règle est ici plutôt que dans chaque
+   fichier, pour que le défaut ne puisse pas revenir. */
+[hidden] { display: none !important; }
+
+html {
+  /* Les montants s'alignent en colonne : sans chiffres tabulaires, une liste
+     de prix devient illisible. Acquis du dépôt, à ne pas défaire. */
+  font-variant-numeric: tabular-nums;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--fond);
+  color: var(--encre);
+  font-family: var(--f-corps);
+  font-size: var(--t-base);
+  line-height: 1.5;
+}
+
+h1, h2, h3, h4, p, figure, ul, ol, dl, dd { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: inherit; }
+button { font: inherit; color: inherit; }
+
+/* Focus visible partout — non négociable. Le trait et son halo tiennent aussi
+   bien sur le blanc que sur le nuit ou sur la plaque jaune. */
+:focus-visible {
+  outline: 2px solid var(--focus-trait);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px var(--focus-halo);
+  border-radius: 3px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Réservé aux lecteurs d'écran. */
+.sr {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
+
+/* =============================================================================
+   LA COQUILLE
+   Un rail d'espaces de 64 px, une colonne d'écrans de 224 px groupés par
+   intention, et la zone de travail qui prend tout le reste. C'est la réponse
+   au « la barre latérale est vide » : le second niveau vit à gauche, en
+   permanence, et non dans des liens dispersés dans les pages.
+============================================================================= */
+
+.appli {
+  display: grid;
+  grid-template-columns: var(--rail) var(--colonne) minmax(0, 1fr);
+  grid-template-rows: 100vh;
+  min-height: 100vh;
+}
+
+/* Le seul endroit où le dégradé du monogramme sort du logo : un filet de 2 px
+   en tête de coquille (CAHIER-UI.md §4 interdit le dégradé en fond de section). */
+.coquille-filet {
+  position: fixed; inset: 0 0 auto 0; height: 2px; z-index: 60;
+  background: linear-gradient(90deg, var(--or), var(--orange) 55%, var(--rouge));
+}
+
+/* --- Le rail des espaces --------------------------------------------------- */
+.rail {
+  grid-row: 1;
+  background: var(--nuit);
+  border-right: 1px solid var(--nuit-filet);
+  display: flex; flex-direction: column; align-items: center;
+  padding: calc(2px + var(--e3)) 0 var(--e3);
+  gap: var(--e1);
+  overflow-y: auto;   /* un écran court ne coupe pas la déconnexion */
+  /* Dans la coquille, l'anneau de focus s'inverse. */
+  --focus-trait: #ffffff; --focus-halo: var(--nuit);
+}
+
+.rail-marque { display: block; width: 40px; margin-bottom: var(--e4); }
+.rail-marque svg, .rail-marque img { display: block; width: 100%; }
+
+.rail-lien {
+  width: 62px; padding: var(--e2) 2px var(--e1);
+  display: grid; justify-items: center; gap: 3px;
+  border-radius: var(--r-1);
+  color: var(--coquille-doux);
+  text-decoration: none;
+  font-size: 10px; line-height: 1.2; letter-spacing: 0.01em;
+  background: none; border: 0; cursor: pointer;
+  /* « Se déconnecter » débordait du rail : le mot le plus long du produit
+     commande la largeur, pas l'inverse. */
+  overflow-wrap: anywhere; text-align: center;
+}
+.rail-lien svg { width: 20px; height: 20px; }
+.rail-lien:hover { background: var(--nuit-3); color: var(--coquille-encre); }
+.rail-lien[aria-current="page"] {
+  background: var(--nuit-3);
+  color: var(--coquille-encre);
+  font-weight: 600;
+}
+.rail-pied { margin-top: auto; }
+
+/* --- La colonne des écrans de l'espace courant ----------------------------- */
+.colonne {
+  grid-row: 1;
+  background: var(--nuit-2);
+  border-right: 1px solid var(--nuit-filet);
+  padding: calc(2px + var(--e4)) var(--e3) var(--e3);
+  display: flex; flex-direction: column;
+  overflow-y: auto;
+  --focus-trait: #ffffff; --focus-halo: var(--nuit-2);
+}
+
+.colonne-espace {
+  font-family: var(--f-titre);
+  font-size: var(--t-grand); font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--coquille-encre);
+  padding: 0 var(--e2) var(--e4);
+}
+
+.colonne-groupe { padding-top: var(--e4); }
+.colonne-groupe:first-of-type { padding-top: 0; }
+
+/* Le groupe dit une intention du métier — Vendre, Suivre, Administrer — et non
+   un type d'objet. C'est ce qui rend la colonne lisible sans la lire. */
+.colonne-titre {
+  font-size: var(--t-micro); font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--coquille-muet);
+  padding: 0 var(--e2) var(--e2);
+}
+
+.colonne-lien {
+  display: flex; align-items: center; gap: var(--e2);
+  padding: 7px var(--e2);
+  border-radius: var(--r-1);
+  border-left: 2px solid transparent;
+  color: var(--coquille-doux);
+  text-decoration: none;
+}
+.colonne-lien svg { width: 16px; height: 16px; flex: none; opacity: 0.85; }
+.colonne-lien:hover { background: var(--nuit-3); color: var(--coquille-encre); }
+/* Jamais la couleur seule : l'écran courant est marqué par le fond, le filet,
+   la graisse et `aria-current`. */
+.colonne-lien[aria-current="page"] {
+  background: var(--nuit-3);
+  border-left-color: var(--coquille-encre);
+  color: var(--coquille-encre);
+  font-weight: 600;
+}
+.colonne-lien svg + span { min-width: 0; }
+
+/* Le compteur d'un écran qui demande une action (dossiers en retard…). */
+.colonne-compte {
+  margin-left: auto;
+  font-family: var(--f-code); font-size: var(--t-micro);
+  padding: 1px 5px; border-radius: 999px;
+  background: var(--nuit); color: var(--coquille-doux);
+}
+.colonne-lien[aria-current="page"] .colonne-compte { background: var(--nuit); }
+
+/* Le bloc de compte est aussi le chemin vers « Mon nom affiché » : sur un poste
+   partagé au comptoir, c'est là qu'on lit qui est connecté, donc là qu'on va
+   corriger son nom. Une entrée de navigation en moins. */
+.colonne-pied {
+  display: flex; align-items: center; gap: var(--e2);
+  width: 100%; margin-top: auto; padding: var(--e3) var(--e2) var(--e1);
+  border: 0; border-top: 1px solid var(--nuit-filet);
+  background: none; text-align: left; cursor: pointer;
+  color: var(--coquille-muet); font-size: var(--t-petit); line-height: 1.35;
+}
+.colonne-pied:hover { color: var(--coquille-doux); }
+.colonne-pied svg { width: 16px; height: 16px; flex: none; }
+.colonne-pied-nom { font-weight: 600; color: var(--coquille-doux); }
+.colonne-pied:hover .colonne-pied-nom { color: var(--coquille-encre); }
+:root[data-nav="repliee"] .colonne-pied { justify-content: center; padding-inline: 0; }
+
+/* Le dialogue partagé — « Mon nom affiché », et tout ce qui viendra après. */
+.dialogue { padding: var(--e5); }
+.dialogue h2 { font-size: var(--t-grand); margin-bottom: var(--e1); }
+.dialogue > .aide { margin-bottom: var(--e5); max-width: 52ch; }
+.dialogue-pied { display: flex; gap: var(--e2); justify-content: flex-end; }
+
+/* =============================================================================
+   LE BANDEAU D'ÉTAT (role="banner")
+   Il répond en permanence aux deux questions qui coûtent cher : où j'écris, et
+   est-ce que c'est parti. L'idée existe déjà dans le produit ; c'est sa forme
+   qui change — il devient la tête de la zone de travail au lieu d'une bande.
+============================================================================= */
+
+.travail { grid-row: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.banniere {
+  height: var(--banniere); flex: none;
+  display: flex; align-items: center; gap: var(--e3);
+  padding: 0 var(--e5) 0 var(--e4);
+  background: var(--papier);
+  border-bottom: 1px solid var(--bord);
+  margin-top: 2px;
+}
+
+/* Hors ligne, la bannière devient la plaque pleine : le basculement se voit du
+   coin de l'œil, sans lire, et en plein soleil. C'est le seul défaut du
+   produit qui détruit des données au lieu d'agacer. */
+.banniere[data-reseau="hors-ligne"] {
+  background: var(--plaque);
+  border-bottom-color: var(--plaque-bord);
+  color: var(--encre-fixe);
+  --focus-trait: #0f1720; --focus-halo: var(--plaque);
+}
+.banniere[data-reseau="hors-ligne"] .banniere-nom { color: var(--encre-fixe); }
+
+.banniere-nom { font-weight: 600; }
+.banniere-espace { flex: 1; }
+
+/* --- La plaque : le repère de boutique ------------------------------------
+   Proportions et matière d'une plaque d'immatriculation, en Plex Mono. C'est
+   l'un des deux seuls emplois du jaune. */
+.plaque {
+  display: inline-flex; align-items: center;
+  height: 26px; padding: 0 var(--e2);
+  background: var(--plaque); color: var(--encre-fixe);
+  border: 1px solid var(--plaque-bord); border-radius: var(--r-plaque);
+  font-family: var(--f-code); font-weight: 500; font-size: var(--t-base);
+  letter-spacing: 0.09em; line-height: 1;
+}
+select.plaque { cursor: pointer; appearance: none; padding-right: var(--e5); }
+.plaque-choix { position: relative; display: inline-flex; }
+.plaque-choix svg {
+  position: absolute; right: 6px; top: 50%; translate: 0 -50%;
+  width: 14px; height: 14px; pointer-events: none; color: var(--encre-fixe);
+}
+/* Hors ligne, la plaque s'inverse en négatif pour rester lisible sur le jaune. */
+.banniere[data-reseau="hors-ligne"] .plaque {
+  background: var(--encre-fixe); color: var(--plaque);
+  border-color: var(--encre-fixe);
+}
+.banniere[data-reseau="hors-ligne"] .plaque-choix svg { color: var(--plaque); }
+
+/* --- L'état de synchronisation (role="status") ----------------------------- */
+.etat { display: inline-flex; align-items: center; gap: 6px; font-size: var(--t-petit); }
+.etat svg { width: 15px; height: 15px; flex: none; }
+.etat[data-etat="a-jour"] { color: var(--encre-doux); }
+.etat[data-etat="envoi"] { color: var(--goutte); font-weight: 600; }
+.etat[data-etat="hors-ligne"] { color: var(--encre-fixe); font-weight: 700; }
+.etat[data-etat="envoi"] svg { animation: tourne 1.4s linear infinite; }
+@keyframes tourne { to { rotate: 360deg; } }
+
+/* --- La recherche globale --------------------------------------------------- */
+.recherche {
+  display: flex; align-items: center; gap: var(--e2);
+  height: 32px; width: min(360px, 32vw); padding: 0 var(--e2);
+  background: var(--fond); border: 1px solid var(--bord);
+  border-radius: var(--r-1); color: var(--encre-doux);
+  cursor: text; text-align: left;
+}
+.recherche svg { width: 15px; height: 15px; flex: none; }
+.recherche .touche { margin-left: auto; }
+
+.touche {
+  font-family: var(--f-code); font-size: var(--t-micro);
+  padding: 1px 5px; border: 1px solid var(--bord);
+  border-bottom-width: 2px; border-radius: var(--r-plaque);
+  background: var(--papier); color: var(--encre-doux); white-space: nowrap;
+}
+
+/* =============================================================================
+   LA ZONE DE TRAVAIL
+   Elle occupe l'écran. Le `max-w-3xl` posé sur tout le contenu disparaît ;
+   seule la prose garde une limite de lisibilité.
+============================================================================= */
+
+.page { flex: 1; overflow-y: auto; padding: var(--e6) var(--e5) var(--e9); }
+.page-large { max-width: var(--travail-max); }
+.prose { max-width: 68ch; }
+
+.tete { display: flex; align-items: flex-start; gap: var(--e4); margin-bottom: var(--e5); }
+.tete-texte { min-width: 0; flex: 1; }
+
+.sur-titre {
+  font-size: var(--t-micro); font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--encre-doux);
+}
+
+h1, .h1 {
+  font-family: var(--f-titre);
+  font-size: var(--t-titre); font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1.15;
+}
+h2, .h2 {
+  font-family: var(--f-titre);
+  font-size: var(--t-grand); font-weight: 700; letter-spacing: -0.01em;
+}
+h3, .h3 { font-size: var(--t-base); font-weight: 700; }
+
+.aide { color: var(--encre-doux); font-size: var(--t-petit); }
+.muet { color: var(--encre-doux); }
+.code { font-family: var(--f-code); letter-spacing: 0.04em; }
+.montant { font-family: var(--f-code); font-weight: 500; white-space: nowrap; }
+
+/* =============================================================================
+   LA SIGNATURE — LA SOUCHE
+   Chaque pièce du magasin porte un numéro que le gérant dicte au téléphone :
+   PTG-2609-0042. L'interface en fait un objet — un pavé arraché du carnet,
+   bord cranté à gauche. Il ouvre chaque fiche et chaque reçu, et c'est la
+   seule forme découpée de l'interface : tout le reste est droit et calme.
+============================================================================= */
+
+.souche {
+  display: inline-grid; gap: 2px;
+  padding: var(--e2) var(--e4) var(--e2) var(--e5);
+  background: var(--fond);
+  color: var(--encre);
+  /* Le bord cranté : une demi-perforation tous les 14 px, comme une souche
+     détachée du carnet. Le masque évite une image et tient à l'impression. */
+  -webkit-mask: radial-gradient(circle 3.5px at left 50%, transparent 3.5px, #000 4px)
+                left top / 100% 14px repeat-y;
+          mask: radial-gradient(circle 3.5px at left 50%, transparent 3.5px, #000 4px)
+                left top / 100% 14px repeat-y;
+  border-radius: 0 var(--r-1) var(--r-1) 0;
+}
+.souche-numero {
+  font-family: var(--f-code); font-weight: 500;
+  font-size: var(--t-grand); letter-spacing: 0.06em; line-height: 1.1;
+}
+.souche-code { color: var(--encre-doux); }
+.souche-legende { font-size: var(--t-petit); color: var(--encre-doux); }
+
+/* Sur la coquille sombre (écran de connexion, en-tête de reçu). */
+.souche-nuit { background: var(--nuit-3); color: var(--coquille-encre); }
+.souche-nuit .souche-code, .souche-nuit .souche-legende { color: var(--coquille-doux); }
+
+/* =============================================================================
+   PATRONS : boutons, champs, pastilles, tableau, fiche, états
+============================================================================= */
+
+/* --- Boutons ---------------------------------------------------------------
+   Un bouton dit ce qui se passe. Une action principale par écran ; le reste
+   est discret. Le destructif se distingue sans crier. */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 34px; padding: 0 var(--e3);
+  border: 1px solid var(--bord-fort); border-radius: var(--r-1);
+  background: var(--papier); color: var(--encre);
+  font-size: var(--t-base); font-weight: 600; text-decoration: none;
+  cursor: pointer; white-space: nowrap;
+}
+.btn svg { width: 16px; height: 16px; flex: none; }
+.btn:hover { background: var(--survol); }
+
+.btn-principal {
+  height: 36px; padding: 0 var(--e4);
+  background: var(--encre); color: var(--papier); border-color: var(--encre);
+}
+.btn-principal:hover { background: #1d2a37; }
+:root[data-theme="sombre"] .btn-principal:hover,
+:root:not([data-theme="clair"]) .btn-principal:hover { background: #cfd6db; }
+
+.btn-discret { border-color: transparent; background: none; font-weight: 500; }
+.btn-discret:hover { background: var(--survol); border-color: var(--bord); }
+
+.btn-destructif { color: var(--braise); border-color: var(--braise); }
+.btn-destructif:hover { background: var(--braise-surface); }
+
+.btn[aria-disabled="true"], .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+.btn[aria-disabled="true"]:hover { background: var(--papier); }
+
+/* --- Champs ---------------------------------------------------------------- */
+.champ { display: grid; gap: 5px; margin-bottom: var(--e4); }
+.champ > label { font-weight: 600; }
+.champ input, .champ select, .champ textarea {
+  height: 38px; padding: 0 var(--e3);
+  border: 1px solid var(--bord-fort); border-radius: var(--r-1);
+  background: var(--papier); color: var(--encre);
+  font-family: inherit; font-size: var(--t-moyen);
+}
+.champ textarea { height: auto; padding: var(--e2) var(--e3); }
+.champ input.code, .champ input[inputmode="numeric"] {
+  font-family: var(--f-code); letter-spacing: 0.05em;
+}
+/* L'erreur se lit au champ et en tête, jamais par la couleur seule. */
+.champ[data-erreur] input, .champ[data-erreur] select { border-color: var(--braise); border-width: 2px; }
+.champ-erreur { color: var(--braise); font-size: var(--t-petit); font-weight: 600; }
+.champ-aide { color: var(--encre-doux); font-size: var(--t-petit); }
+
+fieldset { border: 0; padding: 0; margin: 0 0 var(--e6); }
+legend { padding: 0 0 var(--e1); font-weight: 700; font-size: var(--t-grand);
+         font-family: var(--f-titre); letter-spacing: -0.01em; }
+
+/* --- Pastilles de statut ---------------------------------------------------
+   Jamais la couleur seule : le mot est toujours écrit, la pastille ne fait
+   que doubler. Le soleil sur un écran bon marché efface les nuances. */
+.pastille {
+  display: inline-flex; align-items: center; gap: 5px;
+  padding: 2px var(--e2); border-radius: var(--r-plaque);
+  font-size: var(--t-petit); font-weight: 600; white-space: nowrap;
+  background: var(--fond); color: var(--encre);
+}
+.pastille::before {
+  content: ""; width: 7px; height: 7px; border-radius: 2px;
+  background: currentColor; flex: none;
+}
+.pastille-retard { background: var(--braise-surface); color: var(--braise); }
+.pastille-transit { background: var(--goutte-surface); color: var(--goutte); }
+.pastille-solde { background: var(--solde-surface); color: var(--solde); }
+.pastille-neutre { background: var(--fond); color: var(--encre-doux); }
+
+/* --- Tableau ---------------------------------------------------------------
+   Sur bureau, un vrai tableau : colonnes alignées, en-tête collé, chiffres
+   tabulaires. C'est ce que les listes empilées gaspillaient. */
+.cadre {
+  background: var(--papier);
+  border: 1px solid var(--bord); border-radius: var(--r-2);
+  overflow: hidden;
+}
+/* Un tableau plus large que sa colonne défile dans son propre cadre : la page
+   elle-même ne part jamais de travers (DESIGN.md §13). */
+.cadre-defilant { overflow-x: auto; }
+.cadre-tete {
+  display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e3) var(--e4);
+  border-bottom: 1px solid var(--bord);
+}
+.cadre-compte { margin-left: auto; color: var(--encre-doux); font-size: var(--t-petit); }
+
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  position: sticky; top: 0; z-index: 1;
+  background: var(--papier);
+  text-align: left; font-size: var(--t-micro); font-weight: 700;
+  letter-spacing: 0.07em; text-transform: uppercase; color: var(--encre-doux);
+  padding: var(--e2) var(--e3);
+  border-bottom: 1px solid var(--bord);
+  white-space: nowrap;
+}
+tbody td {
+  padding: var(--e2) var(--e3); height: 40px;
+  border-bottom: 1px solid var(--bord);
+  vertical-align: middle;
+}
+tbody tr:last-child td { border-bottom: 0; }
+tbody tr:hover td { background: var(--survol); }
+/* Un numéro de pièce se dicte au téléphone : il ne se coupe jamais en deux.
+   Idem pour un montant — « 465 000 » cassé sur deux lignes se relit mal et se
+   recopie faux. */
+.code, .montant, .num, .plaque, .souche-numero { white-space: nowrap; }
+.num { text-align: right; font-family: var(--f-code); font-weight: 500; }
+th.num { text-align: right; }
+.principal { font-weight: 600; }
+
+/* Une ligne cliquable garde un vrai bouton dedans : la ligne entière n'est pas
+   un lien, sinon rien n'est atteignable au clavier proprement. */
+.lien-ligne { font-weight: 600; text-decoration: none; }
+.lien-ligne:hover { text-decoration: underline; }
+
+/* --- Filtres ---------------------------------------------------------------- */
+.filtres { display: flex; align-items: center; gap: var(--e2); flex-wrap: wrap; }
+.filtre {
+  height: 30px; padding: 0 var(--e3);
+  display: inline-flex; align-items: center; gap: 5px;
+  border: 1px solid var(--bord); border-radius: 999px;
+  background: var(--papier); color: var(--encre-doux);
+  font-size: var(--t-petit); font-weight: 600; cursor: pointer;
+}
+.filtre[aria-pressed="true"] {
+  background: var(--encre); color: var(--papier); border-color: var(--encre);
+}
+
+/* --- Fiche / panneau latéral ------------------------------------------------
+   Sur bureau, un panneau qui garde la liste visible vaut mieux qu'une
+   navigation aller-retour. */
+.avec-panneau { display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: var(--e5); }
+.panneau {
+  background: var(--papier); border: 1px solid var(--bord);
+  border-radius: var(--r-2); box-shadow: var(--ombre-panneau);
+  align-self: start; position: sticky; top: 0;
+}
+.panneau-tete {
+  display: flex; align-items: flex-start; gap: var(--e3);
+  padding: var(--e4); border-bottom: 1px solid var(--bord);
+}
+.panneau-corps { padding: var(--e4); }
+.panneau-pied {
+  display: flex; gap: var(--e2); flex-wrap: wrap;
+  padding: var(--e3) var(--e4);
+  border-top: 1px solid var(--bord); background: var(--fond);
+  border-radius: 0 0 var(--r-2) var(--r-2);
+}
+
+/* Liste de faits — une fiche montre l'identité, puis les faits, puis les actions. */
+.faits { display: grid; grid-template-columns: auto 1fr; gap: var(--e2) var(--e4); }
+.faits dt { color: var(--encre-doux); }
+.faits dd { font-weight: 600; text-align: right; }
+
+/* --- Barre d'action collée -------------------------------------------------
+   Un formulaire long garde son bouton visible : pas à deux mille pixels de
+   défilement. */
+.barre-action {
+  grid-column: 1 / -1;
+  position: sticky; bottom: 0; z-index: 5;
+  display: flex; align-items: center; gap: var(--e3);
+  margin: var(--e6) calc(var(--e5) * -1) calc(var(--e9) * -1);
+  padding: var(--e3) var(--e5);
+  background: var(--papier); border-top: 1px solid var(--bord);
+}
+.barre-action .pousse { margin-left: auto; }
+
+/* --- L'annonce d'effet -----------------------------------------------------
+   Ce que le mode de paiement change réellement, dit avant la validation.
+   `EFFET_MODE` dans lib/domain/vente.ts : on le garde mot pour mot. */
+.effet {
+  display: flex; gap: var(--e2);
+  padding: var(--e3); border-radius: var(--r-1);
+  background: var(--goutte-surface); color: var(--encre);
+  border-left: 3px solid var(--goutte);
+}
+.effet svg { width: 17px; height: 17px; flex: none; color: var(--goutte); }
+
+/* =============================================================================
+   LES ÉTATS — vide, chargement, erreur, refus, désactivé
+   Un écran n'est pas terminé tant qu'ils ne sont pas dessinés.
+============================================================================= */
+
+/* L'état vide est une invitation à agir, jamais un trou. */
+.vide { padding: var(--e9) var(--e5); text-align: center; }
+.vide svg { width: 40px; height: 40px; color: var(--encre-doux); }
+.vide h2 { margin: var(--e3) 0 var(--e1); }
+.vide p { color: var(--encre-doux); margin: 0 auto var(--e5); max-width: 46ch; }
+
+/* Le chargement ne saute pas : les squelettes ont la taille du contenu à venir. */
+.squelette {
+  display: block; height: 12px; border-radius: 3px;
+  background: linear-gradient(90deg, var(--fond), var(--survol), var(--fond));
+  background-size: 200% 100%;
+  animation: glisse 1.4s ease-in-out infinite;
+}
+@keyframes glisse { to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .squelette { animation: none; } }
+
+/* L'erreur dit ce qui s'est passé et comment le corriger. Elle ne s'excuse
+   pas, et n'accuse aucune cause qu'elle n'a pas vérifiée : un « pas de
+   réseau » affiché pour un mot de passe faux a coûté cher au projet. */
+.avis {
+  display: flex; gap: var(--e3);
+  padding: var(--e3) var(--e4);
+  border-radius: var(--r-1);
+  background: var(--fond); border-left: 3px solid var(--encre-doux);
+}
+.avis svg { width: 18px; height: 18px; flex: none; margin-top: 2px; }
+.avis h2, .avis h3 { font-size: var(--t-base); }
+.avis p { color: var(--encre-doux); }
+.avis-erreur { background: var(--braise-surface); border-left-color: var(--braise); }
+.avis-erreur svg { color: var(--braise); }
+.avis-transit { background: var(--goutte-surface); border-left-color: var(--goutte); }
+.avis-transit svg { color: var(--goutte); }
+.avis-plaque {
+  background: var(--plaque); border-left-color: var(--plaque-bord);
+  color: var(--encre-fixe);
+}
+.avis-plaque p { color: var(--encre-fixe); }
+
+/* =============================================================================
+   BLOCS D'ÉCRAN
+============================================================================= */
+
+.bloc { margin-bottom: var(--e7); }
+.bloc-tete {
+  display: flex; align-items: baseline; gap: var(--e3);
+  margin-bottom: var(--e3);
+}
+.bloc-tete .btn, .bloc-tete .cadre-compte { margin-left: auto; }
+.deux-colonnes { display: grid; grid-template-columns: 1.35fr 1fr; gap: var(--e6); }
+.cadre-pied { padding: var(--e2) var(--e4); border-top: 1px solid var(--bord); }
+
+/* --- A1 · Connexion --------------------------------------------------------
+   Le seul écran sans coquille, et le premier contact avec la marque : c'est
+   là que le monogramme a la place d'exister à sa vraie taille. */
+.connexion { display: grid; grid-template-columns: 420px minmax(0, 1fr); min-height: 100vh; }
+.connexion-marque {
+  background: var(--nuit); color: var(--coquille-encre);
+  padding: var(--e9) var(--e7) var(--e7);
+  display: flex; flex-direction: column;
+  --focus-trait: #ffffff; --focus-halo: var(--nuit);
+}
+.connexion-logo { width: 168px; margin-bottom: var(--e7); }
+.connexion-raison {
+  font-family: var(--f-titre); font-size: var(--t-titre); font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.connexion-mots { color: var(--coquille-doux); margin-top: var(--e2); max-width: 34ch; }
+.connexion-pied {
+  margin-top: auto; color: var(--coquille-muet);
+  font-family: var(--f-code); font-size: var(--t-petit); letter-spacing: 0.06em;
+}
+.connexion-zone { padding: var(--e9) var(--e7); }
+.connexion-carte { max-width: 380px; }
+.connexion-carte h1 { margin-bottom: var(--e1); }
+.connexion-carte .aide { margin-bottom: var(--e5); }
+.connexion-carte .avis { margin-bottom: var(--e5); }
+.btn-large { width: 100%; height: 42px; }
+
+.variantes { margin-top: var(--e9); padding-top: var(--e6); border-top: 1px solid var(--bord); }
+.variantes-grille {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--e6); margin-top: var(--e4);
+}
+.variante { background: var(--papier); border: 1px solid var(--bord);
+            border-radius: var(--r-2); padding: var(--e5); }
+.variante-nom { font-weight: 700; margin-bottom: var(--e3); }
+.variante h3 { font-size: var(--t-grand); font-family: var(--f-titre); letter-spacing: -0.01em; }
+.variante h4 { font-size: var(--t-base); }
+
+/* --- A2 · Supervision : le choix du périmètre ------------------------------
+   Des cartes de boutique, pas des vignettes de chiffres : les indicateurs
+   agrégés sont la spec S24 et n'existent pas encore (D63). */
+.grille-boutiques {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--e4);
+}
+.carte-boutique {
+  display: block; padding: var(--e5);
+  background: var(--papier); border: 1px solid var(--bord);
+  border-radius: var(--r-2); text-decoration: none;
+}
+.carte-boutique:hover { border-color: var(--bord-fort); background: var(--survol); }
+.carte-boutique h3 { font-size: var(--t-grand); margin: var(--e3) 0 var(--e3);
+                     font-family: var(--f-titre); letter-spacing: -0.01em; }
+.carte-boutique .faits { margin-bottom: var(--e3); }
+.carte-alerte, .carte-calme {
+  display: flex; align-items: center; gap: 6px;
+  padding-top: var(--e3); border-top: 1px solid var(--bord);
+  font-size: var(--t-petit); font-weight: 600;
+}
+.carte-alerte svg, .carte-calme svg { width: 15px; height: 15px; }
+.carte-alerte { color: var(--braise); }
+.carte-calme { color: var(--encre-doux); }
+
+/* --- A3 · Accueil du gérant : le geste du jour ----------------------------
+   Un seul, en grand. C'est ce qui manquait : rien n'attirait l'œil vers
+   l'action principale, et le gérant ne pouvait pas deviner que « Nouvelle
+   vente » est le geste de sa journée. */
+.grille-accueil { display: grid; gap: var(--e3); margin-bottom: var(--e7); }
+.geste {
+  display: flex; align-items: center; gap: var(--e4);
+  padding: var(--e5) var(--e6);
+  background: var(--nuit); color: var(--coquille-encre);
+  border-radius: var(--r-2); text-decoration: none;
+  --focus-trait: #ffffff; --focus-halo: var(--nuit);
+}
+.geste:hover { background: var(--nuit-3); }
+.geste-icone { display: grid; place-items: center; width: 44px; height: 44px; flex: none;
+               border-radius: var(--r-1); background: var(--nuit-3); }
+.geste-icone svg { width: 24px; height: 24px; }
+.geste-texte { display: grid; gap: 2px; }
+.geste-titre { font-family: var(--f-titre); font-size: var(--t-titre);
+               font-weight: 700; letter-spacing: -0.02em; }
+.geste-aide { color: var(--coquille-doux); }
+.geste-fleche { margin-left: auto; }
+.geste-fleche svg { width: 22px; height: 22px; }
+.gestes-secondaires { display: flex; gap: var(--e2); flex-wrap: wrap; }
+
+.liste-taches > li {
+  display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e3) var(--e4); border-bottom: 1px solid var(--bord);
+}
+.liste-taches > li:last-child { border-bottom: 0; }
+.liste-taches .pastille { flex: none; }
+.tache-texte { flex: 1; min-width: 0; }
+.liste-taches .btn { margin-left: auto; flex: none; }
+
+.journee > li {
+  display: flex; gap: var(--e3);
+  padding: var(--e2) var(--e4); border-bottom: 1px solid var(--bord);
+}
+.journee > li:last-child { border-bottom: 0; }
+.journee-heure { color: var(--encre-doux); flex: none; }
+
+/* --- A5 · Le formulaire long -----------------------------------------------
+   Une colonne. Jamais deux champs côte à côte s'ils se lisent en séquence :
+   le gérant saisit en dictant, il ne balaie pas la page des yeux. */
+.formulaire { max-width: 640px; }
+.champ-court { max-width: 260px; }
+
+/* La chose choisie, montrée plutôt que résumée : le gérant doit reconnaître
+   sa moto et son client avant de valider. */
+.choisi {
+  display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e3) var(--e4);
+  background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-1);
+}
+.choisi svg { width: 20px; height: 20px; flex: none; }
+.choisi > div { flex: 1; min-width: 0; }
+.choisi .btn { flex: none; }
+
+.modes { display: grid; gap: var(--e2); margin-bottom: var(--e4); }
+.mode {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px var(--e3);
+  padding: var(--e3) var(--e4);
+  border: 1px solid var(--bord); border-radius: var(--r-1);
+  background: var(--papier); cursor: pointer;
+}
+.mode:hover { border-color: var(--bord-fort); }
+.mode input { grid-row: span 2; align-self: center; width: 18px; height: 18px; accent-color: var(--encre); }
+.mode-nom { font-weight: 700; }
+.mode-effet { color: var(--encre-doux); font-size: var(--t-petit); }
+/* Le mode retenu se distingue par la bordure ET la graisse, jamais par la
+   seule couleur (l'état natif du bouton radio reste la source de vérité). */
+.mode:has(input:checked), .mode[data-choisi] {
+  border-color: var(--encre); border-width: 2px; padding: calc(var(--e3) - 1px) calc(var(--e4) - 1px);
+}
+
+.recap { display: flex; align-items: baseline; gap: var(--e2); }
+.recap-montant { font-size: var(--t-grand); font-weight: 500; }
+.barre-boutons { display: flex; gap: var(--e2); flex-wrap: wrap; margin-top: var(--e4); }
+
+/* --- A6 · La fiche en panneau ---------------------------------------------- */
+.panneau-fermer { height: 30px; padding: 0 var(--e2); margin-left: auto; flex: none; }
+.sous-titre {
+  margin: var(--e5) 0 var(--e2); padding-top: var(--e3);
+  border-top: 1px solid var(--bord);
+  font-size: var(--t-micro); font-weight: 700;
+  letter-spacing: 0.09em; text-transform: uppercase; color: var(--encre-doux);
+}
+.versements > li {
+  display: flex; gap: var(--e3); align-items: baseline;
+  padding: var(--e1) 0;
+}
+.versements .montant { margin-left: auto; }
+
+/* La ligne ouverte dans le panneau, et la ligne en retard : toutes deux
+   marquées par un filet à gauche, jamais par un fond coloré seul. */
+tbody tr.ligne-active td { background: var(--survol); }
+tbody tr.ligne-active td:first-child { box-shadow: inset 3px 0 0 var(--encre); }
+tbody tr.ligne-retard td:first-child { box-shadow: inset 3px 0 0 var(--braise); }
+
+/* --- A7 · Le relais du dossier ---------------------------------------------
+   Les quatre statuts d'un document sont un vrai parcours physique entre le
+   magasin et le prestataire : l'ordre porte une information dont le gérant a
+   besoin. C'est le seul endroit du produit où une suite numérotée est
+   légitime (DESIGN.md §6). */
+.relais { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--e3); }
+.relais > li {
+  display: grid; gap: 2px; padding-top: var(--e5); position: relative;
+}
+.relais > li::before {
+  content: ""; position: absolute; top: 9px; left: 0; right: 0; height: 2px;
+  background: var(--bord);
+}
+.relais > li:first-child::before { left: 9px; }
+.relais > li:last-child::before { right: calc(100% - 9px); }
+.relais-rang {
+  position: absolute; top: 0; left: 0; z-index: 1;
+  display: grid; place-items: center; width: 20px; height: 20px;
+  border-radius: 999px; border: 2px solid var(--bord); background: var(--papier);
+  font-size: 10px; font-weight: 700; font-family: var(--f-code);
+}
+.relais > li[data-etape="fait"] .relais-rang {
+  background: var(--solde); border-color: var(--solde); color: #fff;
+}
+.relais > li[data-etape="fait"]::before { background: var(--solde); }
+.relais > li[data-etape="cours"] .relais-rang {
+  background: var(--goutte); border-color: var(--goutte); color: #fff;
+}
+.relais > li[data-etape="attente"] .relais-rang { color: var(--encre-doux); }
+.relais-nom { font-weight: 700; }
+.relais > li[data-etape="attente"] .relais-nom { color: var(--encre-doux); font-weight: 600; }
+.relais-quand { color: var(--encre-doux); font-size: var(--t-petit); }
+
+/* Dans le panneau, le même relais se lit en colonne. */
+.relais-compact { display: grid; grid-auto-flow: row; gap: var(--e1); }
+.relais-compact > li {
+  display: flex; align-items: center; gap: var(--e3);
+  padding: var(--e1) 0; grid-auto-flow: initial;
+}
+.relais-compact > li::before { display: none; }
+.relais-compact .pastille { margin-left: auto; }
+
+.tableau-dossiers td, .tableau-dossiers th { white-space: nowrap; }
+
+/* --- A8 · Crédit ≠ tranches ------------------------------------------------
+   La confusion métier la plus coûteuse du projet. Les deux tableaux ne se
+   mélangent jamais, et chacun rappelle en une phrase où est la moto et qui
+   détient l'argent. */
+.bandeau-explication {
+  display: flex; align-items: center; gap: var(--e2);
+  margin-bottom: var(--e3); padding: var(--e2) var(--e3);
+  background: var(--fond); border-radius: var(--r-1);
+  font-size: var(--t-base); color: var(--encre);
+}
+.bandeau-explication svg { width: 17px; height: 17px; flex: none; color: var(--encre-doux); }
+.bandeau-explication strong { font-weight: 700; }
+
+/* --- A9 · L'identité, posée à l'installation ------------------------------
+   Ce n'est pas un formulaire : c'est un état de fait qu'on relit. La carte le
+   dit par sa forme — pas de champ, pas de bouton. */
+.identite { display: flex; align-items: flex-start; gap: var(--e6); padding: var(--e5); }
+.identite-logo { width: 88px; flex: none; }
+/* Bornée : sur une carte de mille deux cents pixels, l'œil ne doit pas
+   traverser la page pour rejoindre une valeur à son intitulé. */
+.identite-faits { flex: 1; min-width: 0; max-width: 560px; }
+.identite-faits dd { display: flex; align-items: center; justify-content: flex-end;
+                     gap: var(--e2); }
+
+/* --- A9 · Le hub des réglages ---------------------------------------------- */
+.cartes-reglages { display: grid; gap: var(--e2); }
+.carte-reglage {
+  display: flex; align-items: center; gap: var(--e4);
+  padding: var(--e3) var(--e4);
+  background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-1);
+  text-decoration: none;
+}
+.carte-reglage:hover { border-color: var(--bord-fort); background: var(--survol); }
+.carte-icone { flex: none; color: var(--encre-doux); }
+.carte-icone svg { width: 20px; height: 20px; display: block; }
+.carte-texte { display: grid; gap: 1px; flex: 1; min-width: 0; }
+.carte-titre { font-weight: 700; }
+.carte-etat { flex: none; font-size: var(--t-petit); }
+
+/* Le formulaire garde sa colonne de lecture ; la place à sa droite sert à
+   récapituler ce qu'on s'apprête à enregistrer, plutôt qu'à étirer les champs. */
+.avec-recap {
+  display: grid; grid-template-columns: minmax(0, 640px) 340px;
+  gap: 0 var(--e7); align-items: start;
+}
+.recap-carte {
+  position: sticky; top: var(--e5);
+  background: var(--papier); border: 1px solid var(--bord);
+  border-radius: var(--r-2); padding: var(--e5);
+}
+.recap-carte h2 { font-size: var(--t-base); margin-bottom: var(--e3); }
+.recap-carte .faits { margin-bottom: var(--e4); }
+.recap-total {
+  display: flex; align-items: baseline; gap: var(--e2);
+  padding-top: var(--e3); border-top: 1px solid var(--bord);
+}
+.recap-total .montant { margin-left: auto; font-size: var(--t-grand); }
+
+@media (max-width: 1279px) {
+  .avec-recap { grid-template-columns: minmax(0, 1fr); gap: var(--e6); }
+  .recap-carte { position: static; }
+}
+
+/* --- B3 · Ce qui attend sur cet appareil ------------------------------------
+   Une saisie enregistrée localement se voit. C'est la promesse centrale du
+   produit : rien n'est perdu, et le gérant doit pouvoir le vérifier. */
+.attente > li {
+  display: flex; align-items: center; gap: var(--e2);
+  padding: var(--e2) 0; border-bottom: 1px solid var(--bord);
+}
+.attente > li:last-child { border-bottom: 0; }
+.attente svg { width: 16px; height: 16px; flex: none; color: var(--goutte); }
+.attente > li > span:nth-child(2) { flex: 1; min-width: 0; }
+
+/* --- B4 · Les vides --------------------------------------------------------- */
+.vide-serre { padding: var(--e6) var(--e4); }
+.vide-serre svg { width: 30px; height: 30px; }
+.vide .barre-boutons { justify-content: center; }
+
+/* --- B7 · Le refus ---------------------------------------------------------
+   Il explique, et propose une sortie. Il ne prétend pas qu'un déblocage est
+   possible : le cloisonnement est tenu en base, pas à l'écran. */
+.refus { max-width: 60ch; padding: var(--e9) 0; }
+.refus-icone { display: block; color: var(--encre-doux); margin-bottom: var(--e4); }
+.refus-icone svg { width: 36px; height: 36px; }
+.refus h1 { margin-bottom: var(--e3); }
+.refus p.prose { color: var(--encre-doux); margin-bottom: var(--e5); }
+
+/* =============================================================================
+   LA PALETTE DE COMMANDES ET LE RUBAN D'APERÇU
+============================================================================= */
+
+.voile {
+  position: fixed; inset: 0; z-index: 80;
+  display: grid; place-items: start center; padding-top: 12vh;
+  background: rgb(15 23 32 / 0.45);
+}
+.palette-boite {
+  width: min(580px, 92vw);
+  background: var(--papier); border: 1px solid var(--bord);
+  border-radius: var(--r-2); box-shadow: var(--ombre-menu); overflow: hidden;
+}
+.palette-champ {
+  display: flex; align-items: center; gap: var(--e2);
+  padding: var(--e3) var(--e4); border-bottom: 1px solid var(--bord);
+}
+.palette-champ svg { width: 17px; height: 17px; }
+.palette-champ input {
+  flex: 1; min-width: 0; border: 0; outline-offset: 4px; background: none;
+  font: inherit; font-size: var(--t-moyen); color: var(--encre);
+}
+.palette-liste { padding: var(--e2); }
+.palette-liste a {
+  display: flex; align-items: center; gap: var(--e2);
+  padding: var(--e2) var(--e3); border-radius: var(--r-1); text-decoration: none;
+}
+.palette-liste a svg { width: 16px; height: 16px; flex: none; color: var(--encre-doux); }
+.palette-liste a:hover { background: var(--survol); }
+.palette-liste a > span:nth-child(2) { flex: 1; min-width: 0; }
+.palette-liste .pastille { margin-left: auto; }
+.palette-pied { padding: var(--e2) var(--e4) var(--e3); border-top: 1px solid var(--bord); }
+
+/* Le groupe C ne doit pas pouvoir être pris pour du travail livré. */
+.ruban-apercu {
+  display: block; margin-bottom: var(--e5);
+  padding: var(--e3) var(--e4); border-radius: var(--r-1);
+  background: var(--goutte-surface); color: var(--goutte);
+  border-left: 3px solid var(--goutte);
+  font-weight: 600;
+}
+
+/* --- C1 · Le panier du comptoir -------------------------------------------- */
+.panier > li {
+  display: grid; grid-template-columns: auto 1fr auto auto; gap: var(--e2) var(--e3);
+  align-items: baseline; padding: var(--e2) 0; border-bottom: 1px solid var(--bord);
+}
+.panier > li:last-child { border-bottom: 0; }
+
+/* --- C3 · Les chiffres (spec S24) ------------------------------------------
+   Ils n'apparaissent QUE sur cet écran d'aperçu. En supervision, aujourd'hui,
+   ils mentiraient : la spec n'existe pas et le projet a déjà refusé deux fois
+   un tableau de bord à cartes vides (D63). */
+.chiffres { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--e4); }
+.chiffre {
+  padding: var(--e4) var(--e5);
+  background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-2);
+}
+.chiffre-nom { font-size: var(--t-petit); font-weight: 700; color: var(--encre-doux);
+               text-transform: uppercase; letter-spacing: 0.07em; }
+.chiffre-valeur { font-family: var(--f-code); font-size: var(--t-chiffre);
+                  font-weight: 500; line-height: 1.2; margin: var(--e1) 0 2px; }
+.chiffre-detail { font-size: var(--t-petit); }
+
+.barres { display: grid; gap: var(--e3); }
+.barres > li {
+  display: grid; grid-template-columns: 130px minmax(0, 1fr) 120px 90px;
+  gap: var(--e3); align-items: center;
+}
+.barre-nom { font-weight: 600; }
+.barre-piste { height: 10px; border-radius: 999px; background: var(--fond); overflow: hidden; }
+.barre-part { display: block; height: 100%; background: var(--goutte); }
+.barre-valeur { text-align: right; }
+.barre-detail { font-size: var(--t-petit); }
+
+/* --- C4 · Le reçu ----------------------------------------------------------
+   Patron à part : aucune coquille, papier blanc. Le monogramme y est
+   monochrome — on ne dépense pas une cartouche couleur pour un reçu — et la
+   souche ouvre le document, comme sur le carnet dont il vient. */
+.page-recu { background: var(--fond); padding: var(--e6); }
+.barre-recu {
+  display: flex; align-items: center; gap: var(--e4);
+  max-width: 148mm; margin: 0 auto var(--e5);
+}
+.barre-recu .aide { flex: 1; }
+
+.recu {
+  max-width: 148mm; margin: 0 auto; padding: 14mm;
+  background: #fff; color: #0f1720;
+  border: 1px solid var(--bord); border-radius: var(--r-2);
+}
+.recu-tete { display: flex; align-items: flex-start; gap: var(--e4); margin-bottom: var(--e6); }
+.recu-raison p + p { margin-top: 1px; }
+.recu-logo { width: 42px; flex: none; color: #0f1720; }
+.recu-raison { flex: 1; min-width: 0; font-size: var(--t-petit); color: #4a5560; }
+.recu-legaux {
+  margin: calc(var(--e6) * -1 + var(--e3)) 0 var(--e6);
+  padding-top: var(--e2);
+  border-top: 1px solid var(--bord);
+  font-size: var(--t-micro); color: #4a5560;
+}
+.recu-nom { font-family: var(--f-titre); font-size: var(--t-grand);
+            font-weight: 700; color: #0f1720; letter-spacing: -0.01em; }
+.recu-tete .souche { background: #f1f3f5; }
+
+.recu-titre { font-size: var(--t-grand); padding-bottom: var(--e2);
+              border-bottom: 2px solid #0f1720; margin-bottom: var(--e4); }
+.recu-faits { display: grid; grid-template-columns: auto 1fr; gap: 5px var(--e4); }
+.recu-faits dt { color: #4a5560; }
+.recu-faits dd { text-align: right; font-weight: 600; }
+
+.recu-montant {
+  display: flex; align-items: baseline; gap: var(--e3);
+  margin: var(--e5) 0; padding: var(--e3) var(--e4);
+  border: 2px solid #0f1720; border-radius: var(--r-1);
+  font-weight: 700;
+}
+.recu-montant .montant { margin-left: auto; font-size: var(--t-titre); }
+.recu-solde { padding-top: var(--e3); border-top: 1px solid var(--bord); }
+.recu-mention { margin-top: var(--e4); font-size: var(--t-petit); color: #4a5560; }
+
+.recu-pied { display: grid; grid-template-columns: 1fr 1fr; gap: var(--e6);
+             margin-top: var(--e9); }
+.recu-legende { font-size: var(--t-petit); color: #4a5560; margin-bottom: var(--e5); }
+.recu-trait { border-bottom: 1px solid #0f1720; }
+.recu-bas { margin-top: var(--e6); padding-top: var(--e2);
+            border-top: 1px solid var(--bord);
+            font-size: var(--t-micro); color: #4a5560; text-align: center; }
+
+@media print {
+  /* Le reçu occupe la feuille : plus de fond d'écran, plus de cadre, plus de
+     marge d'application. Les marges sont celles de la page. */
+  .page-recu { background: #fff; padding: 0; }
+  /* La colonne du reçu reste bornée à la largeur d'une A5 : sur une A4, des
+     lignes de 186 mm seraient illisibles. C'est l'acquis de S10. */
+  .recu { max-width: 148mm; margin: 0; padding: 0; border: 0; border-radius: 0; }
+  .barre-recu { display: none; }
+}
+
+/* =============================================================================
+   LA GALERIE — maquettes/index.html
+   La page d'entrée, celle que le client ouvre en premier.
+============================================================================= */
+
+.galerie { background: var(--fond); }
+.galerie-tete {
+  display: flex; align-items: flex-start; gap: var(--e6);
+  padding: calc(2px + var(--e9)) var(--e7) var(--e7);
+  background: var(--nuit); color: var(--coquille-encre);
+  --focus-trait: #ffffff; --focus-halo: var(--nuit);
+}
+.galerie-logo { width: 120px; flex: none; }
+.galerie-tete h1 { font-size: 2rem; margin: var(--e1) 0 var(--e3); }
+.galerie-mots { color: var(--coquille-doux); max-width: 62ch; }
+.galerie-theme { flex: none; margin-left: auto; background: none;
+                 color: var(--coquille-encre); border-color: var(--nuit-filet); }
+.galerie-theme:hover { background: var(--nuit-3); }
+
+.galerie-corps { max-width: 1100px; margin: 0 auto; padding: var(--e9) var(--e6); }
+.galerie-bloc { margin-bottom: var(--e9); }
+.galerie-bloc > h2 {
+  font-size: var(--t-titre); margin-bottom: var(--e2);
+  padding-bottom: var(--e2); border-bottom: 2px solid var(--encre);
+}
+.galerie-bloc > .aide, .galerie-bloc > .prose { margin-bottom: var(--e4); }
+.galerie-bloc p.prose + p.prose { margin-top: var(--e3); }
+
+.direction {
+  margin-top: var(--e4); padding: var(--e5);
+  background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-2);
+  font-family: var(--f-code); font-size: var(--t-petit); line-height: 1.65;
+  white-space: pre; overflow-x: auto;
+}
+
+.marques { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+           gap: var(--e4); }
+.marque { margin: 0; padding: var(--e6); border-radius: var(--r-2);
+          border: 1px solid var(--bord); text-align: center; }
+.marque img { width: 168px; max-width: 100%; }
+.marque .marque-petit { width: 64px; }
+.marque figcaption { margin-top: var(--e4); font-size: var(--t-petit); }
+.marque-nuit { background: var(--nuit); border-color: var(--nuit-filet); }
+.marque-nuit figcaption { color: var(--coquille-doux); }
+.marque-papier { background: #fff; color: #0f1720; }
+.marque-papier figcaption { color: #4a5560; }
+
+.jetons { display: grid; gap: var(--e2); }
+.jeton {
+  display: flex; gap: var(--e4); padding: var(--e3) var(--e4);
+  background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-1);
+}
+.jeton-pastille { width: 44px; height: 44px; flex: none; border-radius: var(--r-1);
+                  border: 1px solid var(--bord); }
+.jeton-texte { flex: 1; min-width: 0; }
+.jeton-nom { font-weight: 700; }
+.preuves { display: flex; flex-wrap: wrap; gap: var(--e2); margin-top: var(--e2); }
+.preuve {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 2px var(--e2); border-radius: var(--r-plaque);
+  font-size: var(--t-petit);
+}
+.preuve::before { content: ""; width: 7px; height: 7px; border-radius: 2px;
+                  background: currentColor; }
+/* Jamais la couleur seule : le rapport chiffré est écrit, et le seuil avec. */
+.preuve-ok { background: var(--solde-surface); color: var(--solde); }
+.preuve-non { background: var(--braise-surface); color: var(--braise); }
+.preuve .muet { color: inherit; opacity: 0.75; }
+
+.ecrans { display: grid; gap: var(--e2); }
+.ecran { padding: var(--e3) var(--e4);
+         background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-1); }
+.ecran-apercu { border-style: dashed; }
+.ecran-lien { display: flex; align-items: baseline; gap: var(--e3); text-decoration: none; }
+.ecran-lien:hover .ecran-titre { text-decoration: underline; }
+.ecran-cle { flex: none; width: 2.5em; color: var(--encre-doux); font-weight: 500; }
+.ecran-titre { font-weight: 700; font-size: var(--t-grand);
+               font-family: var(--f-titre); letter-spacing: -0.01em; }
+.ecran .aide { margin-top: 2px; padding-left: calc(2.5em + var(--e3)); max-width: 78ch; }
+
+.mouvements { display: grid; gap: var(--e3); counter-reset: m; }
+.mouvements > li {
+  padding: var(--e4); padding-left: var(--e9);
+  background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-1);
+  position: relative;
+}
+/* Une suite numérotée n'est légitime que si l'ordre porte une information : ici
+   il n'en porte pas, c'est un inventaire. Le rang sert seulement à s'y référer
+   en commentant — « le 4 est trop lent » — et reste donc discret. */
+.mouvements > li::before {
+  counter-increment: m; content: counter(m);
+  position: absolute; left: var(--e4); top: var(--e4);
+  font-family: var(--f-code); font-weight: 500; color: var(--encre-doux);
+}
+.mouvement-nom { font-weight: 700; margin-bottom: var(--e1);
+                 display: flex; align-items: center; gap: var(--e2); }
+.mouvements p { max-width: 76ch; }
+
+.questions { display: grid; gap: var(--e4); counter-reset: q; }
+.questions > li {
+  padding: var(--e4); padding-left: var(--e9);
+  background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-1);
+  position: relative;
+}
+.questions > li::before {
+  counter-increment: q; content: counter(q);
+  position: absolute; left: var(--e4); top: var(--e4);
+  font-family: var(--f-code); font-weight: 500; color: var(--encre-doux);
+}
+.question-titre { font-weight: 700; margin-bottom: var(--e1); }
+.questions p { max-width: 76ch; }
+
+@media (max-width: 767px) {
+  .galerie-tete { flex-direction: column; padding: var(--e7) var(--e4) var(--e6); }
+  .galerie-theme { margin-left: 0; }
+  .galerie-corps { padding: var(--e6) var(--e4); }
+  .ecran .aide { padding-left: 0; }
+}
+
+/* =============================================================================
+   LE REPLI DE LA NAVIGATION
+
+   Un seul grand mouvement dans toute l'interface, et c'est celui-ci. La colonne
+   ne disparaît pas : elle se réduit à ses icônes. Les huit écrans de l'espace
+   restent atteignables repliés comme dépliés — replier pour gagner de la place
+   ne doit pas coûter un niveau de navigation.
+
+   C'est la grille elle-même qui morphe (`--colonne` est une longueur déclarée),
+   pas un calque qui glisse par-dessus : le tableau s'élargit dans le même geste,
+   au lieu d'être recouvert puis redessiné.
+============================================================================= */
+
+/* Le temps que l'état enregistré soit posé, rien ne bouge : sinon la
+   navigation se replie sous les yeux au chargement de chaque page. */
+:root.demarrage *, :root.demarrage *::before, :root.demarrage *::after {
+  transition: none !important;
+  animation: none !important;
+}
+
+.appli { transition: --colonne var(--duree-repli) var(--sortie); }
+:root[data-nav="repliee"] .appli { --colonne: 64px; }
+
+.colonne { overflow-x: hidden; }
+
+/* Les libellés s'effacent plus vite que la colonne ne se referme, et
+   réapparaissent une fois que la place existe. Sans ce décalage, le texte est
+   écrasé pendant la transition — c'est ce détail qui sépare un repli soigné
+   d'une largeur animée. */
+.colonne-espace span,
+.colonne-titre span,
+.colonne-lien > span:not([data-icone]):not(.colonne-compte),
+.colonne-pied span {
+  display: inline-block;
+  max-width: 14rem;
+  overflow: hidden;
+  white-space: nowrap;
+  transition: max-width var(--duree-repli) var(--sortie),
+              opacity var(--duree-reponse) linear var(--duree-reponse);
+}
+:root[data-nav="repliee"] .colonne-espace span,
+:root[data-nav="repliee"] .colonne-titre span,
+:root[data-nav="repliee"] .colonne-lien > span:not([data-icone]):not(.colonne-compte),
+:root[data-nav="repliee"] .colonne-pied span {
+  max-width: 0;
+  opacity: 0;
+  transition: max-width var(--duree-repli) var(--sortie),
+              opacity var(--duree-reponse) linear;
+}
+
+/* Replié, l'intitulé de groupe cède la place à un filet : le groupement reste
+   lisible à l'œil, et son texte reste dans l'arbre d'accessibilité. */
+.colonne-titre { transition: padding var(--duree-repli) var(--sortie); }
+:root[data-nav="repliee"] .colonne-titre {
+  padding: var(--e3) var(--e2) var(--e2);
+  border-top: 1px solid var(--nuit-filet);
+}
+:root[data-nav="repliee"] .colonne-groupe:first-of-type .colonne-titre {
+  border-top: 0; padding-top: 0;
+}
+:root[data-nav="repliee"] .colonne { padding-inline: var(--e2); }
+:root[data-nav="repliee"] .colonne-lien { justify-content: center; padding-inline: 0; }
+:root[data-nav="repliee"] .colonne-espace {
+  /* Replié, le nom de l'espace est déjà lu dans le rail, à côté : le garder
+     ici ne laisserait qu'un trou de quatre-vingts pixels en haut de colonne. */
+  padding: 0; height: 0; overflow: hidden;
+}
+:root[data-nav="repliee"] .colonne-pied { text-align: center; }
+
+/* Le compteur ne rentre plus : il devient une pastille sur l'icône. Il dit
+   toujours qu'il y a quelque chose à traiter, et son nombre reste dans le nom
+   accessible du lien — il n'est masqué qu'à l'œil. */
+.colonne-lien { position: relative; }
+:root[data-nav="repliee"] .colonne-compte {
+  /* La pastille n'est pas un libellé : elle ne s'efface pas avec eux. */
+  opacity: 1; max-width: none;
+  position: absolute; top: 3px; right: 7px;
+  min-width: 9px; width: 9px; height: 9px; padding: 0;
+  /* Neutre, et non la plaque jaune : le compteur dit « il y a des choses ici »,
+     pas « hors ligne » ni « quelle boutique ». Le jaune n'a que deux emplois
+     dans ce produit, et une pastille de navigation n'en est pas un. */
+  border-radius: 999px; background: var(--coquille-doux);
+  /* Le liseré détache la pastille de l'icône qu'elle chevauche. */
+  box-shadow: 0 0 0 2px var(--nuit-2);
+  font-size: 0; color: transparent; overflow: hidden;
+}
+:root[data-nav="repliee"] .colonne-lien[aria-current="page"] .colonne-compte {
+  box-shadow: 0 0 0 2px var(--nuit-3);
+}
+
+/* Le bouton de repli vit dans le bandeau : un seul, toujours visible, replié
+   comme déplié, avec son raccourci. */
+.plier {
+  display: inline-grid; place-items: center;
+  width: 30px; height: 30px; flex: none;
+  border: 1px solid transparent; border-radius: var(--r-1);
+  background: none; color: var(--encre-doux); cursor: pointer;
+}
+.plier:hover { background: var(--survol); border-color: var(--bord); color: var(--encre); }
+.plier svg { width: 17px; height: 17px; }
+/* Le pictogramme dit l'état, pas seulement l'action : le volet gauche est plein
+   quand la navigation est ouverte, vidé quand elle est repliée. */
+.plier .volet { transition: opacity var(--duree-apparition) var(--sortie); }
+.plier[aria-expanded="false"] .volet { opacity: 0.3; }
+.banniere[data-reseau="hors-ligne"] .plier { color: var(--encre-fixe); }
+.banniere[data-reseau="hors-ligne"] .plier:hover { background: rgb(15 23 32 / 0.12); }
+
+/* =============================================================================
+   LES MICRO-ANIMATIONS
+
+   Choisies, pas saupoudrées. Chacune répond à une question que l'utilisateur se
+   pose à cet instant précis ; tout le reste est immobile.
+
+   Ce qu'on ne fait PAS, volontairement : aucune transition entre pages, aucune
+   révélation au défilement, aucune entrée en cascade des lignes de tableau,
+   aucun compteur qui s'incrémente. Ce sont les tics qui font « généré par IA »
+   (DESIGN.md §1), et sur un poste de comptoir ils ne font que retarder la
+   lecture d'un chiffre qu'un client attend en face de soi.
+============================================================================= */
+
+/* 1 · La pression. Un bouton s'enfonce ; il ne rebondit pas. */
+.btn, .filtre, .plier, .rail-lien, .colonne-lien,
+.carte-boutique, .carte-reglage, .geste {
+  transition: background-color var(--duree-reponse) linear,
+              border-color var(--duree-reponse) linear,
+              color var(--duree-reponse) linear,
+              translate var(--duree-reponse) var(--sortie);
+}
+.btn:active, .filtre:active, .plier:active { translate: 0 1px; }
+
+/* 2 · La ligne survolée. Assez rapide pour suivre une souris qui balaie cent
+   lignes, sans traîner derrière elle. */
+tbody tr td { transition: background-color var(--duree-reponse) linear; }
+
+/* 3 · Le panneau de fiche entre par la droite — d'où il vient. Il ne tombe pas
+   du ciel et ne grandit pas depuis son centre. */
+.panneau { animation: panneau-entre var(--duree-apparition) var(--sortie) both; }
+@keyframes panneau-entre {
+  from { opacity: 0; translate: 12px 0; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+/* 4 · La palette de commandes. Le voile s'assombrit, la boîte descend de six
+   pixels : elle vient du clavier, pas d'un clic quelque part sur la page. */
+.voile { animation: voile-entre var(--duree-reponse) linear both; }
+.voile .palette-boite { animation: palette-entre var(--duree-apparition) var(--sortie) both; }
+@keyframes voile-entre { from { opacity: 0; } to { opacity: 1; } }
+@keyframes palette-entre {
+  from { opacity: 0; translate: 0 -6px; scale: 0.985; }
+  to   { opacity: 1; translate: 0 0; scale: 1; }
+}
+
+/* 5 · La bascule d'état du réseau. C'est le changement le plus lourd de
+   conséquences du produit : il doit se voir du coin de l'œil, et pourtant ne
+   jamais clignoter sous les yeux d'un gérant qui compte de l'argent. Une
+   transition de fond, franche et courte. */
+.banniere { transition: background-color var(--duree-apparition) var(--sortie),
+                        border-color var(--duree-apparition) var(--sortie); }
+.plaque, .etat { transition: background-color var(--duree-apparition) var(--sortie),
+                             color var(--duree-apparition) var(--sortie); }
+
+/* La coche « À jour » se trace une fois, quand la file finit de se vider.
+   C'est la réponse à « est-ce que c'est parti » : elle mérite d'être vue. */
+.etat[data-etat="a-jour"] svg path {
+  stroke-dasharray: 26;
+  animation: coche-trace 420ms var(--sortie) both;
+}
+@keyframes coche-trace {
+  from { stroke-dashoffset: 26; }
+  to   { stroke-dashoffset: 0; }
+}
+
+/* 6 · Le relais du dossier. La seule animation qui raconte quelque chose du
+   métier : un papier avance d'une étape entre le magasin et le prestataire.
+   Le trait se remplit dans le sens du parcours, puis la pastille se pose. */
+.relais > li::before { transform-origin: left center; }
+.relais > li[data-avance]::before { animation: relais-remplit 420ms var(--sortie) both; }
+.relais > li[data-avance] .relais-rang {
+  animation: relais-pose 320ms var(--sortie) 260ms both;
+}
+@keyframes relais-remplit { from { scale: 0 1; } to { scale: 1 1; } }
+@keyframes relais-pose {
+  0%   { scale: 1; }
+  55%  { scale: 1.16; }
+  100% { scale: 1; }
+}
+
+/* 7 · Une saisie qui quitte la file d'attente. Elle ne s'évapore pas : la ligne
+   se referme, pour qu'on voie qu'il en reste deux et non trois. */
+.attente > li[data-partie] { animation: file-sort 360ms var(--sortie) both; }
+@keyframes file-sort {
+  0%   { opacity: 1; }
+  50%  { opacity: 0; translate: 12px 0; }
+  100% { opacity: 0; translate: 12px 0; height: 0; padding-block: 0; border-width: 0; }
+}
+
+/* `prefers-reduced-motion` est traité globalement plus haut : tout ce bloc
+   devient instantané, et rien ne cesse de fonctionner. */
+
+/* =============================================================================
+   POINTS DE RUPTURE
+   ≥ 1280 : la disposition de référence. 1024–1280 : la colonne se réduit.
+   768–1024 : le rail se replie. < 768 : navigation basse, l'acquis mobile.
+============================================================================= */
+
+@media (max-width: 1439px) {
+  :root { --colonne: 196px; }
+  /* Le libellé de la recherche se réduit avant de passer sur deux lignes. */
+  .banniere .recherche { width: 240px; }
+  .banniere .recherche > span[data-icone] + span {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+}
+
+/* Sous 1152 px, la liste et le panneau ne tiennent plus côte à côte : les
+   colonnes se coupaient au lieu de se replier. Le panneau passe dessous et
+   la liste retrouve toute la largeur. */
+@media (max-width: 1151px) {
+  .avec-panneau { grid-template-columns: minmax(0, 1fr); gap: var(--e5); }
+  .panneau { position: static; box-shadow: none; }
+}
+
+@media (max-width: 1023px) {
+  .appli { grid-template-columns: var(--rail) minmax(0, 1fr); }
+  .colonne { display: none; }
+}
+
+@media (max-width: 767px) {
+  /* Mobile : on replie le bureau, on n'étire pas un téléphone. La navigation
+     revient dans la zone du pouce — c'est l'acquis du produit, à préserver. */
+  .appli { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto; min-height: 100vh; }
+  .travail { grid-row: 1; }
+  .page { overflow: visible; padding: var(--e4) var(--e3) calc(var(--e9) + var(--e7)); }
+
+  .rail {
+    position: fixed; inset: auto 0 0 0; z-index: 50;
+    flex-direction: row; justify-content: space-around;
+    border-right: 0; border-top: 1px solid var(--nuit-filet);
+    padding: var(--e1) var(--e2) calc(var(--e2) + env(safe-area-inset-bottom));
+    overflow: visible;
+  }
+  .rail-marque, .rail-pied { display: none; }
+  .rail-lien { width: auto; min-width: 56px; }
+
+  .banniere { position: sticky; top: 2px; z-index: 40; padding: 0 var(--e3); gap: var(--e2); }
+  .banniere-nom { display: none; }
+  /* Le libellé de la recherche disparaît de l'écran mais reste le nom
+     accessible du bouton : on ne le supprime pas, on le masque. */
+  .banniere .recherche { width: auto; flex: none; margin-left: auto; }
+  .banniere .recherche > span[data-icone] + span {
+    position: absolute; width: 1px; height: 1px;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+  }
+  .banniere .recherche .touche { display: none; }
+
+  .tete { flex-direction: column; align-items: stretch; }
+  .tete .btn { justify-content: center; }
+
+  /* L'en-tête de cadre s'empile : trois blocs côte à côte dans 360 px ne
+     tiennent pas, et les comprimer les rend illisibles. */
+  .cadre-tete { flex-wrap: wrap; }
+  .cadre-tete .recherche { width: 100%; flex: none; }
+  .filtres { width: 100%; }
+  .cadre-compte { margin-left: 0; }
+
+  .deux-colonnes, .avec-recap, .grille-boutiques,
+  .variantes-grille { grid-template-columns: minmax(0, 1fr); }
+  .barre-action { margin-inline: calc(var(--e3) * -1); padding-inline: var(--e3);
+                  bottom: 76px; flex-wrap: wrap; }
+  .geste { padding: var(--e4); }
+  .geste-titre { font-size: var(--t-grand); }
+  .relais { grid-auto-flow: row; }
+  .relais > li { padding-top: 0; padding-left: var(--e6); }
+  .relais > li::before { top: 0; bottom: -12px; left: 9px; right: auto; width: 2px; height: auto; }
+  .relais > li:last-child::before { display: none; }
+  .relais-rang { top: 0; }
+
+  /* Un tableau ne se comprime pas : sur mobile il se replie en cartes. */
+  .repli thead { display: none; }
+  .repli tbody tr { display: grid; gap: 2px; padding: var(--e3);
+                    border-bottom: 1px solid var(--bord); }
+  .repli tbody td { display: flex; justify-content: space-between; gap: var(--e3);
+                    height: auto; padding: 2px 0; border: 0; }
+  .repli tbody td::before { content: attr(data-col); color: var(--encre-doux);
+                            font-size: var(--t-petit); }
+  .repli tbody td:empty { display: none; }
+  .repli .num { text-align: right; }
+  .repli tbody tr.ligne-active td:first-child,
+  .repli tbody tr.ligne-retard td:first-child { box-shadow: none; }
+  .repli tbody tr.ligne-retard { box-shadow: inset 3px 0 0 var(--braise); }
+  .repli tbody tr.ligne-active { box-shadow: inset 3px 0 0 var(--encre); }
+}
+
+/* =============================================================================
+   IMPRESSION
+   Le reçu est le seul rendu du produit qui devient un objet physique. Le
+   papier est blanc : l'impression n'est pas une inversion du thème. La
+   coquille sort, les marges sont tenues par `@page`.
+============================================================================= */
+
+@media print {
+  :root, :root[data-theme="sombre"] {
+    --encre: #0f1720; --encre-doux: #4a5560;
+    --papier: #ffffff; --fond: #ffffff; --bord: #b9c0c7; --bord-fort: #8a939c;
+    --braise: #b3261e; --braise-surface: #ffffff;
+    --goutte: #17408a; --goutte-surface: #ffffff;
+    --solde: #1b6b4a; --solde-surface: #ffffff;
+    color-scheme: light;
+  }
+  @page { margin: 12mm; }
+  html, body { background: #fff; }
+  .rail, .colonne, .banniere, .coquille-filet, .barre-action,
+  .recherche, .filtres, .sans-impression { display: none !important; }
+  .appli { display: block; }
+  .page { padding: 0; overflow: visible; }
+  .cadre, .panneau { border: 0; box-shadow: none; }
+  article { break-inside: avoid; }
+}
+
+/* Un filtre qui ouvre un menu porte sa flèche ; un filtre qui bascule n'en a
+   pas. La différence se voit avant le clic. */
+.filtre-fleche svg { width: 14px; height: 14px; display: block; }

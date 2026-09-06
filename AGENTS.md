@@ -35,6 +35,9 @@ PARTICULARITÉS :
     tient à la main.)
   - Le cahier des charges est `prompt.md`. La progression est dans `specs/ROADMAP.md`. Tout choix
     tranché sans arbitrage humain est consigné dans `DECISIONS.md`.
+  - Le cahier des charges de la refonte d'interface est `CAHIER-UI.md` — à lire avec `DESIGN.md`
+    dès qu'on touche à la disposition, à la navigation ou à l'identité visuelle. Il ne prime sur
+    aucun contrat.
 ```
 
 ---

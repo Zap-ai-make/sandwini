@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Connexion — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+</head>
+<body>
+
+<!-- Le seul endroit où le dégradé du monogramme sort du logo. -->
+<div class="coquille-filet" aria-hidden="true"></div>
+<a class="sr" href="#travail">Aller au contenu</a>
+
+<div class="connexion">
+
+  <!-- Le panneau de marque : le monogramme à sa vraie taille, une seule fois,
+       là où il a la place d'exister. -->
+  <div class="connexion-marque">
+    <img class="connexion-logo" src="../design/marque/monogramme-se.svg" alt="">
+    <p class="connexion-raison">Sandwidi et frère</p>
+    <p class="connexion-mots">Motos, pièces détachées et dossiers —
+       Pouytenga, Koudougou, Ouagadougou.</p>
+    <p class="connexion-pied">SDI · version 12</p>
+  </div>
+
+  <main class="connexion-zone" id="travail" tabindex="-1">
+      <form class="connexion-carte" action="#" method="post">
+        <h1>Connexion</h1>
+        <p class="aide">Entrez avec le compte que le responsable vous a créé.</p>
+        <div class="avis avis-erreur" role="alert">
+          <span data-icone="alerte"></span>
+          <div>
+            <h2>Adresse ou mot de passe incorrect</h2>
+            <p>Vérifiez la saisie. Si vous ne retrouvez pas le mot de passe,
+               demandez au responsable de le réinitialiser.</p>
+          </div>
+        </div>
+        <div class="champ">
+          <label for="courriel">Adresse e-mail</label>
+          <input id="courriel" type="email" autocomplete="username" value="ousmane@sandwidi.bf">
+        </div>
+        <div class="champ">
+          <label for="mdp">Mot de passe</label>
+          <input id="mdp" type="password" autocomplete="current-password" value="············">
+        </div>
+        <button class="btn btn-principal btn-large" type="submit">Se connecter</button>
+      </form>
+
+    <!-- Les deux autres refus de cet écran, montrés en contexte plutôt que
+         décrits : c'est là que le produit s'est déjà trompé une fois. -->
+    <section class="variantes">
+      <h2 class="sur-titre">Les deux autres refus de cet écran</h2>
+      <div class="variantes-grille">
+        <div class="variante">
+          <p class="variante-nom">Compte sans rôle</p>
+      <form class="connexion-carte" action="#" method="post">
+        <h3>Connexion</h3>
+        <p class="aide">Entrez avec le compte que le responsable vous a créé.</p>
+        <div class="avis avis-transit" role="alert">
+          <span data-icone="cadenas"></span>
+          <div>
+            <h4>Ce compte n’a pas encore de rôle</h4>
+            <p>Le compte existe, mais personne ne lui a encore donné accès à une
+               boutique. Demandez au responsable de vous attribuer un rôle, puis
+               reconnectez-vous.</p>
+          </div>
+        </div>
+        <div class="champ">
+          <label for="courriel">Adresse e-mail</label>
+          <input id="courriel" type="email" autocomplete="username" value="ousmane@sandwidi.bf">
+        </div>
+        <div class="champ">
+          <label for="mdp">Mot de passe</label>
+          <input id="mdp" type="password" autocomplete="current-password" value="············">
+        </div>
+        <button class="btn btn-principal btn-large" type="button">Se connecter</button>
+      </form>
+        </div>
+        <div class="variante">
+          <p class="variante-nom">Réseau absent</p>
+      <form class="connexion-carte" action="#" method="post">
+        <h3>Connexion</h3>
+        <p class="aide">Entrez avec le compte que le responsable vous a créé.</p>
+        <div class="avis avis-plaque" role="alert">
+          <span data-icone="horsligne"></span>
+          <div>
+            <h4>La connexion demande le réseau</h4>
+            <p>C’est l’un des deux seuls gestes qui ne fonctionnent pas hors ligne.
+               Une fois entré, vous pourrez travailler sans réseau toute la journée.</p>
+          </div>
+        </div>
+        <div class="champ">
+          <label for="courriel">Adresse e-mail</label>
+          <input id="courriel" type="email" autocomplete="username" value="ousmane@sandwidi.bf">
+        </div>
+        <div class="champ">
+          <label for="mdp">Mot de passe</label>
+          <input id="mdp" type="password" autocomplete="current-password" value="············">
+        </div>
+        <button class="btn btn-principal btn-large" type="button" aria-disabled="true">Se connecter</button>
+      </form>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script src="coquille.js"></script>
+</body>
+</html>
