@@ -1,62 +1,215 @@
 @import "tailwindcss";
 
 /* ---------------------------------------------------------------------------
-   Direction visuelle SDI — cf. DESIGN.md §2, arrêtée avant le premier écran.
+   Direction visuelle SDI — cf. DESIGN.md §2 et CAHIER-UI.md §5, arrêtée sur les
+   maquettes de la phase 1 et validée par le commanditaire.
 
-   Le monde du sujet est celui de la plaque d'immatriculation : caractères noirs
-   sur fond jaune. C'est de là que vient l'accent, et de nulle part ailleurs.
+   Ces jetons sont la transcription de `maquettes/socle.css`. Rien ici n'est une
+   valeur d'attente : ce qui a été jugé dans le navigateur est ce qui est écrit
+   ici, aux mêmes hex.
 
-   Contrainte physique qui prime sur le goût : l'application s'utilise debout,
-   dehors, en plein soleil, sur un Android bon marché. D'où le blanc pur en
-   surface plutôt qu'un crème (qui se délave), et des contrastes hauts partout.
+   La direction en trois phrases (D70) :
+
+   - La **marque tient la coquille**. Le nuit du monogramme habille le rail,
+     l'en-tête et la connexion. Le dégradé or → rouge reste enfermé dans le
+     logo, sauf un filet de 2 px en tête de coquille : un dégradé en fond de
+     section est le tic que DESIGN.md §1 interdit.
+   - Le **jaune de plaque redevient un signal**, et n'a plus que deux emplois :
+     le code boutique, et l'état hors ligne. Un signal qui apparaît partout
+     n'est plus qu'une couleur.
+   - Les **deux dégradés du logo donnent deux mots du métier**. La goutte bleue
+     dit *parti et pas revenu* — un papier chez le prestataire, une saisie en
+     attente d'envoi. La braise dit *le retard et l'irréversible*.
+
+   Contrainte physique qui prime sur le goût : l'application s'utilise au
+   comptoir, parfois dehors, sur un écran bon marché. D'où le blanc pur en
+   surface plutôt qu'un crème, et des contrastes hauts partout. Toutes les
+   paires texte/fond sont calculées et reportées dans `maquettes/index.html` :
+   aucune sous 4,5:1 en texte normal, 3:1 en grand ou en élément d'interface.
 --------------------------------------------------------------------------- */
 
-@theme {
-  /* Palette — 5 valeurs de structure + 2 sémantiques */
+/* La largeur de la colonne de navigation doit pouvoir s'**animer** : une
+   variable CSS ne le fait pas, sauf si son type est déclaré. C'est ce qui
+   permettra (S28, commit « coquille ») de replier la navigation en morphant la
+   grille elle-même, plutôt qu'en faisant glisser un calque par-dessus le
+   contenu. Déclaré ici parce que c'est un jeton, pas un détail de composant. */
+@property --colonne {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 224px;
+}
+
+/* `static` : sans lui, Tailwind ne publie que les variables consommées par une
+   classe utilitaire, et efface les autres du CSS produit. Or ces jetons se
+   lisent aussi en `var()` depuis du CSS écrit à la main — la coquille, le
+   repli, les blocs `@media print`. Le défaut se voit à l'œil nu : `--color-nuit`
+   n'existait qu'en valeur d'impression, et la coquille sortait en gris.
+   Vérifié dans `.next/static/css/` après compilation, pas supposé. */
+@theme static {
+  /* --- La marque -----------------------------------------------------------
+     Relevés à la pipette sur `design/marque/logo-se-fond-sombre.jpg`, remontés
+     en clarté : un scan sous-exposé n'est pas une couleur de marque. */
+  --color-nuit: #14142b; /* la coquille, et le fond du monogramme */
+  --color-nuit-2: #191a32; /* la colonne des écrans, un cran au-dessus */
+  --color-nuit-3: #22243f; /* l'élément actif dans la coquille */
+  --color-nuit-filet: #2b2d4a; /* les séparations internes à la coquille */
+
+  /* Les cinq arrêts des deux dégradés du monogramme. Ils servent au logo et au
+     filet de coquille — nulle part ailleurs en aplat. */
+  --color-or: #e0a81a;
+  --color-orange: #dd7a28;
+  --color-rouge: #c93c2e;
+  --color-cyan: #2e9bc4;
+  --color-bleu: #1f52a8;
+
+  /* --- Surfaces et texte --------------------------------------------------- */
   --color-encre: #0f1720;
-  --color-papier: #ffffff;
-  --color-fond: #f1f3f5;
-  --color-plaque: #f5c518;
-  --color-bord: #d5dae0;
-  --color-alerte: #b3261e;
-  --color-solde: #1b6b4a;
-
-  /* Nuances dérivées, pas inventées */
   --color-encre-doux: #5a6672;
+  --color-papier: #ffffff; /* la feuille : la zone de travail */
+  --color-fond: #eef1f5; /* ce qui n'est pas la feuille */
+  --color-bord: #d5dae0; /* filets et séparations */
+  --color-bord-fort: #7c8894; /* bordure de champ : elle doit se voir — 3,6:1 */
+  --color-survol: #f4f6f9;
 
-  /* Couleurs qui NE basculent PAS avec le thème.
-     La plaque jaune est une surface de couleur fixe — c'est un objet du monde
-     réel, pas une surface de l'interface. Son encre doit donc rester sombre
-     dans les deux thèmes. Laisser `encre` s'inverser dessus produisait du
-     jaune clair sur jaune : illisible, et repéré en regardant la capture. */
-  --color-encre-fixe: #0f1720;
+  /* Le texte posé sur la coquille sombre. Trois niveaux, pas plus. */
+  --color-coquille-encre: #ffffff;
+  --color-coquille-doux: #c4c9e0;
+  --color-coquille-muet: #8289ad;
+
+  /* --- Le signal : la plaque -----------------------------------------------
+     Deux emplois, jamais trois : le code boutique, et le hors-ligne.
+
+     Ses couleurs ne basculent PAS avec le thème. La plaque est un objet du
+     monde réel, pas une surface d'interface : elle ne change pas de couleur la
+     nuit. Laisser `encre` s'inverser dessus produisait du jaune clair sur
+     jaune — illisible, et repéré en regardant la capture (acquis de S10). */
+  --color-plaque: #f5c518;
   --color-plaque-bord: #8a6d05;
+  --color-encre-fixe: #0f1720;
 
   /* Marqueur de l'onglet actif : lui, s'adapte au thème pour rester visible. */
   --color-accent-actif: #8a6d05;
 
+  /* --- Les trois sémantiques ------------------------------------------------
+     Une couleur, un emploi. Elles viennent des dégradés du logo, pas d'une
+     bibliothèque — et aucune ne travaille seule : un statut, un retard, un
+     moyen de paiement s'écrivent toujours (DESIGN.md §5).
+
+     `alerte` est le mot du dépôt pour ce que les maquettes appellent la
+     braise : même rôle, même hex. On garde le nom déjà employé partout dans
+     `components/` plutôt que de renommer soixante occurrences. */
+  --color-alerte: #c2372a; /* retard, erreur, irréversible */
+  --color-alerte-surface: #fdecea;
+  --color-goutte: #1f52a8; /* parti et pas revenu : prestataire, envoi en attente */
+  --color-goutte-surface: #eaf0fb;
+  --color-solde: #1b6b4a; /* réglé */
+  --color-solde-surface: #e7f3ed;
+
+  /* Anneau de focus : un trait et son halo, pour tenir sur le blanc, sur le
+     nuit et sur la plaque jaune. Redéfini dans la coquille sombre. */
+  --color-focus-trait: #0f1720;
+  --color-focus-halo: #ffffff;
+
+  /* --- Typographie ---------------------------------------------------------
+     Archivo pour tout ce qui se lit, IBM Plex Mono pour tout ce qui se dicte
+     au téléphone ou se lit sur du métal : numéro de pièce, châssis, moteur,
+     code boutique, plaque. Jamais de la prose en Plex Mono. */
   --font-display: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
   --font-code: var(--font-plex-mono), ui-monospace, monospace;
 
-  --radius-plaque: 0.375rem;
+  /* Une échelle nommée par rôle, comme le reste des jetons du dépôt. Elle ne
+     remplace pas celle de Tailwind : `text-sm` et `text-lg` tombent déjà
+     exactement sur `corps` et `bloc`. Ce sont les quatre tailles que Tailwind
+     n'a pas qui sont ajoutées ici, plus les deux qu'on nomme pour les relire. */
+  --text-micro: 0.6875rem; /* 11 px — sur-titres, intitulés de groupe */
+  --text-micro--line-height: 1.4;
+  --text-legende: 0.78125rem; /* 12,5 px — légendes, aides de champ */
+  --text-legende--line-height: 1.45;
+  --text-corps: 0.875rem; /* 14 px — le corps, densité bureau */
+  --text-corps--line-height: 1.5;
+  --text-champ: 0.9375rem; /* 15 px — la saisie, un cran au-dessus du corps */
+  --text-champ--line-height: 1.4;
+  --text-bloc: 1.125rem; /* 18 px — titres de bloc */
+  --text-bloc--line-height: 1.35;
+  --text-ecran: 1.5rem; /* 24 px — titre d'écran */
+  --text-ecran--line-height: 1.2;
+  --text-chiffre: 1.75rem; /* 28 px — un montant qu'on lit de loin */
+  --text-chiffre--line-height: 1.1;
+
+  /* --- Espacement ----------------------------------------------------------
+     Rien à déclarer : l'échelle des maquettes (4 · 8 · 12 · 16 · 20 · 24 · 32 ·
+     40 · 64) est exactement la grille de 4 px de Tailwind. On la vérifie, on ne
+     la duplique pas. */
+
+  /* --- Rayons -------------------------------------------------------------- */
+  --radius-plaque: 0.25rem; /* 4 px — l'objet plaque, et lui seul */
+  --radius-champ: 0.375rem; /* 6 px — boutons, champs */
+  --radius-carte: 0.625rem; /* 10 px — cartes, panneaux */
+
+  /* --- Ombres --------------------------------------------------------------
+     Deux, pas plus. Une ombre partout est un tic ; ici elles disent seulement
+     « ceci flotte au-dessus du reste ». */
+  --shadow-panneau: -8px 0 24px -12px rgb(15 23 32 / 0.28);
+  --shadow-menu: 0 8px 24px -8px rgb(15 23 32 / 0.24);
+
+  /* --- Mouvement -----------------------------------------------------------
+     DESIGN.md §9 : il sert le sujet, il ne le décore pas. Trois durées, deux
+     courbes, et c'est tout. Une application de comptoir utilisée huit heures
+     par jour ne supporte pas d'être ralentie pour faire joli — la plus longue
+     des trois est réservée au seul grand mouvement de l'interface, le repli de
+     la navigation.
+
+     Ces quatre-là se lisent en `var()` dans les composants, pas en classe
+     utilitaire : une durée n'a pas à devenir un vocabulaire. */
+  --duree-reponse: 120ms; /* survol, pression : la réponse doit être immédiate */
+  --duree-apparition: 220ms; /* panneaux, palette, bascule d'état */
+  --duree-repli: 320ms; /* le repli de la colonne, et rien d'autre */
+  --ease-sortie: cubic-bezier(0.32, 0.72, 0, 1); /* décélération franche, sans rebond */
+  --ease-entree: cubic-bezier(0.4, 0, 1, 1);
+
+  /* --- La coquille ---------------------------------------------------------
+     `--colonne` est déclarée en `@property` plus haut pour pouvoir s'animer ;
+     sa valeur de repos vit ici avec les autres. */
+  --rail: 72px;
+  --banniere: 52px;
+  --container-travail: 1600px; /* la borne haute de la zone de travail */
 }
 
 /* Mode sombre : un vrai mode, pas une inversion (DESIGN.md §5).
-   Les surfaces s'assombrissent et se réétagent ; le jaune de plaque ne bouge
-   pas, parce que l'objet réel ne change pas de couleur la nuit. Les deux
-   couleurs sémantiques, elles, s'éclaircissent pour tenir le contraste AA. */
+
+   Il suit le réglage du système, et rien d'autre — le commanditaire a tranché :
+   pas de basculeur dans le produit. Les maquettes en portaient un, mais c'était
+   pour qu'il puisse voir le thème, pas une proposition de réglage.
+
+   La coquille ne bouge presque pas : elle est déjà nuit, c'est l'avantage de
+   cette direction. Ce sont les surfaces de travail qui se réétagent, et les
+   trois sémantiques qui s'éclaircissent pour tenir le contraste. Le jaune de
+   plaque, lui, ne bouge pas. */
 @layer theme {
   @media (prefers-color-scheme: dark) {
     :root {
+      color-scheme: dark;
+
       --color-encre: #e8ecef;
+      --color-encre-doux: #97a3af;
       --color-papier: #151c24;
       --color-fond: #0b0f14;
       --color-bord: #2a343f;
-      --color-encre-doux: #97a3af;
-      --color-alerte: #ff8a7a;
-      --color-solde: #56c08d;
+      --color-bord-fort: #6a7783;
+      --color-survol: #1c242e;
+
       --color-accent-actif: #f5c518;
+
+      --color-alerte: #ff8a7a;
+      --color-alerte-surface: #3a211e;
+      --color-goutte: #7fb2ec;
+      --color-goutte-surface: #16233a;
+      --color-solde: #56c08d;
+      --color-solde-surface: #12291f;
+
+      --color-focus-trait: #ffffff;
+      --color-focus-halo: #0b0f14;
     }
   }
 }
@@ -70,7 +223,9 @@
    vidée par reçu.
 
    L'impression n'est donc pas une inversion du thème : c'est le seul rendu du
-   produit dont la surface est un objet physique, et le papier est blanc. */
+   produit dont la surface est un objet physique, et le papier est blanc. La
+   coquille nuit, elle, n'existe pas sur le papier : ses jetons repassent en
+   valeurs d'encre pour qu'un en-tête de reçu ne sorte jamais en aplat noir. */
 @layer theme {
   @media print {
     :root {
@@ -78,9 +233,24 @@
       --color-papier: #ffffff;
       --color-fond: #ffffff;
       --color-bord: #b9c0c7;
+      --color-bord-fort: #4a5560;
       --color-encre-doux: #4a5560;
+      --color-survol: #ffffff;
+
+      --color-nuit: #0f1720;
+      --color-nuit-2: #ffffff;
+      --color-nuit-3: #ffffff;
+      --color-nuit-filet: #b9c0c7;
+      --color-coquille-encre: #0f1720;
+      --color-coquille-doux: #0f1720;
+      --color-coquille-muet: #4a5560;
+
       --color-alerte: #b3261e;
+      --color-alerte-surface: #ffffff;
+      --color-goutte: #14418c;
+      --color-goutte-surface: #ffffff;
       --color-solde: #1b6b4a;
+      --color-solde-surface: #ffffff;
     }
   }
 }
@@ -100,11 +270,13 @@
   }
 
   /* Focus visible sur tout parcours clavier — non négociable (DESIGN.md §11).
-     Le double liseré tient sur fond clair comme sur la plaque jaune. */
+     Le trait et son halo tiennent sur les trois fonds du produit : le papier
+     blanc, la coquille nuit et la plaque jaune. */
   :focus-visible {
-    outline: 2px solid var(--color-encre);
+    outline: 2px solid var(--color-focus-trait);
     outline-offset: 2px;
-    border-radius: 2px;
+    box-shadow: 0 0 0 4px var(--color-focus-halo);
+    border-radius: 3px;
   }
 
   @media (prefers-reduced-motion: reduce) {

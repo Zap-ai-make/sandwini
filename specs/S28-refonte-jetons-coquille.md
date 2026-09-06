@@ -27,8 +27,10 @@ coquille sans avoir été réécrits.
 - [ ] Les jetons de `maquettes/socle.css` sont transcrits dans le bloc `@theme` de
       `app/globals.css` : palette, typographie, échelle d'espacement, rayons, durées et
       courbes d'animation. Aucune valeur qui n'ait été validée dans les maquettes.
-- [ ] Le mode sombre est écrit en trois temps (système, clair forcé, sombre forcé) et
-      reste un vrai mode, pas une inversion.
+- [ ] Le mode sombre reste un vrai mode, pas une inversion, et suit le réglage du système
+      **et rien d'autre** : le commanditaire a tranché, il n'y a pas de basculeur dans le
+      produit. Les maquettes en portaient un pour qu'il puisse voir le thème ; l'écrire dans
+      l'application serait du code sans utilisateur.
 - [ ] La feuille `@media print` est revérifiée **après** le changement de jetons, et le reçu
       est photographié sous média `print` : il n'a pas régressé (`DESIGN.md` §14, leçon S10).
 - [ ] `app/(app)/layout.tsx` ne borne plus la zone de travail à `max-w-3xl` : elle prend la

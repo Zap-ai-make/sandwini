@@ -64,3 +64,13 @@ pas. Si un écran demande un patron qui n'existe pas, c'est le signe que S28 ét
 on l'ajoute au socle, pas dans l'écran.
 
 Chaque écran est confronté à sa maquette avant d'être commité, pas de mémoire.
+
+**Un défaut repéré en chemin, à corriger ici et pas avant** (`CAHIER-UI.md` §16 : on le note,
+on ne le commit pas dans un autre lot). Sur `/motos` en 390 px, la rangée d'actions rapides
+(`app/(app)/motos/page.tsx`, `flex shrink-0 flex-wrap`) passe sous le bandeau collant quand
+celui-ci grandit en mode hors ligne : le lien « Faire entrer une moto » devient
+**inatteignable au clic**, et `e2e/motos.spec.ts` › « une moto se saisit et se consulte sans
+réseau » échoue dessus — vérifié sur la branche de S28 comme sur la référence, donc antérieur
+à la refonte. Ce n'est pas un défaut de synchronisation, contrairement à ce que D50 et D55
+laissent croire pour ce fichier : c'est un défaut de disposition, et A4 le fait disparaître
+en sortant ces actions de la rangée qui déborde.
