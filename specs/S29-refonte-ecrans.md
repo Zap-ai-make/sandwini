@@ -48,11 +48,40 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       L'accueil aurait affiché une erreur rouge pour toute réponse à quelqu'un qui n'y peut
       rien. Les deux sections ne se montent donc pas dans ce cas, et le sous-titre dit
       « Aucune boutique attribuée » au lieu de « Toutes les boutiques » — vérifié sur capture.
-- [ ] **A4 Stock motos** — tableau pleine largeur, en-têtes collés, filtres persistants,
-      comptage des résultats, « Faire entrer une moto » comme action principale. **C'est ici
-      que naît le patron `Tableau`**, dans `components/patrons/` : S28 ne l'a pas écrit
-      faute d'un seul appelant pour en démentir l'interface, et les huit écrans suivants le
-      reprennent au lieu d'en dessiner chacun un.
+- [x] **A4 Stock motos** — tableau pleine largeur, en-têtes collés, filtres persistants,
+      comptage des résultats, « Faire entrer une moto » comme action principale. Le patron
+      `Tableau` naît ici, dans `components/patrons/`, avec ce que les huit écrans suivants
+      reprennent : colonnes alignées, chiffres tabulaires et insécables, en-tête collé,
+      repli en cartes, lignes fantômes de chargement. Il ne porte **ni tri, ni sélection,
+      ni pagination** : `CAHIER-UI.md` §8.1 mentionne le tri, aucun des neuf écrans ne le
+      demande, et une colonne triable inventée ici serait à refaire au premier écran qui en
+      aurait vraiment besoin.
+      Trois choses ont été retirées plutôt qu'ajoutées. Les liens « Nouvelle vente »,
+      « Ventes » et « Dossiers » en tête d'écran — mot pour mot ceux de la colonne de gauche
+      depuis S28 : les répéter ne donnait pas un raccourci, cela noyait le seul geste que cet
+      écran commande. Le fond jaune du châssis — un stock entier de plaques jaunes fait du
+      signal un décor, et D70 ne lui laisse que deux emplois ; le seul jaune restant est la
+      colonne « Boutique », qui est justement un code boutique. La devise répétée à chaque
+      ligne — elle est titrée une fois, en tête de colonne (`formaterNombre`).
+      **Deux points où la maquette n'a pas pu être suivie à la lettre, et pourquoi.**
+      1. Le repli en cartes tombe à 1024 px et non à 768 : les maquettes escamotent la
+         colonne des écrans dès 1024, la coquille livrée la garde jusqu'à 768, et le tableau
+         a donc 296 px de moins que ce pour quoi il a été dessiné. Le seuil suit la place
+         réelle. **Cet écart de coquille reste à trancher** : entre 768 et 1024, un tiers de
+         l'écran part en navigation, ce qui est le défaut que `CAHIER-UI.md` §2 reproche à
+         l'ancienne barre latérale. Ce n'est pas A4 : cela touche les vingt écrans.
+      2. L'en-tête collé des maquettes est inerte : leur `.cadre` porte `overflow: hidden`,
+         qui fait du cadre la zone de défilement de référence — une boîte qui ne défile
+         jamais. Ici c'est **le tableau qui défile, pas la page** : la zone du tableau prend
+         la hauteur restante et défile dans les deux sens, la barre de filtres reste posée
+         au-dessus (c'est ça, des filtres persistants) et l'en-tête se colle à elle.
+      **Trois défauts trouvés sur capture, pas devinés.** Le premier rendu laissait la page
+      défiler et rognait le cadre en `overflow: clip` : à 1280 px la dernière colonne devenait
+      **inatteignable**, la date d'entrée coupée en « 07/0 » — rogner et déborder ne se
+      conjuguent pas, il fallait une vraie zone de défilement. À 390 px, les intitulés recopiés
+      dans les cartes héritaient du gras et du Plex Mono de leur colonne : « Prix conseillé »
+      sortait dans la police réservée à ce qui se dicte. Et l'en-tête était insécable, ce qui
+      poussait la largeur pour rien ; il se replie désormais sur deux lignes.
 - [ ] **A5 Nouvelle vente** — une colonne, groupes courts et titrés, `EFFET_MODE` annoncé
       avant la validation, barre d'action collée en bas.
 - [ ] **A6 Ventes** — tableau + `FicheVente` en panneau latéral, la liste reste visible.
@@ -107,10 +136,17 @@ Deux choses sont cassées, et aucune n'est graphique :
 
 Vérifié : `e2e/dossier.spec.ts` › « le cycle complet : déposé, revenu, remis » échoue de la
 même façon, à la même ligne, **sur la branche de S28 comme sur le commit qui la précède** —
-donc antérieur aux patrons. **Mais il ne se reproduit pas toujours** : la suite complète est
-repassée à 82 sur 82 sur des émulateurs fraîchement démarrés. C'est donc une course, pas une
-règle mal écrite — le client met à jour un document que la création n'a pas fini de poser, et
-selon la latence du serveur cela passe ou non. Une course qui perd une écriture une fois sur
+donc antérieur aux patrons. **Il ne se reproduisait pas toujours** : la suite complète est
+repassée à 82 sur 82 sur des émulateurs fraîchement démarrés, ce qui avait fait conclure à une
+course — le client met à jour un document que la création n'a pas fini de poser, et selon la
+latence du serveur cela passe ou non.
+
+**À revoir : en A4 il s'est reproduit trois fois de suite, machine calme comprise.** Le test a
+été rejoué sur le commit de référence, A4 mis de côté (`git stash`) et l'application
+recompilée : même échec, même endroit — le bouton « Arrivé au magasin » n'apparaît jamais,
+donc le dépôt n'a pas abouti côté serveur. Ce n'est donc ni A4 ni la refonte. Mais une course
+qui perd trois fois sur trois n'en est plus tout à fait une : la spec qui reprendra ce défaut
+devra vérifier l'ordre des écritures avant de conclure à la latence. Une course qui perd une écriture une fois sur
 deux au comptoir est pire qu'une panne franche : elle ne se voit pas. Ce n'est ni A4 ni A7 : cela demande sa propre spec, côté
 `lib/repositories/dossier.ts` et non côté écran. À ne pas confondre avec le défaut de
 disposition ci-dessus, qui, lui, était bien de la mise en page.

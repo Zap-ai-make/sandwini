@@ -468,6 +468,289 @@
     padding: 1rem;
   }
 
+  /* --------------------------------------------------------------------------
+     Le cadre d'un tableau.
+
+     `clip` et non `hidden`. Les deux rognent les coins — sans quoi la première
+     ligne dépasse de l'arrondi au survol. Mais `hidden` fait du cadre une zone
+     de défilement, et l'en-tête collé s'accrocherait alors à une boîte qui ne
+     défile jamais : il resterait immobile en haut du tableau, c'est-à-dire
+     nulle part. `clip` rogne sans créer de zone de défilement, et l'en-tête
+     reste accroché à `main`, qui défile pour de bon.
+
+     Le débordement horizontal n'a pas besoin d'être repris ici : `main` porte
+     déjà `overflow-y: auto`, ce qui rend son `overflow-x` défilant lui aussi.
+     Un tableau trop large défile donc dans la zone de travail, jamais en
+     emportant la page de travers (`DESIGN.md` §13).
+     -------------------------------------------------------------------------- */
+  .cadre-tableau {
+    display: flex;
+    flex-direction: column;
+    overflow: clip;
+  }
+
+  /* Sur bureau, c'est le tableau qui défile, pas la page. Deux raisons, et
+     aucune n'est cosmétique. La barre de filtres reste posée au-dessus au lieu
+     de partir vers le haut dès la dixième ligne — c'est ça, des filtres
+     persistants. Et une colonne trop large devient **atteignable** : le premier
+     rendu la voyait rognée par le cadre, donc perdue, la date d'entrée coupée
+     en « 07/0 » sur la capture à 1280 px.
+
+     La hauteur haute est celle de la fenêtre moins ce qui la surmonte : le
+     bandeau, la marge de `main`, la tête d'écran et sa marge basse. Approchée,
+     pas calculée au pixel — si elle tombe court, la page reprend le défilement,
+     ce qui ne casse rien. */
+  @media (min-width: 1024px) {
+    .cadre-tableau {
+      max-height: calc(100dvh - 14rem);
+    }
+
+    .tableau-defilant {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+  }
+
+  /* La barre d'un cadre de liste : la recherche, les filtres, le comptage.
+     Elle se replie d'elle-même — trois blocs côte à côte ne tiennent pas dans
+     360 px, et les comprimer les rend illisibles. */
+  .cadre-tete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-bord);
+  }
+
+  .tableau {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-corps);
+  }
+
+  .tableau thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-papier);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-bord);
+    text-align: left;
+    font-size: var(--text-micro);
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-encre-doux);
+  }
+
+  .tableau tbody td {
+    height: 2.5rem; /* 40 px : la densité bureau des maquettes */
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-bord);
+    vertical-align: middle;
+  }
+
+  .tableau tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  .tableau tbody tr:hover td {
+    background: var(--color-survol);
+  }
+
+  /* Un châssis se dicte au téléphone, un montant se recopie : ni l'un ni
+     l'autre ne se coupe en deux. Les chiffres s'alignent à droite pour se
+     comparer d'une colonne à l'autre sans les lire. */
+  .tableau .num {
+    text-align: right;
+  }
+
+  .tableau td.num {
+    font-family: var(--font-code);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .tableau .principal {
+    font-weight: 600;
+  }
+
+  /* L'intitulé de colonne recopié dans la cellule : muet sur bureau, où
+     l'en-tête le porte déjà. */
+  .tableau-etiquette {
+    display: none;
+  }
+
+  /* Un tableau ne se comprime pas : sous 1024 px il se replie en cartes.
+
+     Le repli des maquettes tombait à 768 px — mais elles escamotent la colonne
+     des écrans dès 1024, là où la coquille livrée la garde jusqu'à 768. Entre
+     les deux, le tableau a 296 px de moins que ce pour quoi il a été dessiné.
+     Le seuil suit la place réelle, pas celle de la maquette. */
+  @media (max-width: 1023px) {
+    .tableau thead {
+      display: none;
+    }
+
+    .tableau tbody tr {
+      display: grid;
+      gap: 0.125rem;
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--color-bord);
+    }
+
+    .tableau tbody tr:last-child {
+      border-bottom: 0;
+    }
+
+    .tableau tbody td {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      height: auto;
+      padding: 0.125rem 0;
+      border: 0;
+    }
+
+    /* Le survol se déplace sur la carte entière : une cellule seule surlignée
+       au milieu d'une carte ne veut plus rien dire. */
+    .tableau tbody tr:hover td {
+      background: transparent;
+    }
+
+    /* Le repli casse les rôles de tableau — un `tr` en grille n'est plus une
+       ligne pour un lecteur d'écran. L'intitulé redevient donc du texte lu,
+       sinon la carte annonce huit valeurs sans dire de quoi. */
+    .tableau-etiquette {
+      display: inline;
+      color: var(--color-encre-doux);
+      /* La police et la graisse sont reposées : l'étiquette hérite sinon du
+         `principal` et du `num` de sa cellule, et l'intitulé « Prix conseillé »
+         sortait en Plex Mono — une police réservée à ce qui se dicte, jamais à
+         de la prose. Vu sur la capture à 390 px. */
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: var(--text-legende);
+    }
+  }
+
+  /* La ligne fantôme du chargement. Elle a la taille du contenu à venir : un
+     texte « Chargement… » remplacé par cent lignes fait bondir l'écran au
+     moment où l'œil s'y pose. Le glissement s'arrête si le système demande
+     moins de mouvement — la règle globale de `@layer base` s'en charge. */
+  .squelette {
+    display: block;
+    height: 12px;
+    border-radius: 3px;
+    background: linear-gradient(
+      90deg,
+      var(--color-fond),
+      var(--color-survol),
+      var(--color-fond)
+    );
+    background-size: 200% 100%;
+    animation: glisse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes glisse {
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     La pastille de statut.
+
+     Jamais la couleur seule : le mot est toujours écrit, la pastille ne fait
+     que le doubler (`DESIGN.md` §5). Le soleil sur un écran bon marché efface
+     les nuances bien avant les mots.
+     -------------------------------------------------------------------------- */
+  .pastille {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-plaque);
+    background: var(--color-fond);
+    color: var(--color-encre-doux);
+    font-size: var(--text-legende);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pastille::before {
+    content: "";
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: currentColor;
+  }
+
+  .pastille-solde {
+    background: var(--color-solde-surface);
+    color: var(--color-solde);
+  }
+
+  .pastille-transit {
+    background: var(--color-goutte-surface);
+    color: var(--color-goutte);
+  }
+
+  /* --------------------------------------------------------------------------
+     Les filtres d'une liste.
+
+     Ils restent posés au-dessus du tableau, valeur visible : un filtre replié
+     dans un menu se laisse oublier, et on cherche ensuite pourquoi la moto
+     n'est pas là (`CAHIER-UI.md` §8.1, « filtres persistants et lisibles »).
+     -------------------------------------------------------------------------- */
+  .filtre {
+    display: inline-flex;
+    align-items: center;
+    height: 2rem;
+    padding-inline: 0.75rem;
+    border: 1px solid var(--color-bord);
+    border-radius: 999px;
+    background: var(--color-papier);
+    color: var(--color-encre-doux);
+    font-size: var(--text-legende);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .filtre:hover {
+    background: var(--color-survol);
+  }
+
+  .filtre[aria-pressed="true"] {
+    border-color: var(--color-encre);
+    background: var(--color-encre);
+    color: var(--color-papier);
+  }
+
+  .filtre-choix {
+    height: 2rem;
+    padding-inline: 0.5rem;
+    border: 1px solid var(--color-bord);
+    border-radius: var(--radius-champ);
+    background: var(--color-papier);
+    color: var(--color-encre);
+    font-size: var(--text-legende);
+    font-weight: 600;
+  }
+
+  /* 32 px est la densité bureau. Au doigt, c'est sous la cible minimale de
+     `DESIGN.md` §11 : sur téléphone les filtres reprennent leurs 44 px. */
+  @media (max-width: 767px) {
+    .filtre,
+    .filtre-choix {
+      height: 2.75rem;
+    }
+  }
+
   /* La saisie.
 
      La bordure prend `--color-bord-fort` et non `--color-bord` : le filet des

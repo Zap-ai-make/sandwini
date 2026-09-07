@@ -47,6 +47,10 @@ const PRISES = [
   { nom: "clients-mobile-clair", chemin: "/clients", theme: "light", mobile: true },
   { nom: "clients-bureau-sombre", chemin: "/clients", theme: "dark", mobile: false },
   { nom: "motos-mobile-clair", chemin: "/motos", theme: "light", mobile: true },
+  /* Le stock est le premier écran à porter un vrai tableau : il se regarde en
+     clair comme en sombre, sur bureau — c'est là que les colonnes existent.
+     Sur mobile, la même prise montre le repli en cartes. */
+  { nom: "motos-bureau-clair", chemin: "/motos", theme: "light", mobile: false },
   { nom: "motos-bureau-sombre", chemin: "/motos", theme: "dark", mobile: false },
   { nom: "motos-nouvelle-mobile-clair", chemin: "/motos/nouvelle", theme: "light", mobile: true, boutique: true },
   { nom: "motos-nouvelle-bureau-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: false, boutique: true },

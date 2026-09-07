@@ -44,7 +44,11 @@ test.describe("entrée en stock", () => {
     });
 
     await page.goto("/motos", { waitUntil: "load" });
-    await expect(page.getByRole("listitem").filter({ hasText: "LC6PCJ1A0000001" })).toContainText(
+    /* `locator("tr")` et non `getByRole("row")` : sous 1024 px le tableau se
+       replie en cartes, ce qui lui retire ses rôles de tableau — et la suite
+       tourne sur un Pixel 7. Le sélecteur CSS, lui, décrit la même ligne dans
+       les deux dispositions. */
+    await expect(page.locator("tbody tr").filter({ hasText: "LC6PCJ1A0000001" })).toContainText(
       terrain.modele,
       { timeout: 20_000 },
     );
@@ -87,8 +91,8 @@ test.describe("recherche dans le stock", () => {
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher un châssis").fill(`aaa${marqueur.toLowerCase()}`);
 
-    await expect(page.getByRole("listitem").filter({ hasText: `AAA${marqueur}` })).toBeVisible();
-    await expect(page.getByRole("listitem").filter({ hasText: `BBB${marqueur}` })).toHaveCount(0);
+    await expect(page.locator("tbody tr").filter({ hasText: `AAA${marqueur}` })).toBeVisible();
+    await expect(page.locator("tbody tr").filter({ hasText: `BBB${marqueur}` })).toHaveCount(0);
 
     await page.getByLabel("Chercher un châssis").fill("CHASSIS-INTROUVABLE");
     await expect(contenu(page)).toContainText("Aucune moto ne correspond");
@@ -137,7 +141,10 @@ test.describe("le coût est réservé au responsable", () => {
 
     // Il ouvre la fiche : le coût lui est refusé, et on le lui dit.
     await pageGerant.goto("/motos", { waitUntil: "load" });
-    await pageGerant.getByRole("listitem").filter({ hasText: chassis }).click();
+    /* La fiche s'ouvre par le châssis, pas par la ligne entière : une ligne de
+       tableau ne peut pas être un lien, et l'envelopper dans un gestionnaire de
+       clic la rendrait inatteignable au clavier. */
+    await pageGerant.getByRole("link", { name: chassis }).click();
     await expect(contenu(pageGerant)).toContainText("réservés au responsable");
     await expect(contenu(pageGerant)).not.toContainText("775 000");
 
@@ -146,7 +153,7 @@ test.describe("le coût est réservé au responsable", () => {
     // Le responsable, lui, voit le montant.
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher un châssis").fill(chassis);
-    await page.getByRole("listitem").filter({ hasText: chassis }).click();
+    await page.getByRole("link", { name: chassis }).click();
     await expect(contenu(page)).toContainText("775 000 FCFA");
   });
 });

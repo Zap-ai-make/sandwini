@@ -1,13 +1,19 @@
 "use client";
 
-import { Plus, Receipt, Search } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheMoto } from "@/components/FicheMoto";
-import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import {
+  EtatErreur,
+  EtatSansResultat,
+  EtatVide,
+  SansBoutique,
+} from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
-import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
+import { Tableau, type Colonne } from "@/components/patrons/Tableau";
+import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import {
   ETATS,
   FILTRES_VIDES,
@@ -16,6 +22,7 @@ import {
   filtrerMotos,
   type Filtres,
   type Moto,
+  type StatutMoto,
 } from "@/lib/domain/moto";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -26,9 +33,25 @@ import { ecouterStock } from "@/lib/repositories/motos";
  * Le stock.
  *
  * L'écran répond à une question posée debout, devant une moto : « celle-ci,
- * je l'ai en stock ? ». D'où le châssis en évidence, dessiné comme la plaque —
- * c'est le numéro qu'on relève sur le cadre et qu'on compare caractère par
- * caractère.
+ * je l'ai en stock ? ». D'où le châssis en tête de ligne, en Plex Mono — c'est
+ * le numéro qu'on relève sur le cadre et qu'on compare caractère par caractère.
+ *
+ * **Il empilait des cartes ; c'est un tableau.** Une moto occupait toute la
+ * largeur d'un 1920 pour dire cinq mots, et comparer deux prix demandait de les
+ * chercher dans deux blocs de texte. Chaque fait a maintenant sa colonne
+ * (`CAHIER-UI.md` §8.1) ; le patron `Tableau` naît ici et les écrans suivants
+ * le reprennent.
+ *
+ * **Le châssis n'est plus dessiné en plaque jaune.** Le jaune n'a que deux
+ * emplois — le code boutique et le hors ligne (D70) —, et un stock entier de
+ * plaques jaunes en faisait un décor plutôt qu'un signal. Le seul jaune qui
+ * reste sur cet écran est celui de la colonne « Boutique », qui est justement
+ * un code boutique.
+ *
+ * **Une seule action en tête : faire entrer une moto.** Les trois liens qui
+ * l'accompagnaient — Nouvelle vente, Ventes, Dossiers — sont mot pour mot ceux
+ * de la colonne de gauche depuis S28 : les répéter ici ne donnait pas un
+ * raccourci, cela noyait le seul geste que cet écran-là commande.
  *
  * Filtres et recherche travaillent en mémoire : le stock d'une boutique se
  * compte en dizaines, et une recherche qui ne marche qu'en ligne ne sert à rien
@@ -76,129 +99,215 @@ function Stock() {
     ? catalogue.modeles.filter((modele) => modele.marqueId === filtres.marqueId)
     : catalogue.modeles;
 
+  const toutesBoutiques = perimetre.type === "toutes";
+  const colonnes = useMemo<Colonne<Moto>[]>(() => {
+    const liste: Colonne<Moto>[] = [
+      {
+        cle: "chassis",
+        titre: "Châssis",
+        principal: true,
+        rendu: (moto) => (
+          <Link
+            href={`/motos?moto=${moto.id}`}
+            className="plaque-code text-encre underline-offset-2 hover:underline"
+          >
+            {moto.numeroChassis}
+          </Link>
+        ),
+      },
+      {
+        cle: "modele",
+        titre: "Marque et modèle",
+        principal: true,
+        rendu: (moto) =>
+          `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)}`,
+      },
+      { cle: "etat", titre: "État", rendu: (moto) => LIBELLE_ETAT[moto.etat] },
+      { cle: "couleur", titre: "Couleur", rendu: (moto) => moto.couleur || "—" },
+      { cle: "annee", titre: "Année", chiffre: true, rendu: (moto) => moto.annee ?? "—" },
+      {
+        /* La devise est titrée une fois, en tête de colonne : « 695 000 FCFA »
+           répété cent fois ne dit rien de plus et casse l'alignement. */
+        cle: "prix",
+        titre: "Prix conseillé (FCFA)",
+        chiffre: true,
+        rendu: (moto) =>
+          moto.prixVenteConseille === null ? "—" : formaterNombre(moto.prixVenteConseille),
+      },
+      { cle: "statut", titre: "Statut", rendu: (moto) => <Statut statut={moto.statut} /> },
+      {
+        cle: "entree",
+        titre: "Entrée",
+        chiffre: true,
+        rendu: (moto) => (moto.dateEntree ? formaterDateCourte(moto.dateEntree) : "—"),
+      },
+    ];
+    /* La colonne n'existe que quand la question se pose. Pour un gérant, toutes
+       les lignes portent la même boutique : ce serait une colonne constante. */
+    if (toutesBoutiques) {
+      liste.splice(2, 0, {
+        cle: "boutique",
+        titre: "Boutique",
+        rendu: (moto) => (
+          <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-1.5 py-0.5 text-legende leading-none text-encre-fixe">
+            {moto.boutiqueId}
+          </span>
+        ),
+      });
+    }
+    return liste;
+  }, [catalogue, toutesBoutiques]);
+
   if (sansPerimetre)
     return (
       <SansBoutique
         titre="Stock motos"
-        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : le stock n’a pas encore d’endroit où exister."
+        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : le stock n’a pas encore d’endroit où exister."
       />
     );
+
+  const total = (stock ?? []).length;
+  /* Compté sur ce que l'écran montre, pas sur le stock entier : « 12 motos sur
+     128 · 96 en stock » ferait croire que 96 des 12 lignes sont disponibles. */
+  const enStock = resultats.filter((moto) => moto.statut === "en_stock").length;
+  const chargement = stock === null && !erreur;
 
   return (
     <div>
       <TetePage
         titre="Stock motos"
-        sousTitre={perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
+        sousTitre={toutesBoutiques ? "Toutes les boutiques" : perimetre.nom}
         actions={
-          /* Vendre est le geste quotidien, faire entrer une moto l’exception :
-             c’est la vente qui porte l’accent de plaque. */
-          <>
-            <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
-              <Receipt aria-hidden="true" className="size-4" />
-              Nouvelle vente
-            </Link>
-            <Link href="/motos/ventes" className="bouton bouton-neutre">
-              Ventes
-            </Link>
-            <Link href="/motos/dossiers" className="bouton bouton-neutre">
-              Dossiers
-            </Link>
-            <Link href="/motos/nouvelle" className="bouton bouton-neutre">
-              <Plus aria-hidden="true" className="size-4" />
-              Faire entrer une moto
-            </Link>
-          </>
+          <Link href="/motos/nouvelle" className="bouton bouton-plaque">
+            <Plus aria-hidden="true" className="size-4" />
+            Faire entrer une moto
+          </Link>
         }
       />
 
-      <Recherche filtres={filtres} changer={setFiltres} />
+      <EtatErreur message={erreur} className="mb-4" />
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
-        <Filtre
-          id="filtre-etat"
-          libelle="État"
-          valeur={filtres.etat}
-          changer={(etat) => setFiltres((actuel) => ({ ...actuel, etat: etat as Filtres["etat"] }))}
-          options={ETATS.map((etat) => ({ valeur: etat, libelle: LIBELLE_ETAT[etat] }))}
-          tous="Tous les états"
-        />
-        <Filtre
-          id="filtre-marque"
-          libelle="Marque"
-          valeur={filtres.marqueId}
-          changer={(marqueId) => setFiltres((actuel) => ({ ...actuel, marqueId, modeleId: "" }))}
-          options={catalogue.marques.map((m) => ({ valeur: m.id, libelle: m.nom }))}
-          tous="Toutes les marques"
-        />
-        <Filtre
-          id="filtre-modele"
-          libelle="Modèle"
-          valeur={filtres.modeleId}
-          changer={(modeleId) => setFiltres((actuel) => ({ ...actuel, modeleId }))}
-          options={modelesDeLaMarque.map((m) => ({ valeur: m.id, libelle: m.nom }))}
-          tous="Tous les modèles"
-        />
-      </div>
-
-      <EtatErreur message={erreur} className="mt-4" />
-
-      {stock === null && !erreur ? (
-        <EtatChargement className="mt-6">Chargement du stock…</EtatChargement>
-      ) : (stock ?? []).length === 0 && !erreur ? (
+      {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
+          vide, filtres compris, ferait croire à un stock à zéro. */}
+      {erreur && stock === null ? null : !chargement && total === 0 ? (
         <StockVide perimetreEnCours={perimetreEnCours} />
-      ) : resultats.length === 0 ? (
-        <EtatSansResultat className="mt-6">
-            Aucune moto ne correspond. Vérifiez le châssis saisi, ou élargissez les filtres.
-          </EtatSansResultat>
       ) : (
-        <>
-          <p className="mt-6 text-sm text-encre-doux">
-            {resultats.length === 1 ? "1 moto" : `${resultats.length} motos`}
-            {resultats.length !== (stock ?? []).length && ` sur ${(stock ?? []).length}`}
-          </p>
-          <ul className="cadre cadre-liste mt-2">
-            {resultats.map((moto) => (
-              <li key={moto.id}>
-                <Link
-                  href={`/motos?moto=${moto.id}`}
-                  className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 hover:bg-fond focus-visible:bg-fond"
+        <div className="cadre cadre-tableau">
+          <div className="cadre-tete">
+            <Recherche filtres={filtres} changer={setFiltres} />
+
+            <div
+              className="flex flex-wrap items-center gap-2"
+              role="group"
+              aria-label="Filtrer le stock"
+            >
+              <button
+                type="button"
+                className="filtre"
+                aria-pressed={filtres.etat === ""}
+                onClick={() => setFiltres((actuel) => ({ ...actuel, etat: "" }))}
+              >
+                Tous les états
+              </button>
+              {ETATS.map((etat) => (
+                <button
+                  key={etat}
+                  type="button"
+                  className="filtre"
+                  aria-pressed={filtres.etat === etat}
+                  onClick={() =>
+                    setFiltres((actuel) => ({ ...actuel, etat: actuel.etat === etat ? "" : etat }))
+                  }
                 >
-                  {/* Le châssis est dessiné comme la plaque : c'est le numéro
-                      qu'on relève sur le cadre et qu'on compare caractère par
-                      caractère. */}
-                  <span className="plaque-code shrink-0 rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-xs leading-none text-encre-fixe">
-                    {moto.numeroChassis}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium text-encre">
-                      {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
-                    </span>
-                    <span className="block text-sm text-encre-doux">
-                      {LIBELLE_ETAT[moto.etat]}
-                      {moto.couleur ? ` · ${moto.couleur}` : ""}
-                      {moto.annee ? ` · ${moto.annee}` : ""}
-                      {moto.statut !== "en_stock" ? ` · ${LIBELLE_STATUT[moto.statut]}` : ""}
-                      {perimetre.type === "toutes" ? ` · ${moto.boutiqueId}` : ""}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-right">
-                    {moto.prixVenteConseille !== null && (
-                      <span className="block text-sm font-medium text-encre">
-                        {formaterMontant(moto.prixVenteConseille)}
-                      </span>
-                    )}
-                    <span className="block text-sm text-encre-doux">
-                      {moto.dateEntree ? formaterDateCourte(moto.dateEntree) : "—"}
-                    </span>
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </>
+                  {LIBELLE_ETAT[etat]}
+                </button>
+              ))}
+
+              <Filtre
+                id="filtre-marque"
+                libelle="Marque"
+                valeur={filtres.marqueId}
+                changer={(marqueId) =>
+                  setFiltres((actuel) => ({ ...actuel, marqueId, modeleId: "" }))
+                }
+                options={catalogue.marques.map((marque) => ({
+                  valeur: marque.id,
+                  libelle: marque.nom,
+                }))}
+                tous="Toutes les marques"
+              />
+              <Filtre
+                id="filtre-modele"
+                libelle="Modèle"
+                valeur={filtres.modeleId}
+                changer={(modeleId) => setFiltres((actuel) => ({ ...actuel, modeleId }))}
+                options={modelesDeLaMarque.map((modele) => ({
+                  valeur: modele.id,
+                  libelle: modele.nom,
+                }))}
+                tous="Tous les modèles"
+              />
+            </div>
+
+            {/* Le comptage se lit avant le tableau : c'est lui qui dit si les
+                filtres ont mangé la moto qu'on cherchait. Annoncé poliment, il
+                sert deux fois — il dit d'abord que le stock arrive, puis ce que
+                les filtres ont laissé, à qui ne voit pas le tableau changer.
+                `aria-live` sans `role` : la coquille n'a qu'un seul `status`,
+                et c'est le bandeau réseau. */}
+            <p aria-live="polite" aria-atomic="true" className="ml-auto text-corps text-encre-doux">
+              {chargement ? (
+                "Chargement du stock…"
+              ) : (
+                <>
+                  <strong className="font-semibold text-encre">
+                    {resultats.length === 1 ? "1 moto" : `${resultats.length} motos`}
+                  </strong>
+                  {resultats.length !== total && ` sur ${total}`} · {enStock} en stock
+                </>
+              )}
+            </p>
+          </div>
+
+          {chargement ? (
+            <Tableau
+              legende="Chargement du stock"
+              colonnes={colonnes}
+              lignes={[]}
+              cleDe={(moto) => moto.id}
+              chargement
+            />
+          ) : resultats.length === 0 ? (
+            <EtatSansResultat className="m-4">
+              Aucune moto ne correspond. Vérifiez le châssis saisi, ou élargissez les filtres.
+            </EtatSansResultat>
+          ) : (
+            <Tableau
+              legende="Motos du stock, de la plus récemment entrée à la plus ancienne"
+              colonnes={colonnes}
+              lignes={resultats}
+              cleDe={(moto) => moto.id}
+            />
+          )}
+        </div>
       )}
     </div>
   );
+}
+
+/* Trois statuts sur quatre se lisent d'un mot ; la couleur ne fait que doubler
+   le mot (DESIGN.md §5). « Réservée » prend le bleu de la goutte : la moto est
+   promise et n'est pas encore partie (D70). Vendue et transférée sont des faits
+   accomplis, sans rien à décider : elles restent neutres. */
+const TON_STATUT: Record<StatutMoto, string> = {
+  en_stock: "pastille-solde",
+  reservee: "pastille-transit",
+  vendue: "",
+  transferee: "",
+};
+
+function Statut({ statut }: { statut: StatutMoto }) {
+  return <span className={`pastille ${TON_STATUT[statut]}`}>{LIBELLE_STATUT[statut]}</span>;
 }
 
 function Recherche({
@@ -209,28 +318,26 @@ function Recherche({
   changer: (mise: (actuel: Filtres) => Filtres) => void;
 }) {
   return (
-    <div className="mt-6">
-      <label htmlFor="recherche-chassis" className="block text-sm font-medium text-encre">
+    <div className="relative min-w-56 flex-1 sm:max-w-80">
+      <label htmlFor="recherche-chassis" className="sr-only">
         Chercher un châssis
       </label>
-      <div className="relative mt-1.5">
-        <Search
-          aria-hidden="true"
-          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
-        />
-        <input
-          id="recherche-chassis"
-          type="search"
-          inputMode="search"
-          autoComplete="off"
-          placeholder="Les derniers caractères suffisent"
-          value={filtres.recherche}
-          onChange={(evenement) =>
-            changer((actuel) => ({ ...actuel, recherche: evenement.target.value }))
-          }
-          className="plaque-code saisie pr-3 pl-9 placeholder:font-sans placeholder:tracking-normal placeholder:text-encre-doux"
-        />
-      </div>
+      <Search
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
+      />
+      <input
+        id="recherche-chassis"
+        type="search"
+        inputMode="search"
+        autoComplete="off"
+        placeholder="Les derniers caractères suffisent"
+        value={filtres.recherche}
+        onChange={(evenement) =>
+          changer((actuel) => ({ ...actuel, recherche: evenement.target.value }))
+        }
+        className="plaque-code saisie h-11 pr-3 pl-9 text-corps placeholder:font-sans placeholder:tracking-normal placeholder:text-encre-doux lg:h-8"
+      />
     </div>
   );
 }
@@ -251,15 +358,15 @@ function Filtre({
   tous: string;
 }) {
   return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-encre">
+    <>
+      <label htmlFor={id} className="sr-only">
         {libelle}
       </label>
       <select
         id={id}
         value={valeur}
         onChange={(evenement) => changer(evenement.target.value)}
-        className="saisie mt-1.5"
+        className="filtre-choix"
       >
         <option value="">{tous}</option>
         {options.map((option) => (
@@ -268,27 +375,24 @@ function Filtre({
           </option>
         ))}
       </select>
-    </div>
+    </>
   );
 }
 
 function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
   if (perimetreEnCours) return null;
   return (
-    <div className="mt-6">
-      <EtatVide
-        titre="Aucune moto en stock pour l’instant."
-        action={
-          <Link href="/motos/nouvelle" className="bouton bouton-plaque">
-            <Plus aria-hidden="true" className="size-4" />
-            Faire entrer une moto
-          </Link>
-        }
-      >
-        La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se
-        déclarent dans les réglages.
-      </EtatVide>
-    </div>
+    <EtatVide
+      titre="Aucune moto en stock pour l’instant."
+      action={
+        <Link href="/motos/nouvelle" className="bouton bouton-plaque">
+          <Plus aria-hidden="true" className="size-4" />
+          Faire entrer une moto
+        </Link>
+      }
+    >
+      La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se
+      déclarent dans les réglages.
+    </EtatVide>
   );
 }
-
