@@ -38,7 +38,16 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       un prestataire avec une date dépassée — c'est-à-dire le chemin d'écriture cassé décrit
       plus bas. Le rendu vide et le rendu en attente ont été vus ; les lignes reposent sur
       `dossiersEnAttente` et `estInactive`, deux fonctions pures déjà couvertes par des tests.
-- [ ] **A3 Accueil gérant** — l'action du jour atteignable en un clic.
+- [x] **A3 Accueil gérant** — l'action du jour atteignable en un clic. L'écran listait les
+      espaces de la boutique, c'est-à-dire exactement ce que la colonne de gauche porte depuis
+      S28 : un accueil qui répète la navigation ne fait rien, on le traverse sans le lire. Il
+      porte maintenant un seul geste en grand — la vente, le geste quotidien — puis « à faire
+      aujourd'hui » et « ce que j'ai fait aujourd'hui ».
+      Un défaut trouvé en le construisant : sans boutique attribuée, une écoute sans périmètre
+      est une lecture de **toutes** les boutiques, que les règles refusent à un gérant (D7).
+      L'accueil aurait affiché une erreur rouge pour toute réponse à quelqu'un qui n'y peut
+      rien. Les deux sections ne se montent donc pas dans ce cas, et le sous-titre dit
+      « Aucune boutique attribuée » au lieu de « Toutes les boutiques » — vérifié sur capture.
 - [ ] **A4 Stock motos** — tableau pleine largeur, en-têtes collés, filtres persistants,
       comptage des résultats, « Faire entrer une moto » comme action principale. **C'est ici
       que naît le patron `Tableau`**, dans `components/patrons/` : S28 ne l'a pas écrit
@@ -98,7 +107,11 @@ Deux choses sont cassées, et aucune n'est graphique :
 
 Vérifié : `e2e/dossier.spec.ts` › « le cycle complet : déposé, revenu, remis » échoue de la
 même façon, à la même ligne, **sur la branche de S28 comme sur le commit qui la précède** —
-donc antérieur aux patrons. Ce n'est ni A4 ni A7 : cela demande sa propre spec, côté
+donc antérieur aux patrons. **Mais il ne se reproduit pas toujours** : la suite complète est
+repassée à 82 sur 82 sur des émulateurs fraîchement démarrés. C'est donc une course, pas une
+règle mal écrite — le client met à jour un document que la création n'a pas fini de poser, et
+selon la latence du serveur cela passe ou non. Une course qui perd une écriture une fois sur
+deux au comptoir est pire qu'une panne franche : elle ne se voit pas. Ce n'est ni A4 ni A7 : cela demande sa propre spec, côté
 `lib/repositories/dossier.ts` et non côté écran. À ne pas confondre avec le défaut de
 disposition ci-dessus, qui, lui, était bien de la mise en page.
 

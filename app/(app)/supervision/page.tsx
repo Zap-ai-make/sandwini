@@ -97,7 +97,7 @@ export default function Supervision() {
         </p>
       )}
 
-      <CeQuiDemandeUneDecision />
+      <CeQuiDemandeUneDecision className="mt-8" />
 
       <Link
         href="/parametres/boutiques"

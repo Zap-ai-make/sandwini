@@ -65,7 +65,20 @@ type Ligne = {
   sorte: "dossier" | "tranche";
 };
 
-export function CeQuiDemandeUneDecision() {
+export function CeQuiDemandeUneDecision({
+  /**
+   * Le même calcul sert deux écrans. Chez le responsable il s’appelle « ce qui
+   * demande une décision » — toutes boutiques réunies, c’est un arbitrage.
+   * Chez le gérant il s’appelle « à faire aujourd’hui » — dans sa boutique,
+   * c’est du travail. Le périmètre fait la différence, et il vient déjà du
+   * bandeau ; seul le titre change.
+   */
+  titre = "Ce qui demande une décision",
+  className,
+}: {
+  titre?: string;
+  className?: string;
+} = {}) {
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const { clients } = useFichierClients();
   const boutiqueId = perimetre.boutiqueId;
@@ -168,9 +181,9 @@ export function CeQuiDemandeUneDecision() {
     perimetreEnCours || ventes === null || documents === null || versements === null;
 
   return (
-    <section className="mt-8">
+    <section className={className ?? ""}>
       <div className="mb-3 flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-bloc font-semibold text-encre">Ce qui demande une décision</h2>
+        <h2 className="text-bloc font-semibold text-encre">{titre}</h2>
         <Link href="/motos/dossiers" className="bouton bouton-discret">
           Tous les dossiers
           <ArrowRight aria-hidden="true" className="size-4" />

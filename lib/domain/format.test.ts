@@ -4,8 +4,10 @@ import {
   formaterDate,
   formaterDateCourte,
   formaterDateHeure,
+  formaterHeure,
   formaterMontant,
   formaterNombre,
+  memeJour,
 } from "./format";
 
 /* Les séparateurs de milliers produits par Intl en français sont des espaces
@@ -87,5 +89,37 @@ describe("formaterAnciennete", () => {
   it("dit « date inconnue » plutôt que d’inventer un chiffre", () => {
     expect(formaterAnciennete(null)).toBe("date inconnue");
     expect(formaterAnciennete(Number.NaN)).toBe("date inconnue");
+  });
+});
+
+describe("formaterHeure", () => {
+  it("ne donne que l’heure : dans un journal d’une journée, la date est déjà en tête", () => {
+    expect(formaterHeure(new Date(2026, 8, 5, 15, 12))).toMatch(/15.12/);
+  });
+
+  it("dégrade plutôt que d’écrire « Invalid Date »", () => {
+    expect(formaterHeure(new Date("pas une date"))).toBe("—");
+  });
+});
+
+describe("memeJour", () => {
+  const reference = new Date(2026, 8, 5, 14, 0);
+
+  it("reconnaît le même jour civil, quelle que soit l’heure", () => {
+    expect(memeJour(new Date(2026, 8, 5, 0, 1), reference)).toBe(true);
+    expect(memeJour(new Date(2026, 8, 5, 23, 59), reference)).toBe(true);
+  });
+
+  it("refuse la veille et le lendemain, même à une minute près", () => {
+    expect(memeJour(new Date(2026, 8, 4, 23, 59), reference)).toBe(false);
+    expect(memeJour(new Date(2026, 8, 6, 0, 0), reference)).toBe(false);
+  });
+
+  /* Une écriture partie sans date — le champ n'est rempli qu'à l'arrivée au
+     serveur — n'appartient à aucun jour. La ranger dans « aujourd'hui » ferait
+     apparaître dans le journal du gérant une ligne qu'il n'a pas écrite. */
+  it("n’attribue aucun jour à une date absente ou cassée", () => {
+    expect(memeJour(null, reference)).toBe(false);
+    expect(memeJour(new Date("pas une date"), reference)).toBe(false);
   });
 });
