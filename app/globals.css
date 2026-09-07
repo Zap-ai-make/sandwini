@@ -760,11 +760,14 @@
      un élément d'interface). Le jeton existait déjà et portait ce calcul dans
      son commentaire ; il n'était employé nulle part.
 
-     La hauteur reste celle d'aujourd'hui (48 px, la cible tactile). Les
-     maquettes descendent à 38 px pour la densité bureau : c'est une reprise
-     de chaque formulaire, donc S29, pas ici. */
+     La hauteur est celle des maquettes : 38 px, la densité bureau. Les 48 px
+     d'avant étaient la cible tactile d'un produit dessiné pour le téléphone ;
+     la cible du produit est désormais l'ordinateur (`CAHIER-UI.md` §1), et
+     56 px de hauteur de ligne partout est « un réglage tactile appliqué à une
+     souris » (§7). Sous 768 px la saisie reprend ses 44 px, comme les filtres :
+     là, c'est bien un doigt qui vise. */
   .saisie {
-    height: 3rem;
+    height: 2.375rem;
     width: 100%;
     /* Un champ ne gagne rien à dépasser 32 rem, et il y perd : l'œil ne
        retrouve plus le début de la ligne. La borne est ici, sur le champ, et
@@ -772,9 +775,10 @@
        depuis la refonte de la coquille, et sans cette limite un champ « Nom »
        s'étirait sur 950 px. Vu sur la capture de `/parametres/prestataires`.
 
-       Ce n'est pas la réponse complète : les écrans de formulaire ont besoin
-       que leur colonne entière soit tenue, pas seulement leurs champs. C'est
-       le travail d'A5 et d'A9 dans S29, et c'est noté là-bas. */
+       Elle ne vaut que pour les écrans qui n'ont pas encore leur colonne :
+       dans une colonne tenue (`.colonne-formulaire`), elle est levée juste en
+       dessous. A9 est le dernier écran à en avoir besoin ; quand il l'aura,
+       cette ligne pourra disparaître. */
     max-width: 32rem;
     padding-inline: 0.75rem;
     border: 1px solid var(--color-bord-fort);
@@ -793,6 +797,33 @@
   .saisie[aria-invalid="true"] {
     border-color: var(--color-alerte);
     border-width: 2px;
+  }
+
+  /* 38 px passe sous la cible tactile de `DESIGN.md` §11 : au doigt, la saisie
+     reprend ses 44 px. `textarea.saisie` n'est pas concernée — sa hauteur est
+     déjà libre, et sa spécificité l'emporte sur celle-ci. */
+  @media (max-width: 767px) {
+    .saisie {
+      height: 2.75rem;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     La colonne d'un écran de formulaire.
+
+     La borne posée sur `.saisie` réparait le pire — un champ « Nom » étiré sur
+     950 px — sans répondre à la question : c'est la **colonne** qu'il faut
+     tenir, pas seulement ce qu'elle contient. Sans elle, un titre et son bouton
+     flottent encore aux deux bouts d'une bande vide.
+
+     La colonne tenue, la borne du champ n'a plus de raison d'être : le champ
+     reprend toute sa largeur, comme dans les maquettes. Une seule règle, parce
+     qu'une seule chose se dit ici — le reste de la disposition (l'aparté de
+     droite, la barre collée en bas) a une structure, donc c'est un composant :
+     `components/patrons/Formulaire.tsx` (D73).
+     -------------------------------------------------------------------------- */
+  .colonne-formulaire .saisie {
+    max-width: none;
   }
 
   /* --------------------------------------------------------------------------

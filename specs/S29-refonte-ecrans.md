@@ -82,8 +82,55 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       dans les cartes héritaient du gras et du Plex Mono de leur colonne : « Prix conseillé »
       sortait dans la police réservée à ce qui se dicte. Et l'en-tête était insécable, ce qui
       poussait la largeur pour rien ; il se replie désormais sur deux lignes.
-- [ ] **A5 Nouvelle vente** — une colonne, groupes courts et titrés, `EFFET_MODE` annoncé
-      avant la validation, barre d'action collée en bas.
+- [x] **A5 Nouvelle vente** — une colonne, groupes courts et titrés, `EFFET_MODE` annoncé
+      avant la validation, barre d'action collée en bas. Le patron `Formulaire` naît ici,
+      dans `components/patrons/`, avec ce qu'A9 reprendra : la colonne de 40 rem, l'aparté
+      du récapitulatif qui reste sous les yeux, la barre collée, et `Groupe` — un
+      `fieldset` titré, sans cadre, parce que cinq cadres feraient cinq écrans là où il
+      n'y a qu'un formulaire.
+      **La colonne entière est tenue**, pas seulement les champs : le bloc fait 40 rem de
+      saisie plus 21,25 rem de récapitulatif, et la place à droite ne sert plus à étirer
+      quoi que ce soit. Dans une colonne tenue, la borne de 32 rem posée sur `.saisie` en
+      S28 n'a plus lieu d'être et se lève (`.colonne-formulaire`) ; elle reste pour les
+      écrans qui n'ont pas encore la leur, et disparaîtra avec A9.
+      **La densité bureau arrive avec, comme prévu** : la saisie passe de 48 à 38 px, et
+      reprend 44 px sous 768 px — au doigt, 38 px passe sous la cible de `DESIGN.md` §11,
+      exactement comme les filtres d'A4. Les boutons ne bougent pas : les 34 px des
+      maquettes sont un dessin de bureau, et 44 px est un minimum tactile, pas un goût.
+      Les sept paires `label`/`input` de l'écran passent au patron `Champ`, et leurs
+      aides sont enfin reliées par `aria-describedby` — ce que la documentation du patron
+      promettait sans qu'aucun appelant le fasse.
+      **Trois écarts avec la maquette, et pourquoi.**
+      1. La maquette replie le groupe résolu sur une fiche « Haojue HJ 125-11 · Changer ».
+         Construit, puis retiré : la liste est un vrai groupe de boutons radio, et dans un
+         groupe de boutons radio les flèches du clavier **déplacent et choisissent à la
+         fois**. Une première flèche vers le bas détruisait donc le groupe sous les doigts
+         de qui le parcourait, en emportant le focus (`DESIGN.md` §11) — et
+         `e2e/ventes.spec.ts` l'a dit avant nous, `check()` ne trouvant plus l'élément
+         qu'il venait de cocher. Ce dessin suppose une liste déroulante à recherche, que
+         D72 laisse hors de S29 faute de composant accessible pour la porter.
+      2. « Reste à percevoir » devient **« Reste dû »** : c'est le mot de la fiche de
+         vente, du reçu et des paiements, et un même chiffre ne porte pas deux noms
+         (`DESIGN.md` §12).
+      3. Le châssis ne figure pas dans le récapitulatif. La moto retenue le porte déjà
+         deux blocs plus haut, et un second numéro dans la même colonne se lit comme un
+         autre numéro — or un seul compte ici, celui de la pièce.
+      **Deux défauts trouvés sur capture, puis mesurés dans le navigateur.** La barre
+      collée ne collait pas : elle restait à 64 px du bas, une ligne de saisie visible en
+      dessous d'elle. Deux causes empilées, et les maquettes portent les deux sans qu'elles
+      s'y voient. Un élément collant ne sort pas de son bloc conteneur, et le bloc
+      conteneur d'un enfant de grille est sa **zone de grille** — une rangée à la hauteur
+      exacte de la barre, donc sans un pixel de jeu : la barre est sortie de la grille. Et
+      le rectangle qui retient un élément collant s'arrête à la **boîte de contenu** du
+      défilement, pas à sa marge intérieure : le `pb-16` de `main` se reprend donc trois
+      fois, en marge, en réserve et en `bottom` négatif. Second défaut : la barre masquait
+      les deux derniers champs, qu'aucun défilement n'atteignait — d'où la réserve, posée
+      sur la grille et non sur la colonne, sinon elle ouvre un trou de trois centimètres
+      entre le dernier champ et le récapitulatif quand ils s'empilent à 390 px.
+      **Une chose retirée** : le lien de retour « Ventes » en tête d'écran, mot pour mot
+      celui de la colonne de gauche. « Annuler », dans la barre, dit la même sortie là où
+      la main est déjà. Et la mention de la marge réservée au responsable (D2) descend du
+      titre au prix, là où la question se pose.
 - [ ] **A6 Ventes** — tableau + `FicheVente` en panneau latéral, la liste reste visible.
       **C'est ici que naît le patron `PanneauLateral`** — même raison qu'en A4. `PanneauRecu`
       porte aujourd'hui le nom d'un panneau mais rend une page pleine ; il le devient ici.
@@ -157,12 +204,33 @@ formulaires garde ses paires `label`/`input` écrites à la main, une cinquantai
 convertir maintenant les aurait posés à 48 px pour les reposer à 38 px avec la densité
 bureau : deux passes au lieu d'une. A5 et A9 les prennent, en même temps que la hauteur.
 
+*A5 a levé la moitié de cette dette, et voici où passe la ligne.* **La hauteur est une
+règle CSS unique, et elle est posée** : tous les formulaires du dépôt sont à 38 px depuis
+A5, qu'ils emploient le patron ou non. Il ne reste donc plus deux passes à craindre — un
+écran qui convertit ses paires plus tard ne repose rien. Chaque écran de S29 prend donc les
+siennes dans son propre commit, comme A5 a pris les sept de la vente ; A9 balaie ce qui
+n'appartient à aucun des neuf, c'est-à-dire les six écrans de réglages. Restent en dehors
+des neuf, et donc sans commit qui les porte : `/motos/nouvelle` (douze paires) et
+`/clients` (une). Ils ont la densité ; ils n'ont ni le patron ni la colonne.
+
 **La colonne des écrans de formulaire reste à tenir.** En retirant `max-w-3xl`, S28 a rendu
 la zone de travail à sa largeur — ce qu'il fallait pour les listes, et ce qui a étiré les
 champs de saisie sur 950 px. Le patron `.saisie` les borne à 32 rem, ce qui répare le pire,
 mais la carte qui les contient s'étend toujours sur toute la largeur : un titre « Ajouter un
 prestataire » et son bouton flottent aux deux bouts d'une bande vide. A5 et A9 tiennent la
 colonne entière, pas seulement les champs.
+
+*A5 l'a tenue, et le patron `Formulaire` la porte pour A9.* La borne de 32 rem sur `.saisie`
+survit exactement jusque-là : c'est elle qui empêche les écrans de réglages de s'étirer d'ici
+leur tour, et la ligne qui la pose dit qu'A9 pourra la retirer.
+
+**Le corps du produit est resté à 16 px, et ce n'est pas A5 qui peut en décider.** Les
+maquettes posent un corps à 14 px — c'est l'autre moitié de la densité bureau, et le patron
+`Page` de S28 annonce qu'elle « arrive avec S29 ». Elle n'est pas arrivée avec A5 : une
+taille de corps se change dans `body`, donc sur les vingt écrans d'un coup, dans un commit
+qui en nomme un seul. C'est le même genre de question que l'écart de coquille entre 768 et
+1024 px relevé en A4, et elle se tranche au même endroit : avec le commanditaire, sur un
+écran regardé, pas au détour d'un formulaire.
 
 **Un défaut repéré en chemin — et réparé en chemin, sans qu'on le cherche.** Sur `/motos` en
 390 px, la rangée d'actions rapides
