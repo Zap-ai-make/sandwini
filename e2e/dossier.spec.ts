@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  bandeauEtat,
   contenu,
   creerPrestataire,
   nomUnique,
@@ -133,6 +134,51 @@ test.describe("confier un document à un prestataire", () => {
     /* Le formulaire reste ouvert et la saisie reste là : on corrige le montant,
        on ne recommence pas le dépôt. */
     await expect(plaque.getByLabel("Avance versée")).toHaveValue("0");
+  });
+
+  test("le dépôt se termine sans réseau : l’écran rend la main tout de suite", async ({
+    page,
+    context,
+  }) => {
+    await seConnecterEtEntrer(page);
+    const prestataire = nomUnique("Sankara");
+    await creerPrestataire(page, prestataire);
+    await vendre(page, { mode: "Crédit", prix: "1200000", encaisse: "400000" });
+
+    const carteGrise = ligne(page, "Carte grise");
+    await carteGrise.getByRole("button", { name: "Déposer chez un prestataire" }).click();
+    await carteGrise.getByLabel("Prestataire").selectOption({ label: prestataire });
+    await carteGrise.getByLabel("Avance versée").fill("20000");
+
+    /* Le comptoir n’a pas toujours de réseau, et c’est le cas normal, pas
+       l’exception (AGENTS.md). Le dépôt s’écrit dans le cache local sans
+       attendre le serveur : l’écran doit en tirer les conséquences tout de
+       suite, sinon le gérant reste devant un formulaire qui ne se referme
+       jamais et un papier qu’il ne peut plus faire avancer. */
+    await context.setOffline(true);
+    await carteGrise.getByRole("button", { name: "Enregistrer le dépôt" }).click();
+
+    await expect(carteGrise).toContainText("Chez le prestataire");
+    await expect(carteGrise).toContainText(prestataire);
+
+    /* Les trois signes que le geste est terminé : le formulaire est parti, et
+       l’étape suivante est offerte — sans réseau. */
+    await expect(carteGrise.getByRole("button", { name: "Enregistrer le dépôt" })).toHaveCount(0);
+    await expect(carteGrise.getByRole("button", { name: "Arrivé au magasin" })).toBeVisible();
+
+    /* Ce qui attend est annoncé ailleurs, et c’est la contrepartie du reste :
+       si l’écran rend la main avant le serveur, quelque chose doit dire ce qui
+       n’est pas encore parti. Le bandeau le compte — ce qui exige que l’écriture
+       du dossier passe par la file, ce qu’elle avait oublié de faire.
+
+       On ne va pas jusqu’à « À jour » après le retour du réseau : la file ne
+       repart qu’au bout de l’attente croissante du SDK (S27 au backlog), et
+       D55 range cet indicateur parmi les signaux instables. Ce test porte sur
+       le dépôt, pas sur la reconnexion. */
+    await expect(bandeauEtat(page)).toContainText("saisie");
+    await expect(bandeauEtat(page)).toContainText("en attente");
+
+    await context.setOffline(false);
   });
 
   test("le cycle complet : déposé, revenu, remis", async ({ page }) => {

@@ -1,7 +1,7 @@
 "use client";
 
-import { CircleAlert, LoaderCircle } from "lucide-react";
-import { useCallback, useState } from "react";
+import { CircleAlert } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import {
   estEnRetard,
@@ -21,7 +21,7 @@ import {
   type StatutDocument,
 } from "@/lib/domain/vente";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import { avancerDocument } from "@/lib/repositories/dossier";
+import { avancerDocument, messageErreurDossier } from "@/lib/repositories/dossier";
 import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 import { jourLocal } from "@/lib/domain/recu";
 import { EtatErreur } from "@/components/patrons/Etats";
@@ -58,29 +58,45 @@ export function DossierDocuments({ documents }: { documents: DocumentDossier[] |
 function LigneDocument({ document }: { document: DocumentDossier }) {
   const session = useSession();
   const [depotOuvert, setDepotOuvert] = useState(false);
-  const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  /* Un geste part une fois. Le verrou se lève dès que le document a changé de
+     statut — ce que l'écriture locale provoque en un souffle. Un état de React
+     ferait clignoter les boutons pour rien ; une référence suffit à empêcher
+     le double clic sans rien raconter à l'écran. */
+  const gesteParti = useRef(false);
+  useEffect(() => {
+    gesteParti.current = false;
+  }, [document.statut]);
 
   const suivants = statutsSuivants(document.type, document.statut);
   const enRetard =
     document.statut === "chez_prestataire" && estEnRetard(document.disponibleLe, new Date());
 
-  async function avancer(vers: StatutDocument, depot?: SaisieDepot) {
-    if (session.statut !== "connecte" || envoi) return;
+  /* On n'attend pas le serveur pour rendre la main. Firestore applique
+     l'écriture au cache local sur-le-champ : la ligne affiche déjà le nouveau
+     statut, donc le formulaire n'a plus de raison d'être ouvert et l'étape
+     suivante doit être offerte. Attendre l'accusé de réception, c'était laisser
+     le gérant devant un formulaire qui ne se referme jamais — pour toujours au
+     comptoir sans réseau, et le temps d'une file encombrée le reste du temps.
+     Ce qui n'est pas encore parti est annoncé par le bandeau, qui compte les
+     écritures en attente ; un refus tardif revient par le `catch`. */
+  function avancer(vers: StatutDocument, depot?: SaisieDepot) {
+    if (session.statut !== "connecte" || gesteParti.current) return;
     setErreur(null);
-    setEnvoi(true);
     try {
-      await avancerDocument(
+      const enregistre = avancerDocument(
         document,
         vers,
         { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
         depot,
       );
+      gesteParti.current = true;
       setDepotOuvert(false);
+      enregistre.catch((cause) => setErreur(messageErreurDossier(cause)));
     } catch (cause) {
+      /* Refus immédiat : transition impossible ou dépôt incomplet. Ces
+         phrases-là sont écrites pour être lues, on les garde telles quelles. */
       setErreur(cause instanceof Error ? cause.message : "L’enregistrement a échoué.");
-    } finally {
-      setEnvoi(false);
     }
   }
 
@@ -134,11 +150,9 @@ function LigneDocument({ document }: { document: DocumentDossier }) {
               <button
                 key={vers}
                 type="button"
-                disabled={envoi}
-                onClick={() => void avancer(vers)}
-                className="inline-flex h-11 items-center gap-2 rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond disabled:opacity-60"
+                onClick={() => avancer(vers)}
+                className="inline-flex h-11 items-center gap-2 rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
               >
-                {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                 {LIBELLE_ACTION[vers]}
               </button>
             ),
@@ -149,9 +163,8 @@ function LigneDocument({ document }: { document: DocumentDossier }) {
       {depotOuvert && (
         <FormulaireDepot
           type={document.type}
-          envoi={envoi}
           onAnnuler={() => setDepotOuvert(false)}
-          onDeposer={(depot) => void avancer("chez_prestataire", depot)}
+          onDeposer={(depot) => avancer("chez_prestataire", depot)}
         />
       )}
     </li>
@@ -169,12 +182,10 @@ const LIBELLE_ACTION: Record<StatutDocument, string> = {
 
 function FormulaireDepot({
   type,
-  envoi,
   onAnnuler,
   onDeposer,
 }: {
   type: DocumentDossier["type"];
-  envoi: boolean;
   onAnnuler: () => void;
   onDeposer: (depot: SaisieDepot) => void;
 }) {
@@ -336,12 +347,7 @@ function FormulaireDepot({
           <EtatErreur message={probleme} className="mt-3" />
 
           <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              type="submit"
-              disabled={envoi}
-              className="bouton bouton-plaque disabled:opacity-60"
-            >
-              {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
+            <button type="submit" className="bouton bouton-plaque">
               Enregistrer le dépôt
             </button>
             <button

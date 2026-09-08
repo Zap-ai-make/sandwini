@@ -1657,3 +1657,41 @@ ici aurait été deviner leur interface sans un seul appelant pour la démentir.
 S29 les crée dans `components/patrons/` au premier écran qui les demande (A4 et
 A6), et sa spec le dit noir sur blanc pour que le huitième écran ne redessine
 pas le sien.
+
+---
+
+## D76 — Un geste au comptoir n'attend jamais l'accusé de réception du serveur
+
+*S30. Les numéros D74 et D75 sont pris par S29, qui attend sur sa branche.*
+
+*Le dépôt d'un document chez un prestataire ne se terminait jamais : le
+formulaire restait ouvert par-dessus une ligne qui disait déjà « Chez le
+prestataire », et l'étape suivante n'était plus offerte.*
+
+**Ce qui était écrit.** `await avancerDocument(...)` puis `setDepotOuvert(false)`.
+Lu vite, c'est la séquence évidente : on enregistre, puis on referme.
+
+**Pourquoi c'est faux ici.** Une promesse d'écriture Firestore ne se résout
+qu'à l'accusé de réception du serveur — `lib/reseau/file-ecritures.ts` le dit
+en toutes lettres, et c'est même la raison d'être du compteur de la file. Le
+cache local, lui, a déjà appliqué l'écriture. Attendre la promesse, c'est donc
+tenir l'écran dans un état « en cours » alors que le travail est fait. Hors
+ligne, l'attente ne se termine jamais et le dossier devient inutilisable —
+exactement là où le hors-ligne devait sauver la mise.
+
+**La règle.** Valider tout de suite, envoyer, avancer l'écran sur l'écriture
+locale, rattacher un `catch` pour le refus tardif. Ce qui n'est pas encore
+parti est annoncé par le bandeau, qui compte les écritures en attente — donc
+toute écriture passe par `suivreEcriture`, sans exception. `FormulaireClient`
+faisait déjà exactement cela ; le dossier était le seul écran à s'en écarter.
+
+**Ce que ça coûte, et pourquoi c'est le bon prix.** Un refus du serveur arrive
+après coup, hors du geste qui l'a causé. C'est le prix du hors-ligne, et il est
+déjà payé partout ailleurs dans le produit. L'inverse — bloquer le comptoir
+pour garder l'erreur près de son geste — revient à faire dépendre du réseau
+une application faite pour s'en passer.
+
+**Effet de bord mesuré.** La suite de bout en bout du dossier est passée de
+8,5 minutes à 1,5 minute. Les tests étaient lents pour la raison même qui les
+faisait échouer : chaque geste attendait un accusé de réception coincé dans
+une file encombrée.

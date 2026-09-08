@@ -85,10 +85,11 @@ c'est le voir revenir sous un autre nom.
 
 | ID  | Spec                                              | Touche | Périmètre | Statut  |
 |-----|---------------------------------------------------|--------|-----------|---------|
-| S30 | Le dépôt chez un prestataire refusé par les règles | S11    | MVP       | à faire |
+| S30 | Le dépôt chez un prestataire ne se termine jamais | S11    | MVP       | terminée |
 
-Rang : avant toute nouvelle fonctionnalité. C'est une capacité MVP livrée qui échoue une fois sur
-deux au comptoir, et le gérant n'a aucun moyen de savoir si l'argent est sorti de la caisse.
+S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
+hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
+accusait, et il était faux. La leçon est en D76.
 
 ---
 
