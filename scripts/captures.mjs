@@ -161,16 +161,32 @@ for (const {
     .catch(() => {});
   if (premiereVente || premierRecu) {
     /* Dans le contenu, pas n'importe où : la navigation principale est elle
-       aussi une liste, et sa première entrée renvoyait à l'accueil. */
-    const premiere = page.getByRole("main").getByRole("listitem").first().getByRole("link").first();
+       aussi une liste, et sa première entrée renvoyait à l'accueil.
+
+       Une ligne de tableau **ou** un élément de liste : depuis S29 les ventes
+       sont un tableau (A6) et les reçus une liste. La campagne cherchait un
+       `listitem` sur les deux et s'arrêtait net sur la fiche de vente — elle
+       n'avait pas été rejouée depuis. Un outil de revue qui ne suit pas les
+       écrans qu'il photographie ne revoit plus rien. */
+    const premiere = page
+      .getByRole("main")
+      .locator("tbody tr, li")
+      .first()
+      .getByRole("link")
+      .first();
     await premiere.waitFor({ timeout: 20000 });
     await premiere.click();
     await page.locator("h1").first().waitFor({ timeout: 20000 });
+    /* Un panneau se remplit après son ouverture, et plus lentement que la
+       liste qui l'a appelé : quinze secondes ne suffisaient pas, et la
+       campagne photographiait « Chargement de la vente… » — c'est-à-dire
+       rien. On regarde le rendu réel, ou on ne regarde pas (`DESIGN.md` §14). */
     await page
       .getByText(/Chargement/)
       .first()
-      .waitFor({ state: "detached", timeout: 15000 })
+      .waitFor({ state: "detached", timeout: 30000 })
       .catch(() => {});
+    await page.waitForTimeout(1500);
   }
   if (coupe) {
     await contexte.setOffline(true);
