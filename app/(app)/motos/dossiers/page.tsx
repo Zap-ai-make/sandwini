@@ -324,6 +324,7 @@ export default function PageDossiers() {
                 lignes={resultats}
                 cleDe={(dossier) => dossier.venteId}
                 cleActive={choisi?.venteId ?? null}
+                enRetard={(dossier) => dossier.enRetard}
               />
             )}
           </div>

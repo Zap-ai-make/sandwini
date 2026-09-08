@@ -68,7 +68,7 @@ par le commanditaire ; la phase 2 s'exécute comme deux specs normales.
 | ID  | Spec                                              | Dépend de | Périmètre | Statut  |
 |-----|---------------------------------------------------|-----------|-----------|---------|
 | S28 | Refonte de l'interface — jetons, coquille, patrons | S12       | post-MVP  | terminée |
-| S29 | Refonte de l'interface — les écrans                | S28       | post-MVP  | en cours (7/9) |
+| S29 | Refonte de l'interface — les écrans                | S28       | post-MVP  | en cours (8/9) |
 
 La coupure entre les deux n'est pas administrative : à la fin de S28 l'application tourne dans la
 nouvelle coquille avec ses écrans d'aujourd'hui. Le défaut n°1 du diagnostic — le rail vide et le

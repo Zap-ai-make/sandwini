@@ -61,6 +61,7 @@ export function Tableau<T>({
   cleDe,
   chargement,
   cleActive,
+  enRetard,
 }: {
   /**
    * Ce que le tableau montre, et dans quel ordre. Lu par les lecteurs d’écran
@@ -81,6 +82,15 @@ export function Tableau<T>({
    * porte `aria-current`, parce que lui seul sait où il mène.
    */
   cleActive?: string | null;
+  /**
+   * La ligne qui traîne : un filet à gauche, pour la retrouver de loin dans une
+   * file de quarante.
+   *
+   * Il ne remplace jamais le mot — « En retard », « Aucun versement depuis 60
+   * jours » restent écrits dans leur colonne (`DESIGN.md` §5). Le filet sert à
+   * balayer la liste, pas à la comprendre.
+   */
+  enRetard?: (ligne: T) => boolean;
 }) {
   return (
     /* La zone qui défile, et à laquelle l'en-tête se colle. Sur bureau elle
@@ -120,7 +130,14 @@ export function Tableau<T>({
             {lignes.map((ligne) => (
               <tr
                 key={cleDe(ligne)}
-                className={cleDe(ligne) === cleActive ? "ligne-active" : undefined}
+                className={
+                  [
+                    enRetard?.(ligne) ? "ligne-retard" : "",
+                    cleDe(ligne) === cleActive ? "ligne-active" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ") || undefined
+                }
               >
                 {colonnes.map((colonne) => (
                   <Cellule key={colonne.cle} colonne={colonne}>

@@ -254,8 +254,40 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       L835:24…`. Le cache local a écrit « Chez le prestataire » que le serveur refuse. C'est
       le défaut déjà relevé en S28, il appartient à `lib/repositories/dossier.ts` et demande
       sa propre spec — pas la refonte.
-- [ ] **A8 Paiements** — **deux sections séparées et nommées** : Dettes (crédit) et Tranches
+- [x] **A8 Paiements** — **deux sections séparées et nommées** : Dettes (crédit) et Tranches
       (moto retenue). Jamais mêlées dans un même tableau.
+      **Elles sont désormais visibles en même temps, et c’est là tout le changement.** L’écran
+      les rangeait derrière trois boutons dont un seul était pressé à la fois : on ne pouvait
+      pas les confondre, mais on ne pouvait pas non plus voir la différence — et c’est la voir
+      qui l’enseigne. Chaque section porte son titre, son total, et la phrase des maquettes qui
+      dit où est la moto : partie avec le client, donc il doit cet argent ; ou retenue au
+      magasin, donc le magasin détient l’argent et ce n’est pas une dette. Les deux tableaux
+      n’ont pas le même vocabulaire non plus — « Déjà versé / Reste dû » d’un côté,
+      « Détenu / Reste à percevoir » de l’autre —, et c’est voulu (§13).
+      **La troisième liste a disparu.** « Tranches inactives » était un tri de la deuxième :
+      l’information vit maintenant dans la colonne État de chaque ligne (« Aucun versement
+      depuis 60 jours »), dans le filet rouge qui marque la ligne, et dans le comptage en tête
+      de section. Une liste dont chaque élément se lit déjà dans une autre n’est pas une liste.
+      Le patron `Tableau` gagne pour cela un crochet `enRetard` — la règle `.ligne-retard`
+      posée en A7 n’en avait aucun et ne s’appliquait nulle part ; A7 l’utilise désormais aussi.
+      **Deux écarts avec la maquette, tous deux dictés par le rendu.**
+      1. **« Prix convenu » n’a pas de colonne.** Il vaut exactement « déjà versé + reste dû »,
+         et sa colonne poussait « Action » entièrement hors du cadre à 1280 px, colonne des
+         écrans dépliée — vu sur capture. Un geste qu’on ne voit pas est un geste qui n’existe
+         pas. Il se lit sur la fiche, à un clic.
+      2. **« Échu depuis 55 jours » n’existe pas.** La maquette le montre sur une dette ; le
+         domaine n’a aucune date d’échéance pour un crédit, et le seuil d’inactivité réglable
+         est explicitement celui des tranches (§6.3, §14). L’État d’une dette dit donc ce
+         qu’on sait — impayée ou partiellement payée — et la colonne « Dernier versement »
+         dit à quelle date le client a versé pour la dernière fois — c’est de là que se lit le
+         silence, et les lignes sont triées de la plus ancienne vente à la plus récente.
+      **La bande d’explication a dû changer de surface.** La maquette la pose sur `--fond`,
+      qui est ici le sol de la page : elle y était littéralement invisible, en clair comme en
+      sombre. Elle prend le papier et un filet, comme tout ce qui se détache du sol.
+      Reste, à 1280 px et pour le responsable seul — c’est lui qui a la colonne « Boutique » —,
+      une vingtaine de pixels de débordement sur le tableau des dettes, mesurés sur des noms de
+      modèles de trente caractères que les émulateurs fabriquent et que le métier n’écrit pas.
+      La zone défile : la colonne reste atteignable, comme en A4 et A6.
 - [ ] **A9 Réglages** — les écrans d'administration atteints sans les chercher, et
       « Identité de l'entreprise » en lecture seule (D71).
 - [ ] Pour chaque écran : vide, chargement (sans saut de mise en page), erreur, hors ligne,
