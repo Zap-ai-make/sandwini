@@ -4,7 +4,13 @@ import { CircleAlert, LoaderCircle, UserCheck, UserX } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
-import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import {
+  EtatChargement,
+  EtatErreur,
+  EtatErreurSaisie,
+  EtatSansResultat,
+} from "@/components/patrons/Etats";
+import { Champ } from "@/components/patrons/Champ";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
@@ -48,10 +54,7 @@ function Utilisateurs() {
 
   return (
     <div>
-      <TetePage
-        retour={{ href: "/parametres", libelle: "Réglages" }}
-        titre="Utilisateurs"
-      />
+      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Utilisateurs" />
 
       <FormulaireGerant boutiques={ouvertes} />
 
@@ -321,9 +324,7 @@ function Rattachement({
         Annuler
       </button>
 
-      {acheminement && (
-        <p className="w-full text-sm text-encre-doux">{acheminement}</p>
-      )}
+      {acheminement && <p className="w-full text-sm text-encre-doux">{acheminement}</p>}
 
       <p className="w-full text-sm text-encre-doux">
         Changer de boutique ferme la session du gérant&nbsp;: il devra se reconnecter pour voir la
@@ -371,34 +372,25 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
   }
 
   return (
-    <form
-      onSubmit={soumettre}
-      className="mt-6 cadre p-4"
-      noValidate
-    >
+    <form onSubmit={soumettre} className="mt-6 cadre p-4" noValidate>
       <h2 className="font-semibold text-encre">Créer un gérant</h2>
       <p className="mt-1 flex gap-2 text-sm text-encre-doux">
         <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <span>Cette action demande du réseau, contrairement au reste de l’application.</span>
       </p>
 
-      <div className="mt-4 space-y-4">
-        <div>
-          <label htmlFor="nom" className="block text-sm font-medium text-encre">
-            Nom
-          </label>
+      <div className="colonne-formulaire mt-4 max-w-[40rem] space-y-4">
+        <Champ id="nom" libelle="Nom">
           <input
             id="nom"
             required
             value={nom}
             onChange={(e) => setNom(e.target.value)}
-            className="saisie mt-1.5"
+            className="saisie"
           />
-        </div>
-        <div>
-          <label htmlFor="email-gerant" className="block text-sm font-medium text-encre">
-            Adresse e-mail
-          </label>
+        </Champ>
+
+        <Champ id="email-gerant" libelle="Adresse e-mail">
           <input
             id="email-gerant"
             type="email"
@@ -406,13 +398,15 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
             required
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="saisie mt-1.5"
+            className="saisie"
           />
-        </div>
-        <div>
-          <label htmlFor="mot-de-passe-gerant" className="block text-sm font-medium text-encre">
-            Mot de passe provisoire
-          </label>
+        </Champ>
+
+        <Champ
+          id="mot-de-passe-gerant"
+          libelle="Mot de passe provisoire"
+          aide="Au moins 10 caractères. Il est affiché en clair pour que vous puissiez le dicter."
+        >
           <input
             id="mot-de-passe-gerant"
             type="text"
@@ -420,30 +414,28 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
             minLength={10}
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            className="saisie mt-1.5 font-code"
+            aria-describedby="mot-de-passe-gerant-aide"
+            className="saisie font-code"
           />
-          <p className="mt-1 text-sm text-encre-doux">
-            Au moins 10 caractères. Il est affiché en clair pour que vous puissiez le dicter.
-          </p>
-        </div>
+        </Champ>
+
         <div>
-          <label htmlFor="boutique-gerant" className="block text-sm font-medium text-encre">
-            Boutique
-          </label>
-          <select
-            id="boutique-gerant"
-            value={boutiqueId}
-            onChange={(e) => setBoutiqueId(e.target.value)}
-            className="saisie mt-1.5"
-          >
-            <option value="">Aucune pour l’instant</option>
-            {boutiques.map((boutique) => (
-              <option key={boutique.id} value={boutique.id}>
-                {boutique.code} · {boutique.nom}
-              </option>
-            ))}
-          </select>
-          <p className="mt-1 text-sm text-encre-doux">
+          <Champ id="boutique-gerant" libelle="Boutique">
+            <select
+              id="boutique-gerant"
+              value={boutiqueId}
+              onChange={(e) => setBoutiqueId(e.target.value)}
+              className="saisie"
+            >
+              <option value="">Aucune pour l’instant</option>
+              {boutiques.map((boutique) => (
+                <option key={boutique.id} value={boutique.id}>
+                  {boutique.code} · {boutique.nom}
+                </option>
+              ))}
+            </select>
+          </Champ>
+          <p className="mt-1 text-corps text-encre-doux">
             {boutiques.length === 0 ? (
               <>
                 Aucune boutique ouverte —{" "}

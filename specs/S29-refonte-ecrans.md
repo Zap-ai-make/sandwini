@@ -288,8 +288,42 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       une vingtaine de pixels de débordement sur le tableau des dettes, mesurés sur des noms de
       modèles de trente caractères que les émulateurs fabriquent et que le métier n’écrit pas.
       La zone défile : la colonne reste atteignable, comme en A4 et A6.
-- [ ] **A9 Réglages** — les écrans d'administration atteints sans les chercher, et
+- [x] **A9 Réglages** — les écrans d'administration atteints sans les chercher, et
       « Identité de l'entreprise » en lecture seule (D71).
+      **L’identité se lit sur le hub, à plat.** Elle occupait un écran qu’il fallait ouvrir
+      pour découvrir qu’on n’y saisissait rien — or c’est précisément ce qu’il faut apprendre
+      (D71). Le composant `IdentiteEntreprise` la rend désormais aux deux endroits à partir
+      d’une seule écriture.
+      **Chaque destination annonce ce qu’on y trouvera** : « 16 boutiques actives »,
+      « 3 comptes », « 14 marques · 10 modèles », « 3 prestataires ». C’est le sens de
+      « atteints sans les chercher » : on ne va pas voir pour savoir, et sur une installation
+      neuve ce compte dit quel écran reste à remplir. Le patron `Hub` gagne un `etat` pour
+      cela. Les abonnements qui l’alimentent sont muets pour qui n’a pas le droit de lire la
+      collection : un gérant ne voit pas la carte « Utilisateurs », il ne demande donc pas les
+      comptes.
+      **La synchronisation revient dans le hub, sous « Cet appareil ».** S28 l’en avait
+      écartée volontairement — elle n’est pas une administration — et un test d’`espaces`
+      gardait cette décision. La maquette règle la même tension autrement, et mieux : une
+      section à elle, avec la phrase qui dit pourquoi (ce qui attend ici n’attend pas
+      ailleurs). Le test a changé avec la décision, dans le même commit, et garde ce qui reste
+      vrai : elle n’exige aucune capacité.
+      **Les seize dernières paires `label`/`input` écrites à la main sont passées au patron
+      `Champ`**, et les quatre formulaires d’administration tiennent maintenant leur colonne —
+      boutiques, utilisateurs, prestataires, catalogue.
+      **Un écart avec la maquette.** Elle ouvre « Mon nom affiché » dans un dialogue ; le
+      produit ne sait pas renommer un compte depuis l’application, et l’écrire serait ajouter
+      une fonction sous couvert de refonte (D72). Le nom se lit dans « Votre compte », comme
+      avant.
+      **Ce qui a été trouvé sur capture** : la section « Ce qui change » commençait par
+      « Identité de l’entreprise », c’est-à-dire par ce qui, deux lignes plus haut, venait
+      d’être déclaré non modifiable. La fiche suit désormais l’identité ; « Ce qui change »
+      porte les cinq écrans de la maquette, et rien d’autre.
+- [ ] **La borne `max-width: 32rem` de `.saisie` reste** — A9 devait l’emporter. Ses quatre
+      formulaires tiennent bien leur colonne désormais, mais la règle protège encore cinq
+      écrans hors du groupe A, qui n’ont donc pas de maquette à confronter :
+      `/motos/nouvelle`, `/clients`, `FormulaireClient`, `ListeReferentiel` et la connexion.
+      La retirer aujourd’hui les laisserait s’étirer sur toute la largeur. À traiter avec eux,
+      pas ici.
 - [ ] Pour chaque écran : vide, chargement (sans saut de mise en page), erreur, hors ligne,
       refus expliqué avec une sortie, désactivé qui dit *pourquoi* avant le geste.
 - [ ] Aucun coût d'achat ni marge sur un écran de gérant, sur aucun de ces neuf écrans (D2).

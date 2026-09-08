@@ -3,7 +3,13 @@
 import { Phone } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
-import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import {
+  EtatChargement,
+  EtatErreur,
+  EtatErreurSaisie,
+  EtatSansResultat,
+} from "@/components/patrons/Etats";
+import { Champ } from "@/components/patrons/Champ";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -58,10 +64,7 @@ function Prestataires() {
 
   return (
     <div>
-      <TetePage
-        retour={{ href: "/parametres", libelle: "Réglages" }}
-        titre="Prestataires"
-      />
+      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Prestataires" />
       <p className="mt-2 max-w-prose text-encre-doux">
         Ceux à qui vous confiez les cartes grises et les plaques. Ils apparaîtront au moment de
         déposer un dossier, filtrés selon ce qu’ils traitent.
@@ -139,24 +142,20 @@ function Champs({
   prefixe: string;
 }) {
   return (
-    <>
+    <div className="colonne-formulaire max-w-[40rem] space-y-4">
       <div className="mt-4">
-        <label htmlFor={`${prefixe}-nom`} className="block text-sm font-medium text-encre">
-          Nom
-        </label>
-        <input
-          id={`${prefixe}-nom`}
-          value={saisie.nom}
-          maxLength={LONGUEUR_NOM_MAX}
-          onChange={(evenement) => changer({ nom: evenement.target.value })}
-          className="saisie mt-1.5"
-        />
+        <Champ id={`${prefixe}-nom`} libelle="Nom">
+          <input
+            id={`${prefixe}-nom`}
+            value={saisie.nom}
+            maxLength={LONGUEUR_NOM_MAX}
+            onChange={(evenement) => changer({ nom: evenement.target.value })}
+            className="saisie"
+          />
+        </Champ>
       </div>
 
-      <div className="mt-4">
-        <label htmlFor={`${prefixe}-telephone`} className="block text-sm font-medium text-encre">
-          Téléphone
-        </label>
+      <Champ id={`${prefixe}-telephone`} libelle="Téléphone">
         <input
           id={`${prefixe}-telephone`}
           type="tel"
@@ -164,16 +163,16 @@ function Champs({
           value={saisie.telephone}
           maxLength={LONGUEUR_TELEPHONE_MAX}
           onChange={(evenement) => changer({ telephone: evenement.target.value })}
-          className="saisie mt-1.5"
+          className="saisie"
         />
-      </div>
+      </Champ>
 
       <ChoixTypes
         valeurs={saisie.typesDocuments}
         changer={(typesDocuments) => changer({ typesDocuments })}
         prefixe={prefixe}
       />
-    </>
+    </div>
   );
 }
 
@@ -205,11 +204,7 @@ function Formulaire() {
   }
 
   return (
-    <form
-      onSubmit={soumettre}
-      className="mt-6 cadre p-4"
-      noValidate
-    >
+    <form onSubmit={soumettre} className="mt-6 cadre p-4" noValidate>
       <h2 className="font-semibold text-encre">Ajouter un prestataire</h2>
 
       <Champs
@@ -225,10 +220,7 @@ function Formulaire() {
         </p>
       )}
 
-      <button
-        type="submit"
-        className="mt-3 bouton bouton-plaque"
-      >
+      <button type="submit" className="mt-3 bouton bouton-plaque">
         Enregistrer le prestataire
       </button>
     </form>
@@ -329,10 +321,7 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
             changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
             prefixe={`edition-${prestataire.id}`}
           />
-          <button
-            type="submit"
-            className="mt-4 bouton bouton-plaque"
-          >
+          <button type="submit" className="mt-4 bouton bouton-plaque">
             Enregistrer
           </button>
         </form>

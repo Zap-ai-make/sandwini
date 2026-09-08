@@ -853,8 +853,13 @@
 
        Elle ne vaut que pour les écrans qui n'ont pas encore leur colonne :
        dans une colonne tenue (`.colonne-formulaire`), elle est levée juste en
-       dessous. A9 est le dernier écran à en avoir besoin ; quand il l'aura,
-       cette ligne pourra disparaître. */
+       dessous. S29 devait l'emporter avec A9 ; A9 tient désormais ses quatre
+       formulaires de réglages, mais cette ligne reste, parce qu'elle protège
+       encore cinq écrans qui n'appartiennent pas au groupe A et n'ont donc pas
+       de maquette à confronter : `/motos/nouvelle`, `/clients`,
+       `FormulaireClient`, `ListeReferentiel` et la connexion. La retirer
+       aujourd'hui les laisserait s'étirer sur toute la largeur. Elle
+       disparaîtra quand ces cinq-là tiendront leur colonne à leur tour. */
     max-width: 32rem;
     padding-inline: 0.75rem;
     border: 1px solid var(--color-bord-fort);

@@ -69,11 +69,7 @@ export function espacesVisibles(role: Role, metiers: readonly Metier[]): Espace[
 }
 
 /** Cet espace est-il ouvert à ce rôle sur ce périmètre ? */
-export function accedeEspace(
-  role: Role,
-  metiers: readonly Metier[],
-  espace: Espace,
-): boolean {
+export function accedeEspace(role: Role, metiers: readonly Metier[], espace: Espace): boolean {
   if (espace === "supervision") return peut(role, "acceder_supervision");
   if (espace === "accueil") return !peut(role, "acceder_supervision");
 
@@ -195,7 +191,15 @@ export const ECRANS_DE: Record<Espace, readonly EcranDEspace[]> = {
       capacite: "gerer_referentiels",
       quoi: "Qui traite les cartes grises et les plaques",
     },
-    { href: "/diagnostic", libelle: "Synchronisation", intention: "suivre" },
+    {
+      href: "/diagnostic",
+      libelle: "Synchronisation",
+      intention: "suivre",
+      /* Sans cette phrase, le hub des réglages l'écartait : il ne montre que
+         les destinations qui savent dire ce qu'on y fait. Un écran présent
+         dans la colonne et absent du hub est un écran qu'on croit disparu. */
+      quoi: "Ce qui reste à envoyer depuis cet appareil, et depuis quand",
+    },
   ],
 };
 
