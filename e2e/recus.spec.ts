@@ -143,7 +143,9 @@ test.describe("le reçu d’un versement", () => {
     await encaisser(page, "200000");
     await expect(contenu(page)).toContainText("300 000 FCFA", { timeout: 20_000 });
 
-    await page.getByRole("link", { name: "Reçu", exact: true }).first().click();
+    /* Le lien porte désormais le numéro du reçu en plus du mot : on vise celui
+       du deuxième versement, au lieu du premier lien qui s'appelait « Reçu ». */
+    await page.getByRole("link", { name: `Reçu ${numero}/V2`, exact: true }).click();
 
     const recu = page.getByRole("article");
     await expect(recu).toBeVisible({ timeout: 20_000 });

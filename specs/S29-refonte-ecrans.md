@@ -131,9 +131,66 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       celui de la colonne de gauche. « Annuler », dans la barre, dit la même sortie là où
       la main est déjà. Et la mention de la marge réservée au responsable (D2) descend du
       titre au prix, là où la question se pose.
-- [ ] **A6 Ventes** — tableau + `FicheVente` en panneau latéral, la liste reste visible.
-      **C'est ici que naît le patron `PanneauLateral`** — même raison qu'en A4. `PanneauRecu`
-      porte aujourd'hui le nom d'un panneau mais rend une page pleine ; il le devient ici.
+- [x] **A6 Ventes** — tableau + `FicheVente` en panneau latéral, la liste reste visible.
+      Le patron `PanneauLateral` naît ici, avec `AvecPanneau` (la disposition), `TitrePanneau`
+      (le filet plutôt qu'un cadre : dans 420 px, six cadres emboîtés font une pile de
+      boîtes) et `Faits` / `Fait` (l'identité, puis les faits, la forme des maquettes).
+      **La souche arrive avec.** D70 avait rétrogradé la plaque en signal pur et promis une
+      autre signature — le numéro de pièce dessiné comme le talon qu'on arrache du carnet.
+      Elle n'existait que dans les maquettes ; elle est en tête du panneau, crantée par un
+      masque CSS qui tient à l'impression et suit la couleur de la surface. Ni jaune ni
+      plaque : le numéro complet n'est pas un code boutique, et seules les trois lettres de
+      tête se détachent — en gris, pas en jaune, sans quoi ce serait un troisième emploi.
+      **La fiche cesse d'être une page.** Elle portait un `h1` au nom du client ; l'écran
+      n'en a plus qu'un, « Ventes », et le panneau est un `complementary` nommé
+      « Vente <numéro> ». Quatre assertions bout en bout visaient ce titre de niveau 1 et
+      visent désormais le repère — mises à jour dans le même commit (`CAHIER-UI.md` §12),
+      comme deux libellés qui ont changé avec la fiche : « Remise au client : Oui, le … »,
+      qui était une ligne de faits, s'écrit en toutes lettres au même endroit que la phrase
+      disant l'inverse tant que la moto reste au magasin ; et le lien du reçu d'un versement
+      s'appelle « Reçu <numéro> » et non plus « Reçu », parce qu'un nom accessible doit dire
+      où il mène et qu'une suite de chiffres ne le dit pas.
+      **Trois écarts avec la maquette, et le rendu réel les a dictés tous les trois.**
+      1. Le seuil des deux colonnes se mesure sur la **zone de travail**, pas sur la
+         fenêtre. La maquette bascule à 1152 px de fenêtre ; à 1280 px la coquille en prend
+         296, il en reste 944 pour un panneau de 420 et un tableau de sept colonnes, et
+         « Paiement » sortait à moitié du cadre — vu sur capture, puis mesuré. La même
+         fenêtre, colonne repliée, laisse 1104 px et le couple respire. C'est donc une
+         requête de conteneur : replier la colonne des écrans (Ctrl B) fait apparaître la
+         fiche à côté de sa liste, ce qui est le geste qu'un repli doit récompenser.
+      2. **Sous le seuil, le panneau remplace la liste au lieu de s'empiler dessous.** Les
+         maquettes les empilent, ce qui tient avec leurs sept lignes ; avec deux cents
+         ventes, ouvrir une fiche demanderait de faire défiler toute la liste pour
+         l'atteindre (`DESIGN.md` §6). La liste est masquée, pas démontée : la recherche et
+         les filtres sont un état, et on les retrouve en fermant le panneau.
+      3. **C'est le corps du panneau qui défile**, comme le tableau d'à côté depuis A4. Le
+         panneau simplement collant des maquettes suffit à leurs huit lignes de faits ; la
+         vraie fiche porte le dossier, les versements, le formulaire d'encaissement et la
+         marge, dépasse la hauteur de l'écran, et un panneau collant plus haut que la
+         fenêtre ne colle plus — le pied d'actions partait avec le reste.
+      **Ce que le tableau a gagné, et ce qu'il a rendu.** Six colonnes — pièce, client,
+      moto, mode, reste dû, paiement — plus « Boutique » quand le périmètre est « toutes »,
+      comme en A4. Le châssis y a figuré une capture durant, puis en est sorti : dix-sept
+      caractères en Plex Mono insécables poussaient le tableau au-delà de la place que le
+      panneau lui laisse. La recherche l'accepte toujours, et le panneau le montre. L'état
+      du dossier quitte aussi la ligne pour le panneau (`resumerDossier`) : le tableau dit
+      ce qui se compare d'une vente à l'autre, le panneau ce sur quoi on agit.
+      Il reste, à 1440 px et pour le responsable seul — c'est lui qui a la colonne
+      « Boutique » —, vingt-quatre pixels de débordement mesurés sur des noms de modèles
+      de trente-trois caractères, que les émulateurs fabriquent et que le métier n'écrit
+      pas (« Haojue HJ 125-11 » en fait seize). La zone défile, donc la colonne reste
+      **atteignable** : c'est la leçon d'A4, et elle a tenu.
+      **Ce qui a été retiré.** Les liens « Paiements » et « Reçus » en tête d'écran, mot
+      pour mot ceux de la colonne de gauche — même raison qu'en A4. Et les trois cadres
+      empilés de la fiche — l'argent, la moto, le client, quatre lignes chacun — qui sont
+      une seule liste de faits : dans 420 px, trois cadres font une pile de boîtes.
+      **`PanneauRecu` n'a pas été converti, et c'est un écart à la spec.** Deux raisons.
+      Il n'y a **aucune maquette validée** de l'écran des reçus — le groupe A n'en contient
+      pas, et `c4-recu.html` est un aperçu du papier, pas de l'écran : le convertir, c'est
+      dessiner de mémoire, ce que ce chantier s'interdit. Et le reçu est un document de
+      format A5, soit 560 px : le poser dans un panneau de 420 le comprimerait au lieu de
+      le montrer. Le patron existe désormais et l'attend ; ce qui manque est une maquette à
+      confronter, pas du code.
 - [ ] **A7 Dossiers en attente** — qui détient quel papier, et ce qui est en retard. Le
       relais des quatre documents avance sans recharger la page.
 - [ ] **A8 Paiements** — **deux sections séparées et nommées** : Dettes (crédit) et Tranches

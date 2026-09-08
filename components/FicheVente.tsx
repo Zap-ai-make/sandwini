@@ -1,10 +1,18 @@
 "use client";
 
-import { ArrowLeft, CircleAlert, KeyRound, Lock, Printer, ReceiptText, TriangleAlert } from "lucide-react";
+import { CircleAlert, Info, KeyRound, Lock, Printer, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { DossierDocuments } from "@/components/DossierDocuments";
+import { Avis } from "@/components/patrons/Avis";
+import { Champ } from "@/components/patrons/Champ";
 import { EtatChargement, EtatErreur, EtatErreurSaisie } from "@/components/patrons/Etats";
+import {
+  Fait,
+  Faits,
+  PanneauLateral,
+  TitrePanneau,
+} from "@/components/patrons/PanneauLateral";
 import { useSession } from "@/lib/auth/session";
 import { formaterTelephone, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
@@ -19,6 +27,7 @@ import {
   estRenumerotee,
   lignePaiement,
   peutRemettreMoto,
+  resumerDossier,
   validerVersement,
   type DocumentDossier,
   type LignePaiement,
@@ -43,17 +52,29 @@ import {
 } from "@/lib/repositories/ventes";
 
 /**
- * La fiche d'une vente : tout le dossier sur un écran.
+ * La fiche d'une vente : tout le dossier, à côté de la liste.
  *
  * C'est l'écran qu'on ouvre quand un client revient — avec son reçu, ou juste
  * son nom. Il doit répondre en une seconde à trois questions : qu'est-ce qu'il
  * a acheté, combien reste-t-il dû, où en sont ses papiers.
  *
- * Comme la fiche d'une moto, ce n'est pas une route à part mais un panneau de
- * `/motos/ventes`, ouvert par `?vente=`. Une route dynamique obligerait le
- * navigateur à demander au serveur un document que le service worker n'a jamais
- * vu : hors ligne, la vente qu'on vient d'enregistrer tomberait sur la page de
- * repli (D39).
+ * **C'est un panneau, désormais, et plus une page.** La fiche remplaçait la
+ * liste : on revenait, la recherche était à refaire et la position perdue. Elle
+ * s'ouvre maintenant à droite du tableau, qui reste lisible — `CAHIER-UI.md`
+ * §7. Ce n'est toujours pas une route : `?vente=` plutôt que `/ventes/[id]`,
+ * parce qu'une route dynamique tomberait hors ligne sur la page de repli pour
+ * une vente enregistrée il y a dix secondes (D39).
+ *
+ * **L'identité passe du titre à la souche.** L'écran portait un `h1` au nom du
+ * client ; il n'y en a plus qu'un, « Ventes », et le panneau est une section de
+ * cet écran, pas une page de plus. Ce que le client cherche des yeux en tendant
+ * son papier, c'est le numéro de la pièce : il est en tête, dessiné comme le
+ * talon qu'on arrache du carnet (D70).
+ *
+ * **Les faits d'abord, resserrés.** L'argent, la moto et le client tenaient
+ * trois cadres empilés de quatre lignes chacun ; dans 420 px, trois cadres font
+ * une pile de boîtes. Ils sont une seule liste de faits, dans l'ordre où la
+ * question se pose : qui, quoi, combien, combien reste-t-il.
  */
 export function FicheVente({ id }: { id: string }) {
   const session = useSession();
@@ -85,10 +106,15 @@ export function FicheVente({ id }: { id: string }) {
       ecouterDocumentsDeVente(id, auChangement, enErreur),
     [id],
   );
-  const { valeur: documents } = useAbonnement(
-    souscrireDocuments,
-    "Le dossier n’a pas pu être lu.",
+  const { valeur: documents } = useAbonnement(souscrireDocuments, "Le dossier n’a pas pu être lu.");
+
+  const motoId = vente?.motoId ?? "";
+  const souscrireMoto = useCallback(
+    (auChangement: (moto: Moto | null) => void, enErreur: (cause: unknown) => void) =>
+      motoId ? ecouterMoto(motoId, auChangement, enErreur) : () => {},
+    [motoId],
   );
+  const { valeur: moto } = useAbonnement(souscrireMoto, "La moto n’a pas pu être chargée.");
 
   const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
   const client = vente ? clients.find((fiche) => fiche.id === vente.clientId) : undefined;
@@ -104,132 +130,201 @@ export function FicheVente({ id }: { id: string }) {
   );
 
   return (
-    <div>
-      {/* Le lien de retour dans son propre bloc : « inline-flex » seul, la
-          plaque du numéro qui suit se posait sur la même ligne et recouvrait le
-          mot « Ventes ». */}
-      <div>
-        <Link
-          href="/motos/ventes"
-          className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-        >
-          <ArrowLeft aria-hidden="true" className="size-4" />
-          Ventes
-        </Link>
-      </div>
-
+    <PanneauLateral
+      nom={vente ? `Vente ${vente.numero}` : "Vente"}
+      fermerVers="/motos/ventes"
+      identite={
+        vente ? (
+          <div className="souche">
+            <p className="souche-numero">
+              <span className="souche-code">{vente.boutiqueId}</span>
+              {vente.numero.startsWith(`${vente.boutiqueId}-`)
+                ? vente.numero.slice(vente.boutiqueId.length)
+                : ` ${vente.numero}`}
+            </p>
+            <p className="souche-legende">
+              {vente.date ? `Vente du ${formaterDate(vente.date)}` : "Date inconnue"}
+            </p>
+          </div>
+        ) : (
+          <p className="font-semibold text-encre">Vente</p>
+        )
+      }
+      actions={
+        vente ? (
+          <>
+            {/* Le reçu de la vente se réimprime à tout moment, et il se compose
+                à la lecture : rien n'a été figé à la première impression (D61). */}
+            <Link
+              href={`/motos/recus?recu=${identifiantRecu(vente.id, null)}`}
+              className="bouton bouton-plaque"
+            >
+              <Printer aria-hidden="true" className="size-4" />
+              Reçu de vente
+            </Link>
+            {moto && (
+              <Link href={`/motos?moto=${moto.id}`} className="bouton bouton-neutre">
+                Fiche de la moto
+              </Link>
+            )}
+          </>
+        ) : undefined
+      }
+    >
       {erreur ? (
-        <EtatErreur message={erreur} className="mt-6" />
+        <EtatErreur message={erreur} />
       ) : vente === null ? (
-        <EtatChargement className="mt-6">Chargement de la vente…</EtatChargement>
+        <EtatChargement>Chargement de la vente…</EtatChargement>
       ) : (
         <>
-          <span className="plaque-code mt-3 inline-block rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe">
-            {vente.numero}
-          </span>
-          <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">
-            {client?.nom ?? "Client inconnu"}
-          </h1>
-          <p className="mt-1 text-sm text-encre-doux">
-            {vente.date ? formaterDate(vente.date) : "Date inconnue"} · {vente.boutiqueId} ·{" "}
-            {LIBELLE_MODE[vente.modePaiement]}
-          </p>
+          {estRenumerotee(vente) && (
+            <Avis role="status" ton="alerte" titre="Ce reçu a été renuméroté" className="mb-4">
+              Un autre appareil avait déjà attribué{" "}
+              <span className="plaque-code">{vente.numeroInitial}</span> pendant la coupure. Le
+              numéro qui fait foi est désormais{" "}
+              <span className="plaque-code">{vente.numero}</span>. Si le client détient un reçu
+              portant l’ancien, remettez-lui le nouveau.
+            </Avis>
+          )}
 
-          {estRenumerotee(vente) && <Renumerotee vente={vente} />}
+          <Identite
+            vente={vente}
+            client={client}
+            moto={moto}
+            catalogue={catalogue}
+            suivi={suivi}
+          />
 
-          <Argent vente={vente} suivi={suivi} />
-
-          {/* Le reçu de la vente se réimprime à tout moment, et il se compose
-              à la lecture : rien n'a été figé à la première impression (D61). */}
-          <Link
-            href={`/motos/recus?recu=${identifiantRecu(vente.id, null)}`}
-            className="mt-4 bouton bouton-plaque"
-          >
-            <Printer aria-hidden="true" className="size-4" />
-            Reçu de vente
-          </Link>
+          <EffetVente vente={vente} suivi={suivi} />
 
           {suivi && peutRemettreMoto(vente, suivi.resteDu) && <RemiseMoto vente={vente} />}
 
-          <MotoVendue vente={vente} catalogue={catalogue} suivi={suivi} />
+          <section>
+            <TitrePanneau>Les versements</TitrePanneau>
+            <ListeVersements versements={versements} />
+            {/* Le formulaire n’apparaît qu’une fois les versements lus : leur
+                nombre donne le rang du reçu, et leur somme le reste réellement
+                dû. Sans eux, on numéroterait à l’aveugle. */}
+            {suivi && suivi.resteDu > 0 && (
+              <FormulaireVersement
+                vente={vente}
+                versements={versements ?? []}
+                resteDu={suivi.resteDu}
+              />
+            )}
+          </section>
 
-          {client && <FicheClient client={client} />}
-
-          <Dossier documents={documents} />
-
-          <Versements vente={vente} versements={versements} suivi={suivi} />
+          <section>
+            <TitrePanneau>Le dossier</TitrePanneau>
+            {documents && documents.length > 0 && (
+              <p className="mb-2 text-corps text-encre-doux">{resumerDossier(documents)}</p>
+            )}
+            <DossierDocuments documents={documents} />
+          </section>
 
           {(vente.inclus.length > 0 || vente.nonInclus.length > 0) && (
-            <div className="mt-6 grid gap-6 sm:grid-cols-2">
+            <section>
+              <TitrePanneau>Ce qui était convenu</TitrePanneau>
               <ListeConvenue titre="Inclus dans la vente" valeurs={vente.inclus} />
               <ListeConvenue titre="Non inclus" valeurs={vente.nonInclus} />
-            </div>
+            </section>
           )}
 
-          {estResponsable ? <Marge id={id} /> : <MargeMasquee />}
+          <section>
+            <TitrePanneau>Marge</TitrePanneau>
+            {estResponsable ? <Marge id={id} /> : <MargeMasquee />}
+          </section>
         </>
       )}
-    </div>
+    </PanneauLateral>
   );
 }
 
 /**
- * Le signalement d'une renumérotation (D44, `prompt.md` §3.3).
+ * Qui, quoi, combien — en une seule liste.
  *
- * On le repère en comparant les deux champs, sans drapeau qui pourrait mentir.
- * Le message dit l'ancien numéro autant que le nouveau : c'est l'ancien qui est
- * écrit sur le reçu déjà remis au client.
+ * L'ordre suit la question qu'on se pose en tendant la main vers le reçu : le
+ * nom qu'on vérifie, la moto qu'on reconnaît, puis l'argent. Le reste dû ferme
+ * la liste parce que c'est le chiffre qu'on annonce à voix haute.
  */
-function Renumerotee({ vente }: { vente: Vente }) {
-  return (
-    <p
-      role="status"
-      className="mt-4 flex gap-3 rounded-plaque border border-plaque-bord bg-plaque/15 p-4 text-sm text-encre"
-    >
-      <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span>
-        Ce reçu a été renuméroté à la synchronisation : un autre appareil avait déjà attribué{" "}
-        <span className="plaque-code">{vente.numeroInitial}</span> pendant la coupure. Le numéro qui
-        fait foi est désormais <span className="plaque-code">{vente.numero}</span>. Si le client
-        détient un reçu portant l’ancien, remettez-lui le nouveau.
-      </span>
-    </p>
-  );
-}
-
-function Argent({ vente, suivi }: { vente: Vente; suivi: LignePaiement | null }) {
+function Identite({
+  vente,
+  client,
+  moto,
+  catalogue,
+  suivi,
+}: {
+  vente: Vente;
+  client: Client | undefined;
+  moto: Moto | null;
+  catalogue: Catalogue;
+  suivi: LignePaiement | null;
+}) {
   const totalPaye = suivi?.totalPaye ?? vente.totalPaye;
   const resteDu = suivi?.resteDu ?? vente.resteDu;
   const statutPaiement = suivi?.statutPaiement ?? vente.statutPaiement;
-  const dernierVersementAt = suivi?.dernierVersementAt ?? vente.dernierVersementAt;
-  const solde = resteDu === 0;
 
   return (
-    <section className="mt-6 overflow-hidden rounded-plaque border-2 border-plaque-bord bg-papier">
-      <dl className="divide-y divide-bord">
-        <Ligne titre="Prix convenu" valeur={formaterMontant(vente.prixConvenu)} />
-        <Ligne titre="Déjà payé" valeur={formaterMontant(totalPaye)} />
-        <div className="flex items-baseline justify-between gap-4 bg-fond px-4 py-3">
-          <dt className="text-sm font-medium text-encre">Reste dû</dt>
-          <dd
-            className={[
-              "text-right text-xl font-semibold tabular-nums",
-              solde ? "text-solde" : "text-encre",
-            ].join(" ")}
-          >
-            {formaterMontant(resteDu)}
-          </dd>
-        </div>
-      </dl>
-      {/* Jamais la couleur seule : le statut est écrit en toutes lettres
-          (DESIGN.md §5). */}
-      <p className="border-t border-bord px-4 py-3 text-sm text-encre-doux">
-        {LIBELLE_STATUT_PAIEMENT[statutPaiement]}
-        {dernierVersementAt
-          ? ` · dernier versement le ${formaterDate(dernierVersementAt)}`
-          : " · aucun versement"}
-      </p>
-    </section>
+    <Faits>
+      <Fait titre="Client">{client?.nom ?? "Client inconnu"}</Fait>
+      {client && (
+        <Fait titre="Téléphone" code>
+          {formaterTelephone(client.telephone)}
+        </Fait>
+      )}
+      <Fait titre="Moto">
+        {moto ? `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)}` : "…"}
+      </Fait>
+      {moto && (
+        <Fait titre="Châssis" code>
+          {moto.numeroChassis}
+        </Fait>
+      )}
+      <Fait titre="Mode">{LIBELLE_MODE[vente.modePaiement]}</Fait>
+      <Fait titre="Prix convenu" code>
+        {formaterMontant(vente.prixConvenu)}
+      </Fait>
+      <Fait titre="Déjà versé" code>
+        {formaterMontant(totalPaye)}
+      </Fait>
+      <Fait titre="Reste dû" code>
+        {/* Jamais la couleur seule : « Soldée » est écrit juste dessous. */}
+        <span className={resteDu === 0 ? "text-solde" : "text-encre"}>
+          {formaterMontant(resteDu)}
+        </span>
+      </Fait>
+      <Fait titre="Paiement">{LIBELLE_STATUT_PAIEMENT[statutPaiement]}</Fait>
+    </Faits>
+  );
+}
+
+/**
+ * Ce que le mode de paiement a décidé du sort de la moto.
+ *
+ * La distinction crédit / tranches est la confusion la plus coûteuse du produit
+ * (`prompt.md` §13), et elle ne se déduit pas d'un montant : elle s'écrit. La
+ * phrase se lit ici comme sur l'écran de saisie, au même endroit de la lecture
+ * et avec les mêmes mots.
+ */
+function EffetVente({ vente, suivi }: { vente: Vente; suivi: LignePaiement | null }) {
+  const resteDu = suivi?.resteDu ?? vente.resteDu;
+
+  return (
+    <p className="mt-4 flex gap-2 rounded-champ border-l-[3px] border-l-goutte bg-goutte-surface p-3 text-encre">
+      <Info aria-hidden="true" className="mt-0.5 size-[18px] shrink-0 text-goutte" />
+      <span>
+        {vente.motoRemise
+          ? vente.dateRemiseMoto
+            ? `La moto a été remise au client le ${formaterDate(vente.dateRemiseMoto)}.`
+            : "La moto a été remise au client."
+          : /* Le montant s'ajoute, la phrase ne se remplace pas : « la moto
+               reste au magasin » est la distinction elle-même, et elle ne se
+               dilue pas dans un chiffre (§13). */
+            resteDu > 0
+            ? `Non remise : la moto reste au magasin, il reste ${formaterMontant(resteDu)} à verser.`
+            : "Non remise : la moto reste au magasin."}
+      </span>
+    </p>
   );
 }
 
@@ -258,12 +353,12 @@ function RemiseMoto({ vente }: { vente: Vente }) {
   }
 
   return (
-    <section className="mt-6 rounded-plaque border-2 border-plaque-bord bg-plaque/15 p-4">
-      <h2 className="flex items-center gap-2 font-semibold text-encre">
+    <section className="mt-4 rounded-champ border border-solde bg-solde-surface p-3">
+      <h3 className="flex items-center gap-2 font-semibold text-encre">
         <KeyRound aria-hidden="true" className="size-4 shrink-0" />
         Tranches soldées — la moto peut partir
-      </h2>
-      <p className="mt-1 max-w-prose text-sm text-encre-doux">
+      </h3>
+      <p className="mt-1 text-corps text-encre-doux">
         Le client a versé la totalité du prix convenu. En confirmant, la moto passe en vendue et
         l’argent détenu pour son compte devient une recette du magasin. Cette confirmation ne
         s’annule pas depuis l’application.
@@ -272,12 +367,8 @@ function RemiseMoto({ vente }: { vente: Vente }) {
       <EtatErreur message={erreur} className="mt-3" />
 
       {confirmation ? (
-        <div className="mt-4 flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={remettre}
-            className="bouton bouton-plaque"
-          >
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={remettre} className="bouton bouton-plaque">
             Oui, la moto est remise
           </button>
           <button
@@ -292,7 +383,7 @@ function RemiseMoto({ vente }: { vente: Vente }) {
         <button
           type="button"
           onClick={() => setConfirmation(true)}
-          className="mt-4 bouton bouton-plaque"
+          className="bouton bouton-plaque mt-3"
         >
           Confirmer la remise de la moto
         </button>
@@ -301,188 +392,63 @@ function RemiseMoto({ vente }: { vente: Vente }) {
   );
 }
 
-function MotoVendue({
-  vente,
-  catalogue,
-  suivi,
-}: {
-  vente: Vente;
-  catalogue: Catalogue;
-  suivi: LignePaiement | null;
-}) {
-  const souscrire = useCallback(
-    (auChangement: (moto: Moto | null) => void, enErreur: (cause: unknown) => void) =>
-      ecouterMoto(vente.motoId, auChangement, enErreur),
-    [vente.motoId],
-  );
-  const { valeur: moto } = useAbonnement(souscrire, "La moto n’a pas pu être chargée.");
-
-  return (
-    <Bloc titre="La moto">
-      {moto === null ? (
-        <p className="px-4 py-3 text-sm text-encre-doux">Chargement…</p>
-      ) : (
-        <dl className="divide-y divide-bord">
-          <Ligne
-            titre="Modèle"
-            valeur={`${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)}`}
-          />
-          <Ligne titre="Châssis" valeur={moto.numeroChassis} code />
-          <Ligne
-            titre="Remise au client"
-            valeur={
-              vente.motoRemise
-                ? vente.dateRemiseMoto
-                  ? `Oui, le ${formaterDate(vente.dateRemiseMoto)}`
-                  : "Oui"
-                : /* Le montant s'ajoute, la phrase ne se remplace pas : « la
-                     moto reste au magasin » est la distinction crédit /
-                     tranches elle-même, et elle ne se dilue pas dans un
-                     chiffre (§13). */
-                  suivi && suivi.resteDu > 0
-                  ? `Non — la moto reste au magasin, il reste ${formaterMontant(suivi.resteDu)} à verser`
-                  : "Non — la moto reste au magasin"
-            }
-          />
-          <div className="px-4 py-3">
-            <Link
-              href={`/motos?moto=${moto.id}`}
-              className="text-sm font-medium text-encre underline underline-offset-4"
-            >
-              Ouvrir la fiche de la moto
-            </Link>
-          </div>
-        </dl>
-      )}
-    </Bloc>
-  );
-}
-
-function FicheClient({ client }: { client: Client }) {
-  return (
-    <Bloc titre="Le client">
-      <dl className="divide-y divide-bord">
-        <Ligne titre="Nom" valeur={client.nom} />
-        <Ligne titre="Téléphone" valeur={formaterTelephone(client.telephone)} />
-        {client.telephone2 && (
-          <Ligne titre="Second téléphone" valeur={formaterTelephone(client.telephone2)} />
-        )}
-        {client.adresse && <Ligne titre="Adresse" valeur={client.adresse} />}
-      </dl>
-    </Bloc>
-  );
-}
-
-/**
- * Le dossier. S8 l'ouvre, S11 le fait vivre : les boutons d'avancement, le
- * dépôt chez un prestataire et son avance vivent dans `DossierDocuments`.
- */
-function Dossier({ documents }: { documents: DocumentDossier[] | null }) {
-  return (
-    <Bloc titre="Le dossier">
-      <DossierDocuments documents={documents} />
-    </Bloc>
-  );
-}
-
-function Versements({
-  vente,
-  versements,
-  suivi,
-}: {
-  vente: Vente;
-  versements: Versement[] | null;
-  suivi: LignePaiement | null;
-}) {
-  return (
-    <>
-      <ListeVersements versements={versements} />
-      {/* Le formulaire n’apparaît qu’une fois les versements lus : leur nombre
-          donne le rang du reçu, et leur somme le reste réellement dû. Sans
-          eux, on numéroterait à l’aveugle. */}
-      {suivi && suivi.resteDu > 0 && (
-        <FormulaireVersement
-          vente={vente}
-          versements={versements ?? []}
-          resteDu={suivi.resteDu}
-        />
-      )}
-    </>
-  );
-}
-
 function ListeVersements({ versements }: { versements: Versement[] | null }) {
+  if (versements === null) return <p className="text-corps text-encre-doux">Chargement…</p>;
+  if (versements.length === 0)
+    return (
+      <p className="text-corps text-encre-doux">
+        Aucun versement enregistré : le client n’a encore rien déposé.
+      </p>
+    );
+
   return (
-    <Bloc titre="Versements">
-      {versements === null ? (
-        <p className="px-4 py-3 text-sm text-encre-doux">Chargement…</p>
-      ) : versements.length === 0 ? (
-        <p className="px-4 py-3 text-sm text-encre-doux">
-          Aucun versement enregistré : le client n’a encore rien déposé.
-        </p>
-      ) : (
-        <ul className="divide-y divide-bord">
-          {versements.map((versement) => (
-            <li
-              key={versement.id}
-              className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 px-4 py-3"
-            >
-              <span className="min-w-0">
-                <span className="block text-encre">
-                  {LIBELLE_MOYEN[versement.moyenPaiement]}
-                  {versement.numeroRecu && (
-                    <span className="plaque-code ml-2 text-sm text-encre-doux">
-                      {versement.numeroRecu}
-                    </span>
-                  )}
-                </span>
-                <span className="block text-sm text-encre-doux">
-                  {versement.date ? formaterDateHeure(versement.date) : "—"}
-                  {versement.reference ? ` · ${versement.reference}` : ""}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-3">
-                <span className="font-semibold text-encre tabular-nums">
-                  {formaterMontant(versement.montant)}
-                </span>
-                {/* L'acompte du jour de la vente n'a pas de reçu à lui : il est
-                    porté par le reçu de vente, remis en même temps (D52). */}
-                {rangInscrit(versement.numeroRecu) !== null && (
-                  <Link
-                    href={`/motos/recus?recu=${identifiantRecu(versement.venteId, versement.id)}`}
-                    className="inline-flex items-center gap-1.5 rounded-plaque border border-bord px-2.5 py-1.5 text-sm font-medium text-encre hover:bg-fond"
-                  >
-                    <ReceiptText aria-hidden="true" className="size-4" />
-                    Reçu
-                  </Link>
-                )}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-    </Bloc>
+    <ul className="divide-y divide-bord">
+      {versements.map((versement) => (
+        <li key={versement.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 py-2">
+          <span className="plaque-code text-corps text-encre-doux">
+            {versement.date ? formaterDateHeure(versement.date) : "—"}
+          </span>
+          <span className="font-code ml-auto font-semibold whitespace-nowrap text-encre">
+            {formaterMontant(versement.montant)}
+          </span>
+          <span className="w-full text-corps text-encre-doux">
+            {LIBELLE_MOYEN[versement.moyenPaiement]}
+            {versement.reference ? ` · ${versement.reference}` : ""}
+            {/* L'acompte du jour de la vente n'a pas de reçu à lui : il est
+                porté par le reçu de vente, remis en même temps (D52). */}
+            {rangInscrit(versement.numeroRecu) !== null && (
+              <>
+                {" · "}
+                {/* « Reçu » puis le numéro, et pas le numéro seul : le nom
+                    accessible du lien doit dire où il mène, et une suite de
+                    chiffres ne le dit pas (`DESIGN.md` §8). */}
+                <Link
+                  href={`/motos/recus?recu=${identifiantRecu(versement.venteId, versement.id)}`}
+                  className="inline-flex items-center gap-1 font-medium text-encre underline underline-offset-2"
+                >
+                  <ReceiptText aria-hidden="true" className="size-3.5" />
+                  Reçu <span className="plaque-code">{versement.numeroRecu}</span>
+                </Link>
+              </>
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
 function ListeConvenue({ titre, valeurs }: { titre: string; valeurs: string[] }) {
+  if (valeurs.length === 0) return null;
   return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">{titre}</h2>
-      {valeurs.length === 0 ? (
-        <p className="mt-2 rounded-plaque border border-dashed border-bord p-3 text-sm text-encre-doux">
-          Rien de noté.
-        </p>
-      ) : (
-        <ul className="mt-2 cadre cadre-liste">
-          {valeurs.map((valeur) => (
-            <li key={valeur} className="px-4 py-2.5 text-encre">
-              {valeur}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    <div className="mt-2">
+      <p className="text-corps text-encre-doux">{titre}</p>
+      <ul className="mt-1 list-inside list-disc text-encre">
+        {valeurs.map((valeur) => (
+          <li key={valeur}>{valeur}</li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -502,71 +468,41 @@ function Marge({ id }: { id: string }) {
   );
   const { valeur: marge, erreur } = useAbonnement(souscrire, "La marge n’a pas pu être lue.");
 
+  if (erreur) return <EtatErreur message={erreur} />;
+  if (marge === null)
+    return (
+      <p className="flex gap-2 text-corps text-encre-doux">
+        <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+        <span>
+          La marge se calcule sur le serveur, à partir du coût d’entrée de la moto. Elle apparaîtra
+          dès que cette vente y sera parvenue.
+        </span>
+      </p>
+    );
+
   return (
-    <section className="mt-6">
-      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Marge</h2>
-      {erreur ? (
-        <EtatErreur message={erreur} className="mt-2" />
-      ) : marge === null ? (
-        <p className="mt-2 flex gap-3 rounded-plaque border border-dashed border-bord p-4 text-sm text-encre-doux">
-          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>
-            La marge se calcule sur le serveur, à partir du coût d’entrée de la moto. Elle
-            apparaîtra dès que cette vente y sera parvenue.
-          </span>
-        </p>
-      ) : (
-        <dl className="mt-2 cadre cadre-liste">
-          <Ligne titre="Coût de la moto, figé à la vente" valeur={formaterMontant(marge.coutMotoSnapshot)} />
-          <div className="flex items-baseline justify-between gap-4 bg-fond px-4 py-3">
-            <dt className="text-sm font-medium text-encre">Marge</dt>
-            <dd
-              className={[
-                "text-right text-lg font-semibold",
-                marge.marge < 0 ? "text-alerte" : "text-solde",
-              ].join(" ")}
-            >
-              {formaterMontant(marge.marge)}
-            </dd>
-          </div>
-        </dl>
-      )}
-    </section>
+    <Faits>
+      <Fait titre="Coût de la moto, figé à la vente" code>
+        {formaterMontant(marge.coutMotoSnapshot)}
+      </Fait>
+      <Fait titre="Marge" code>
+        <span className={marge.marge < 0 ? "text-alerte" : "text-solde"}>
+          {formaterMontant(marge.marge)}
+        </span>
+      </Fait>
+    </Faits>
   );
 }
 
 function MargeMasquee() {
   return (
-    <section className="mt-6">
-      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Marge</h2>
-      <p className="mt-2 flex gap-3 rounded-plaque border border-dashed border-bord p-4 text-sm text-encre-doux">
-        <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        <span>
-          Le coût de la moto et la marge de cette vente sont réservés au responsable. Ils ne sont
-          pas masqués à l’écran&nbsp;: ils ne quittent jamais le serveur pour votre compte.
-        </span>
-      </p>
-    </section>
-  );
-}
-
-function Bloc({ titre, children }: { titre: string; children: React.ReactNode }) {
-  return (
-    <section className="mt-6">
-      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">{titre}</h2>
-      <div className="mt-2 cadre">
-        {children}
-      </div>
-    </section>
-  );
-}
-
-function Ligne({ titre, valeur, code = false }: { titre: string; valeur: string; code?: boolean }) {
-  return (
-    <div className="flex items-baseline justify-between gap-4 px-4 py-3">
-      <dt className="text-sm text-encre-doux">{titre}</dt>
-      <dd className={["text-right text-encre", code ? "plaque-code" : ""].join(" ")}>{valeur}</dd>
-    </div>
+    <p className="flex gap-2 text-corps text-encre-doux">
+      <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      <span>
+        Le coût de la moto et la marge de cette vente sont réservés au responsable. Ils ne sont pas
+        masqués à l’écran&nbsp;: ils ne quittent jamais le serveur pour votre compte.
+      </span>
+    </p>
   );
 }
 
@@ -619,97 +555,76 @@ function FormulaireVersement({
   }
 
   return (
-    <section className="mt-6">
-      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
-        Encaisser un versement
-      </h2>
+    <form onSubmit={encaisser} noValidate className="mt-4 rounded-champ border border-bord p-3">
+      <p className="mb-3 font-semibold text-encre">Encaisser un versement</p>
 
       {recu && (
-        <p
-          role="status"
-          className="mt-2 rounded-plaque border border-plaque-bord bg-plaque/15 p-4 text-sm text-encre"
-        >
+        <p role="status" className="mb-3 text-corps text-encre">
           Versement enregistré — reçu <span className="plaque-code">{recu}</span>. Si le réseau
           manque, il partira seul dès son retour.
         </p>
       )}
 
-      <form
-        onSubmit={encaisser}
-        noValidate
-        className="mt-2 cadre p-4"
-      >
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="montant-versement" className="block text-sm font-medium text-encre">
-              Montant reçu
-            </label>
-            <input
-              id="montant-versement"
-              type="text"
-              inputMode="numeric"
-              autoComplete="off"
-              value={saisie.montant}
-              onChange={(evenement) =>
-                setSaisie((actuel) => ({ ...actuel, montant: evenement.target.value }))
-              }
-              className="saisie mt-1.5 tabular-nums"
-            />
-            <p className="mt-1 text-sm text-encre-doux">
-              Au plus {formaterMontant(resteDu)}, le reste dû.
-            </p>
-          </div>
-
-          <div>
-            <label htmlFor="moyen-versement" className="block text-sm font-medium text-encre">
-              Moyen de paiement
-            </label>
-            <select
-              id="moyen-versement"
-              value={saisie.moyenPaiement}
-              onChange={(evenement) =>
-                setSaisie((actuel) => ({
-                  ...actuel,
-                  moyenPaiement: evenement.target.value as MoyenPaiement,
-                }))
-              }
-              className="saisie mt-1.5"
-            >
-              {MOYENS_PAIEMENT.map((moyen) => (
-                <option key={moyen} value={moyen}>
-                  {LIBELLE_MOYEN[moyen]}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="sm:col-span-2">
-            <label htmlFor="reference-versement" className="block text-sm font-medium text-encre">
-              Référence <span className="font-normal text-encre-doux">(facultatif)</span>
-            </label>
-            <input
-              id="reference-versement"
-              type="text"
-              autoComplete="off"
-              placeholder="Numéro de transaction mobile money"
-              value={saisie.reference}
-              onChange={(evenement) =>
-                setSaisie((actuel) => ({ ...actuel, reference: evenement.target.value }))
-              }
-              className="saisie mt-1.5 placeholder:text-encre-doux"
-            />
-          </div>
-        </div>
-
-        <EtatErreurSaisie message={erreur} className="mt-3" />
-
-        <button
-          type="submit"
-          className="bouton bouton-plaque"
+      <div className="space-y-3">
+        <Champ
+          id="montant-versement"
+          libelle="Montant reçu"
+          aide={`Au plus ${formaterMontant(resteDu)}, le reste dû.`}
         >
-          Enregistrer le versement
-        </button>
-      </form>
-    </section>
+          <input
+            id="montant-versement"
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            aria-describedby="montant-versement-aide"
+            value={saisie.montant}
+            onChange={(evenement) =>
+              setSaisie((actuel) => ({ ...actuel, montant: evenement.target.value }))
+            }
+            className="plaque-code saisie"
+          />
+        </Champ>
+
+        <Champ id="moyen-versement" libelle="Moyen de paiement">
+          <select
+            id="moyen-versement"
+            value={saisie.moyenPaiement}
+            onChange={(evenement) =>
+              setSaisie((actuel) => ({
+                ...actuel,
+                moyenPaiement: evenement.target.value as MoyenPaiement,
+              }))
+            }
+            className="saisie"
+          >
+            {MOYENS_PAIEMENT.map((moyen) => (
+              <option key={moyen} value={moyen}>
+                {LIBELLE_MOYEN[moyen]}
+              </option>
+            ))}
+          </select>
+        </Champ>
+
+        <Champ id="reference-versement" libelle="Référence" facultatif>
+          <input
+            id="reference-versement"
+            type="text"
+            autoComplete="off"
+            placeholder="Numéro de transaction mobile money"
+            value={saisie.reference}
+            onChange={(evenement) =>
+              setSaisie((actuel) => ({ ...actuel, reference: evenement.target.value }))
+            }
+            className="saisie placeholder:text-encre-doux"
+          />
+        </Champ>
+      </div>
+
+      <EtatErreurSaisie message={erreur} className="mt-2" />
+
+      <button type="submit" className="bouton bouton-plaque">
+        Enregistrer le versement
+      </button>
+    </form>
   );
 }

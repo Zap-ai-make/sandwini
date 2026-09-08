@@ -99,7 +99,13 @@ test.describe("la moto des tranches ne part qu’au dernier franc", () => {
     await page.getByRole("button", { name: "Confirmer la remise de la moto" }).click();
     await page.getByRole("button", { name: "Oui, la moto est remise" }).click();
 
-    await expect(contenu(page)).toContainText("Remise au client", { timeout: 20_000 });
+    /* La fiche disait « Remise au client : Oui, le … » sur une ligne de faits ;
+       depuis A6 elle l'écrit en toutes lettres, au même endroit que la phrase
+       qui disait l'inverse tant que la moto restait au magasin. Le fait n'a pas
+       changé, sa formulation si (`CAHIER-UI.md` §12). */
+    await expect(contenu(page)).toContainText("La moto a été remise au client", {
+      timeout: 20_000,
+    });
     await expect(
       page.getByRole("button", { name: "Confirmer la remise de la moto" }),
     ).toHaveCount(0);
@@ -181,7 +187,10 @@ test.describe("hors ligne", () => {
       timeout: 30_000,
     });
     await page.reload({ waitUntil: "load" });
-    await expect(contenu(page).getByRole("heading", { level: 1 })).toContainText(client, {
+  /* Depuis A6, la fiche est un panneau de l'écran des ventes et non plus une
+     page : l'unique `h1` reste « Ventes », et c'est le repère `complementary`,
+     nommé « Vente <numéro> », qui porte la vente ouverte. */
+    await expect(contenu(page).getByRole("complementary")).toContainText(client, {
       timeout: 30_000,
     });
 

@@ -556,6 +556,18 @@
     border-bottom: 0;
   }
 
+  /* La ligne ouverte dans le panneau. Le fond seul ne suffit pas — il disparaît
+     au soleil sur un écran de comptoir, et il ne dit rien à qui ne voit pas les
+     nuances : le filet à gauche le double (`DESIGN.md` §5). Le lien de la
+     première cellule porte en plus `aria-current`, qui, lui, s'entend. */
+  .tableau tbody tr.ligne-active td {
+    background: var(--color-survol);
+  }
+
+  .tableau tbody tr.ligne-active td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-encre);
+  }
+
   .tableau tbody tr:hover td {
     background: var(--color-survol);
   }
@@ -616,9 +628,17 @@
     }
 
     /* Le survol se déplace sur la carte entière : une cellule seule surlignée
-       au milieu d'une carte ne veut plus rien dire. */
-    .tableau tbody tr:hover td {
+       au milieu d'une carte ne veut plus rien dire. Le marquage de la ligne
+       ouverte suit le même chemin — replié, il n'y a plus de première cellule
+       où accrocher le filet. */
+    .tableau tbody tr:hover td,
+    .tableau tbody tr.ligne-active td {
       background: transparent;
+    }
+
+    .tableau tbody tr.ligne-active {
+      background: var(--color-survol);
+      box-shadow: inset 3px 0 0 var(--color-encre);
     }
 
     /* Le repli casse les rôles de tableau — un `tr` en grille n'est plus une
@@ -698,6 +718,62 @@
   .pastille-transit {
     background: var(--color-goutte-surface);
     color: var(--color-goutte);
+  }
+
+  /* Le retard et l'impayé : la braise. Elle ne travaille jamais seule non plus
+     — « Impayée » est écrit à côté du point. */
+  .pastille-retard {
+    background: var(--color-alerte-surface);
+    color: var(--color-alerte);
+  }
+
+  /* --------------------------------------------------------------------------
+     LA SOUCHE — la signature du produit (D70).
+
+     Le numéro de pièce dessiné comme un pavé arraché du carnet à souches, bord
+     cranté à gauche. Il vient du métier : c'est le numéro que le gérant dicte
+     au téléphone quand un client rappelle, et le carnet à souches est l'objet
+     que ce logiciel remplace. La plaque d'immatriculation, elle, a été
+     rétrogradée en signal pur — deux signatures n'en font aucune.
+
+     Le crantage est un masque, pas une image : il tient à l'impression, il
+     suit la couleur de la surface, et il ne pèse rien. Une demi-perforation
+     tous les 14 px, comme sur le carnet.
+
+     Ni jaune ni plaque : le numéro complet n'est pas un code boutique, et le
+     jaune n'a que deux emplois (D70). Seules les trois lettres de tête, qui
+     *sont* le code boutique, se détachent — en gris, pas en jaune : un pavé
+     jaune de trois lettres au milieu d'un numéro ferait un troisième emploi.
+     -------------------------------------------------------------------------- */
+  .souche {
+    display: inline-grid;
+    gap: 2px;
+    padding: 0.5rem 1rem 0.5rem 1.25rem;
+    border-radius: 0 var(--radius-champ) var(--radius-champ) 0;
+    background: var(--color-fond);
+    color: var(--color-encre);
+    -webkit-mask: radial-gradient(circle 3.5px at left 50%, transparent 3.5px, #000 4px) left top /
+      100% 14px repeat-y;
+    mask: radial-gradient(circle 3.5px at left 50%, transparent 3.5px, #000 4px) left top / 100%
+      14px repeat-y;
+  }
+
+  .souche-numero {
+    font-family: var(--font-code);
+    font-size: var(--text-bloc);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .souche-code {
+    color: var(--color-encre-doux);
+  }
+
+  .souche-legende {
+    font-size: var(--text-legende);
+    color: var(--color-encre-doux);
   }
 
   /* --------------------------------------------------------------------------

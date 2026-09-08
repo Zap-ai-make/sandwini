@@ -1,23 +1,24 @@
 "use client";
 
-import { Plus, Search, TriangleAlert } from "lucide-react";
+import { Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheVente } from "@/components/FicheVente";
-import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
+import { AvecPanneau } from "@/components/patrons/PanneauLateral";
+import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { normaliserNom, type Client } from "@/lib/domain/client";
-import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
+import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
   LIBELLE_MODE,
   LIBELLE_STATUT_PAIEMENT,
+  STATUTS_PAIEMENT,
   chercherVentes,
   comparerVentes,
-  estRenumerotee,
-  resumerDossier,
-  type DocumentDossier,
+  type StatutPaiement,
   type Vente,
   type VenteCherchable,
 } from "@/lib/domain/vente";
@@ -26,7 +27,7 @@ import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
-import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
+import { ecouterVentes } from "@/lib/repositories/ventes";
 
 /**
  * Les ventes de la boutique.
@@ -36,6 +37,13 @@ import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
  * sur la moto — et la liste se réduit. C'est le geste qu'on répète vingt fois
  * par jour ; enregistrer une vente n'arrive que quelques fois.
  *
+ * **La liste ne quitte plus l'écran quand on ouvre une vente.** Elle empilait
+ * des cartes, et la fiche les remplaçait : on revenait, la recherche était à
+ * refaire et la position perdue. C'est un tableau, et la fiche s'ouvre à sa
+ * droite dans un panneau — ce que `CAHIER-UI.md` §7 demande pour tout écran où
+ * le contexte compte. La ligne ouverte se marque, on passe de l'une à l'autre
+ * sans rien reperdre.
+ *
  * Tout est filtré en mémoire, sur des collections chargées entières : une
  * recherche qui ne marche qu'en ligne ne sert à rien dans une application dont
  * le hors-ligne est la promesse.
@@ -43,21 +51,18 @@ import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
 export default function PageVentes() {
   return (
     <Suspense fallback={null}>
-      <AiguillageVentes />
+      <Ventes />
     </Suspense>
   );
 }
 
-function AiguillageVentes() {
-  const venteOuverte = useSearchParams().get("vente");
-  return venteOuverte ? <FicheVente id={venteOuverte} /> : <Ventes />;
-}
-
 function Ventes() {
+  const venteOuverte = useSearchParams().get("vente");
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
   const [recherche, setRecherche] = useState("");
+  const [statut, setStatut] = useState<StatutPaiement | "">("");
 
   const boutiqueId = perimetre.boutiqueId;
 
@@ -78,25 +83,9 @@ function Ventes() {
   );
   const { valeur: stock } = useAbonnement(souscrireStock, "Le stock n’a pas pu être chargé.");
 
-  /* Une seule écoute pour l'état des dossiers de tout l'écran, plutôt qu'une par
-     ligne : cinquante ventes affichées feraient cinquante flux ouverts. */
-  const souscrireDossiers = useCallback(
-    (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterDossiers(boutiqueId, auChangement, enErreur),
-    [boutiqueId],
-  );
-  const { valeur: dossiers } = useAbonnement(
-    souscrireDossiers,
-    "L’état des dossiers n’a pas pu être lu.",
-  );
-
   const cherchables = useMemo<Cherchable[]>(() => {
     const parClient = new Map(clients.map((client) => [client.id, client]));
     const parMoto = new Map((stock ?? []).map((moto) => [moto.id, moto]));
-    const parVente = new Map<string, DocumentDossier[]>();
-    for (const document of dossiers ?? []) {
-      parVente.set(document.venteId, [...(parVente.get(document.venteId) ?? []), document]);
-    }
 
     return [...(ventes ?? [])].sort(comparerVentes).map((vente) => {
       const client = parClient.get(vente.clientId);
@@ -105,7 +94,6 @@ function Ventes() {
         vente,
         client,
         moto,
-        documents: parVente.get(vente.id) ?? [],
         nomNormalise: client?.nomNormalise ?? "",
         telephones: client
           ? [client.telephoneNormalise, client.telephone, client.telephone2]
@@ -115,89 +103,190 @@ function Ventes() {
         chassis: moto?.numeroChassis ?? "",
       };
     });
-  }, [ventes, clients, stock, dossiers]);
+  }, [ventes, clients, stock]);
 
-  const resultats = useMemo(
-    () => chercherVentes(cherchables, recherche, normaliserNom),
-    [cherchables, recherche],
-  );
+  const resultats = useMemo(() => {
+    const trouves = chercherVentes(cherchables, recherche, normaliserNom);
+    return statut ? trouves.filter((ligne) => ligne.vente.statutPaiement === statut) : trouves;
+  }, [cherchables, recherche, statut]);
+
+  const toutesBoutiques = perimetre.type === "toutes";
+  const colonnes = useMemo<Colonne<Cherchable>[]>(() => {
+    const liste: Colonne<Cherchable>[] = [
+      {
+        cle: "numero",
+        titre: "Pièce",
+        principal: true,
+        rendu: (ligne) => (
+          <Link
+            href={`/motos/ventes?vente=${ligne.vente.id}`}
+            aria-current={ligne.vente.id === venteOuverte ? "true" : undefined}
+            className="plaque-code text-encre underline-offset-2 hover:underline"
+          >
+            {ligne.vente.numero}
+          </Link>
+        ),
+      },
+      {
+        cle: "client",
+        titre: "Client",
+        principal: true,
+        rendu: (ligne) => ligne.client?.nom ?? "Client inconnu",
+      },
+      {
+        /* Le modèle seul. Le châssis y a figuré une capture durant — la
+           recherche l'accepte, et une ligne qui ne le montre pas ne dit pas
+           pourquoi elle a répondu — mais dix-sept caractères en Plex Mono
+           insécables poussaient le tableau au-delà de la place que le panneau
+           lui laisse : la colonne « Paiement » sortait à moitié du cadre. Il
+           est dans le panneau, à deux lignes de là, sur la vente qu'on vient
+           d'ouvrir. */
+        cle: "moto",
+        titre: "Moto",
+        rendu: (ligne) =>
+          ligne.moto
+            ? `${catalogue.nomMarque(ligne.moto.marqueId)} ${catalogue.nomModele(ligne.moto.modeleId)}`
+            : "Moto hors de ce périmètre",
+      },
+      { cle: "mode", titre: "Mode", rendu: (ligne) => LIBELLE_MODE[ligne.vente.modePaiement] },
+      {
+        /* La devise est titrée une fois, en tête de colonne. Le tiret dit
+           « rien à percevoir » sans faire croire à une donnée manquante. */
+        cle: "reste",
+        titre: "Reste dû (FCFA)",
+        chiffre: true,
+        rendu: (ligne) =>
+          ligne.vente.resteDu === 0 ? "—" : formaterNombre(ligne.vente.resteDu),
+      },
+      {
+        cle: "paiement",
+        titre: "Paiement",
+        rendu: (ligne) => <Paiement statut={ligne.vente.statutPaiement} />,
+      },
+    ];
+    /* La colonne n'existe que quand la question se pose : dans une boutique,
+       toutes les lignes portent la même. */
+    if (toutesBoutiques) {
+      liste.splice(1, 0, {
+        cle: "boutique",
+        titre: "Boutique",
+        rendu: (ligne) => (
+          <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-1.5 py-0.5 text-legende leading-none text-encre-fixe">
+            {ligne.vente.boutiqueId}
+          </span>
+        ),
+      });
+    }
+    return liste;
+  }, [catalogue, toutesBoutiques, venteOuverte]);
 
   if (perimetre.type === "aucune")
     return (
       <SansBoutique
         titre="Ventes"
-        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : une vente n’a pas encore d’endroit où exister."
+        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : une vente n’a pas encore d’endroit où exister."
       />
     );
+
+  const total = cherchables.length;
+  const enCours = resultats.filter((ligne) => ligne.vente.resteDu > 0).length;
+  const chargement = ventes === null && !erreur;
 
   return (
     <div>
       <TetePage
         titre="Ventes"
-        sousTitre={perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
+        sousTitre={toutesBoutiques ? "Toutes les boutiques" : perimetre.nom}
         actions={
-          <>
-            <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
-              <Plus aria-hidden="true" className="size-4" />
-              Nouvelle vente
-            </Link>
-            <Link href="/motos/paiements" className="bouton bouton-neutre">
-              Paiements
-            </Link>
-            <Link href="/motos/recus" className="bouton bouton-neutre">
-              Reçus
-            </Link>
-          </>
+          <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+            <Plus aria-hidden="true" className="size-4" />
+            Nouvelle vente
+          </Link>
         }
       />
 
-      <div className="mt-6">
-        <label htmlFor="recherche-vente" className="block text-sm font-medium text-encre">
-          Chercher une vente
-        </label>
-        <div className="relative mt-1.5">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
-          />
-          <input
-            id="recherche-vente"
-            type="search"
-            inputMode="search"
-            autoComplete="off"
-            placeholder="Nom, téléphone, numéro de reçu ou châssis"
-            value={recherche}
-            onChange={(evenement) => setRecherche(evenement.target.value)}
-            className="saisie pr-3 pl-9 placeholder:text-encre-doux"
-          />
-        </div>
-      </div>
+      <EtatErreur message={erreur} className="mb-4" />
 
-      <EtatErreur message={erreur} className="mt-4" />
+      <AvecPanneau
+        panneau={venteOuverte ? <FicheVente id={venteOuverte} /> : null}
+      >
+        {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
+            vide, filtres compris, ferait croire à une boutique sans vente. */}
+        {erreur && ventes === null ? null : !chargement && total === 0 ? (
+          <AucuneVente perimetreEnCours={perimetreEnCours} />
+        ) : (
+          <div className="cadre cadre-tableau">
+            <div className="cadre-tete">
+              <Recherche valeur={recherche} changer={setRecherche} />
 
-      {ventes === null && !erreur ? (
-        <EtatChargement className="mt-6">Chargement des ventes…</EtatChargement>
-      ) : (ventes ?? []).length === 0 && !erreur ? (
-        <AucuneVente perimetreEnCours={perimetreEnCours} />
-      ) : resultats.length === 0 ? (
-        <EtatSansResultat className="mt-6">
-          Aucune vente ne correspond. Essayez le numéro de téléphone, ou le numéro du reçu.
-        </EtatSansResultat>
-      ) : (
-        <>
-          <p className="mt-6 text-sm text-encre-doux">
-            {resultats.length === 1 ? "1 vente" : `${resultats.length} ventes`}
-            {resultats.length !== cherchables.length && ` sur ${cherchables.length}`}
-          </p>
-          <ul className="mt-2 cadre cadre-liste">
-            {resultats.map((ligne) => (
-              <li key={ligne.vente.id}>
-                <LigneVente ligne={ligne} catalogue={catalogue} montrerBoutique={perimetre.type === "toutes"} />
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
+              <div
+                className="flex flex-wrap items-center gap-2"
+                role="group"
+                aria-label="Filtrer les ventes"
+              >
+                <button
+                  type="button"
+                  className="filtre"
+                  aria-pressed={statut === ""}
+                  onClick={() => setStatut("")}
+                >
+                  Toutes
+                </button>
+                {STATUTS_PAIEMENT.map((valeur) => (
+                  <button
+                    key={valeur}
+                    type="button"
+                    className="filtre"
+                    aria-pressed={statut === valeur}
+                    onClick={() => setStatut((actuel) => (actuel === valeur ? "" : valeur))}
+                  >
+                    {LIBELLE_STATUT_PAIEMENT[valeur]}
+                  </button>
+                ))}
+              </div>
+
+              {/* Le comptage se lit avant le tableau : c'est lui qui dit si la
+                  recherche a mangé la vente qu'on cherchait. `aria-live` sans
+                  `role` : la coquille n'a qu'un seul `status`, le bandeau. */}
+              <p aria-live="polite" aria-atomic="true" className="ml-auto text-corps text-encre-doux">
+                {chargement ? (
+                  "Chargement des ventes…"
+                ) : (
+                  <>
+                    <strong className="font-semibold text-encre">
+                      {resultats.length === 1 ? "1 vente" : `${resultats.length} ventes`}
+                    </strong>
+                    {resultats.length !== total && ` sur ${total}`} · {enCours} en cours
+                  </>
+                )}
+              </p>
+            </div>
+
+            {chargement ? (
+              <Tableau
+                legende="Chargement des ventes"
+                colonnes={colonnes}
+                lignes={[]}
+                cleDe={(ligne) => ligne.vente.id}
+                chargement
+              />
+            ) : resultats.length === 0 ? (
+              <EtatSansResultat className="m-4">
+                Aucune vente ne correspond. Essayez le numéro de téléphone, le numéro du reçu, ou
+                élargissez les filtres.
+              </EtatSansResultat>
+            ) : (
+              <Tableau
+                legende="Ventes de la boutique, de la plus récente à la plus ancienne"
+                colonnes={colonnes}
+                lignes={resultats}
+                cleDe={(ligne) => ligne.vente.id}
+                cleActive={venteOuverte}
+              />
+            )}
+          </div>
+        )}
+      </AvecPanneau>
     </div>
   );
 }
@@ -205,69 +294,50 @@ function Ventes() {
 type Cherchable = VenteCherchable & {
   client: Client | undefined;
   moto: Moto | undefined;
-  documents: DocumentDossier[];
 };
 
-function LigneVente({
-  ligne,
-  catalogue,
-  montrerBoutique,
-}: {
-  ligne: Cherchable;
-  catalogue: ReturnType<typeof useCatalogue>;
-  montrerBoutique: boolean;
-}) {
-  const { vente, client, moto, documents } = ligne;
+/* Jamais la couleur seule : le mot est écrit, la pastille ne fait que le
+   doubler. L'impayé prend la braise — c'est du retard —, le partiel le bleu de
+   la goutte : quelque chose est parti et n'est pas revenu (D70). */
+const TON_PAIEMENT: Record<StatutPaiement, string> = {
+  impaye: "pastille-retard",
+  partiel: "pastille-transit",
+  solde: "pastille-solde",
+};
 
+function Paiement({ statut }: { statut: StatutPaiement }) {
   return (
-    <Link
-      href={`/motos/ventes?vente=${vente.id}`}
-      className="block px-4 py-3 hover:bg-fond focus-visible:bg-fond"
-    >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span className="plaque-code shrink-0 rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-xs leading-none text-encre-fixe">
-          {vente.numero}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block font-medium text-encre">{client?.nom ?? "Client inconnu"}</span>
-          <span className="block text-sm text-encre-doux">
-            {moto
-              ? `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)} · ${moto.numeroChassis}`
-              : "Moto hors de ce périmètre"}
-            {montrerBoutique ? ` · ${vente.boutiqueId}` : ""}
-          </span>
-        </span>
-        <span className="shrink-0 text-right">
-          <span className="block font-medium text-encre">{formaterMontant(vente.prixConvenu)}</span>
-          <span className="block text-sm text-encre-doux">
-            {vente.date ? formaterDateCourte(vente.date) : "—"}
-          </span>
-        </span>
-      </div>
+    <span className={`pastille ${TON_PAIEMENT[statut]}`}>{LIBELLE_STATUT_PAIEMENT[statut]}</span>
+  );
+}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-        {/* Jamais la couleur seule : le reste dû est écrit, le statut aussi
-            (DESIGN.md §5). */}
-        <span className={vente.resteDu === 0 ? "text-solde" : "text-encre"}>
-          {LIBELLE_STATUT_PAIEMENT[vente.statutPaiement]}
-          {vente.resteDu > 0 && ` · reste ${formaterMontant(vente.resteDu)}`}
-        </span>
-        <span aria-hidden="true" className="text-bord">
-          |
-        </span>
-        <span className="text-encre-doux">{LIBELLE_MODE[vente.modePaiement]}</span>
-        <span aria-hidden="true" className="text-bord">
-          |
-        </span>
-        <span className="text-encre-doux">{resumerDossier(documents)}</span>
-        {estRenumerotee(vente) && (
-          <span className="inline-flex items-center gap-1 rounded-plaque border border-plaque-bord bg-plaque/15 px-2 py-0.5 text-encre">
-            <TriangleAlert aria-hidden="true" className="size-3.5" />
-            Renuméroté
-          </span>
-        )}
-      </div>
-    </Link>
+function Recherche({
+  valeur,
+  changer,
+}: {
+  valeur: string;
+  changer: (valeur: string) => void;
+}) {
+  return (
+    <div className="relative min-w-56 flex-1">
+      <label htmlFor="recherche-vente" className="sr-only">
+        Chercher une vente
+      </label>
+      <Search
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
+      />
+      <input
+        id="recherche-vente"
+        type="search"
+        inputMode="search"
+        autoComplete="off"
+        placeholder="Nom, téléphone, numéro de reçu ou châssis"
+        value={valeur}
+        onChange={(evenement) => changer(evenement.target.value)}
+        className="saisie pr-3 pl-9 placeholder:text-encre-doux"
+      />
+    </div>
   );
 }
 
@@ -276,7 +346,6 @@ function AucuneVente({ perimetreEnCours }: { perimetreEnCours: boolean }) {
   return (
     <EtatVide
       titre="Aucune vente enregistrée pour l’instant."
-      className="mt-6"
       action={
         <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
           <Plus aria-hidden="true" className="size-4" />
@@ -289,4 +358,3 @@ function AucuneVente({ perimetreEnCours }: { perimetreEnCours: boolean }) {
     </EtatVide>
   );
 }
-

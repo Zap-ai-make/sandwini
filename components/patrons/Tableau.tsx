@@ -60,6 +60,7 @@ export function Tableau<T>({
   lignes,
   cleDe,
   chargement,
+  cleActive,
 }: {
   /**
    * Ce que le tableau montre, et dans quel ordre. Lu par les lecteurs d’écran
@@ -72,6 +73,14 @@ export function Tableau<T>({
   cleDe: (ligne: T) => string;
   /** Le trajet n'est pas fini : des lignes fantômes tiennent la place. */
   chargement?: boolean;
+  /**
+   * La ligne ouverte dans le panneau latéral, s’il y en a un.
+   *
+   * Le tableau se contente de la marquer — fond et filet à gauche, jamais la
+   * couleur seule (`DESIGN.md` §5) ; c’est le lien de la première cellule qui
+   * porte `aria-current`, parce que lui seul sait où il mène.
+   */
+  cleActive?: string | null;
 }) {
   return (
     /* La zone qui défile, et à laquelle l'en-tête se colle. Sur bureau elle
@@ -109,7 +118,10 @@ export function Tableau<T>({
         ) : (
           <tbody>
             {lignes.map((ligne) => (
-              <tr key={cleDe(ligne)}>
+              <tr
+                key={cleDe(ligne)}
+                className={cleDe(ligne) === cleActive ? "ligne-active" : undefined}
+              >
                 {colonnes.map((colonne) => (
                   <Cellule key={colonne.cle} colonne={colonne}>
                     {colonne.rendu(ligne)}
