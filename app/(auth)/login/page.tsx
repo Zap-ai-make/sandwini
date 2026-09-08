@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
 import { accueilDuRole } from "@/lib/domain/espaces";
 import { authentification, configurationPresente } from "@/lib/firebase/client";
+import { EtatErreurSaisie } from "@/components/patrons/Etats";
 
 /* Après cinq échecs, l’écran s’impose une pause. Ce n’est pas la protection
    principale — un attaquant sérieux n’utilise pas notre formulaire — mais
@@ -99,7 +100,7 @@ export default function Connexion() {
       </p>
 
       {!configurationPresente ? (
-        <p className="mt-6 flex gap-3 rounded-plaque border border-bord bg-papier p-4 text-sm text-encre">
+        <p className="mt-6 flex gap-3 cadre p-4 text-sm text-encre">
           <CircleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-alerte" />
           <span>
             Firebase n’est pas configuré sur cet appareil. Copiez <code className="font-code">.env.example</code>{" "}
@@ -111,7 +112,7 @@ export default function Connexion() {
            Sans cet écran, le formulaire se contentait de rester là : la panne la
            plus décourageante du produit, parce qu’elle ne laisse rien à tenter. */
         <div className="mt-6">
-          <p className="flex gap-3 rounded-plaque border border-bord bg-papier p-4 text-sm text-encre">
+          <p className="flex gap-3 cadre p-4 text-sm text-encre">
             <CircleAlert aria-hidden="true" className="mt-0.5 size-5 shrink-0 text-alerte" />
             <span>
               Votre mot de passe est bon, mais ce compte n’a pas encore de rôle&nbsp;: l’application
@@ -143,7 +144,7 @@ export default function Connexion() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="saisie mt-1.5"
             />
           </div>
 
@@ -159,14 +160,12 @@ export default function Connexion() {
               required
               value={motDePasse}
               onChange={(e) => setMotDePasse(e.target.value)}
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="saisie mt-1.5"
             />
           </div>
 
           {/* L’erreur est annoncée aux lecteurs d’écran, pas seulement affichée. */}
-          <p role="alert" aria-live="assertive" className="min-h-5 text-sm text-alerte">
-            {erreur ?? ""}
-          </p>
+          <EtatErreurSaisie message={erreur} />
 
           <button
             type="submit"

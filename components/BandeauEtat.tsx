@@ -2,6 +2,7 @@
 
 import { Check, ChevronDown, CloudOff, RefreshCw } from "lucide-react";
 import { useId } from "react";
+import { PaletteCommandes } from "@/components/PaletteCommandes";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 
@@ -20,6 +21,11 @@ import { useEtatReseau } from "@/lib/reseau/etat-reseau";
  * Pour le responsable, la plaque n’est pas qu’un affichage : c’est le sélecteur
  * de périmètre lui-même. Le choix se fait donc là où la réponse se lit, et non
  * dans un menu qu’il faudrait aller rouvrir pour vérifier.
+ *
+ * Depuis la refonte il n’est plus une bande posée sur toute la largeur : c’est
+ * la **tête de la zone de travail**, à droite de la navigation. Il y gagne la
+ * recherche globale, et le sujet de l’écran cesse d’être poussé vers le bas par
+ * une barre qui parle d’autre chose.
  */
 
 function libelleAttente(nombre: number): string {
@@ -54,7 +60,12 @@ export function BandeauEtat() {
     <header
       className={[
         // `print:hidden` : un reçu imprimé ne porte pas l’état du réseau (S10).
-        "sticky top-0 z-40 flex items-center gap-3 border-b px-3 py-2 print:hidden",
+        "sticky top-0 z-40 flex h-[var(--banniere)] shrink-0 items-center gap-3 border-b px-4 print:hidden",
+        /* 220 ms : assez pour se voir du coin de l’œil, assez court pour ne
+           jamais clignoter sous les yeux de quelqu’un qui compte de l’argent.
+           C’est le seul changement d’état du produit qui détruit des données
+           au lieu d’agacer, et il mérite d’être vu — pas d’être subi. */
+        "transition-colors duration-[var(--duree-apparition)] ease-(--ease-sortie)",
         horsLigne ? "border-plaque-bord bg-plaque" : "border-bord bg-papier",
       ].join(" ")}
     >
@@ -110,6 +121,11 @@ export function BandeauEtat() {
       >
         {perimetre.nom}
       </span>
+
+      {/* La recherche globale : atteindre un écran sans lever la main du
+          clavier. Elle vient après le nom de la boutique — on lit d’abord où
+          l’on est, on décide ensuite d’aller ailleurs. */}
+      <PaletteCommandes />
 
       {/* aria-live : le passage hors ligne doit être annoncé, pas seulement
           coloré. Et le texte porte toute l’information — jamais la couleur

@@ -1,11 +1,12 @@
 "use client";
 
-import { LoaderCircle, Plus, Search, TriangleAlert } from "lucide-react";
+import { Plus, Search, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheVente } from "@/components/FicheVente";
-import { useSession } from "@/lib/auth/session";
+import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { normaliserNom, type Client } from "@/lib/domain/client";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
@@ -121,39 +122,34 @@ function Ventes() {
     [cherchables, recherche],
   );
 
-  if (perimetre.type === "aucune") return <SansBoutique />;
+  if (perimetre.type === "aucune")
+    return (
+      <SansBoutique
+        titre="Ventes"
+        sansBoutiqueDeclaree="Aucune boutique n’est déclarée : une vente n’a pas encore d’endroit où exister."
+      />
+    );
 
   return (
     <div>
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-encre">Ventes</h1>
-          <p className="mt-1 text-sm text-encre-doux">
-            {perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
-          </p>
-        </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
-          <Link
-            href="/motos/ventes/nouvelle"
-            className="inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Nouvelle vente
-          </Link>
-          <Link
-            href="/motos/paiements"
-            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-          >
-            Paiements
-          </Link>
-          <Link
-            href="/motos/recus"
-            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-          >
-            Reçus
-          </Link>
-        </div>
-      </div>
+      <TetePage
+        titre="Ventes"
+        sousTitre={perimetre.type === "toutes" ? "Toutes les boutiques" : perimetre.nom}
+        actions={
+          <>
+            <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+              <Plus aria-hidden="true" className="size-4" />
+              Nouvelle vente
+            </Link>
+            <Link href="/motos/paiements" className="bouton bouton-neutre">
+              Paiements
+            </Link>
+            <Link href="/motos/recus" className="bouton bouton-neutre">
+              Reçus
+            </Link>
+          </>
+        }
+      />
 
       <div className="mt-6">
         <label htmlFor="recherche-vente" className="block text-sm font-medium text-encre">
@@ -172,35 +168,28 @@ function Ventes() {
             placeholder="Nom, téléphone, numéro de reçu ou châssis"
             value={recherche}
             onChange={(evenement) => setRecherche(evenement.target.value)}
-            className="h-12 w-full rounded-plaque border border-bord bg-papier pr-3 pl-9 text-encre placeholder:text-encre-doux"
+            className="saisie pr-3 pl-9 placeholder:text-encre-doux"
           />
         </div>
       </div>
 
-      {erreur && (
-        <p role="alert" className="mt-4 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-4" />
 
       {ventes === null && !erreur ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement des ventes…
-        </p>
+        <EtatChargement className="mt-6">Chargement des ventes…</EtatChargement>
       ) : (ventes ?? []).length === 0 && !erreur ? (
         <AucuneVente perimetreEnCours={perimetreEnCours} />
       ) : resultats.length === 0 ? (
-        <p className="mt-6 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-6">
           Aucune vente ne correspond. Essayez le numéro de téléphone, ou le numéro du reçu.
-        </p>
+        </EtatSansResultat>
       ) : (
         <>
           <p className="mt-6 text-sm text-encre-doux">
             {resultats.length === 1 ? "1 vente" : `${resultats.length} ventes`}
             {resultats.length !== cherchables.length && ` sur ${cherchables.length}`}
           </p>
-          <ul className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+          <ul className="mt-2 cadre cadre-liste">
             {resultats.map((ligne) => (
               <li key={ligne.vente.id}>
                 <LigneVente ligne={ligne} catalogue={catalogue} montrerBoutique={perimetre.type === "toutes"} />
@@ -285,43 +274,19 @@ function LigneVente({
 function AucuneVente({ perimetreEnCours }: { perimetreEnCours: boolean }) {
   if (perimetreEnCours) return null;
   return (
-    <div className="mt-6 rounded-plaque border border-dashed border-bord p-4">
-      <p className="text-encre">Aucune vente enregistrée pour l’instant.</p>
-      <p className="mt-1 max-w-prose text-sm text-encre-doux">
-        Une vente demande une moto en stock et un client. Le client peut se créer au moment de la
-        vente, sans quitter l’écran.
-      </p>
-      <Link
-        href="/motos/ventes/nouvelle"
-        className="mt-4 inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
-      >
-        <Plus aria-hidden="true" className="size-4" />
-        Enregistrer la première
-      </Link>
-    </div>
-  );
-}
-
-function SansBoutique() {
-  const session = useSession();
-  const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
-
-  return (
-    <div className="max-w-prose">
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Ventes</h1>
-      <p className="mt-3 text-encre-doux">
-        {estResponsable
-          ? "Aucune boutique n’est déclarée : une vente n’a pas encore d’endroit où exister."
-          : "Aucune boutique ne vous est attribuée. Vos écrans resteront vides tant que le responsable ne vous en aura pas donné une."}
-      </p>
-      {estResponsable && (
-        <Link
-          href="/parametres/boutiques"
-          className="mt-6 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
-        >
-          Créer une boutique
+    <EtatVide
+      titre="Aucune vente enregistrée pour l’instant."
+      className="mt-6"
+      action={
+        <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+          <Plus aria-hidden="true" className="size-4" />
+          Enregistrer la première
         </Link>
-      )}
-    </div>
+      }
+    >
+      Une vente demande une moto en stock et un client. Le client peut se créer au moment de la
+      vente, sans quitter l’écran.
+    </EtatVide>
   );
 }
+

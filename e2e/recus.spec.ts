@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { IDENTITE } from "@/lib/domain/entreprise";
 import {
   bandeauEtat,
   contenu,
@@ -55,23 +56,10 @@ function impressions(page: Page) {
   return page.evaluate(() => (window as unknown as { impressions: number }).impressions);
 }
 
-/** L'en-tête que tout reçu doit porter : sans elle, le §10 n'est pas tenu. */
-const ENTREPRISE = {
-  nom: "Sandwidi et frère",
-  adresse: "Avenue de la Nation, Pouytenga",
-  telephone: "70112233",
-  identifiant: "IFU-00919283",
-};
-
-async function renseignerEntreprise(page: Page) {
-  await page.goto("/parametres/entreprise", { waitUntil: "load" });
-  await page.getByLabel("Nom de l’entreprise").fill(ENTREPRISE.nom);
-  await page.getByLabel("Adresse").fill(ENTREPRISE.adresse);
-  await page.getByLabel("Téléphone", { exact: true }).fill(ENTREPRISE.telephone);
-  await page.getByLabel("Numéro d’identification").fill(ENTREPRISE.identifiant);
-  await page.getByRole("button", { name: "Enregistrer la fiche" }).click();
-  await expect(contenu(page).getByRole("status")).toBeVisible({ timeout: 20_000 });
-}
+/* L'en-tête que tout reçu doit porter (§10). Depuis D71 elle ne se saisit plus :
+   elle est une constante du code, et c'est elle que les tests lisent. Le décor
+   des reçus n'a donc plus d'étape « renseigner l'entreprise » — une chose de
+   moins entre le gérant et son papier. */
 
 /** L'identifiant de la vente dont la fiche est ouverte — il porte l'URL du reçu. */
 function venteOuverte(page: Page): string {
@@ -84,7 +72,6 @@ test.describe("le reçu de vente", () => {
   }) => {
     await compterLesImpressions(page);
     await seConnecterEtEntrer(page);
-    await renseignerEntreprise(page);
 
     const { client, chassis, numero } = await vendre(page, {
       mode: "Crédit",
@@ -98,8 +85,8 @@ test.describe("le reçu de vente", () => {
     await expect(recu).toBeVisible({ timeout: 20_000 });
 
     // Le contenu obligatoire du §10, ligne à ligne.
-    await expect(recu).toContainText(ENTREPRISE.nom);
-    await expect(recu).toContainText(ENTREPRISE.adresse);
+    await expect(recu).toContainText(IDENTITE.raisonSociale);
+    await expect(recu).toContainText(IDENTITE.activite);
     await expect(recu).toContainText(numero);
     await expect(recu).toContainText(client);
     await expect(recu).toContainText(chassis);
@@ -108,8 +95,10 @@ test.describe("le reçu de vente", () => {
     await expect(recu).toContainText("800 000 FCFA");
     await expect(recu).toContainText("Espèces");
     await expect(recu).toContainText("Établi par");
-    // Les mentions légales s’impriment parce qu’elles sont renseignées (D11).
-    await expect(recu).toContainText(ENTREPRISE.identifiant);
+    /* Les mentions légales s'impriment toujours : elles ne dépendent plus de ce
+       que quelqu'un a pensé à saisir (D71). */
+    await expect(recu).toContainText(IDENTITE.ifu);
+    await expect(recu).toContainText(IDENTITE.rccm);
 
     /* Le rendu imprimé, pas le rendu à l'écran : c'est un autre document, et
        c'est celui qu'on remet au client. */
@@ -136,7 +125,6 @@ test.describe("le reçu d’un versement", () => {
   }) => {
     await compterLesImpressions(page);
     await seConnecterEtEntrer(page);
-    await renseignerEntreprise(page);
 
     const { client, numero } = await vendre(page, {
       mode: "Crédit",
@@ -191,7 +179,6 @@ test.describe("hors ligne", () => {
   }) => {
     await compterLesImpressions(page);
     await seConnecterEtEntrer(page);
-    await renseignerEntreprise(page);
 
     const { numero } = await vendre(page, {
       mode: "Crédit",
@@ -229,7 +216,7 @@ test.describe("hors ligne", () => {
     const recu = page.getByRole("article");
     await expect(recu).toBeVisible({ timeout: 30_000 });
     await expect(recu).toContainText(numero);
-    await expect(recu).toContainText(ENTREPRISE.nom);
+    await expect(recu).toContainText(IDENTITE.raisonSociale);
     await expect(recu).toContainText("250 000 FCFA");
     await expect(recu).toContainText("750 000 FCFA");
 

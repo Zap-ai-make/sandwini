@@ -1,18 +1,10 @@
 "use client";
 
-import {
-  ArrowLeft,
-  CircleAlert,
-  KeyRound,
-  LoaderCircle,
-  Lock,
-  Printer,
-  ReceiptText,
-  TriangleAlert,
-} from "lucide-react";
+import { ArrowLeft, CircleAlert, KeyRound, Lock, Printer, ReceiptText, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { DossierDocuments } from "@/components/DossierDocuments";
+import { EtatChargement, EtatErreur, EtatErreurSaisie } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterTelephone, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
@@ -127,14 +119,9 @@ export function FicheVente({ id }: { id: string }) {
       </div>
 
       {erreur ? (
-        <p role="alert" className="mt-6 text-alerte">
-          {erreur}
-        </p>
+        <EtatErreur message={erreur} className="mt-6" />
       ) : vente === null ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement de la vente…
-        </p>
+        <EtatChargement className="mt-6">Chargement de la vente…</EtatChargement>
       ) : (
         <>
           <span className="plaque-code mt-3 inline-block rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe">
@@ -156,7 +143,7 @@ export function FicheVente({ id }: { id: string }) {
               à la lecture : rien n'a été figé à la première impression (D61). */}
           <Link
             href={`/motos/recus?recu=${identifiantRecu(vente.id, null)}`}
-            className="mt-4 inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
+            className="mt-4 bouton bouton-plaque"
           >
             <Printer aria-hidden="true" className="size-4" />
             Reçu de vente
@@ -282,25 +269,21 @@ function RemiseMoto({ vente }: { vente: Vente }) {
         s’annule pas depuis l’application.
       </p>
 
-      {erreur && (
-        <p role="alert" className="mt-3 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-3" />
 
       {confirmation ? (
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="button"
             onClick={remettre}
-            className="inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+            className="bouton bouton-plaque"
           >
             Oui, la moto est remise
           </button>
           <button
             type="button"
             onClick={() => setConfirmation(false)}
-            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+            className="bouton bouton-neutre"
           >
             Pas encore
           </button>
@@ -309,7 +292,7 @@ function RemiseMoto({ vente }: { vente: Vente }) {
         <button
           type="button"
           onClick={() => setConfirmation(true)}
-          className="mt-4 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="mt-4 bouton bouton-plaque"
         >
           Confirmer la remise de la moto
         </button>
@@ -491,7 +474,7 @@ function ListeConvenue({ titre, valeurs }: { titre: string; valeurs: string[] })
           Rien de noté.
         </p>
       ) : (
-        <ul className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-2 cadre cadre-liste">
           {valeurs.map((valeur) => (
             <li key={valeur} className="px-4 py-2.5 text-encre">
               {valeur}
@@ -523,9 +506,7 @@ function Marge({ id }: { id: string }) {
     <section className="mt-6">
       <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Marge</h2>
       {erreur ? (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
+        <EtatErreur message={erreur} className="mt-2" />
       ) : marge === null ? (
         <p className="mt-2 flex gap-3 rounded-plaque border border-dashed border-bord p-4 text-sm text-encre-doux">
           <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
@@ -535,7 +516,7 @@ function Marge({ id }: { id: string }) {
           </span>
         </p>
       ) : (
-        <dl className="mt-2 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <dl className="mt-2 cadre cadre-liste">
           <Ligne titre="Coût de la moto, figé à la vente" valeur={formaterMontant(marge.coutMotoSnapshot)} />
           <div className="flex items-baseline justify-between gap-4 bg-fond px-4 py-3">
             <dt className="text-sm font-medium text-encre">Marge</dt>
@@ -573,7 +554,7 @@ function Bloc({ titre, children }: { titre: string; children: React.ReactNode })
   return (
     <section className="mt-6">
       <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">{titre}</h2>
-      <div className="mt-2 overflow-hidden rounded-plaque border border-bord bg-papier">
+      <div className="mt-2 cadre">
         {children}
       </div>
     </section>
@@ -656,7 +637,7 @@ function FormulaireVersement({
       <form
         onSubmit={encaisser}
         noValidate
-        className="mt-2 rounded-plaque border border-bord bg-papier p-4"
+        className="mt-2 cadre p-4"
       >
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
@@ -672,7 +653,7 @@ function FormulaireVersement({
               onChange={(evenement) =>
                 setSaisie((actuel) => ({ ...actuel, montant: evenement.target.value }))
               }
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre tabular-nums"
+              className="saisie mt-1.5 tabular-nums"
             />
             <p className="mt-1 text-sm text-encre-doux">
               Au plus {formaterMontant(resteDu)}, le reste dû.
@@ -692,7 +673,7 @@ function FormulaireVersement({
                   moyenPaiement: evenement.target.value as MoyenPaiement,
                 }))
               }
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="saisie mt-1.5"
             >
               {MOYENS_PAIEMENT.map((moyen) => (
                 <option key={moyen} value={moyen}>
@@ -715,18 +696,16 @@ function FormulaireVersement({
               onChange={(evenement) =>
                 setSaisie((actuel) => ({ ...actuel, reference: evenement.target.value }))
               }
-              className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre placeholder:text-encre-doux"
+              className="saisie mt-1.5 placeholder:text-encre-doux"
             />
           </div>
         </div>
 
-        <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-          {erreur ?? ""}
-        </p>
+        <EtatErreurSaisie message={erreur} className="mt-3" />
 
         <button
           type="submit"
-          className="inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="bouton bouton-plaque"
         >
           Enregistrer le versement
         </button>

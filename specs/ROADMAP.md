@@ -67,7 +67,7 @@ par le commanditaire ; la phase 2 s'exécute comme deux specs normales.
 
 | ID  | Spec                                              | Dépend de | Périmètre | Statut  |
 |-----|---------------------------------------------------|-----------|-----------|---------|
-| S28 | Refonte de l'interface — jetons, coquille, patrons | S12       | post-MVP  | à faire |
+| S28 | Refonte de l'interface — jetons, coquille, patrons | S12       | post-MVP  | terminée |
 | S29 | Refonte de l'interface — les écrans                | S28       | post-MVP  | à faire |
 
 La coupure entre les deux n'est pas administrative : à la fin de S28 l'application tourne dans la

@@ -1,9 +1,10 @@
 "use client";
 
-import { ArrowLeft, LoaderCircle, Pencil, Store } from "lucide-react";
-import Link from "next/link";
+import { Pencil, Store } from "lucide-react";
 import { useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
   LONGUEUR_ADRESSE_MAX,
@@ -49,17 +50,15 @@ function Boutiques() {
 
   return (
     <div>
-      <Link
-        href="/parametres"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Réglages
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Boutiques</h1>
-      <p className="mt-2 max-w-prose text-encre-doux">
-        Ce que vend une boutique décide des espaces que son gérant voit.
-      </p>
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Réglages" }}
+        titre="Boutiques"
+        sousTitre={
+          <>
+            Ce que vend une boutique décide des espaces que son gérant voit.
+          </>
+        }
+      />
 
       <FormulaireCreation existantes={boutiques} />
 
@@ -67,24 +66,17 @@ function Boutiques() {
         Boutiques déclarées
       </h2>
 
-      {erreur && (
-        <p role="alert" className="mt-3 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-3" />
 
       {chargement ? (
-        <p className="mt-3 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement des boutiques…
-        </p>
+        <EtatChargement className="mt-3">Chargement des boutiques…</EtatChargement>
       ) : boutiques.length === 0 && !erreur ? (
-        <p className="mt-3 rounded-plaque border border-dashed border-bord p-4 text-encre-doux">
+        <EtatSansResultat className="mt-3">
           Aucune boutique pour l’instant. Le formulaire ci-dessus crée la première&nbsp;; tant
           qu’elle n’existe pas, aucun gérant ne peut être rattaché.
-        </p>
+        </EtatSansResultat>
       ) : (
-        <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+        <ul className="mt-3 cadre cadre-liste">
           {boutiques.map((boutique) => (
             <LigneBoutique key={boutique.id} boutique={boutique} />
           ))}
@@ -166,11 +158,7 @@ function LigneBoutique({ boutique }: { boutique: Boutique }) {
         </span>
       </div>
 
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
 
       {edition && <FormulaireEdition boutique={boutique} surFin={() => setEdition(false)} />}
     </li>
@@ -208,7 +196,7 @@ function ChampsBoutique({
           maxLength={LONGUEUR_NOM_MAX}
           value={saisie.nom}
           onChange={(e) => changer({ nom: e.target.value })}
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         />
       </div>
 
@@ -223,7 +211,7 @@ function ChampsBoutique({
           maxLength={LONGUEUR_CODE}
           value={saisie.code}
           onChange={(e) => changer({ code: normaliserCode(e.target.value) })}
-          className="plaque-code mt-1.5 h-12 w-24 rounded-plaque border border-bord bg-papier px-3 text-encre disabled:opacity-60"
+          className="plaque-code saisie mt-1.5 w-24 disabled:opacity-60"
         />
         <p className="mt-1 text-sm text-encre-doux">
           {codeModifiable
@@ -275,7 +263,7 @@ function ChampsBoutique({
           maxLength={LONGUEUR_ADRESSE_MAX}
           value={saisie.adresse}
           onChange={(e) => changer({ adresse: e.target.value })}
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         />
       </div>
 
@@ -290,7 +278,7 @@ function ChampsBoutique({
           maxLength={LONGUEUR_TELEPHONE_MAX}
           value={saisie.telephone}
           onChange={(e) => changer({ telephone: e.target.value })}
-          className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+          className="saisie mt-1.5"
         />
       </div>
     </div>
@@ -337,7 +325,7 @@ function FormulaireCreation({ existantes }: { existantes: Boutique[] }) {
   return (
     <form
       onSubmit={soumettre}
-      className="mt-6 rounded-plaque border border-bord bg-papier p-4"
+      className="mt-6 cadre p-4"
       noValidate
     >
       <h2 className="flex items-center gap-2 font-semibold text-encre">
@@ -352,9 +340,7 @@ function FormulaireCreation({ existantes }: { existantes: Boutique[] }) {
         codeModifiable
       />
 
-      <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-3" />
       {succes && (
         <p role="status" aria-live="polite" className="text-sm text-solde">
           {succes}
@@ -415,21 +401,19 @@ function FormulaireEdition({ boutique, surFin }: { boutique: Boutique; surFin: (
         codeModifiable={false}
       />
 
-      <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-3" />
 
       <div className="mt-3 flex gap-2">
         <button
           type="submit"
-          className="inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="bouton bouton-plaque"
         >
           Enregistrer
         </button>
         <button
           type="button"
           onClick={surFin}
-          className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          className="bouton bouton-neutre"
         >
           Annuler
         </button>

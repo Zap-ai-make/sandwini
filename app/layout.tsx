@@ -46,6 +46,24 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr" className={`${archivo.variable} ${plexMono.variable}`}>
       <body className="min-h-dvh antialiased">
+        {/* L'état de la navigation, posé **avant** le premier rendu.
+
+            Sans ce script, la colonne s'ouvrait grande puis se refermait sous
+            les yeux de celui qui l'avait repliée la veille — un mouvement que
+            personne n'a demandé, à chaque chargement de page. Il est en ligne
+            et synchrone pour cette raison précise : tout ce qui passe par React
+            arrive après la peinture.
+
+            Il ne fait rien d'autre que lire une préférence d'affichage : pas de
+            réseau, pas de donnée, rien qui mérite un `nonce` (le `script-src`
+            du projet autorise l'inline, cf. `next.config.ts`). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              'try{if(localStorage.getItem("sdi.nav.repliee")==="1")' +
+              'document.documentElement.dataset.nav="repliee"}catch(e){}',
+          }}
+        />
         <FournisseurSession>
           <FournisseurEtatReseau>{children}</FournisseurEtatReseau>
         </FournisseurSession>

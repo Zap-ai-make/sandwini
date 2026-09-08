@@ -166,6 +166,11 @@ un détail d'un formulaire.
 ## D15 — Identité de l'entreprise : paramètre, pas constante
 `prompt.md` §10
 
+> **Renversée par D71** (revue des maquettes, S28). Le responsable ne veut pas
+> saisir son identité : elle est désormais une constante de
+> `lib/domain/entreprise.ts`. Ce qui suit décrit l'état antérieur, gardé parce
+> qu'une décision effacée ne s'apprend pas.
+
 Le nom de l'entreprise, son logo, ses adresses et téléphones sont saisis dans les paramètres par le
 responsable, comme le cahier des charges l'exige. Aucun nom commercial n'est écrit en dur dans le
 code ou l'interface.
@@ -1552,6 +1557,12 @@ quelqu'un. Il répond au défaut signalé pendant S12 : l'application imprimait 
 e-mail à la place du nom. On l'atteint par le bloc de compte en bas de la navigation, là où
 l'on lit déjà qui est connecté sur un poste partagé — pas par une entrée de menu de plus.
 
+**Ce qu'elle renverse.** D15 disait « paramètre, pas constante », et l'avait
+tranché depuis `prompt.md` §10. Cette lecture n'était pas fausse : le cahier des
+charges demandait bien un écran de saisie. C'est le commanditaire qui a changé
+d'avis en voyant les maquettes, et son avis prime sur une lecture de son propre
+cahier.
+
 **Ce que ça change pour la phase 2 :** l'écran `/parametres/entreprise` cesse d'être un
 formulaire et devient une carte en lecture seule. Les tests bout en bout qui remplissent ce
 formulaire sont à retirer dans le même commit, et le titre de niveau 1 « Entreprise »
@@ -1563,3 +1574,86 @@ contrat de test (`CAHIER-UI.md` §12).
 marquées « à confirmer » dans l'écran des réglages et dans la galerie. **Elles ne partent
 pas en production telles quelles** — un numéro fiscal faux sur un reçu est un problème
 juridique, pas un détail d'affichage.
+
+---
+
+## D72 — Pas de bibliothèque de composants : `<dialog>` suffit
+
+*S28, commit de la coquille. `CAHIER-UI.md` §13 autorisait shadcn/ui sous trois
+conditions et demandait que la décision soit consignée — elle l'est ici, y
+compris parce qu'elle est négative.*
+
+Le cahier de la refonte avait raison de poser la question : un logiciel de
+bureau a besoin de menus, de dialogues et d'une palette de commandes
+**réellement accessibles**, et les écrire à la main est le mauvais calcul
+classique — pièges de focus, ARIA, navigation clavier, retour du focus au
+déclencheur.
+
+**Ce que le chantier a réellement demandé.** Un seul composant de ce genre : la
+palette de commandes. Pas de menu déroulant, pas d'onglets, pas de tiroir — la
+coquille est une grille CSS, et le sélecteur de périmètre est un `<select>`
+natif depuis S3.
+
+**Ce que `<dialog>` donne gratuitement**, avec `showModal()` : le piège de
+focus, la fermeture par Échap, le fond inerte, le retour du focus au bouton qui
+l'a ouvert, et le placement dans la couche supérieure sans `z-index` à
+arbitrer. C'est-à-dire l'intégralité de ce pour quoi on aurait installé Radix.
+
+**La décision.** Aucune bibliothèque de composants. `ARCHITECTURE.md` §1 :
+le meilleur code est celui qu'on n'écrit pas — et une dépendance qu'on n'ajoute
+pas est aussi une dépendance qu'on ne suit pas, qu'on ne met pas à jour, et dont
+l'identité visuelle ne vient pas contaminer la nôtre.
+
+**Ce qui ferait rouvrir la question**, et il faut le dire pour que la décision
+ne se pétrifie pas : un menu contextuel à navigation clavier (les flèches dans
+un `role="menu"`), une liste déroulante avec recherche, ou un tiroir redimensionnable.
+Aucun n'est au programme de S29. Le jour où l'un le devient, on installe les
+composants concernés — pas le catalogue — et on les réhabille avec les jetons du
+projet.
+
+**Une réserve honnête.** `<dialog>` demande `showModal()` en JavaScript : sans
+lui, la palette ne s'ouvre pas. Ce n'est pas une régression d'accessibilité —
+elle double la navigation, elle ne la remplace pas : tout ce qu'elle atteint est
+dans la colonne de gauche, en HTML, sans script.
+
+---
+
+## D73 — Un patron est un composant s'il a une structure, une classe s'il n'a qu'une apparence
+
+*S28, commit des patrons. La spec demandait « les patrons écrits une fois, en
+composants réutilisables ». Écrits une fois, oui ; en composants, pas toujours.*
+
+**Ce que le dépôt répétait.** Cent cadres blancs bordés, quarante-cinq boutons
+de plaque, trente-deux champs de saisie, vingt-sept attentes, vingt-cinq
+encadrés pointillés, et quatre copies mot pour mot du même refus de périmètre.
+Ce n'est pas une abstraction spéculative qu'on va chercher : c'est de la
+déduplication, échelle 2 d'`ARCHITECTURE.md` §1.
+
+**La ligne de partage.** Un composant quand il y a une structure ou un
+comportement à tenir — les états, la tête d'écran, le hub, le champ. Une classe
+CSS quand il n'y a qu'une apparence et que l'élément qui la porte change d'un
+appel à l'autre : `.cadre` habille tour à tour un `ul`, un `dl`, un `div`, une
+`section`. Un composant l'aurait obligé à recevoir un `as` générique pour ne
+rendre au bout du compte qu'une chaîne de classes — de la cérémonie autour du
+vide.
+
+**Ce que la ligne a rapporté, en plus du volume.** Trois défauts sont sortis du
+bois au moment où la forme unique s'est écrite :
+
+1. La bordure des champs prenait `--color-bord`, à 1,3:1 sur le papier. Le
+   jeton `--color-bord-fort` existait, portait le calcul de contraste dans son
+   commentaire, et n'était employé nulle part. `.saisie` le prend.
+2. Le hub des réglages gardait sa propre copie des six écrans d'administration
+   et les cloisonnait tous derrière `gerer_utilisateurs`, là où la colonne de
+   gauche cloisonne chacun par sa propre capacité. Deux listes finissent
+   toujours par répondre deux choses ; il n'y en a plus qu'une, dans
+   `ECRANS_DE`.
+3. Sans le `max-w-3xl` retiré au commit de la coquille, un champ « Nom »
+   s'étirait sur 950 px. Vu sur une capture, pas déduit.
+
+**Ce qu'on n'a pas écrit, et pourquoi.** Le tableau et le panneau latéral. Les
+maquettes en fixent le dessin, mais aucun écran n'en a aujourd'hui — les écrire
+ici aurait été deviner leur interface sans un seul appelant pour la démentir.
+S29 les crée dans `components/patrons/` au premier écran qui les demande (A4 et
+A6), et sa spec le dit noir sur blanc pour que le huitième écran ne redessine
+pas le sien.

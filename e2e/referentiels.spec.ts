@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { IDENTITE } from "@/lib/domain/entreprise";
 import {
   contenu,
   emailUnique,
@@ -22,41 +23,52 @@ function section(page: Page, titre: string) {
     .filter({ has: page.getByRole("heading", { name: titre }) });
 }
 
-test.describe("entreprise", () => {
-  test("les coordonnées saisies reviennent après un rechargement", async ({
-    page,
-  }) => {
+test.describe("identité de l’entreprise", () => {
+  /* Depuis D71 il n'y a plus rien à saisir ici : l'identité est une constante
+     du code. Ce qui se vérifie a donc changé de nature — non plus « la saisie
+     revient après rechargement », mais « les mentions légales sont là, et
+     personne ne peut les retirer ». */
+  test("montre les mentions légales sans offrir de les modifier", async ({ page }) => {
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/entreprise", { waitUntil: "load" });
-    await page.getByRole("heading", { name: "Entreprise", level: 1 }).waitFor();
+    await page
+      .getByRole("heading", { name: "Identité de l’entreprise", level: 1 })
+      .waitFor();
 
-    const nom = nomUnique("Sandwidi et frère");
-    await page.getByLabel("Nom de l’entreprise").fill(nom);
-    await page.getByLabel("Adresse").fill("Pouytenga, marché central");
-    await page.getByLabel("Téléphone", { exact: true }).fill("70 00 00 00");
-    await page.getByRole("button", { name: "Enregistrer la fiche" }).click();
+    const identite = contenu(page).getByRole("region").or(contenu(page)).first();
+    await expect(identite).toContainText(IDENTITE.raisonSociale);
+    await expect(identite).toContainText(IDENTITE.ifu);
+    await expect(identite).toContainText("IFU");
+    await expect(identite).toContainText("RCCM");
 
-    await expect(contenu(page).getByRole("status")).toContainText(
-      "Fiche enregistrée",
-    );
-
-    await page.reload({ waitUntil: "load" });
-    await expect(page.getByLabel("Nom de l’entreprise")).toHaveValue(nom);
-    await expect(page.getByLabel("Téléphone", { exact: true })).toHaveValue(
-      "70 00 00 00",
-    );
+    /* Aucun champ d'identité : c'est la forme de l'écran qui dit qu'on ne la
+       modifie pas. Un champ grisé aurait laissé croire qu'il existe un moyen
+       de le dégriser. */
+    await expect(page.getByLabel("Nom de l’entreprise")).toHaveCount(0);
+    await expect(page.getByLabel("Numéro d’identification")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Enregistrer la fiche" })).toHaveCount(0);
   });
 
-  test("une entreprise sans nom est refusée — c’est l’en-tête du reçu", async ({
-    page,
-  }) => {
+  test("le seuil des tranches inactives, lui, se règle et revient", async ({ page }) => {
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/entreprise", { waitUntil: "load" });
 
-    await page.getByLabel("Nom de l’entreprise").fill("");
-    await page.getByRole("button", { name: "Enregistrer la fiche" }).click();
+    await page.getByLabel("Signaler après").fill("45");
+    await page.getByRole("button", { name: "Enregistrer le réglage" }).click();
+    await expect(contenu(page).getByRole("status")).toContainText("enregistré");
 
-    await expect(contenu(page).getByRole("alert")).toContainText("nom");
+    await page.reload({ waitUntil: "load" });
+    await expect(page.getByLabel("Signaler après")).toHaveValue("45");
+  });
+
+  test("un seuil hors bornes est refusé, et l’écran dit pourquoi", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    await page.goto("/parametres/entreprise", { waitUntil: "load" });
+
+    await page.getByLabel("Signaler après").fill("0");
+    await page.getByRole("button", { name: "Enregistrer le réglage" }).click();
+
+    await expect(contenu(page).getByRole("alert").first()).toContainText("jours");
   });
 });
 

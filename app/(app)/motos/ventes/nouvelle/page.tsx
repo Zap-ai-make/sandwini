@@ -4,6 +4,8 @@ import { ArrowLeft, Bike, CircleAlert, Lock, Search, UserPlus } from "lucide-rea
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { FormulaireClient } from "@/components/FormulaireClient";
+import { EtatErreur, EtatErreurSaisie } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import { chercherClients, formaterTelephone, type Client } from "@/lib/domain/client";
 import { formaterMontant } from "@/lib/domain/format";
@@ -212,13 +214,9 @@ export default function PageNouvelleVente() {
         </div>
       )}
 
-      {erreurStock && (
-        <p role="alert" className="mb-4 text-sm text-alerte">
-          {erreurStock}
-        </p>
-      )}
+      <EtatErreur message={erreurStock} className="mb-4" />
 
-      <fieldset className="rounded-plaque border border-bord bg-papier p-4">
+      <fieldset className="cadre p-4">
         <legend className="px-1 font-semibold text-encre">La moto</legend>
 
         {stock === null ? (
@@ -232,7 +230,7 @@ export default function PageNouvelleVente() {
             </p>
             <Link
               href="/motos/nouvelle"
-              className="mt-4 inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
+              className="mt-4 bouton bouton-plaque"
             >
               <Bike aria-hidden="true" className="size-4" />
               Faire entrer une moto
@@ -297,7 +295,7 @@ export default function PageNouvelleVente() {
         )}
       </fieldset>
 
-      <fieldset className="mt-6 rounded-plaque border border-bord bg-papier p-4">
+      <fieldset className="mt-6 cadre p-4">
         <legend className="px-1 font-semibold text-encre">Le client</legend>
 
         <ChampRecherche
@@ -377,7 +375,7 @@ export default function PageNouvelleVente() {
         </section>
       )}
 
-      <fieldset className="mt-6 rounded-plaque border border-bord bg-papier p-4">
+      <fieldset className="mt-6 cadre p-4">
         <legend className="px-1 font-semibold text-encre">La vente</legend>
 
         <div className="mt-2">
@@ -389,7 +387,7 @@ export default function PageNouvelleVente() {
             inputMode="numeric"
             value={saisie.prixConvenu}
             onChange={(evenement) => changer({ prixConvenu: evenement.target.value })}
-            className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-lg text-encre"
+            className="saisie mt-1.5 text-lg"
           />
           <p className="mt-1 text-sm text-encre-doux">En FCFA entiers, sans centimes.</p>
         </div>
@@ -438,7 +436,7 @@ export default function PageNouvelleVente() {
         </div>
       </fieldset>
 
-      <fieldset className="mt-6 rounded-plaque border border-bord bg-papier p-4">
+      <fieldset className="mt-6 cadre p-4">
         <legend className="px-1 font-semibold text-encre">Encaissé aujourd’hui</legend>
 
         <div className="mt-2">
@@ -455,7 +453,7 @@ export default function PageNouvelleVente() {
             inputMode="numeric"
             value={saisie.montantEncaisse}
             onChange={(evenement) => changer({ montantEncaisse: evenement.target.value })}
-            className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-lg text-encre"
+            className="saisie mt-1.5 text-lg"
           />
         </div>
 
@@ -469,7 +467,7 @@ export default function PageNouvelleVente() {
             onChange={(evenement) =>
               changer({ moyenPaiement: evenement.target.value as MoyenPaiement })
             }
-            className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+            className="saisie mt-1.5"
           >
             {MOYENS_PAIEMENT.map((moyen) => (
               <option key={moyen} value={moyen}>
@@ -490,7 +488,7 @@ export default function PageNouvelleVente() {
               value={saisie.reference}
               maxLength={60}
               onChange={(evenement) => changer({ reference: evenement.target.value })}
-              className="plaque-code mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+              className="plaque-code saisie mt-1.5"
             />
           </div>
         )}
@@ -504,14 +502,12 @@ export default function PageNouvelleVente() {
         numero={numeroAVenir}
       />
 
-      <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-3" />
 
       <button
         type="button"
         onClick={enregistrer}
-        className="mt-3 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+        className="mt-3 bouton bouton-plaque"
       >
         Enregistrer la vente
       </button>
@@ -714,7 +710,7 @@ function ChampRecherche({
           value={valeur}
           onChange={(evenement) => changer(evenement.target.value)}
           className={[
-            "h-12 w-full rounded-plaque border border-bord bg-papier pr-3 pl-9 text-encre placeholder:text-encre-doux",
+            "saisie pr-3 pl-9 placeholder:text-encre-doux",
             monospace ? "plaque-code placeholder:font-sans placeholder:tracking-normal" : "",
           ].join(" ")}
         />
@@ -746,7 +742,7 @@ function ListeLibre({
         rows={3}
         value={valeur}
         onChange={(evenement) => changer(evenement.target.value)}
-        className="mt-1.5 w-full rounded-plaque border border-bord bg-papier px-3 py-2 text-encre"
+        className="saisie mt-1.5"
       />
       <p className="mt-1 text-sm text-encre-doux">{aide}</p>
     </div>
@@ -766,7 +762,7 @@ function Cadre({ children }: { children: React.ReactNode }) {
         <ArrowLeft aria-hidden="true" className="size-4" />
         Ventes
       </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Nouvelle vente</h1>
+      <TetePage titre="Nouvelle vente" />
       {estGerant && (
         <p className="mt-1 flex items-center gap-2 text-sm text-encre-doux">
           <Lock aria-hidden="true" className="size-3.5 shrink-0" />

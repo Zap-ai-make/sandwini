@@ -1,14 +1,14 @@
 "use client";
 
-import { LoaderCircle, ShieldAlert, Store } from "lucide-react";
-import Link from "next/link";
+import { Store } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { useSession } from "@/lib/auth/session";
 import { LIBELLE_METIER } from "@/lib/domain/boutique";
-import { accedeEspace, accueilDuRole, metierDeLEspace, type Espace } from "@/lib/domain/espaces";
+import { accedeEspace, metierDeLEspace, type Espace } from "@/lib/domain/espaces";
 import { peut, type Capacite } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
+import { EtatChargement, EtatRefus } from "@/components/patrons/Etats";
 
 /**
  * Garde de navigation.
@@ -37,10 +37,7 @@ export function GardeSession({ children }: { children: ReactNode }) {
   if (session.statut === "chargement") {
     return (
       <div className="flex min-h-dvh items-center justify-center p-8">
-        <p className="flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
-          Ouverture de votre session…
-        </p>
+        <EtatChargement>Ouverture de votre session…</EtatChargement>
       </div>
     );
   }
@@ -76,22 +73,10 @@ export function GardeCapacite({
 
   if (!peut(session.utilisateur.role, capacite)) {
     return (
-      <section className="max-w-prose">
-        <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight text-encre">
-          <ShieldAlert aria-hidden="true" className="size-6 shrink-0 text-alerte" />
-          Réservé au responsable
-        </h1>
-        <p className="mt-3 text-encre-doux">
-          Cet écran gère les comptes et les paramètres de l’entreprise. Votre compte de gérant n’y a
-          pas accès&nbsp;; ce n’est pas une erreur de votre part.
-        </p>
-        <Link
-          href={accueilDuRole(session.utilisateur.role)}
-          className="mt-6 inline-flex h-11 items-center rounded-plaque border border-bord px-4 text-sm font-medium text-encre hover:bg-fond"
-        >
-          Revenir à l’accueil
-        </Link>
-      </section>
+      <EtatRefus titre="Réservé au responsable">
+        Cet écran gère les comptes et les paramètres de l’entreprise. Votre compte de gérant n’y a
+        pas accès&nbsp;; ce n’est pas une erreur de votre part.
+      </EtatRefus>
     );
   }
 
@@ -119,12 +104,7 @@ export function GardeEspace({ espace, children }: { espace: Espace; children: Re
   if (session.statut !== "connecte") return null;
 
   if (chargement) {
-    return (
-      <p className="flex items-center gap-3 text-encre-doux">
-        <LoaderCircle aria-hidden="true" className="size-5 animate-spin" />
-        Ouverture de l’espace…
-      </p>
-    );
+    return <EtatChargement>Ouverture de l’espace…</EtatChargement>;
   }
 
   const metier = metierDeLEspace(espace);
@@ -144,18 +124,17 @@ export function GardeEspace({ espace, children }: { espace: Espace; children: Re
   const toutes = perimetre.type === "toutes";
 
   return (
-    <section className="max-w-prose">
-      <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-tight text-encre">
-        <Store aria-hidden="true" className="size-6 shrink-0 text-encre-doux" />
-        {toutes ? "Aucune boutique de ce métier" : "Pas dans cette boutique"}
-      </h1>
+    <EtatRefus
+      icone={<Store aria-hidden="true" className="size-6 shrink-0 text-encre-doux" />}
+      titre={toutes ? "Aucune boutique de ce métier" : "Pas dans cette boutique"}
+    >
       {toutes ? (
-        <p className="mt-3 text-encre-doux">
+        <p className="text-encre-doux">
           Aucune de vos boutiques ne vend de {marchandise}. Cet espace s’ouvrira dès qu’une
           boutique en déclarera le métier, dans les réglages.
         </p>
       ) : (
-        <p className="mt-3 text-encre-doux">
+        <p className="text-encre-doux">
           <span className="plaque-code">{perimetre.code}</span>
           {perimetre.nom ? ` ${perimetre.nom}` : ""} ne vend pas de {marchandise}
           {peutChoisir
@@ -163,12 +142,6 @@ export function GardeEspace({ espace, children }: { espace: Espace; children: Re
             : " : cet espace n’existe donc pas pour elle. Ce n’est pas une erreur de votre part."}
         </p>
       )}
-      <Link
-        href={accueilDuRole(session.utilisateur.role)}
-        className="mt-6 inline-flex h-11 items-center rounded-plaque border border-bord px-4 text-sm font-medium text-encre hover:bg-fond"
-      >
-        Revenir à l’accueil
-      </Link>
-    </section>
+    </EtatRefus>
   );
 }

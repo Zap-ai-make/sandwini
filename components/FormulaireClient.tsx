@@ -14,6 +14,8 @@ import {
   type SaisieClient,
 } from "@/lib/domain/client";
 import { creerClient, messageErreurClient, modifierClient } from "@/lib/repositories/clients";
+import { Champ } from "@/components/patrons/Champ";
+import { EtatErreurSaisie } from "@/components/patrons/Etats";
 
 /**
  * Créer ou corriger un client.
@@ -98,14 +100,14 @@ export function FormulaireClient({
   return (
     <form onSubmit={soumettre} noValidate>
       <div className="space-y-4">
-        <Champ
+        <ChampClient
           id={`${prefixe}-nom`}
           libelle="Nom"
           valeur={saisie.nom}
           maximum={LONGUEUR_NOM_MAX}
           changer={(nom) => changer({ nom })}
         />
-        <Champ
+        <ChampClient
           id={`${prefixe}-telephone`}
           libelle="Téléphone"
           type="tel"
@@ -114,7 +116,7 @@ export function FormulaireClient({
           changer={(telephone) => changer({ telephone })}
           aide="Huit chiffres suffisent. L’indicatif est ajouté tout seul."
         />
-        <Champ
+        <ChampClient
           id={`${prefixe}-telephone2`}
           libelle="Second téléphone"
           type="tel"
@@ -123,7 +125,7 @@ export function FormulaireClient({
           maximum={LONGUEUR_TELEPHONE_MAX}
           changer={(telephone2) => changer({ telephone2 })}
         />
-        <Champ
+        <ChampClient
           id={`${prefixe}-adresse`}
           libelle="Adresse"
           facultatif
@@ -141,19 +143,17 @@ export function FormulaireClient({
             value={saisie.note}
             maxLength={LONGUEUR_NOTE_MAX}
             onChange={(evenement) => changer({ note: evenement.target.value })}
-            className="mt-1.5 w-full rounded-plaque border border-bord bg-papier px-3 py-2 text-encre"
+            className="saisie mt-1.5"
           />
         </div>
       </div>
 
-      <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-        {erreur ?? ""}
-      </p>
+      <EtatErreurSaisie message={erreur} className="mt-3" />
 
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="submit"
-          className="inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="bouton bouton-plaque"
         >
           {existant ? "Enregistrer" : "Créer le client"}
         </button>
@@ -161,7 +161,7 @@ export function FormulaireClient({
           <button
             type="button"
             onClick={surAnnulation}
-            className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-fond"
+            className="bouton bouton-neutre"
           >
             Annuler
           </button>
@@ -171,7 +171,14 @@ export function FormulaireClient({
   );
 }
 
-function Champ({
+/**
+ * Le champ de ce formulaire : l'enveloppe vient du patron, la saisie reste ici.
+ *
+ * Ce qui justifie qu'il subsiste, c'est `maximum` et le `inputMode` déduit du
+ * type — deux détails propres au fichier clients, qui n'ont rien à faire dans
+ * un patron partagé.
+ */
+function ChampClient({
   id,
   libelle,
   valeur,
@@ -191,11 +198,7 @@ function Champ({
   aide?: string;
 }) {
   return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-encre">
-        {libelle}
-        {facultatif && <span className="font-normal text-encre-doux"> (facultatif)</span>}
-      </label>
+    <Champ id={id} libelle={libelle} facultatif={facultatif} aide={aide}>
       <input
         id={id}
         type={type}
@@ -203,9 +206,8 @@ function Champ({
         value={valeur}
         maxLength={maximum}
         onChange={(evenement) => changer(evenement.target.value)}
-        className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
+        className="saisie"
       />
-      {aide && <p className="mt-1 text-sm text-encre-doux">{aide}</p>}
-    </div>
+    </Champ>
   );
 }

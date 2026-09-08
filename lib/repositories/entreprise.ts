@@ -1,28 +1,32 @@
 import { doc, onSnapshot, setDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import {
-  ENTREPRISE_VIDE,
-  LOGO_LARGEUR_MAX,
+  REGLAGES_DEFAUT,
   SEUIL_INACTIVITE_DEFAUT,
-  normaliserEntreprise,
-  type Entreprise,
+  type ReglagesEntreprise,
 } from "@/lib/domain/entreprise";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
 import { traceModification, type Auteur } from "./referentiels";
 
 /**
- * L'identité de l'entreprise — un seul document, `entreprise/profil`.
+ * Les réglages de l'entreprise — un seul document, `entreprise/profil`.
  *
- * Une collection pour un document unique peut surprendre ; c'est ce que
- * Firestore impose (pas de document à la racine) et c'est aussi ce qui rend la
- * règle simple à écrire : tout le monde lit, seul le responsable écrit.
+ * Il ne porte plus l'identité : celle-ci est une constante de
+ * `lib/domain/entreprise.ts` depuis D71. Ce qui reste ici tient en un entier,
+ * le seuil d'inactivité des tranches.
+ *
+ * Le document garde son chemin plutôt que d'être renommé : les fiches déjà
+ * écrites en préversion portent le seuil, et une migration pour changer un nom
+ * de collection serait un risque payé pour rien. Les anciens champs d'identité
+ * qui y traînent encore ne sont plus lus, et la règle Firestore ne les accepte
+ * plus en écriture — ils s'éteindront à la première sauvegarde.
  */
 
 const CHEMIN = ["entreprise", "profil"] as const;
 
-export function ecouterEntreprise(
-  auChangement: (entreprise: Entreprise) => void,
+export function ecouterReglages(
+  auChangement: (reglages: ReglagesEntreprise) => void,
   enErreur: (cause: unknown) => void,
 ): () => void {
   return onSnapshot(
@@ -34,12 +38,6 @@ export function ecouterEntreprise(
       auChangement(
         donnees
           ? {
-              nom: donnees.nom ?? "",
-              adresse: donnees.adresse ?? "",
-              telephone: donnees.telephone ?? "",
-              telephone2: donnees.telephone2 ?? "",
-              identifiant: donnees.identifiant ?? "",
-              logo: typeof donnees.logo === "string" && donnees.logo ? donnees.logo : null,
               /* Absent des fiches saisies avant S9 : le défaut du cahier des
                  charges prend le relais plutôt qu'un zéro qui signalerait
                  toutes les tranches comme inactives. */
@@ -48,70 +46,24 @@ export function ecouterEntreprise(
                   ? donnees.seuilInactiviteTranches
                   : SEUIL_INACTIVITE_DEFAUT,
             }
-          : ENTREPRISE_VIDE,
+          : REGLAGES_DEFAUT,
       );
     },
     enErreur,
   );
 }
 
-export function enregistrerEntreprise(entreprise: Entreprise, auteur: Auteur): Promise<void> {
-  const propre = normaliserEntreprise(entreprise);
+export function enregistrerReglages(
+  reglages: ReglagesEntreprise,
+  auteur: Auteur,
+): Promise<void> {
+  /* Écriture **sans `merge`**, et c'est le point important. En fusion,
+     Firestore évalue la règle sur le document résultant : les anciens champs
+     d'identité y seraient encore, et `hasOnly` les refuserait — la sauvegarde
+     échouerait sur toute fiche saisie avant D71. Le remplacement complet écrit
+     exactement ce que la règle attend, et efface l'identité périmée au
+     passage. Il n'y a rien d'autre à préserver dans ce document. */
   return suivreEcriture(
-    setDoc(
-      doc(db(), ...CHEMIN),
-      {
-        ...propre,
-        /* `null` plutôt qu'un champ absent : les règles vérifient le contrat
-           champ par champ, et une clé qui disparaît est plus difficile à
-           raisonner qu'une clé vide. */
-        logo: propre.logo ?? null,
-        ...traceModification(auteur),
-      },
-      { merge: true },
-    ),
+    setDoc(doc(db(), ...CHEMIN), { ...reglages, ...traceModification(auteur) }),
   );
-}
-
-/**
- * Réduit une image choisie sur l'appareil et l'encode pour Firestore.
- *
- * Le logo part dans le document parce que les reçus s'impriment hors ligne
- * (cf. `lib/domain/entreprise.ts`). Il faut donc qu'il soit petit — d'où la
- * réduction ici, sur l'appareil, avant tout enregistrement. Un responsable qui
- * choisit la photo brute de son enseigne ne doit pas avoir à s'en occuper.
- *
- * Le format de sortie est PNG : les logos ont des aplats et souvent de la
- * transparence, que le JPEG rendrait mal.
- */
-export async function reduireLogo(fichier: File): Promise<string> {
-  const image = await chargerImage(fichier);
-  const echelle = Math.min(1, LOGO_LARGEUR_MAX / Math.max(image.width, image.height));
-  const largeur = Math.max(1, Math.round(image.width * echelle));
-  const hauteur = Math.max(1, Math.round(image.height * echelle));
-
-  const toile = document.createElement("canvas");
-  toile.width = largeur;
-  toile.height = hauteur;
-  const contexte = toile.getContext("2d");
-  if (!contexte) throw new Error("Le navigateur n’a pas pu préparer l’image.");
-  contexte.drawImage(image, 0, 0, largeur, hauteur);
-
-  return toile.toDataURL("image/png");
-}
-
-function chargerImage(fichier: File): Promise<HTMLImageElement> {
-  return new Promise((resoudre, rejeter) => {
-    const url = URL.createObjectURL(fichier);
-    const image = new Image();
-    image.onload = () => {
-      URL.revokeObjectURL(url);
-      resoudre(image);
-    };
-    image.onerror = () => {
-      URL.revokeObjectURL(url);
-      rejeter(new Error("Ce fichier n’est pas une image lisible."));
-    };
-    image.src = url;
-  });
 }

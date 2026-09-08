@@ -1,33 +1,40 @@
 "use client";
 
-import { ArrowLeft, ImageOff, LoaderCircle } from "lucide-react";
-import Link from "next/link";
+import { TriangleAlert } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { Champ } from "@/components/patrons/Champ";
+import { EtatChargement, EtatErreur, EtatErreurSaisie } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
+import { formaterTelephone } from "@/lib/domain/client";
 import {
-  ENTREPRISE_VIDE,
-  LOGO_LARGEUR_MAX,
-  LOGO_TYPES_ACCEPTES,
-  LONGUEUR_ADRESSE_MAX,
-  LONGUEUR_IDENTIFIANT_MAX,
-  LONGUEUR_NOM_MAX,
-  LONGUEUR_TELEPHONE_MAX,
+  IDENTITE,
+  IDENTITE_A_CONFIRMER,
+  LIBELLE_IDENTITE,
+  REGLAGES_DEFAUT,
   SEUIL_INACTIVITE_MAX,
   SEUIL_INACTIVITE_MIN,
-  validerEntreprise,
-  type Entreprise,
+  validerReglages,
+  type ReglagesEntreprise,
 } from "@/lib/domain/entreprise";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import { ecouterEntreprise, enregistrerEntreprise, reduireLogo } from "@/lib/repositories/entreprise";
+import { ecouterReglages, enregistrerReglages } from "@/lib/repositories/entreprise";
 import { messageErreurReferentiel } from "@/lib/repositories/referentiels";
 
 /**
- * L'identité de l'entreprise.
+ * L'identité de l'entreprise — et ce qui, à côté d'elle, se règle encore.
  *
- * Tout ce qui est saisi ici s'imprime en haut d'un reçu remis à un client.
- * C'est la seule raison d'être de cet écran, et c'est ce que son texte dit —
- * plutôt que « paramètres généraux », qui ne dirait rien de ce à quoi ça sert.
+ * **Cet écran n'est plus un formulaire d'identité.** Raison sociale, siège,
+ * téléphone, IFU et RCCM sont posés dans le code (D71) : ils s'impriment sur
+ * chaque reçu sans que personne ait à les saisir, et personne ne peut les
+ * vider. La forme de l'écran le dit — une carte qu'on lit, sans champ ni
+ * bouton. Un champ grisé aurait laissé croire qu'il existe un moyen de le
+ * dégriser.
+ *
+ * Reste un réglage, et un seul : au bout de combien de jours une vente en
+ * tranches sans versement est signalée. Ce n'est pas de l'identité, c'est une
+ * décision de commerce, et elle change.
  */
 export default function PageEntreprise() {
   return (
@@ -38,64 +45,107 @@ export default function PageEntreprise() {
 }
 
 function FicheEntreprise() {
+  return (
+    <Cadre>
+      <Identite />
+      <Reglages />
+    </Cadre>
+  );
+}
+
+function Identite() {
+  const aConfirmer = new Set<string>(IDENTITE_A_CONFIRMER);
+
+  return (
+    <section className="cadre p-4">
+      <h2 className="font-semibold text-encre">Ce qui s’imprime en tête de chaque reçu</h2>
+      <p className="mt-1 max-w-prose text-sm text-encre-doux">
+        Ces informations font partie du logiciel. Elles ne se saisissent pas, et elles ne peuvent
+        pas être effacées&nbsp;: un reçu sans mentions légales n’est pas conforme.
+      </p>
+
+      <dl className="mt-4 divide-y divide-bord border-y border-bord">
+        {(Object.keys(IDENTITE) as (keyof typeof IDENTITE)[]).map((champ) => (
+          <div key={champ} className="flex flex-wrap items-baseline justify-between gap-x-4 py-2">
+            <dt className="text-sm text-encre-doux">{LIBELLE_IDENTITE[champ]}</dt>
+            <dd className="text-right text-encre">
+              <span className={aConfirmer.has(champ) ? "plaque-code" : undefined}>
+                {champ === "telephones"
+                  ? IDENTITE.telephones.map((numero) => formaterTelephone(numero)).join(" · ")
+                  : IDENTITE[champ]}
+              </span>
+              {aConfirmer.has(champ) && (
+                <span className="ml-2 text-sm font-semibold text-alerte">à confirmer</span>
+              )}
+            </dd>
+          </div>
+        ))}
+      </dl>
+
+      {/* Tant que ces deux numéros n'ont pas été communiqués, ils sont au bon
+          format et faux. Le dire ici, en rouge, plutôt que dans un commentaire
+          de code que personne n'ouvrira avant le premier contrôle fiscal.
+
+          `note` et non `alert` : ce message est là en permanence, il ne
+          survient pas. Un `alert` permanent est réannoncé à chaque ouverture de
+          l'écran et entre en concurrence avec la vraie erreur de validation du
+          formulaire juste en dessous — c'est un test bout en bout qui l'a
+          montré, en trouvant celui-ci quand il cherchait celle-là. */}
+      {IDENTITE_A_CONFIRMER.length > 0 && (
+        <p
+          role="note"
+          className="mt-4 flex max-w-prose gap-3 rounded-plaque border border-alerte bg-alerte-surface p-3 text-sm text-encre"
+        >
+          <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0 text-alerte" />
+          <span>
+            <strong className="font-semibold">
+              {IDENTITE_A_CONFIRMER.length === 1
+                ? "Un numéro n’a pas été confirmé"
+                : "Deux numéros n’ont pas été confirmés"}
+              .
+            </strong>{" "}
+            Ils s’impriment sur un document commercial. Communiquez les vrais numéros à qui
+            maintient le logiciel avant de remettre un reçu à un client.
+          </span>
+        </p>
+      )}
+    </section>
+  );
+}
+
+function Reglages() {
   const session = useSession();
   const souscrire = useCallback(
-    (auChangement: (v: Entreprise) => void, enErreur: (c: unknown) => void) =>
-      ecouterEntreprise(auChangement, enErreur),
+    (auChangement: (v: ReglagesEntreprise) => void, enErreur: (c: unknown) => void) =>
+      ecouterReglages(auChangement, enErreur),
     [],
   );
   const { valeur, erreur: erreurLecture } = useAbonnement(
     souscrire,
-    "La fiche de l’entreprise n’a pas pu être chargée.",
+    "Le réglage des tranches n’a pas pu être chargé.",
   );
 
-  const [brouillon, setBrouillon] = useState<Entreprise | null>(null);
+  const [brouillon, setBrouillon] = useState<ReglagesEntreprise | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [succes, setSucces] = useState<string | null>(null);
-  const [logoEnCours, setLogoEnCours] = useState(false);
 
   /* Tant que rien n'a été touché, l'écran montre ce que dit la base ; dès la
      première frappe, il montre le brouillon et ne s'en écarte plus. Recopier
-     les instantanés suivants dans l'état ferait sauter le texte sous les doigts
-     de celui qui tape — ce sont d'ailleurs nos propres écritures qui
+     les instantanés suivants dans l'état ferait sauter le nombre sous les
+     doigts de celui qui tape — ce sont d'ailleurs nos propres écritures qui
      reviennent. */
   const saisie = brouillon ?? valeur;
 
   if (erreurLecture) {
     return (
-      <Cadre>
-        <p role="alert" className="text-alerte">
-          {erreurLecture}
-        </p>
-      </Cadre>
+      <EtatErreur message={erreurLecture} className="mt-6" />
     );
   }
 
   if (!saisie) {
     return (
-      <Cadre>
-        <p className="flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement de la fiche…
-        </p>
-      </Cadre>
+      <EtatChargement className="mt-6">Chargement du réglage…</EtatChargement>
     );
-  }
-
-  const changer = (partie: Partial<Entreprise>) =>
-    setBrouillon((actuel) => ({ ...(actuel ?? valeur ?? ENTREPRISE_VIDE), ...partie }));
-
-  async function choisirLogo(fichier: File) {
-    setErreur(null);
-    setSucces(null);
-    setLogoEnCours(true);
-    try {
-      changer({ logo: await reduireLogo(fichier) });
-    } catch (cause) {
-      setErreur(cause instanceof Error ? cause.message : "Cette image n’a pas pu être lue.");
-    } finally {
-      setLogoEnCours(false);
-    }
   }
 
   function soumettre(evenement: React.FormEvent) {
@@ -103,228 +153,84 @@ function FicheEntreprise() {
     if (session.statut !== "connecte" || !saisie) return;
     setSucces(null);
 
-    const probleme = validerEntreprise(saisie);
+    const probleme = validerReglages(saisie);
     if (probleme) {
       setErreur(probleme);
       return;
     }
 
     setErreur(null);
-    enregistrerEntreprise(saisie, {
+    enregistrerReglages(saisie, {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
     }).catch((cause) => setErreur(messageErreurReferentiel(cause)));
-    setSucces("Fiche enregistrée. Les prochains reçus la porteront.");
+    setSucces("Réglage enregistré.");
   }
 
   return (
-    <Cadre>
-      <form onSubmit={soumettre} className="max-w-prose" noValidate>
-        <div className="rounded-plaque border border-bord bg-papier p-4">
-          <h2 className="font-semibold text-encre">Ce qui s’imprime sur les reçus</h2>
-
-          <Champ
-            id="nom-entreprise"
-            libelle="Nom de l’entreprise"
-            valeur={saisie.nom}
-            maximum={LONGUEUR_NOM_MAX}
-            changer={(nom) => changer({ nom })}
-          />
-          <Champ
-            id="adresse-entreprise"
-            libelle="Adresse"
-            valeur={saisie.adresse}
-            maximum={LONGUEUR_ADRESSE_MAX}
-            changer={(adresse) => changer({ adresse })}
-          />
-          <Champ
-            id="telephone-entreprise"
-            libelle="Téléphone"
-            type="tel"
-            valeur={saisie.telephone}
-            maximum={LONGUEUR_TELEPHONE_MAX}
-            changer={(telephone) => changer({ telephone })}
-          />
-          <Champ
-            id="telephone2-entreprise"
-            libelle="Second téléphone"
-            type="tel"
-            facultatif
-            valeur={saisie.telephone2}
-            maximum={LONGUEUR_TELEPHONE_MAX}
-            changer={(telephone2) => changer({ telephone2 })}
-          />
-          <Champ
-            id="identifiant-entreprise"
-            libelle="Numéro d’identification"
-            facultatif
-            valeur={saisie.identifiant}
-            maximum={LONGUEUR_IDENTIFIANT_MAX}
-            changer={(identifiant) => changer({ identifiant })}
-            aide="Imprimé sur les reçus s’il est renseigné."
-          />
-        </div>
-
-        <div className="mt-6 rounded-plaque border border-bord bg-papier p-4">
-          <h2 className="font-semibold text-encre">Logo</h2>
-          <p className="mt-1 text-sm text-encre-doux">
-            Réduit à {LOGO_LARGEUR_MAX} pixels et gardé avec vos données, pour qu’un reçu s’imprime
-            même sans réseau.
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-center gap-4">
-            <span className="flex size-24 shrink-0 items-center justify-center overflow-hidden rounded-plaque border border-bord bg-fond">
-              {saisie.logo ? (
-                // eslint-disable-next-line @next/next/no-img-element -- data: local, jamais distant
-                <img src={saisie.logo} alt="Logo de l’entreprise" className="max-h-full max-w-full" />
-              ) : (
-                <ImageOff aria-hidden="true" className="size-6 text-encre-doux" />
-              )}
-            </span>
-
-            <span className="flex flex-wrap gap-2">
-              <label
-                htmlFor="fichier-logo"
-                className="inline-flex h-11 cursor-pointer items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-              >
-                {logoEnCours ? "Lecture…" : saisie.logo ? "Remplacer" : "Choisir une image"}
-              </label>
-              <input
-                id="fichier-logo"
-                type="file"
-                accept={LOGO_TYPES_ACCEPTES.join(",")}
-                className="sr-only"
-                onChange={(evenement) => {
-                  const fichier = evenement.target.files?.[0];
-                  evenement.target.value = "";
-                  if (fichier) void choisirLogo(fichier);
-                }}
-              />
-              {saisie.logo && (
-                <button
-                  type="button"
-                  onClick={() => changer({ logo: null })}
-                  className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-                >
-                  Retirer le logo
-                </button>
-              )}
-            </span>
-          </div>
-        </div>
-
-        <div className="mt-6 rounded-plaque border border-bord bg-papier p-4">
-          <h2 className="font-semibold text-encre">Tranches inactives</h2>
-          <p className="mt-1 max-w-prose text-sm text-encre-doux">
-            Une vente en tranches dont le client n’a rien versé depuis ce nombre de jours est
-            signalée dans la liste des tranches. Rien ne se déclenche tout seul&nbsp;: la moto reste
-            au magasin, et l’argent reste au client.
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-end gap-3">
-            <div>
-              <label htmlFor="seuil-inactivite" className="block text-sm font-medium text-encre">
-                Signaler après
-              </label>
-              <input
-                id="seuil-inactivite"
-                type="number"
-                inputMode="numeric"
-                min={SEUIL_INACTIVITE_MIN}
-                max={SEUIL_INACTIVITE_MAX}
-                step={1}
-                value={
-                  Number.isFinite(saisie.seuilInactiviteTranches)
-                    ? String(saisie.seuilInactiviteTranches)
-                    : ""
-                }
-                onChange={(evenement) => {
-                  const brut = evenement.target.value.trim();
-                  changer({
-                    seuilInactiviteTranches: brut === "" ? Number.NaN : Number(brut),
-                  });
-                }}
-                className="mt-1.5 h-12 w-28 rounded-plaque border border-bord bg-papier px-3 text-encre tabular-nums"
-              />
-            </div>
-            <span className="pb-3 text-encre-doux">jours sans versement</span>
-          </div>
-        </div>
-
-        <p role="alert" aria-live="assertive" className="mt-3 min-h-5 text-sm text-alerte">
-          {erreur ?? ""}
+    <form onSubmit={soumettre} className="mt-6" noValidate>
+      <div className="cadre p-4">
+        <h2 className="font-semibold text-encre">Tranches inactives</h2>
+        <p className="mt-1 max-w-prose text-sm text-encre-doux">
+          Une vente en tranches dont le client n’a rien versé depuis ce nombre de jours est
+          signalée dans la liste des tranches. Rien ne se déclenche tout seul&nbsp;: la moto reste
+          au magasin, et l’argent reste au client.
         </p>
-        {succes && (
-          <p role="status" aria-live="polite" className="text-sm text-solde">
-            {succes}
-          </p>
-        )}
 
-        <button
-          type="submit"
-          className="mt-3 inline-flex h-12 items-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
-        >
-          Enregistrer la fiche
-        </button>
-      </form>
-    </Cadre>
+        <div className="mt-4 flex flex-wrap items-end gap-3">
+          <Champ id="seuil-inactivite" libelle="Signaler après">
+            <input
+              id="seuil-inactivite"
+              type="number"
+              inputMode="numeric"
+              min={SEUIL_INACTIVITE_MIN}
+              max={SEUIL_INACTIVITE_MAX}
+              step={1}
+              value={
+                Number.isFinite(saisie.seuilInactiviteTranches)
+                  ? String(saisie.seuilInactiviteTranches)
+                  : ""
+              }
+              onChange={(evenement) => {
+                const brut = evenement.target.value.trim();
+                setBrouillon({
+                  ...(brouillon ?? valeur ?? REGLAGES_DEFAUT),
+                  seuilInactiviteTranches: brut === "" ? Number.NaN : Number(brut),
+                });
+              }}
+              className="saisie w-28 tabular-nums"
+              aria-invalid={erreur ? true : undefined}
+            />
+          </Champ>
+          <span className="pb-3 text-encre-doux">jours sans versement</span>
+        </div>
+      </div>
+
+      <EtatErreurSaisie message={erreur} className="mt-3" />
+      {succes && (
+        <p role="status" aria-live="polite" className="text-sm text-solde">
+          {succes}
+        </p>
+      )}
+
+      <button type="submit" className="bouton bouton-plaque mt-3">
+        Enregistrer le réglage
+      </button>
+    </form>
   );
 }
 
 function Cadre({ children }: { children: React.ReactNode }) {
   return (
     <div>
-      <Link
-        href="/parametres"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Réglages
-      </Link>
-      <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">Entreprise</h1>
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Réglages" }}
+        titre="Identité de l’entreprise"
+      />
       <p className="mt-2 mb-6 max-w-prose text-encre-doux">
-        Ces informations forment l’en-tête de chaque reçu remis à un client.
+        L’en-tête de chaque reçu remis à un client, et le seul réglage qui l’accompagne.
       </p>
       {children}
-    </div>
-  );
-}
-
-function Champ({
-  id,
-  libelle,
-  valeur,
-  maximum,
-  changer,
-  type = "text",
-  facultatif = false,
-  aide,
-}: {
-  id: string;
-  libelle: string;
-  valeur: string;
-  maximum: number;
-  changer: (valeur: string) => void;
-  type?: string;
-  facultatif?: boolean;
-  aide?: string;
-}) {
-  return (
-    <div className="mt-4">
-      <label htmlFor={id} className="block text-sm font-medium text-encre">
-        {libelle}
-        {facultatif && <span className="font-normal text-encre-doux"> (facultatif)</span>}
-      </label>
-      <input
-        id={id}
-        type={type}
-        inputMode={type === "tel" ? "tel" : undefined}
-        value={valeur}
-        maxLength={maximum}
-        onChange={(evenement) => changer(evenement.target.value)}
-        className="mt-1.5 h-12 w-full rounded-plaque border border-bord bg-papier px-3 text-encre"
-      />
-      {aide && <p className="mt-1 text-sm text-encre-doux">{aide}</p>}
     </div>
   );
 }

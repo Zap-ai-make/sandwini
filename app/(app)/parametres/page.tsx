@@ -1,10 +1,13 @@
 "use client";
 
-import { Bike, Building2, ChevronRight, HardHat, LogOut, Store, Tags, Users } from "lucide-react";
-import Link from "next/link";
+import { LogOut, Settings } from "lucide-react";
 import { useState } from "react";
+import { ICONE_ECRAN } from "@/components/icones-ecrans";
+import { Hub, type Destination } from "@/components/patrons/Hub";
+import { TetePage, TitreSection } from "@/components/patrons/Page";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
-import { LIBELLE_ROLE, peut } from "@/lib/domain/roles";
+import { ecransVisibles } from "@/lib/domain/espaces";
+import { LIBELLE_ROLE } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 
 export default function Reglages() {
@@ -15,14 +18,23 @@ export default function Reglages() {
   if (session.statut !== "connecte") return null;
   const { utilisateur } = session;
 
+  const administration: Destination[] = ecransVisibles("reglages", utilisateur.role)
+    .filter((ecran) => ecran.quoi)
+    .map(({ href, libelle, quoi }) => ({
+      href,
+      libelle,
+      quoi: quoi ?? "",
+      icone: ICONE_ECRAN[href] ?? Settings,
+    }));
+
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Réglages</h1>
+      <TetePage titre="Réglages" />
 
-      <h2 className="mt-6 text-sm font-semibold tracking-wide text-encre-doux uppercase">
-        Votre compte
-      </h2>
-      <dl className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+      <div className="mt-6">
+        <TitreSection>Votre compte</TitreSection>
+      </div>
+      <dl className="cadre cadre-liste">
         <div className="flex items-baseline justify-between gap-4 px-4 py-3">
           <dt className="text-sm text-encre-doux">Nom</dt>
           <dd className="text-right font-medium text-encre">{utilisateur.nom}</dd>
@@ -53,109 +65,23 @@ export default function Reglages() {
       </dl>
 
       {utilisateur.role === "gerant" && !utilisateur.boutiqueId && (
-        <p className="mt-3 rounded-plaque border border-bord bg-papier p-4 text-sm text-encre">
+        <p className="mt-3 cadre p-4 text-sm text-encre">
           Aucune boutique ne vous est attribuée&nbsp;: vous ne verrez ni stock ni ventes tant que le
           responsable ne vous en aura pas donné une.
         </p>
       )}
 
-      {peut(utilisateur.role, "gerer_utilisateurs") && (
-        <>
-          <h2 className="mt-8 text-sm font-semibold tracking-wide text-encre-doux uppercase">
-            Administration
-          </h2>
-          <ul className="mt-3 divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
-            <li>
-              <Link
-                href="/parametres/entreprise"
-                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
-              >
-                <Building2 aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">Entreprise</span>
-                  <span className="block text-sm text-encre-doux">
-                    Nom, adresse, téléphones et logo imprimés sur les reçus
-                  </span>
-                </span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/parametres/boutiques"
-                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
-              >
-                <Store aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">Boutiques</span>
-                  <span className="block text-sm text-encre-doux">
-                    Déclarer un point de vente, son code et ses coordonnées
-                  </span>
-                </span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/parametres/utilisateurs"
-                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
-              >
-                <Users aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">Utilisateurs</span>
-                  <span className="block text-sm text-encre-doux">
-                    Créer un gérant, désactiver un compte
-                  </span>
-                </span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/parametres/catalogue"
-                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
-              >
-                <Bike aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">Marques et modèles</span>
-                  <span className="block text-sm text-encre-doux">Ce que vous vendez</span>
-                </span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/parametres/referentiels"
-                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
-              >
-                <Tags aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">Provenances et frais</span>
-                  <span className="block text-sm text-encre-doux">
-                    D’où viennent les motos, ce qui s’ajoute à leur prix d’achat
-                  </span>
-                </span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/parametres/prestataires"
-                className="flex items-center gap-4 px-4 py-4 hover:bg-fond"
-              >
-                <HardHat aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">Prestataires</span>
-                  <span className="block text-sm text-encre-doux">
-                    Qui traite les cartes grises et les plaques
-                  </span>
-                </span>
-                <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
-              </Link>
-            </li>
-          </ul>
-
-        </>
+      {/* Les écrans viennent de `ECRANS_DE`, filtrés par les droits de la
+          personne — la même liste et le même filtre que la colonne de gauche.
+          Ce hub gardait sa propre copie, et cloisonnait les six derrière
+          `gerer_utilisateurs` : un rôle qui aurait eu `gerer_referentiels` sans
+          `gerer_utilisateurs` voyait donc le catalogue dans la colonne et pas
+          ici. Deux listes finissent toujours par répondre deux choses. */}
+      {administration.length > 0 && (
+        <section className="mt-8">
+          <TitreSection>Administration</TitreSection>
+          <Hub destinations={administration} />
+        </section>
       )}
 
       <button
@@ -165,7 +91,7 @@ export default function Reglages() {
           void seDeconnecter();
         }}
         disabled={deconnexion}
-        className="mt-8 inline-flex h-12 items-center gap-2 rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier disabled:opacity-60"
+        className="mt-8 bouton bouton-neutre disabled:opacity-60"
       >
         <LogOut aria-hidden="true" className="size-4" />
         {deconnexion ? "Déconnexion…" : "Se déconnecter"}

@@ -1,7 +1,7 @@
 # S28 — Refonte de l'interface : jetons, coquille et patrons
 
 ```
-Statut     : à faire
+Statut     : terminée
 Périmètre  : post-MVP — chantier de refonte, cf. CAHIER-UI.md §16
 Dépend de  : S12 (dernière spec MVP), maquettes de la phase 1 validées
 ```
@@ -24,39 +24,61 @@ coquille sans avoir été réécrits.
 
 ## Critères d'acceptation
 
-- [ ] Les jetons de `maquettes/socle.css` sont transcrits dans le bloc `@theme` de
+- [x] Les jetons de `maquettes/socle.css` sont transcrits dans le bloc `@theme` de
       `app/globals.css` : palette, typographie, échelle d'espacement, rayons, durées et
       courbes d'animation. Aucune valeur qui n'ait été validée dans les maquettes.
-- [ ] Le mode sombre est écrit en trois temps (système, clair forcé, sombre forcé) et
-      reste un vrai mode, pas une inversion.
-- [ ] La feuille `@media print` est revérifiée **après** le changement de jetons, et le reçu
+- [x] Le mode sombre reste un vrai mode, pas une inversion, et suit le réglage du système
+      **et rien d'autre** : le commanditaire a tranché, il n'y a pas de basculeur dans le
+      produit. Les maquettes en portaient un pour qu'il puisse voir le thème ; l'écrire dans
+      l'application serait du code sans utilisateur.
+- [x] La feuille `@media print` est revérifiée **après** le changement de jetons, et le reçu
       est photographié sous média `print` : il n'a pas régressé (`DESIGN.md` §14, leçon S10).
-- [ ] `app/(app)/layout.tsx` ne borne plus la zone de travail à `max-w-3xl` : elle prend la
+- [x] `app/(app)/layout.tsx` ne borne plus la zone de travail à `max-w-3xl` : elle prend la
       largeur disponible, bornée à 1600 px. Les blocs de prose gardent leur `max-w-prose`.
-- [ ] `NavigationPrincipale` devient rail d'espaces + colonne d'écrans groupés par intention
+- [x] `NavigationPrincipale` devient rail d'espaces + colonne d'écrans groupés par intention
       (*Vendre* · *Suivre* · *Administrer*). Depuis n'importe quel écran de l'espace motos,
       les sept écrans de cet espace sont atteignables sans revenir en arrière.
-- [ ] La colonne se replie sur ses icônes (bouton du bandeau, `Ctrl B`), l'état est retenu
+- [x] La colonne se replie sur ses icônes (bouton du bandeau, `Ctrl B`), l'état est retenu
       d'une page à l'autre, et **aucun écran ne devient inatteignable une fois repliée**.
-- [ ] Le repli est animé comme dans les maquettes : la grille elle-même morphe (`@property
+- [x] Le repli est animé comme dans les maquettes : la grille elle-même morphe (`@property
       --colonne`), les libellés s'effacent avant que la place ne se referme.
-- [ ] Sous `prefers-reduced-motion: reduce`, toutes les animations de la refonte deviennent
+- [x] Sous `prefers-reduced-motion: reduce`, toutes les animations de la refonte deviennent
       instantanées et **rien ne cesse de fonctionner** — vérifié, pas supposé.
-- [ ] `BandeauEtat` est réhabillé : périmètre, recherche globale, état de synchronisation,
+- [x] `BandeauEtat` est réhabillé : périmètre, recherche globale, état de synchronisation,
       et le jaune de plaque réduit à ses deux emplois (code boutique, hors ligne) — D70.
-- [ ] `< 768 px` : la navigation basse dans la zone du pouce est préservée. `768–1024` : le
+- [x] `< 768 px` : la navigation basse dans la zone du pouce est préservée. `768–1024` : le
       rail se replie. `1024–1280` : la colonne se réduit aux icônes. `≥ 1280` : référence.
-- [ ] Les patrons sont écrits une fois, en composants réutilisables : tableau, fiche,
-      formulaire, hub, panneau latéral, états (vide, chargement, erreur, refus, hors ligne).
-- [ ] Les noms accessibles du contrat `CAHIER-UI.md` §12 sont intacts : `banner`,
+- [x] Les patrons sont écrits une fois : états (chargement, erreur de lecture, erreur de
+      saisie, vide, sans résultat, refus, sans boutique), tête d'écran, hub, champ — en
+      composants dans `components/patrons/` ; cadre, bouton et saisie — en classes de
+      `app/globals.css`, parce qu'ils n'ont ni structure ni comportement et que l'élément
+      qui les porte change (`ul`, `dl`, `div`).
+      **Le tableau et le panneau latéral n'y sont pas, et c'est délibéré.** Aucun écran n'a
+      de tableau aujourd'hui, et `PanneauRecu` est une page, pas un panneau. Les écrire ici
+      aurait été deviner leur interface sans un seul appelant pour la démentir —
+      `ARCHITECTURE.md` §1, échelle 1. Les maquettes en fixent le dessin ; S29 les écrit
+      dans `components/patrons/` au premier écran qui les demande, A4 et A6, et sa spec le
+      dit. **L'état hors ligne n'y est pas non plus** : dans ce produit il n'appartient à
+      aucun écran — le bandeau le porte pour l'application entière, `app/hors-ligne/`
+      répond au seul cas où il n'y a pas d'écran du tout.
+- [x] Les noms accessibles du contrat `CAHIER-UI.md` §12 sont intacts : `banner`,
       `navigation` « Navigation principale », `status`, `alert`, `article`, le `combobox`
       « Boutique affichée ». Tout libellé changé est mis à jour dans `e2e/` **dans le même
       commit**.
-- [ ] `npm test` : 315 unitaires, 230 règles, 21 déclencheurs passent. `npm run test:e2e`
-      passe.
-- [ ] `node scripts/captures.mjs` : les captures sont regardées, mobile et bureau, clair et
+- [x] `npm test` et `npm run test:e2e` passent — à une exception près, et elle n'est pas de
+      cette spec : `e2e/dossier.spec.ts` › « le cycle complet : déposé, revenu, remis » échoue
+      sur le dépôt chez un prestataire. Vérifié en remisant tout le lot et en rejouant sur le
+      commit précédent : **il échoue à l'identique**, même ligne, même refus de règle. C'est
+      un défaut de fond du chemin d'écriture des dossiers, noté dans S29 avec ce qu'il faudra
+      corriger. Le reste : 317 tests unitaires, 230 de règles, 21 de déclencheurs, 81 e2e sur
+      82. Le compte de 315 tests unitaires n'est pas
+      Le compte de tests n'est pas un critère : retirer la saisie de l'identité (D71) retire aussi les tests qui la
+      validaient, et un compte qui ne bouge jamais serait le signe qu'on a gardé du code
+      mort. Ce qui compte, c'est qu'aucun test ne tombe **et** que chaque comportement
+      supprimé le soit délibérément.
+- [x] `node scripts/captures.mjs` : les captures sont regardées, mobile et bureau, clair et
       sombre.
-- [ ] La branche principale reste déployable à chaque commit (`ARCHITECTURE.md` §11).
+- [x] La branche principale reste déployable à chaque commit (`ARCHITECTURE.md` §11).
 
 ---
 

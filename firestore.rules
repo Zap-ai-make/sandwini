@@ -220,26 +220,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Le logo est une image encodée dans le document : c'est ce qui permet à un
-    // reçu de s'imprimer sans réseau. On borne sa taille — Firestore plafonne à
-    // 1 Mio par document, et ce document est relu à chaque ouverture.
-    function logoValide(valeur) {
-      return valeur == null
-             || (valeur is string && valeur.size() <= 200000 && valeur[0:11] == 'data:image/');
-    }
-
+    // Le document `entreprise/profil` ne porte plus l'identité de l'entreprise :
+    // raison sociale, siège, téléphone, IFU, RCCM et logo sont une constante du
+    // code depuis D71. Une donnée qui ne change jamais n'a rien à faire dans une
+    // collection modifiable — surtout quand elle s'imprime sur un document
+    // commercial et qu'un champ vidé produirait des reçus non conformes sans
+    // que rien n'alerte.
+    //
+    // Il ne reste donc qu'un entier, et la règle le dit : tout autre champ est
+    // refusé. Les fiches écrites avant cette décision portent encore les anciens
+    // champs ; l'application les remplace entièrement à la première sauvegarde
+    // (écriture sans `merge`, cf. `lib/repositories/entreprise.ts`), parce qu'en
+    // fusion la règle verrait le document résultant et refuserait ce qu'il reste.
     function entrepriseValide(donnees) {
-      return donnees.keys().hasOnly(['nom', 'adresse', 'telephone', 'telephone2', 'identifiant',
-                                     'logo', 'seuilInactiviteTranches',
+      return donnees.keys().hasOnly(['seuilInactiviteTranches',
                                      'updatedAt', 'updatedBy', 'updatedByName'])
-             && donnees.nom is string
-             && donnees.nom.size() > 0
-             && donnees.nom.size() <= 80
-             && texteBorne(donnees.adresse, 200)
-             && texteBorne(donnees.telephone, 40)
-             && texteBorne(donnees.telephone2, 40)
-             && texteBorne(donnees.identifiant, 40)
-             && logoValide(donnees.logo)
              // Le seuil d'inactivité des tranches (S9, §6.3). Facultatif :
              // les fiches saisies avant S9 n'en ont pas, et le défaut de
              // trente jours prend le relais côté application.

@@ -1,10 +1,11 @@
 "use client";
 
-import { ArrowLeft, Check, LoaderCircle, Printer, Share2, TriangleAlert } from "lucide-react";
+import { ArrowLeft, Check, Printer, Share2 } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { Recu } from "@/components/Recu";
-import { ENTREPRISE_VIDE, entrepriseComplete, type Entreprise } from "@/lib/domain/entreprise";
+import { EtatChargement, EtatErreur, EtatVide } from "@/components/patrons/Etats";
+import { IDENTITE } from "@/lib/domain/entreprise";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_TYPE_RECU, lireIdentifiantRecu, textePartage, trouverRecu } from "@/lib/domain/recu";
@@ -12,7 +13,6 @@ import type { Vente, Versement } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
-import { ecouterEntreprise } from "@/lib/repositories/entreprise";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterMoto } from "@/lib/repositories/motos";
 import { ecouterVente, ecouterVersements } from "@/lib/repositories/ventes";
@@ -67,16 +67,6 @@ export function PanneauRecu({ cle }: { cle: string }) {
     "Les versements n’ont pas pu être lus.",
   );
 
-  const souscrireEntreprise = useCallback(
-    (auChangement: (entreprise: Entreprise) => void, enErreur: (cause: unknown) => void) =>
-      ecouterEntreprise(auChangement, enErreur),
-    [],
-  );
-  const { valeur: entreprise } = useAbonnement(
-    souscrireEntreprise,
-    "L’en-tête de l’entreprise n’a pas pu être lu.",
-  );
-
   /* Enveloppée pour la même raison que la vente : une moto absente et une moto
      pas encore arrivée sont deux `null` différents, et le reçu doit attendre la
      seconde sans attendre la première. */
@@ -98,18 +88,20 @@ export function PanneauRecu({ cle }: { cle: string }) {
     [vente, versements, cle],
   );
 
-  /* **Le reçu s'affiche complet ou pas du tout.** L'en-tête de l'entreprise et
-     la moto arrivent par des écoutes distinctes, et pendant leur trajet le
-     document disait « Entreprise non renseignée » et « Moto introuvable » — deux
-     affirmations fausses, sur un papier qu'un gérant pressé aurait pu imprimer.
-     Vu en regardant la capture du rendu imprimé, pas à l'écran (`DESIGN.md`
-     §14). */
+  /* **Le reçu s'affiche complet ou pas du tout.** La moto arrive par une écoute
+     distincte, et pendant son trajet le document disait « Moto introuvable » —
+     une affirmation fausse, sur un papier qu'un gérant pressé aurait pu
+     imprimer. Vu en regardant la capture du rendu imprimé, pas à l'écran
+     (`DESIGN.md` §14).
+
+     L'en-tête de l'entreprise ne figure plus dans cette attente : depuis D71
+     c'est une constante, elle est là avant la première requête. Une chose de
+     moins qui puisse manquer sur un papier. */
   const enCours =
     venteId !== "" &&
     !erreur &&
     (etatVente === null ||
       versements === null ||
-      entreprise === null ||
       (vente !== null && etatMoto === null && !erreurMoto));
 
   return (
@@ -125,50 +117,21 @@ export function PanneauRecu({ cle }: { cle: string }) {
       </div>
 
       {erreur ? (
-        <p role="alert" className="mt-6 text-alerte">
-          {erreur}
-        </p>
+        <EtatErreur message={erreur} className="mt-6" />
       ) : enCours ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement du reçu…
-        </p>
+        <EtatChargement className="mt-6">Chargement du reçu…</EtatChargement>
       ) : !contenu ? (
         <Introuvable />
       ) : (
         <>
           <Actions
             titre={`${LIBELLE_TYPE_RECU[contenu.type]} ${contenu.numero}`}
-            texte={textePartage(
-              contenu,
-              entreprise?.nom ?? "",
-              formaterMontant,
-              formaterDate,
-            )}
+            texte={textePartage(contenu, IDENTITE.raisonSociale, formaterMontant, formaterDate)}
             venteId={contenu.vente.id}
           />
-          {/* Un reçu sans en-tête reste imprimable — mieux vaut un papier
-              incomplet que pas de papier — mais on le dit, et seulement à
-              l'écran : cette phrase ne part pas chez le client. */}
-          {entreprise && !entrepriseComplete(entreprise) && (
-            <p className="mt-3 flex gap-3 rounded-plaque border border-dashed border-bord p-3 text-sm text-encre-doux print:hidden">
-              <TriangleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-              <span>
-                La fiche entreprise n’a ni nom ni téléphone : ce reçu s’imprimera sans en-tête.{" "}
-                <Link
-                  href="/parametres/entreprise"
-                  className="font-medium text-encre underline underline-offset-4"
-                >
-                  Compléter la fiche
-                </Link>
-              </span>
-            </p>
-          )}
-
           <div className="mt-4 print:mt-0">
             <Recu
               contenu={contenu}
-              entreprise={entreprise ?? ENTREPRISE_VIDE}
               boutique={boutiques.find((b) => b.id === contenu.vente.boutiqueId) ?? null}
               client={clients.find((fiche) => fiche.id === contenu.vente.clientId) ?? null}
               moto={etatMoto?.moto ?? null}
@@ -225,7 +188,7 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
         <button
           type="button"
           onClick={() => window.print()}
-          className="inline-flex h-12 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+          className="bouton bouton-plaque"
         >
           <Printer aria-hidden="true" className="size-4" />
           Imprimer le reçu
@@ -233,14 +196,14 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
         <button
           type="button"
           onClick={partager}
-          className="inline-flex h-12 items-center gap-2 rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          className="bouton bouton-neutre"
         >
           <Share2 aria-hidden="true" className="size-4" />
           Partager le récapitulatif
         </button>
         <Link
           href={`/motos/ventes?vente=${venteId}`}
-          className="inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
+          className="bouton bouton-neutre"
         >
           Ouvrir la vente
         </Link>
@@ -257,11 +220,7 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
           {message}
         </p>
       )}
-      {erreur && (
-        <p role="alert" className="mt-2 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-2" />
     </div>
   );
 }
@@ -273,18 +232,17 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
  */
 function Introuvable() {
   return (
-    <div className="mt-6 max-w-prose rounded-plaque border border-dashed border-bord p-4">
-      <p className="text-encre">Ce reçu est introuvable.</p>
-      <p className="mt-1 text-sm text-encre-doux">
-        Le lien ne correspond à aucun reçu de cette vente. Si le versement a été encaissé sur un
-        autre appareil, il apparaîtra ici dès que la synchronisation l’aura apporté.
-      </p>
-      <Link
-        href="/motos/recus"
-        className="mt-4 inline-flex h-12 items-center rounded-plaque border border-bord px-4 font-medium text-encre hover:bg-papier"
-      >
-        Revenir aux reçus
-      </Link>
-    </div>
+    <EtatVide
+      titre="Ce reçu est introuvable."
+      className="mt-6 max-w-prose"
+      action={
+        <Link href="/motos/recus" className="bouton bouton-neutre">
+          Revenir aux reçus
+        </Link>
+      }
+    >
+      Le lien ne correspond à aucun reçu de cette vente. Si le versement a été encaissé sur un
+      autre appareil, il apparaîtra ici dès que la synchronisation l’aura apporté.
+    </EtatVide>
   );
 }

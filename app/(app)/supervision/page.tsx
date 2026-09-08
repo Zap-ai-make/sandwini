@@ -1,8 +1,10 @@
 "use client";
 
-import { ChevronRight, LoaderCircle, Settings } from "lucide-react";
+import { ChevronRight, Settings } from "lucide-react";
 import Link from "next/link";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
+import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
+import { TetePage } from "@/components/patrons/Page";
 import { LIBELLE_METIER, reunirMetiers, type Metier } from "@/lib/domain/boutique";
 import { ESPACES } from "@/lib/domain/espaces";
 import { CODE_ENTREPRISE, usePerimetre } from "@/lib/perimetre/perimetre";
@@ -27,28 +29,25 @@ export default function Supervision() {
 
   return (
     <div>
-      <h1 className="text-2xl font-semibold tracking-tight text-encre">Supervision</h1>
-      <p className="mt-2 max-w-prose text-encre-doux">
-        L’entreprise entière, ou une boutique à la fois. Ce que vous ouvrez ici s’inscrit dans le
-        bandeau, en haut&nbsp;: c’est le périmètre de tout ce que vous verrez et saisirez ensuite.
-      </p>
+      <TetePage
+        titre="Supervision"
+        sousTitre={
+          <>
+            L’entreprise entière, ou une boutique à la fois. Ce que vous ouvrez ici s’inscrit dans le
+            bandeau, en haut&nbsp;: c’est le périmètre de tout ce que vous verrez et saisirez ensuite.
+          </>
+        }
+      />
 
       <InvitationBoutique />
 
-      {erreur && (
-        <p role="alert" className="mt-6 text-sm text-alerte">
-          {erreur}
-        </p>
-      )}
+      <EtatErreur message={erreur} className="mt-6" />
 
       {chargement ? (
-        <p className="mt-6 flex items-center gap-3 text-encre-doux">
-          <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-          Chargement des boutiques…
-        </p>
+        <EtatChargement className="mt-6">Chargement des boutiques…</EtatChargement>
       ) : actives.length > 0 ? (
         <nav aria-label="Boutiques" className="mt-6">
-          <ul className="divide-y divide-bord overflow-hidden rounded-plaque border border-bord bg-papier">
+          <ul className="cadre cadre-liste">
             {/* L’entreprise entière vient en premier : c’est la vue par défaut du
                 responsable, et choisir une boutique est le geste qui rétrécit. La
                 plaque porte le code de l’entreprise, comme dans le bandeau. */}
