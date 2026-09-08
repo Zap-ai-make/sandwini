@@ -1657,3 +1657,58 @@ ici aurait été deviner leur interface sans un seul appelant pour la démentir.
 S29 les crée dans `components/patrons/` au premier écran qui les demande (A4 et
 A6), et sa spec le dit noir sur blanc pour que le huitième écran ne redessine
 pas le sien.
+
+---
+
+## D74 — Le seuil d'un panneau se mesure sur la zone de travail, pas sur la fenêtre
+
+*S29, A6. Les maquettes font basculer la liste et sa fiche en deux colonnes dès
+1152 px de fenêtre. À 1280 px, le rendu réel a démenti le nombre.*
+
+**Ce que la fenêtre ne dit pas.** La coquille prend 296 px — rail et colonne des
+écrans. À 1280 px de fenêtre il en reste 984 pour un panneau de 420 et un
+tableau de six colonnes : « Paiement » sortait à moitié du cadre, vu sur capture
+puis mesuré. La même fenêtre, colonne repliée, laisse 1264 px et le couple
+respire. Une largeur de fenêtre ne dit rien de la place dont un composant
+dispose ; seule sa boîte le sait.
+
+**La bascule est donc une requête de conteneur**, à 68 rem de zone de travail.
+Elle a un effet que le seuil de fenêtre n'aurait jamais eu : replier la colonne
+des écrans (Ctrl B) fait apparaître la fiche à côté de sa liste. Le repli
+récompense enfin le geste, au lieu de rendre du vide.
+
+**En dessous, le panneau remplace la liste au lieu de s'empiler dessous.** Les
+maquettes les empilent, ce qui tient avec leurs sept lignes ; avec deux cents
+ventes, ouvrir une fiche demanderait de faire défiler toute la liste pour
+l'atteindre. La liste est masquée, pas démontée : la recherche et les filtres
+sont un état, et on les retrouve en fermant.
+
+**Portée.** A6 (ventes), et tout écran qui posera une liste à côté d'un détail.
+A7 applique le même raisonnement à son relais, qui remplace la file sous 1024 px
+pour la même raison.
+
+---
+
+## D75 — La synchronisation revient dans le hub des réglages, sous son propre titre
+
+*S29, A9. Renverse une décision de S28, que `lib/domain/espaces.test.ts`
+gardait.*
+
+**Ce que S28 avait décidé, et pourquoi.** « Synchronisation » n'est pas une
+administration : elle n'exige aucun droit, elle décrit l'état d'un appareil. Le
+hub des réglages ne montre que les écrans qui savent dire ce qu'on y fait ;
+l'entrée n'ayant pas de phrase, elle en était écartée — volontairement, et un
+test le tenait.
+
+**Ce que la maquette A9 fait de la même tension.** Elle ne l'écarte pas : elle
+lui donne une section à elle, « Cet appareil », et la phrase qui manquait — ce
+qui attend ici n'attend pas ailleurs. La distinction est dite au lieu d'être
+obtenue par une absence.
+
+**Pourquoi c'est mieux.** Un écran présent dans la colonne de gauche et absent
+du hub est un écran qu'on croit disparu. Le hub existe précisément pour
+*expliquer* ses destinations ; celle-ci avait le plus besoin d'être expliquée.
+
+**Ce que le test garde encore.** Il n'assertait plus l'absence de la phrase mais
+ce qui reste vrai et structurant : cette entrée n'exige aucune capacité, donc
+elle ne se range pas avec ce qui en exige une.

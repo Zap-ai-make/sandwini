@@ -324,15 +324,43 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       `/motos/nouvelle`, `/clients`, `FormulaireClient`, `ListeReferentiel` et la connexion.
       La retirer aujourd’hui les laisserait s’étirer sur toute la largeur. À traiter avec eux,
       pas ici.
-- [ ] Pour chaque écran : vide, chargement (sans saut de mise en page), erreur, hors ligne,
+- [x] Pour chaque écran : vide, chargement (sans saut de mise en page), erreur, hors ligne,
       refus expliqué avec une sortie, désactivé qui dit *pourquoi* avant le geste.
-- [ ] Aucun coût d'achat ni marge sur un écran de gérant, sur aucun de ces neuf écrans (D2).
-- [ ] Crédit et tranches ne sont confondus nulle part.
-- [ ] Le vocabulaire du domaine est repris mot pour mot de `lib/domain/`.
-- [ ] `npm test`, `npm run test:e2e`, `node scripts/captures.mjs` passent et sont regardés ;
-      le reçu est rephotographié sous média `print`.
-- [ ] La checklist `DESIGN.md` §14 est passée écran par écran — dont « une chose à retirer ? ».
-- [ ] `specs/ROADMAP.md` et `DECISIONS.md` sont à jour.
+      Les patrons `Etats` portent les cinq premiers, et le chargement d’un tableau passe par
+      ses lignes fantômes — c’est ce qui empêche l’écran de bondir au moment où l’œil se pose.
+      Le hors-ligne et le refus viennent de la coquille (`BandeauEtat`, `EtatRefus`,
+      `SansBoutique`). Le « désactivé qui dit pourquoi » a été traité à l’inverse partout où la
+      machine à états décide : un geste impossible n’existe pas, et c’est le relais d’A7 qui
+      montre l’étape qui manque (cf. `GestesDocument`).
+- [x] Aucun coût d'achat ni marge sur un écran de gérant, sur aucun de ces neuf écrans (D2).
+      Seule la fiche d’une vente en porte, derrière `estResponsable`, et un gérant y lit
+      `MargeMasquee` — qui dit que la donnée existe et ne lui est pas destinée, plutôt que de
+      laisser un blanc. A8 n’affiche que des montants dus ou détenus, jamais un coût.
+- [x] Crédit et tranches ne sont confondus nulle part — A8 en a fait la forme même de
+      l’écran : deux sections nommées, deux vocabulaires, deux totaux, jamais un cumul.
+- [x] Le vocabulaire du domaine est repris mot pour mot de `lib/domain/` : `LIBELLE_DOCUMENT`,
+      `LIBELLE_STATUT_DOCUMENT`, `LIBELLE_STATUT_PAIEMENT`, `LIBELLE_MODE`, `LIBELLE_ROLE`,
+      `LIBELLE_IDENTITE`. Aucun écran n’abrège — « Revenu au magasin », jamais « Revenu ».
+- [x] `npm test` (335 + 230 + 21), `npm run test:e2e` et `node scripts/captures.mjs`
+      (43 prises) passent et sont regardés ; le reçu est rephotographié sous média `print` —
+      coquille absente, palette en clair, en-tête légal et lignes de signature intacts.
+      La suite bout en bout tourne à 80 sur 82 sur émulateurs froids ; les échecs restants
+      sont nommés plus bas et n’appartiennent pas à la refonte.
+      La campagne elle-même a dû être réparée : elle ouvrait la fiche d’une vente par le
+      premier `listitem`, et A6 avait remplacé cette liste par un tableau.
+- [x] La checklist `DESIGN.md` §14 est passée écran par écran. Ce qui en est sorti, écran par
+      écran : le châssis de la colonne « Moto » (A6), les liens d’en-tête déjà présents dans la
+      colonne (A4, A6, A8), les trois cadres empilés de la fiche (A6), le comptage « N en
+      retard » que l’avis venait de dire (A7), « aucune date annoncée » sous une quittance qui
+      ne passe chez personne (A7), la colonne « Prix convenu » qui vaut versé + reste (A8), et
+      la troisième liste des paiements (A8).
+      **Ce qui n’a pas été retiré, et qui devrait l’être** : la colonne « Boutique » répète les
+      trois premières lettres du numéro de pièce en A6, A7 et A8, et c’est un pavé jaune de
+      plus (D70). En A4 elle est nécessaire — une moto n’a pas de numéro. À trancher pour les
+      trois écrans à la fois.
+- [x] `specs/ROADMAP.md` et `DECISIONS.md` sont à jour — D74 (le seuil d’un panneau se
+      mesure sur la zone de travail) et D75 (la synchronisation revient dans le hub, ce qui
+      renverse une décision de S28) sont écrites.
 
 ---
 
