@@ -77,6 +77,21 @@ chantier devait s'arrêter là, le produit y aurait déjà gagné.
 
 ---
 
+## Défauts ouverts
+
+Un défaut qui survit à la spec qui l'a produit devient une spec à lui : il a un symptôme daté, des
+critères d'acceptation, et il se ferme comme les autres. Le laisser vivre en note de bas de rapport,
+c'est le voir revenir sous un autre nom.
+
+| ID  | Spec                                              | Touche | Périmètre | Statut  |
+|-----|---------------------------------------------------|--------|-----------|---------|
+| S30 | Le dépôt chez un prestataire refusé par les règles | S11    | MVP       | à faire |
+
+Rang : avant toute nouvelle fonctionnalité. C'est une capacité MVP livrée qui échoue une fois sur
+deux au comptoir, et le gérant n'a aucun moyen de savoir si l'argent est sorti de la caisse.
+
+---
+
 ## Ce que le MVP ne fait volontairement pas
 
 Espace pièces détachées · inventaires · caisse et clôture · chiffres de la supervision · pages publiques
