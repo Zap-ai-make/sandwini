@@ -1,7 +1,6 @@
 "use client";
 
-import { LoaderCircle } from "lucide-react";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import { statutsSuivants, validerDepot, type SaisieDepot } from "@/lib/domain/dossier";
 import { estTypeDocument, type Prestataire } from "@/lib/domain/prestataire";
@@ -15,7 +14,7 @@ import {
   type StatutDocument,
 } from "@/lib/domain/vente";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import { avancerDocument } from "@/lib/repositories/dossier";
+import { avancerDocument, messageErreurDossier } from "@/lib/repositories/dossier";
 import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 import { Champ } from "@/components/patrons/Champ";
 import { EtatErreur } from "@/components/patrons/Etats";
@@ -46,27 +45,38 @@ export function GestesDocument({
 }) {
   const session = useSession();
   const [depotOuvert, setDepotOuvert] = useState(false);
-  const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  /* Un geste part une fois. Le verrou se leve des que le document a change de
+     statut — ce que l'ecriture locale provoque en un souffle. */
+  const gesteParti = useRef(false);
+  useEffect(() => {
+    gesteParti.current = false;
+  }, [document.venteId, document.type, document.statut]);
 
   const suivants = statutsSuivants(document.type, document.statut);
 
-  async function avancer(vers: StatutDocument, depot?: SaisieDepot) {
-    if (session.statut !== "connecte" || envoi) return;
+  /* On n'attend pas le serveur pour rendre la main (D76). Firestore applique
+     l'ecriture au cache local sur-le-champ : la ligne affiche deja le nouveau
+     statut, donc le formulaire n'a plus de raison d'etre ouvert et l'etape
+     suivante doit etre offerte. Attendre l'accuse de reception, c'etait laisser
+     le gerant devant un formulaire qui ne se referme jamais — pour toujours au
+     comptoir sans reseau. Ce qui n'est pas encore parti est annonce par le
+     bandeau ; un refus tardif revient par le `catch`. */
+  function avancer(vers: StatutDocument, depot?: SaisieDepot) {
+    if (session.statut !== "connecte" || gesteParti.current) return;
     setErreur(null);
-    setEnvoi(true);
     try {
-      await avancerDocument(
+      const enregistre = avancerDocument(
         document,
         vers,
         { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
         depot,
       );
+      gesteParti.current = true;
       setDepotOuvert(false);
+      enregistre.catch((cause) => setErreur(messageErreurDossier(cause)));
     } catch (cause) {
       setErreur(cause instanceof Error ? cause.message : "L’enregistrement a échoué.");
-    } finally {
-      setEnvoi(false);
     }
   }
 
@@ -92,8 +102,7 @@ export function GestesDocument({
               <button
                 key={vers}
                 type="button"
-                disabled={envoi}
-                onClick={() => void avancer(vers)}
+                onClick={() => avancer(vers)}
                 /* Le premier proposé est celui qui fait avancer le document ;
                    « Non concerné par cette vente » le sort du parcours et ne
                    doit pas se cliquer par habitude. */
@@ -105,7 +114,6 @@ export function GestesDocument({
                       : "bouton bouton-neutre disabled:opacity-60"
                 }
               >
-                {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                 {LIBELLE_ACTION[vers]}
               </button>
             ),
@@ -116,9 +124,8 @@ export function GestesDocument({
       {depotOuvert && (
         <FormulaireDepot
           type={document.type}
-          envoi={envoi}
           onAnnuler={() => setDepotOuvert(false)}
-          onDeposer={(depot) => void avancer("chez_prestataire", depot)}
+          onDeposer={(depot) => avancer("chez_prestataire", depot)}
         />
       )}
     </div>
@@ -136,12 +143,10 @@ const LIBELLE_ACTION: Record<StatutDocument, string> = {
 
 function FormulaireDepot({
   type,
-  envoi,
   onAnnuler,
   onDeposer,
 }: {
   type: DocumentDossier["type"];
-  envoi: boolean;
   onAnnuler: () => void;
   onDeposer: (depot: SaisieDepot) => void;
 }) {
@@ -289,10 +294,8 @@ function FormulaireDepot({
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="submit"
-              disabled={envoi}
               className="bouton bouton-plaque disabled:opacity-60"
             >
-              {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
               Enregistrer le dépôt
             </button>
             <button type="button" onClick={onAnnuler} className="bouton bouton-neutre">
