@@ -1,5 +1,6 @@
 import { Timestamp, collection, doc, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import {
   lireJour,
   transitionAutorisee,
@@ -29,8 +30,20 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * faire avancer le même document. Les règles Firestore refuseraient de toute
  * façon (D27), mais elles refusent sans expliquer — autant s'arrêter avant, avec
  * une phrase.
+ *
+ * **La fonction ne s'attend pas, et c'est le point.** Elle valide tout de suite
+ * — un refus de transition ou un dépôt incomplet lève ici, sur-le-champ — puis
+ * rend la promesse du lot sans l'attendre. Cette promesse ne se résout qu'à
+ * l'accusé de réception du serveur (`lib/reseau/file-ecritures.ts`) : hors
+ * ligne elle reste en suspens pour toujours. Un écran qui l'attendait bloquait
+ * le geste au comptoir exactement là où le hors-ligne devait le rendre
+ * possible. L'appelant avance sur l'écriture locale, et rattache un `catch`
+ * pour le refus tardif — c'est ce que fait déjà `FormulaireClient`.
+ *
+ * `suivreEcriture` la compte tant qu'elle n'est pas confirmée : c'est le
+ * bandeau, et lui seul, qui dit au gérant ce qui reste à envoyer.
  */
-export async function avancerDocument(
+export function avancerDocument(
   document: DocumentDossier,
   vers: StatutDocument,
   auteur: Auteur,
@@ -99,5 +112,25 @@ export async function avancerDocument(
     ...traceCreation(auteur),
   });
 
-  await lot.commit();
+  return suivreEcriture(lot.commit());
+}
+
+/**
+ * Ce qu'on montre au gérant quand le serveur finit par refuser.
+ *
+ * Le message brut de Firestore — « PERMISSION_DENIED: false for 'create'
+ * @ L161, evaluation error at L835 » — est de l'anglais qui cite des numéros
+ * de ligne d'un fichier de règles. Affiché tel quel, il n'apprend rien à
+ * quelqu'un qui tient un comptoir et ne lui dit pas quoi faire.
+ *
+ * Même forme que `messageErreurClient` : ce sont les mêmes refus, vus depuis
+ * un autre écran.
+ */
+export function messageErreurDossier(cause: unknown): string {
+  const code = (cause as { code?: string }).code ?? "";
+  if (code.includes("permission-denied"))
+    return "Ce document n’a pas pu être enregistré : cette action ne vous est pas permise.";
+  if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
+  if (code.includes("not-found")) return "Cette vente n’existe plus.";
+  return "Le dossier n’a pas pu être mis à jour. Réessayez.";
 }
