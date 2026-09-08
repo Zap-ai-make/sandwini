@@ -975,6 +975,192 @@
     letter-spacing: 0.08em;
     font-variant-numeric: tabular-nums;
   }
+
+  /* --------------------------------------------------------------------------
+     A7 — LE RELAIS D'UN DOCUMENT.
+
+     Les quatre statuts d'un papier sont un déplacement physique entre le
+     magasin, un prestataire et le client : l'ordre porte une information dont
+     le gérant a besoin. C'est le seul endroit du produit où une suite numérotée
+     est légitime (`DESIGN.md` §6) — ailleurs, un numéro devant une liste
+     promet un ordre que la donnée ne tient pas.
+
+     Le rang n'est pas rempli de blanc comme dans la maquette : en sombre,
+     `--color-solde` devient un vert clair, et du blanc dessus tombe sous le
+     seuil. Le texte prend la surface de sa propre sémantique — clair sur foncé
+     au jour, foncé sur clair la nuit, sans rien décider ici.
+     -------------------------------------------------------------------------- */
+  .relais {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .relais > li {
+    position: relative;
+    display: grid;
+    gap: 2px;
+    padding-top: 1.75rem;
+  }
+
+  /* Le trait qui relie les rangs, tiré d'un rang à l'autre et coupé aux
+     extrémités : la ligne ne part pas dans le vide à gauche du premier ni à
+     droite du dernier. */
+  .relais > li::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--color-bord);
+  }
+
+  .relais > li:first-child::before {
+    left: 9px;
+  }
+
+  .relais > li:last-child::before {
+    right: calc(100% - 9px);
+  }
+
+  .relais-rang {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-bord);
+    border-radius: 999px;
+    background: var(--color-papier);
+    color: var(--color-encre-doux);
+    font-family: var(--font-code);
+    font-size: 0.625rem;
+    font-weight: 700;
+  }
+
+  .relais > li[data-etape="fait"] .relais-rang {
+    border-color: var(--color-solde);
+    background: var(--color-solde);
+    color: var(--color-solde-surface);
+  }
+
+  .relais > li[data-etape="fait"]::before {
+    background: var(--color-solde);
+  }
+
+  .relais > li[data-etape="cours"] .relais-rang {
+    border-color: var(--color-goutte);
+    background: var(--color-goutte);
+    color: var(--color-goutte-surface);
+  }
+
+  .relais-nom {
+    font-weight: 700;
+  }
+
+  .relais > li[data-etape="attente"] .relais-nom {
+    color: var(--color-encre-doux);
+    font-weight: 600;
+  }
+
+  .relais-quand {
+    color: var(--color-encre-doux);
+    font-size: var(--text-legende);
+  }
+
+  /* Sous 768 px, le relais se lit de haut en bas. Quatre colonnes de 90 px
+     coupent « Chez le prestataire » en trois lignes, et le parcours ne se lit
+     plus. Le trait bascule avec : il devient vertical, et relie les rangs
+     comme il le faisait horizontalement. */
+  @media (max-width: 767px) {
+    .relais {
+      grid-auto-flow: row;
+      grid-auto-columns: auto;
+      gap: 0;
+    }
+
+    .relais > li {
+      padding: 0.375rem 0 0.375rem 1.875rem;
+    }
+
+    .relais > li::before {
+      top: 0;
+      bottom: 0;
+      left: 9px;
+      right: auto;
+      width: 2px;
+      height: auto;
+    }
+
+    .relais > li:first-child::before {
+      top: 1.125rem;
+      left: 9px;
+    }
+
+    .relais > li:last-child::before {
+      bottom: calc(100% - 1.125rem);
+      right: auto;
+    }
+
+    .relais-rang {
+      top: 0.375rem;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     A7 — La pastille qui se clique.
+
+     Dans la file des dossiers, chaque document a sa colonne et son mot ; le
+     mot est aussi la porte vers son parcours, sous le tableau. Le geste doit se
+     voir avant le clic, et le choix rester visible après : sinon on ne sait
+     plus lequel des vingt-huit documents de l'écran le relais raconte.
+     -------------------------------------------------------------------------- */
+  .pastille-bouton {
+    cursor: pointer;
+  }
+
+  .pastille-bouton:hover {
+    box-shadow: 0 0 0 1px currentColor;
+  }
+
+  .pastille-bouton[aria-current="true"] {
+    box-shadow: 0 0 0 2px var(--color-encre);
+  }
+
+  /* La ligne dont un document a dépassé la date annoncée. Le filet double le
+     mot « En retard » déjà écrit dans la colonne du document — il ne le
+     remplace pas (`DESIGN.md` §5) ; il sert à retrouver la ligne de loin dans
+     une file de quarante.
+
+     Les deux règles qui suivent rejouent le marquage de la ligne ouverte, après
+     celle du retard : quand une ligne est les deux à la fois, c'est celle qu'on
+     regarde qui l'emporte — le retard, lui, est encore écrit dans sa colonne. */
+  .tableau tbody tr.ligne-retard td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-alerte);
+  }
+
+  .tableau tbody tr.ligne-active td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-encre);
+  }
+
+  @media (max-width: 1023px) {
+    .tableau tbody tr.ligne-retard td:first-child {
+      box-shadow: none;
+    }
+
+    .tableau tbody tr.ligne-retard {
+      box-shadow: inset 3px 0 0 var(--color-alerte);
+    }
+
+    .tableau tbody tr.ligne-active {
+      box-shadow: inset 3px 0 0 var(--color-encre);
+    }
+  }
 }
 
 @media print {

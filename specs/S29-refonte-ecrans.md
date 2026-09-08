@@ -191,8 +191,69 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       format A5, soit 560 px : le poser dans un panneau de 420 le comprimerait au lieu de
       le montrer. Le patron existe désormais et l'attend ; ce qui manque est une maquette à
       confronter, pas du code.
-- [ ] **A7 Dossiers en attente** — qui détient quel papier, et ce qui est en retard. Le
+- [x] **A7 Dossiers en attente** — qui détient quel papier, et ce qui est en retard. Le
       relais des quatre documents avance sans recharger la page.
+      **Une colonne par document.** L'écran empilait des cartes qui listaient, en petites
+      lignes grises, les seuls documents encore en cours d'une vente. La question posée —
+      qui détient quel papier — se compare d'un dossier à l'autre : elle se range en
+      colonnes. Les quatre y sont désormais, réglés compris, parce que c'est en voyant les
+      trois premiers remis qu'on comprend qu'il ne manque que le quatrième. La colonne
+      « Chez qui, depuis » nomme le plus ancien dépôt — celui dont le délai s'allonge, pas
+      celui qu'on vient de confier — et compte les jours de jour à jour, comme
+      `estEnRetard` : un dépôt du matin se dit « aujourd'hui », pas « 0 jour ».
+      **Le relais naît, et c'est le geste qui manquait.** Cliquer un document ouvre son
+      parcours sous la file : les trois ou quatre étapes du déplacement physique du papier
+      entre le magasin, le prestataire et le client, et le geste suivant. Il fallait
+      auparavant ouvrir la vente pour faire avancer un document, c'est-à-dire quitter la
+      file qu'on est en train de vider. C'est le seul endroit du produit où une suite
+      numérotée est légitime (`DESIGN.md` §6) : l'ordre y porte une information vraie.
+      **La machine à états n'existe plus qu'une fois.** `components/GestesDocument.tsx` est
+      né de l'extraction : la fiche d'une vente et la file des dossiers proposent les mêmes
+      gestes, tirés de `statutsSuivants`, et un chemin autorisé ici mais refusé là serait un
+      défaut invisible jusqu'au jour où le serveur tranche (D65, D27). Le formulaire de
+      dépôt y est passé au patron `Champ` au passage.
+      **Trois écarts avec la maquette.**
+      1. **Aucun bouton grisé.** La maquette grise « Remettre au client » et ajoute une
+         phrase sous les boutons pour dire ce qu'il attend. Le relais le dit déjà, et
+         mieux : l'étape « Revenu au magasin » est là, en gris, juste avant. Un bouton
+         grisé invite à chercher ce qui le débloquerait ; une étape qui reste à franchir
+         dit où le chercher. C'est aussi la règle que S11 s'était donnée.
+      2. **Sous 1024 px, le relais remplace la file** au lieu de s'ajouter dessous — même
+         raison qu'en A6 : avec quarante dossiers repliés en cartes, il faudrait dérouler
+         tout l'écran pour atteindre le papier qu'on vient de choisir. La file est masquée,
+         pas démontée : la recherche et le filtre sont un état, et on les retrouve en
+         fermant. Sous 768 px, le relais lui-même se lit de haut en bas — quatre colonnes de
+         90 px coupent « Chez le prestataire » en trois lignes.
+      3. **Les listes déroulantes « Prestataire » et « Document » ont disparu**, remplacées
+         par la recherche des maquettes (numéro, client, prestataire) et par les trois
+         questions qu'on pose vraiment à une file : en retard, chez un prestataire, à
+         remettre. La seconde liste n'avait plus lieu d'être — les quatre documents ont
+         chacun leur colonne ; la première est dans la recherche, qui accepte le nom du
+         prestataire recopié sur le document.
+      **Quatre défauts trouvés sur capture, dont un vrai.** Cliquer une carte grise en
+      marquait **quatre** — celles de toutes les lignes — et ouvrait le relais de la
+      première venue : un document vit en `ventesMotos/{venteId}/documents/{type}`, son
+      identifiant est donc « carte_grise », le même pour toutes les ventes du monde. La
+      sélection porte désormais sur le couple vente + type. Les trois autres tenaient à la
+      forme : le pavé du tableau s'étirait sur toute la hauteur réservée quand la file était
+      courte, poussant le relais au ras du bas de l'écran (la grille est bornée en
+      `max-height`, plus figée en `height`) ; à 1280 px, colonne dépliée, le numéro de pièce
+      se cassait en trois lignes (il est insécable, et c'est la zone de défilement qui absorbe
+      le débordement, comme en A4) ; et un dépôt du matin s'affichait « 0 jour », là où l'on
+      dit « aujourd'hui ».
+      **Deux choses ont été retirées.** Le comptage répétait « · N en retard » sous l'avis qui
+      venait de le dire ; et « aucune date annoncée » s'écrivait sous l'étape de retour d'une
+      quittance, qui ne passe chez personne et pour laquelle nul n'a jamais promis de date.
+      Reste une redondance non traitée, parce qu'elle dépasse cet écran : la colonne
+      « Boutique » répète les trois premières lettres du numéro de pièce, en A6 comme en A7,
+      et c'est un pavé jaune de plus (D70). En A4 elle est nécessaire — une moto n'a pas de
+      numéro de pièce. À trancher pour les trois écrans à la fois, pas dans un commit.
+      **Le défaut du dépôt de dossier s'est reproduit, et il se nomme.** `e2e/dossier.spec.ts`
+      « le cycle complet » échoue encore : après un dépôt, le formulaire reste ouvert et le
+      gérant lit `PERMISSION_DENIED: false for 'create' @ L161, evaluation error at
+      L835:24…`. Le cache local a écrit « Chez le prestataire » que le serveur refuse. C'est
+      le défaut déjà relevé en S28, il appartient à `lib/repositories/dossier.ts` et demande
+      sa propre spec — pas la refonte.
 - [ ] **A8 Paiements** — **deux sections séparées et nommées** : Dettes (crédit) et Tranches
       (moto retenue). Jamais mêlées dans un même tableau.
 - [ ] **A9 Réglages** — les écrans d'administration atteints sans les chercher, et

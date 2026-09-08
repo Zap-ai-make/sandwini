@@ -139,7 +139,7 @@ export function CeQuiDemandeUneDecision({
     const enRetard: Ligne[] = dossiersEnAttente(
       ventes,
       documents,
-      { ...FILTRES_DOSSIERS_VIDES, enRetardSeulement: true },
+      { ...FILTRES_DOSSIERS_VIDES, etat: "en_retard" },
       maintenant,
     )
       .map((dossier) => {

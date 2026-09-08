@@ -76,10 +76,7 @@ export function transitionAutorisee(
 }
 
 /** Ce qu'on propose à l'écran. Vide sur un statut terminal. */
-export function statutsSuivants(
-  type: TypeDocument,
-  de: StatutDocument,
-): readonly StatutDocument[] {
+export function statutsSuivants(type: TypeDocument, de: StatutDocument): readonly StatutDocument[] {
   return CHEMIN[type][de];
 }
 
@@ -207,7 +204,89 @@ export function validerDepot(saisie: SaisieDepot): string | null {
   return null;
 }
 
+/* --- Le relais d'un document (§7.3) --------------------------------------- */
+
+/** Où en est une étape du parcours, vue depuis le statut d'aujourd'hui. */
+export type EtatEtape = "fait" | "cours" | "attente";
+
+export type EtapeRelais = {
+  statut: StatutDocument;
+  etat: EtatEtape;
+};
+
+/* Les deux parcours, mis à plat. Ce sont les mêmes chemins que `CHEMIN`, lus
+   dans l'autre sens : `CHEMIN` dit ce qu'un statut a le droit de devenir,
+   ceux-ci disent dans quel ordre on les traverse. */
+const PARCOURS_ARRIVE_FAIT: readonly StatutDocument[] = [
+  "a_faire",
+  "revenu_magasin",
+  "remis_client",
+];
+const PARCOURS_PRESTATAIRE: readonly StatutDocument[] = [
+  "a_faire",
+  "chez_prestataire",
+  "revenu_magasin",
+  "remis_client",
+];
+
+/**
+ * Le parcours d'un document, et l'étape où il se trouve.
+ *
+ * Les statuts ne sont pas des cases à cocher : ce sont les étapes d'un
+ * déplacement physique entre le magasin, un prestataire et le client. L'ordre
+ * porte une information vraie — c'est ce qui autorise une suite numérotée à
+ * l'écran, la seule du produit (`DESIGN.md` §6), et ce qui répond d'un coup
+ * d'œil à « où est ce papier, et qu'est-ce qui vient après ».
+ *
+ * **Le parcours dépend du type.** La quittance et le CMC n'ont pas d'étape chez
+ * un prestataire ; en dessiner une, vide, ferait attendre un retour que
+ * personne n'a promis (D65).
+ *
+ * Un document écarté n'a pas de parcours : la liste est vide, et l'écran dit
+ * « Sans objet » plutôt que de tracer un chemin que rien n'empruntera.
+ */
+export function etapesRelais(type: TypeDocument, statut: StatutDocument): EtapeRelais[] {
+  const parcours = passeParUnPrestataire(type) ? PARCOURS_PRESTATAIRE : PARCOURS_ARRIVE_FAIT;
+  const rang = parcours.indexOf(statut);
+  if (rang === -1) return [];
+
+  return parcours.map((etape, position) => ({
+    statut: etape,
+    etat:
+      position < rang
+        ? "fait"
+        : position > rang
+          ? "attente"
+          : /* L'étape d'où plus rien ne sort n'est pas « en cours » : le document
+               a fini son voyage, et un point bleu le dirait encore en route. */
+            estStatutTerminal(type, statut)
+            ? "fait"
+            : "cours",
+  }));
+}
+
+/**
+ * Le nombre de jours écoulés, compté de jour à jour.
+ *
+ * Même règle que `estEnRetard` : un dépôt d'hier à 17 h fait un jour ce matin,
+ * pas zéro. C'est ainsi qu'un gérant compte l'attente d'un client.
+ */
+export function joursEcoules(depuis: Date | null, aujourdhui: Date): number | null {
+  if (!depuis) return null;
+  const jours = Math.round((debutDeJournee(aujourdhui) - debutDeJournee(depuis)) / 86_400_000);
+  return jours < 0 ? 0 : jours;
+}
+
 /* --- La liste des dossiers en attente (§7.3) ------------------------------ */
+
+/**
+ * Qui détient un papier de ce dossier, en ce moment.
+ *
+ * `null` ne veut pas dire « on ne sait pas » mais « rien n'est encore parti » :
+ * les documents sont tous à faire, et il n'y a personne à relancer.
+ */
+export type Detention =
+  { chez: "prestataire"; nom: string; depuisJours: number | null } | { chez: "magasin" } | null;
 
 /** Un dossier ouvert, réduit à ce que la liste doit montrer. */
 export type DossierEnAttente = {
@@ -216,10 +295,17 @@ export type DossierEnAttente = {
   boutiqueId: string;
   clientId: string;
   date: Date | null;
+  /**
+   * Les quatre documents, par type. `null` tant que le document n'est pas
+   * parvenu du serveur : une colonne vide dit « on ne sait pas encore », ce qui
+   * n'est pas la même chose que « rien à faire ».
+   */
+  documents: Readonly<Record<TypeDocument, DocumentDossier | null>>;
   /** Les documents qui restent à traiter, dans l'ordre de `TYPES_DOCUMENT`. */
   enCours: readonly DocumentDossier[];
   /** Au moins un document est chez un prestataire au-delà de la date annoncée. */
   enRetard: boolean;
+  detention: Detention;
 };
 
 /** Ce qu'un dossier a besoin de porter pour entrer dans la liste. */
@@ -232,36 +318,48 @@ export type VenteDuDossier = {
   statutDossier: StatutDossier;
 };
 
-export type FiltresDossiers = {
-  /** Vide : toutes les boutiques du périmètre. */
-  boutiqueId: string;
-  /** Vide : tous les prestataires. */
-  prestataireId: string;
-  /** Vide : tous les types de document. */
-  type: TypeDocument | "";
-  enRetardSeulement: boolean;
+/**
+ * Les trois questions qu'on pose à une file de dossiers.
+ *
+ * Ce ne sont pas des catégories mais des gestes : ce qui a dépassé la date
+ * annoncée est à relancer, ce qui est chez un prestataire est à aller chercher,
+ * ce qui est revenu au magasin est à remettre à son client aujourd'hui.
+ */
+export const FILTRES_ETAT = ["en_retard", "chez_prestataire", "a_remettre"] as const;
+export type FiltreEtat = (typeof FILTRES_ETAT)[number];
+
+export const LIBELLE_FILTRE_ETAT: Record<FiltreEtat, string> = {
+  en_retard: "En retard",
+  chez_prestataire: "Chez un prestataire",
+  a_remettre: "À remettre",
 };
 
-export const FILTRES_DOSSIERS_VIDES: FiltresDossiers = {
-  boutiqueId: "",
-  prestataireId: "",
-  type: "",
-  enRetardSeulement: false,
+export type FiltresDossiers = {
+  /** Vide : tous les dossiers ouverts. */
+  etat: FiltreEtat | "";
 };
+
+export const FILTRES_DOSSIERS_VIDES: FiltresDossiers = { etat: "" };
 
 /**
  * Les dossiers ouverts, du plus ancien au plus récent (§7.3).
  *
  * Du plus ancien d'abord, et non l'inverse : cette liste n'est pas un journal
  * qu'on parcourt, c'est une file d'attente qu'on vide. Ce qui traîne depuis le
- * plus longtemps est ce qu'il faut traiter en premier — et c'est aussi le client
- * qui a le plus de raisons d'appeler.
+ * plus longtemps est ce qu'il faut traiter en premier — et c'est aussi le
+ * client qui a le plus de raisons d'appeler.
  *
- * **Le filtre « en retard » est calculé ici, pas demandé à Firestore.** Il
- * dépend de la date du jour : une requête figée serait fausse dès le lendemain.
- * Le calcul local reste juste sans réseau, où aucune horloge serveur n'est
- * joignable (D38) — et le nombre de dossiers ouverts reste modeste par
- * construction : un dossier ouvert est un dossier vivant.
+ * **Les quatre documents sortent ensemble, réglés compris.** La liste ne
+ * rendait que les documents en cours ; l'écran montre désormais une colonne par
+ * document, où « Remis au client » compte autant que « À faire » — c'est en
+ * voyant les trois premiers remis qu'on comprend qu'il ne manque que le
+ * quatrième. `enCours` reste ce qui décide de la présence dans la file.
+ *
+ * **L'état est calculé ici, pas demandé à Firestore.** Le retard dépend de la
+ * date du jour : une requête figée serait fausse dès le lendemain. Le calcul
+ * local reste juste sans réseau, où aucune horloge serveur n'est joignable
+ * (D38) — et le nombre de dossiers ouverts reste modeste par construction : un
+ * dossier ouvert est un dossier vivant.
  */
 export function dossiersEnAttente(
   ventes: readonly VenteDuDossier[],
@@ -276,37 +374,126 @@ export function dossiersEnAttente(
     else parVente.set(document.venteId, [document]);
   }
 
-  return ventes
-    .filter((vente) => vente.statutDossier === "ouvert")
-    .filter((vente) => !filtres.boutiqueId || vente.boutiqueId === filtres.boutiqueId)
-    .map((vente) => {
-      const enCours = (parVente.get(vente.id) ?? [])
-        .filter((document) => !estRegle(document.statut))
-        .sort((a, b) => TYPES_DOCUMENT.indexOf(a.type) - TYPES_DOCUMENT.indexOf(b.type));
-      return {
-        venteId: vente.id,
-        numero: vente.numero,
-        boutiqueId: vente.boutiqueId,
-        clientId: vente.clientId,
-        date: vente.date,
-        enCours,
-        enRetard: enCours.some((document) => estEnRetard(document.disponibleLe, aujourdhui)),
-      };
-    })
-    /* Un dossier sans document en cours n'a rien à faire dans une file
+  return (
+    ventes
+      .filter((vente) => vente.statutDossier === "ouvert")
+      .map((vente) => {
+        const tous = parVente.get(vente.id) ?? [];
+        const parType = Object.fromEntries(
+          TYPES_DOCUMENT.map((type) => [
+            type,
+            tous.find((document) => document.type === type) ?? null,
+          ]),
+        ) as Record<TypeDocument, DocumentDossier | null>;
+
+        const enCours = tous
+          .filter((document) => !estRegle(document.statut))
+          .sort((a, b) => TYPES_DOCUMENT.indexOf(a.type) - TYPES_DOCUMENT.indexOf(b.type));
+
+        return {
+          venteId: vente.id,
+          numero: vente.numero,
+          boutiqueId: vente.boutiqueId,
+          clientId: vente.clientId,
+          date: vente.date,
+          documents: parType,
+          enCours,
+          enRetard: enCours.some((document) => estEnRetard(document.disponibleLe, aujourdhui)),
+          detention: detentionDe(enCours, aujourdhui),
+        };
+      })
+      /* Un dossier sans document en cours n'a rien à faire dans une file
        d'attente. Il n'est pas encore clos — la clôture demande aussi le
        paiement soldé et la moto remise — mais côté documents, il n'attend
        plus rien. */
-    .filter((dossier) => dossier.enCours.length > 0)
-    .filter(
-      (dossier) =>
-        !filtres.prestataireId ||
-        dossier.enCours.some((document) => document.prestataireId === filtres.prestataireId),
-    )
-    .filter(
-      (dossier) =>
-        !filtres.type || dossier.enCours.some((document) => document.type === filtres.type),
-    )
-    .filter((dossier) => !filtres.enRetardSeulement || dossier.enRetard)
-    .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0));
+      .filter((dossier) => dossier.enCours.length > 0)
+      .filter((dossier) => correspondALEtat(dossier, filtres.etat))
+      .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0))
+  );
+}
+
+/**
+ * Qui détient le dossier : celui qui attend depuis le plus longtemps.
+ *
+ * Deux documents peuvent être chez deux prestataires différents. La colonne n'en
+ * nomme qu'un, et c'est le plus ancien dépôt — celui dont le délai s'allonge,
+ * pas celui qu'on vient de confier. Le détail des quatre est sur la même ligne,
+ * dans les colonnes des documents.
+ */
+function detentionDe(enCours: readonly DocumentDossier[], aujourdhui: Date): Detention {
+  const dehors = enCours
+    .filter((document) => document.statut === "chez_prestataire")
+    .sort((a, b) => (a.deposeLe?.getTime() ?? 0) - (b.deposeLe?.getTime() ?? 0));
+
+  const premier = dehors[0];
+  if (premier) {
+    return {
+      chez: "prestataire",
+      nom: premier.prestataireNom || "un prestataire",
+      depuisJours: joursEcoules(premier.deposeLe, aujourdhui),
+    };
+  }
+
+  /* Revenu au magasin, donc détenu par le magasin : c'est ce qui se remet au
+     client aujourd'hui, sans attendre personne. */
+  if (enCours.some((document) => document.statut === "revenu_magasin")) {
+    return { chez: "magasin" };
+  }
+  return null;
+}
+
+function correspondALEtat(dossier: DossierEnAttente, etat: FiltreEtat | ""): boolean {
+  switch (etat) {
+    case "":
+      return true;
+    case "en_retard":
+      return dossier.enRetard;
+    case "chez_prestataire":
+      return dossier.enCours.some((document) => document.statut === "chez_prestataire");
+    case "a_remettre":
+      return dossier.enCours.some((document) => document.statut === "revenu_magasin");
+  }
+}
+
+/** Un dossier accompagné de ce qui ne vit pas dans la vente : le nom du client. */
+export type DossierCherchable = {
+  dossier: DossierEnAttente;
+  /** Déjà normalisé par l'appelant, qui tient le fichier des clients. */
+  nomNormalise: string;
+};
+
+/**
+ * La recherche de la file : un numéro, un client, un prestataire.
+ *
+ * Les trois façons dont un dossier revient à l'esprit au comptoir. Le client
+ * appelle et donne son nom ; il tend un reçu et on lit le numéro ; le
+ * prestataire passe et on cherche tout ce qu'il détient. Le numéro se compare
+ * sans ses tirets — personne ne les retape à l'identique depuis un reçu
+ * froissé.
+ *
+ * C'est cette recherche qui remplace les listes déroulantes « Prestataire » et
+ * « Document » de l'écran précédent : la première est ici, et la seconde n'a
+ * plus lieu d'être puisque les quatre documents ont chacun leur colonne.
+ */
+export function chercherDossiers<T extends DossierCherchable>(
+  lignes: readonly T[],
+  recherche: string,
+  normaliserNom: (brut: string) => string,
+): T[] {
+  const texte = recherche.trim();
+  if (!texte) return [...lignes];
+
+  const nom = normaliserNom(texte);
+  const brut = texte.toUpperCase().replace(/[\s-]+/g, "");
+
+  return lignes.filter((ligne) => {
+    if (nom.length > 0 && ligne.nomNormalise.includes(nom)) return true;
+    if (
+      nom.length > 0 &&
+      ligne.dossier.enCours.some((document) => normaliserNom(document.prestataireNom).includes(nom))
+    ) {
+      return true;
+    }
+    return brut.length >= 3 && ligne.dossier.numero.replace(/-/g, "").includes(brut);
+  });
 }
