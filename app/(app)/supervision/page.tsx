@@ -54,13 +54,12 @@ export default function Supervision() {
       <TetePage
         surTitre={`${perimetre.type === "boutique" ? perimetre.nom : "Toutes les boutiques"} · ${formaterMois(new Date())}`}
         titre="Supervision"
-        sousTitre={
-          <>
-            Choisissez une boutique pour y travailler, ou restez ici pour voir l’ensemble. Ce que
-            vous ouvrez s’inscrit dans le bandeau&nbsp;: c’est le périmètre de tout ce que vous
-            verrez et saisirez ensuite.
-          </>
-        }
+        /* Une phrase, celle de la maquette (`a2:81`). La seconde — « ce que
+           vous ouvrez s'inscrit dans le bandeau… » — expliquait un mécanisme
+           que le bandeau montre lui-même, deux centimètres plus haut, et
+           poussait la tête d'écran à trois lignes. C'est l'accessoire qu'on
+           retire avant de sortir (`DESIGN.md` §14). */
+        sousTitre="Choisissez une boutique pour y travailler, ou restez ici pour voir l’ensemble."
       />
 
       <InvitationBoutique />

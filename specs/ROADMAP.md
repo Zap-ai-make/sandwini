@@ -55,7 +55,9 @@ avant toute spec post-MVP.
 | S24 | Supervision — les chiffres toutes boutiques   | S9, S11     | Pilotage ; S3bis a posé la section, il reste à la remplir — et il faut que les données à agréger existent d'abord. |
 | S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
-| S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). |
+| S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). **Mesuré en S31** : 9 échecs sur émulateurs vieillis, 6 sur émulateurs neufs, 2 en rejouant ces six, 0 en rejouant ces deux. L'ensemble qui échoue change à chaque passe ; aucun test n'échoue deux fois de suite. |
+| S32 | Recherche globale — motos, ventes, clients     | aucune      | La palette du bandeau ne cherche que des écrans ; les maquettes lui font chercher des choses. Demande un index consultable hors ligne, ce qui en fait une spec et non une ligne : relevé pendant S31, sans être codé. |
+| S33 | Renommer le nom affiché sur les reçus          | aucune      | `a9:180-191` fait de « Votre compte » une carte « Mon nom affiché » : le nom qui s'imprime au bas des reçus remis. Le produit ne sait pas renommer un compte (D72) — c'est une écriture et une règle, pas un habillage. |
 
 ---
 
@@ -69,7 +71,7 @@ par le commanditaire ; la phase 2 s'exécute comme deux specs normales.
 |-----|---------------------------------------------------|-----------|-----------|---------|
 | S28 | Refonte de l'interface — jetons, coquille, patrons | S12       | post-MVP  | terminée |
 | S29 | Refonte de l'interface — les écrans                | S28       | post-MVP  | terminée |
-| S31 | Mise en conformité — marque, coquille, états       | S29       | post-MVP  | en cours |
+| S31 | Mise en conformité — marque, coquille, états       | S29       | post-MVP  | terminée |
 
 La coupure entre les deux n'est pas administrative : à la fin de S28 l'application tourne dans la
 nouvelle coquille avec ses écrans d'aujourd'hui. Le défaut n°1 du diagnostic — le rail vide et le
@@ -81,6 +83,14 @@ maquette sur sa **zone de travail**, jamais sur la coquille qui l'entoure ni sur
 l'habille. Ce qui n'a pas été comparé ligne à ligne ne l'a pas été. L'audit
 `AUDIT-CONFORMITE-MAQUETTES.md` mesure l'écart : 48 défauts, dont trois transverses aux neuf
 écrans. S24 reste la moitié qui coûte comme une fonctionnalité, et elle garde son rang ci-dessous.
+
+S31 est fermée. Elle a repris la marque (le monogramme et ses deux dégradés, le jaune ramené à ses
+deux emplois), la coquille (les groupes nommés de la colonne, les deux pieds, la bascule de thème),
+le sur-titre des neuf écrans, les états, les deux formes d'A2 et d'A3, A9, A4 et le reçu. Trois
+défauts qu'aucun diff ne montrait sont sortis sur capture : une colonne tronquée, une phrase cassée
+en trois, et surtout un reçu qui s'imprimait blanc sur nuit depuis une machine réglée en sombre
+(D77). A2.4 et A2.8 y sont entrées en commit détachable — aucune des deux ne demandait d'agrégat
+neuf. Ce qui restait « manque de données » attend S24, et ne se déguise pas en carte à zéro (D63).
 
 ---
 

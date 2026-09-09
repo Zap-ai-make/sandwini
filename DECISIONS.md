@@ -1748,3 +1748,70 @@ une application faite pour s'en passer.
 8,5 minutes à 1,5 minute. Les tests étaient lents pour la raison même qui les
 faisait échouer : chaque geste attendait un accusé de réception coincé dans
 une file encombrée.
+
+---
+
+## D77 — La feuille d'impression ne se laisse défaire par aucun thème
+
+*S31, le reçu. Vu sur `captures/s31/recu-papier-dark.png` : depuis une machine
+réglée en sombre, le reçu sortait blanc sur nuit.*
+
+**Le mécanisme.** Deux `@media` peuvent être vraies en même temps — on imprime
+*et* la machine préfère le sombre. L'ordre de la source ne tranche alors qu'à
+spécificité égale, et chaque branche d'une liste de sélecteurs compte la sienne
+pour elle-même. Le bloc d'impression écrivait `:root`, à (0,1,0) ; le thème
+sombre système écrit `:root:not([data-theme="clair"])`, à (0,2,0). Le sombre
+gagnait, en silence, et personne ne l'aurait su avant la première cartouche
+vidée.
+
+**Le correctif n'est pas d'ajouter un sélecteur, c'est de tenir une règle.**
+Toute règle qui pose la palette sombre doit avoir sa jumelle exacte dans le
+bloc d'impression, même sélecteur, plus bas dans le fichier. Aujourd'hui elles
+sont quatre : `:root`, `:root:not([data-theme="clair"])` (le réglage système),
+`:root[data-theme="sombre"]` et `:root[data-theme="clair"]` (la bascule
+explicite, dans les deux sens). Ajouter demain une cinquième façon de peindre
+en sombre oblige à ajouter la cinquième branche ici.
+
+**Pourquoi cette règle et pas une autre.** Le reçu est le seul rendu du produit
+qui devient un objet physique : c'est la leçon de S10, et elle a maintenant un
+mécanisme précis à surveiller plutôt qu'un principe. Un correctif de S31 avait
+déjà couvert la bascule explicite en croyant avoir couvert le cas ; il avait
+manqué le réglage système, qui est le cas courant — personne ne bascule un
+thème, on hérite de celui du téléphone.
+
+**Ce qui l'a trouvé, et ce qui ne l'aurait pas trouvé.** Une capture sous
+`colorScheme: "dark"` puis `emulateMedia({ media: "print" })`. Ni le typage, ni
+le lint, ni les 589 tests n'ont d'accès à une cascade CSS. `maquettes/socle.css`
+porte le même trou à sa ligne 1624 : la maquette n'a jamais été imprimée depuis
+un poste sombre.
+
+---
+
+## D78 — Deux lecteurs, deux textes : la déduplication s'arrête au destinataire
+
+*S31, le reçu. `EFFET_MODE` existait, disait la bonne chose, et n'avait rien à
+faire sur le papier du client.*
+
+**La tentation.** « La moto reste au magasin jusqu'au dernier versement.
+L'argent reçu est un engagement. » est déjà écrite, déjà testée, et parle bien
+du mode « tranches ». La réutiliser sur le reçu coûte un import.
+
+**Pourquoi c'est faux.** Cette phrase s'adresse au gérant à la seconde où il
+valide : elle lui dit ce qu'il prend sur lui. Sur le papier que le client
+emporte, sa seconde moitié ne dit plus rien d'utile — ce que le client relira
+trois semaines plus tard, c'est *quand* il repartira avec sa moto. Ce n'est pas
+le même énoncé traduit, c'est une autre information. Les fondre en une aurait
+mal servi les deux, et la première correction demandée par l'un aurait dégradé
+le texte de l'autre.
+
+**La ligne de partage, en complément de D73.** D73 déduplique ce qui répond à
+la même question ; il faut ajouter : *pour le même lecteur*. `LIBELLE_MODE`
+(« Tranches ») est un nom, il est partagé. `EFFET_MODE` et `MENTION_RECU` sont
+deux réponses, à deux personnes, à deux moments. Deux constantes voisines dans
+le même fichier, avec le commentaire qui dit pourquoi elles ne fusionneront
+pas — c'est ce commentaire qui empêchera la fusion, pas la distance.
+
+**Le test qui existe déjà.** Les deux sont des `Record<ModePaiement, string>` :
+un quatrième mode de paiement fait échouer la compilation aux deux endroits, et
+oblige à écrire les deux textes. C'est la garde qu'on veut ici — pas qu'ils
+restent identiques, mais qu'aucun ne soit oublié.

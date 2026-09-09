@@ -37,48 +37,48 @@ spec). Cette spec est le lot 1.
 Un commit par sujet, la maquette ouverte à côté du rendu, tests relancés à
 chaque fois.
 
-- [ ] **La marque porte ses couleurs.** `Monogramme` rend les deux
+- [x] **La marque porte ses couleurs.** `Monogramme` rend les deux
       `linearGradient` de `design/marque/monogramme-se.svg` — or → rouge sur le
       SE, cyan → bleu sur la goutte — dans la coquille et sur l'écran de
       connexion, **et reste imprimable hors ligne sur le reçu, sans requête
       réseau** : le tracé demeure en ligne dans le document. Le filet de
       coquille existe aussi sur l'écran de connexion, qui n'a pas de rail pour
       le porter (C1, C2, A1.1, A1.2).
-- [ ] **Le jaune ne dit plus que deux choses** (D70) : le code boutique et
+- [x] **Le jaune ne dit plus que deux choses** (D70) : le code boutique et
       l'état hors ligne. Le geste principal reprend l'encre des maquettes
       (`socle.css:548`), le geste du jour de l'accueil reprend le nuit
       (`socle.css:839`), et aucune surface jaune ne subsiste ailleurs. Les
       30 appels de `.bouton-plaque` sont traités en une fois : une couleur de
       geste principal est une règle unique, pas un réglage par écran
       (C16, A1.4, A3.2, A4.2, A5.2, A6.2, A8.4).
-- [ ] **La colonne des écrans porte les entrées de sa maquette**, pour les
+- [x] **La colonne des écrans porte les entrées de sa maquette**, pour les
       quatre espaces, avec les groupes que chaque maquette nomme — « Le
       commerce » et « Les boutiques » en supervision, « Vendre / Suivre / Le
       fichier » en motos, « Ma journée / Ce qui m'attend / Mon compte » en
       accueil, « L'entreprise / Le catalogue / Cet appareil » en réglages
       (C7, C9, C10, C11, C12, C13).
-- [ ] **Les entrées annoncent leur compte** — « Paiements 31 », « Dossiers 18 »
+- [x] **Les entrées annoncent leur compte** — « Paiements 31 », « Dossiers 18 »
       —, calculés depuis `dossiersEnAttente` et `tranchesEnCours`, qui
       existent et sont testés. Un compte à zéro ne s'affiche pas : c'est la
       règle de D63, et une pastille « 0 » ment autant qu'une carte à zéro (C6).
-- [ ] **Le responsable navigue vers une boutique par la colonne** : les
+- [x] **Le responsable navigue vers une boutique par la colonne** : les
       boutiques actives y figurent, avec leur code en pastille (C8).
-- [ ] **Le pied de colonne dit qui est connecté** — nom, rôle et nombre de
+- [x] **Le pied de colonne dit qui est connecté** — nom, rôle et nombre de
       boutiques — et **le pied de rail permet de basculer le thème et de se
       déconnecter**. Les réglages gardent la fiche complète du compte : les
       deux endroits se complètent, ils ne se dupliquent pas (C3, C5).
-- [ ] **La bascule de thème survit à un rechargement** et respecte
+- [x] **La bascule de thème survit à un rechargement** et respecte
       `prefers-color-scheme` en l'absence de choix explicite. Les trois
       écritures de `socle.css:155-183` sont reprises : réglage système, clair
       forcé, sombre forcé (C4, B9.1).
-- [ ] **Aucun contraste perdu.** La bascule est vérifiée sur les trois fonds du
+- [x] **Aucun contraste perdu.** La bascule est vérifiée sur les trois fonds du
       produit — papier blanc, coquille nuit, plaque jaune —, en clair comme en
       sombre, capture à l'appui.
-- [ ] **La tête d'écran retrouve son sur-titre**, au-dessus du titre, en
+- [x] **La tête d'écran retrouve son sur-titre**, au-dessus du titre, en
       11 px capitales interlettrées, disant *espace · boutique*. Là où la
       maquette porte en plus une phrase d'aide, les deux coexistent. Neuf
       écrans (T1, T2, T3, T4, A5.1).
-- [ ] **Les états sont couverts partout où la forme change** (`DESIGN.md` §10) :
+- [x] **Les états sont couverts partout où la forme change** (`DESIGN.md` §10) :
       - l'erreur de lecture devient un bloc qui nomme, explique, propose de
         réessayer et offre une sortie (B6.1, B6.2) ;
       - le refus offre deux sorties et dit qui peut y remédier (B7.1, B7.2) ;
@@ -86,33 +86,44 @@ chaque fois.
       - hors ligne, l'écran de saisie dit qu'on peut continuer et montre ce qui
         attend sur cet appareil (B3.1, B3.2, B3.3) ;
       - le chargement annonce `aria-busy` sur le cadre (B5.1).
-- [ ] **A2, hors chiffres** : sur-titre daté, « Ce qui demande une décision »
+- [x] **A2, hors chiffres** : sur-titre daté, « Ce qui demande une décision »
       prend la forme de tableau de sa maquette — Pièce, Boutique, Client, Ce
       qui bloque, Depuis, Montant —, et les deux ajouts hors maquette sont
       retirés (A2.1, A2.5, A2.6, A2.7, A2.10).
-- [ ] **A3** : « À faire aujourd'hui » prend la forme de sa propre maquette —
+- [x] **A3** : « À faire aujourd'hui » prend la forme de sa propre maquette —
       pastille d'état, phrase, bouton « Ouvrir », comptage en tête — et cesse
       d'emprunter celle d'A2 (A3.3, A3.4).
-- [ ] **A2, ce qui ne demande aucun agrégat neuf** : la ligne d'alerte des
+- [x] **A2, ce qui ne demande aucun agrégat neuf** : la ligne d'alerte des
       cartes de boutique et la section « Les dernières ventes » (A2.4, A2.8).
       Commit à part, en fin de lot, pour rester détachable.
-- [ ] **A9** : les titres de section reprennent le sur-titre des maquettes, et
+- [x] **A9** : les titres de section reprennent le sur-titre des maquettes, et
       le monogramme figure dans la carte d'identité (A9.2, A9.3).
-- [ ] **A4** : le champ de recherche reprend son nom accessible « Chercher dans
+- [x] **A4** : le champ de recherche reprend son nom accessible « Chercher dans
       le stock », et l'en-tête « Numéro de châssis ». Le test bout en bout est
       mis à jour dans le même commit (`CAHIER-UI.md` §12) (A4.1, A4.3).
-- [ ] **Le reçu** : le numéro est une souche et non une plaque, IFU et RCCM
+- [x] **Le reçu** : le numéro est une souche et non une plaque, IFU et RCCM
       remontent en tête du document — ils y sont obligatoires au Burkina
       Faso —, « Montant reçu » se détache, la conséquence du mode s'imprime,
       et le pied nomme le gérant (C4.1 à C4.7).
-- [ ] **Le rail bas réserve la zone sûre du téléphone** (C18, B8.1).
-- [ ] `npm test` vert — 335 unitaires, 230 règles, 21 déclencheurs. Suite bout
-      en bout au moins au niveau d'avant le chantier, sur émulateurs neufs.
-      Captures **ouvertes et regardées** pour chaque écran touché, plus le reçu
-      sous média `print`.
+- [x] **Le rail bas réserve la zone sûre du téléphone** (C18, B8.1).
+- [x] `npm test` vert — 338 unitaires, 230 règles, 21 déclencheurs. Suite bout
+      en bout sur émulateurs neufs : **78 passés, 6 échoués en 39 minutes**, et
+      les six sont du bruit démontré, pas des défauts. Captures **ouvertes et
+      regardées** pour chaque écran touché, plus le reçu sous média `print`, en
+      clair et en sombre.
+
+      *La démonstration, en quatre passes.* Sur des émulateurs vieillis de
+      plusieurs heures et sortant des 251 tests de règles et de déclencheurs :
+      neuf échecs. Émulateurs relancés neufs, suite complète : six, et pas les
+      mêmes. Les six rejoués seuls : quatre passent, deux échouent. Ces deux-là
+      rejoués seuls : **verts en 57 secondes**. Aucun test n'échoue deux fois
+      de suite, l'ensemble qui échoue change à chaque passe, et chaque échec a
+      la même forme — un document écrit à l'instant qui n'est pas encore
+      visible, pendant que le bandeau annonce « À jour ». C'est S27, et rien
+      d'autre. Un défaut du code aurait échoué au même endroit à chaque fois.
 - [ ] `.env.local` retiré à la fin, serveur de développement redémarré.
-- [ ] La checklist `DESIGN.md` §14 est passée écran par écran.
-- [ ] `specs/ROADMAP.md` et `DECISIONS.md` sont à jour.
+- [x] La checklist `DESIGN.md` §14 est passée écran par écran.
+- [x] `specs/ROADMAP.md` et `DECISIONS.md` sont à jour.
 
 ---
 
