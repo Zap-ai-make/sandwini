@@ -1,7 +1,7 @@
 # S24 — La supervision et ses chiffres
 
 ```
-Statut     : à valider — six questions au commanditaire, aucune ligne de code écrite
+Statut     : en cours — trois arbitrages rendus, trois pris par défaut et signalés
 Périmètre  : post-MVP
 Dépend de  : S9 (versements), S11 (dossiers), S31 (la forme des écrans)
 ```
@@ -232,4 +232,46 @@ chiffres mesurent — et l'écran l'écrit sous les cartes, une fois.
 
 ## Ce que le commanditaire a tranché
 
-*À remplir. Aucune ligne de code ne s'écrit avant.*
+**1. La marge — réponse A.** Entière au mois de la vente. La marge est acquise
+quand la vente est faite ; c'est déjà ce que `figerMargeVente` écrit dans la
+base, et un chiffre qui se recalcule rétroactivement quand un client paie en
+retard est un chiffre qu'on ne peut pas citer deux fois de suite.
+
+*Ce que cela oblige à écrire à l'écran* : la marge d'un mois n'est pas de
+l'argent en caisse. La carte le dit sous sa valeur — « acquise à la vente, pas
+encore encaissée en totalité » dès qu'une vente en tranches ou à crédit entre
+dans le total. Sans cette ligne, le choix A devient un mensonge tranquille.
+
+**2. Le restant dû — séparé, confirmé.** Une carte, deux lignes : *Créances*
+(crédits — la moto est partie, l'argent manque) et *Dépôts* (tranches — la moto
+est au magasin, l'argent est là). Les additionner produisait un nombre qui ne
+désignait rien. La maquette se contredisait elle-même sur ce point ; c'est sa
+seconde version qui fait foi.
+
+**3. L'encaissé — réponse A.** Brut : la somme des versements clients du mois,
+rien de retranché. Les avances versées aux prestataires sont une sortie, et un
+solde est le sujet de la caisse (S22).
+
+---
+
+### Les trois arbitrages pris par défaut
+
+Le commanditaire a répondu aux trois questions qui changent le sens des
+chiffres. Les trois autres portent sur la portée, elles sont restées sans
+réponse, et je prends ma recommandation plutôt que de bloquer un lot entier
+dessus. **Chacune se change en un commit**, et je le note pour que personne ne
+lise ces choix comme validés.
+
+**4. Le sélecteur de mois — douze derniers mois.** Ils couvrent la comparaison
+annuelle et tiennent dans une liste qu'on lit d'un coup. Étendre la portée est
+une ligne ; la réduire aussi.
+
+**5. Le gérant ne voit pas de chiffres.** S24 sert le responsable. Le gérant
+n'a rien demandé, et un écran de chiffres sur l'accueil d'un comptoir
+concurrencerait le geste du jour. La variante — les mêmes chiffres bornés à sa
+boutique, marge exclue — devient une entrée de backlog plutôt qu'une supposition
+codée.
+
+**6. Un mois vide.** Une phrase et aucune carte quand le mois entier est à zéro ;
+les cartes dès qu'un seul chiffre est non nul, sinon la grille se troue et l'œil
+cherche ce qui manque.
