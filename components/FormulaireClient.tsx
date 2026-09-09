@@ -97,8 +97,11 @@ export function FormulaireClient({
 
   const prefixe = existant ? `client-${existant.id}` : "nouveau-client";
 
+  /* La largeur appartient au formulaire, pas au champ : sans cela, un « Nom »
+     s'étirait sur toute la zone de travail dès que la borne de `.saisie` a été
+     levée. */
   return (
-    <form onSubmit={soumettre} noValidate>
+    <form onSubmit={soumettre} className="colonne-formulaire max-w-[40rem]" noValidate>
       <div className="space-y-4">
         <ChampClient
           id={`${prefixe}-nom`}

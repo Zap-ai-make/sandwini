@@ -965,22 +965,19 @@
   .saisie {
     height: 2.375rem;
     width: 100%;
-    /* Un champ ne gagne rien à dépasser 32 rem, et il y perd : l'œil ne
-       retrouve plus le début de la ligne. La borne est ici, sur le champ, et
-       pas sur la colonne — la zone de travail n'est plus bornée à 768 px
-       depuis la refonte de la coquille, et sans cette limite un champ « Nom »
-       s'étirait sur 950 px. Vu sur la capture de `/parametres/prestataires`.
+    /* Aucune borne ici, et c'est le sujet de cette dette. `.saisie` en portait
+       une de 32 rem, qui protégeait cinq écrans sans colonne — l'entrée en
+       stock, le fichier clients, la fiche client, les référentiels, la
+       connexion. Elle les protégeait en contraignant les vingt autres, y
+       compris ceux dont la mise en page tenait déjà sa largeur : la borne
+       vivait sur le contrôle alors que la question appartient à l'écran, et un
+       champ ne sait pas de quelle place il dispose.
 
-       Elle ne vaut que pour les écrans qui n'ont pas encore leur colonne :
-       dans une colonne tenue (`.colonne-formulaire`), elle est levée juste en
-       dessous. S29 devait l'emporter avec A9 ; A9 tient désormais ses quatre
-       formulaires de réglages, mais cette ligne reste, parce qu'elle protège
-       encore cinq écrans qui n'appartiennent pas au groupe A et n'ont donc pas
-       de maquette à confronter : `/motos/nouvelle`, `/clients`,
-       `FormulaireClient`, `ListeReferentiel` et la connexion. La retirer
-       aujourd'hui les laisserait s'étirer sur toute la largeur. Elle
-       disparaîtra quand ces cinq-là tiendront leur colonne à leur tour. */
-    max-width: 32rem;
+       Les cinq tiennent désormais leur colonne, et la borne est levée. La
+       largeur se pose là où on la voit : `.colonne-formulaire` sur la mise en
+       page, `sm:max-w-80` sur une recherche. Un champ qui s'étire à nouveau
+       est un écran à qui l'on a oublié sa colonne, et cela se voit sur une
+       capture — pas une règle globale à rétablir. */
     padding-inline: 0.75rem;
     border: 1px solid var(--color-bord-fort);
     border-radius: var(--radius-champ);
@@ -1023,9 +1020,10 @@
      droite, la barre collée en bas) a une structure, donc c'est un composant :
      `components/patrons/Formulaire.tsx` (D73).
      -------------------------------------------------------------------------- */
-  .colonne-formulaire .saisie {
-    max-width: none;
-  }
+  /* `.colonne-formulaire` ne lève plus rien — il n'y a plus de borne à lever.
+     La classe reste le marqueur de « ce bloc tient sa largeur », lu par les
+     écrans et par quiconque relit cette feuille : la retirer ferait croire que
+     la largeur d'un formulaire ne se décide nulle part. */
 
   /* --------------------------------------------------------------------------
      Les boutons.

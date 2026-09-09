@@ -155,7 +155,12 @@ export default function PageNouvelleMoto() {
         </div>
       )}
 
-      <form onSubmit={soumettre} noValidate>
+      {/* La colonne est ici, sur la mise en page, et non sur le champ : c'est
+          l'écran qui sait de quelle largeur il dispose. `.saisie` portait une
+          borne de 32 rem pour protéger cet écran-là et quatre autres ; elle
+          contraignait du même coup tous les champs du produit, y compris ceux
+          d'une colonne qui en tenait déjà la largeur. */}
+      <form onSubmit={soumettre} className="colonne-formulaire max-w-[40rem]" noValidate>
         <fieldset className="cadre p-4">
           <legend className="px-1 font-semibold text-encre">La moto</legend>
 

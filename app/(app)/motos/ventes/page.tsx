@@ -321,8 +321,12 @@ function Recherche({
   valeur: string;
   changer: (valeur: string) => void;
 }) {
+  /* Bornée comme les autres recherches du produit, et comme le socle des
+     maquettes qui la fixe à `min(360px, 32vw)` (`socle.css:448`). Sans
+     borne elle traversait la moitié de l'écran depuis que `.saisie` a
+     rendu sa largeur à la mise en page — mesuré, pas estimé. */
   return (
-    <div className="relative min-w-56 flex-1">
+    <div className="relative min-w-56 flex-1 sm:max-w-80">
       <label htmlFor="recherche-vente" className="sr-only">
         Chercher une vente
       </label>

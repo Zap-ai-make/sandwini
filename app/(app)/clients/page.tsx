@@ -91,7 +91,10 @@ export default function PageClients() {
             placeholder="Un numéro, ou le début d’un nom"
             value={recherche}
             onChange={(evenement) => setRecherche(evenement.target.value)}
-            className="saisie pr-3 pl-9 placeholder:text-encre-doux"
+            /* Bornée comme la recherche du stock : un champ de recherche ne
+               gagne rien à traverser l'écran, et l'œil ne retrouve plus le
+               début de la ligne. */
+            className="saisie pr-3 pl-9 placeholder:text-encre-doux sm:max-w-80"
           />
         </div>
       </div>

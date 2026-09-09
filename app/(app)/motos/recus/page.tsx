@@ -130,7 +130,10 @@ function Recus() {
         <label htmlFor="recherche-recu" className="block text-sm font-medium text-encre">
           Chercher un reçu
         </label>
-        <div className="relative mt-1.5">
+        {/* Bornée comme les autres recherches du produit. Mesurée à
+           1264 px une fois la borne de `.saisie` levée : un champ qui
+           traverse l'écran fait perdre le début de la ligne à l'œil. */}
+        <div className="relative mt-1.5 sm:max-w-80">
           <Search
             aria-hidden="true"
             className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
