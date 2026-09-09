@@ -24,8 +24,41 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // `get(cle, defaut)` et non `token.role`, et la raison est mesurée, pas
+    // supposée. Lire une clé absente d'une map fait bien planter l'évaluation :
+    // le moteur répond « Property role is undefined on object ». Mais un
+    // plantage n'abat pas toute l'expression — un `||` le rattrape et la
+    // branche suivante décide. C'est pourquoi le défaut est resté invisible :
+    // presque partout ici, un OU couvre la lecture du jeton.
+    //
+    // Il mord là où les deux branches lisent le jeton. `boutiques/{code}` est
+    // ce cas. Avant, un compte sans claim y recevait, dans son navigateur :
+    //
+    //   Property role is undefined on object. for 'get' @ L87,
+    //   false for 'get' @ L159, false for 'get' @ L855
+    //
+    // Trois choses ne vont pas là-dedans. Le refus est un plantage, donc rendu
+    // pour la mauvaise raison. Le nom de la clé manquante sort des règles et
+    // arrive chez le client. Et trois règles sont citées pour une décision,
+    // dont le joker des référentiels (L159) qui n'avait rien à voir. Depuis,
+    // le même appel rend :
+    //
+    //   false for 'get' @ L106, false for 'get' @ L909
+    //
+    // — la règle des boutiques, et le refus par défaut. Une décision, et sa
+    // cause. `regles/utilisateurs.test.ts` fige le premier point.
+    //
+    // Le cas n'est pas d'école : entre la création d'un compte et la pose de
+    // ses claims par la Cloud Function il s'écoule un instant réel, et c'est
+    // celui où l'application demande « où suis-je ».
     function role() {
-      return request.auth.token.role;
+      return request.auth.token.get('role', '');
+    }
+
+    // La boutique du compte, ou la chaîne vide s'il n'en a pas. Vide ne
+    // correspond à aucun code de boutique — le refus est donc une décision.
+    function boutiqueDuCompte() {
+      return request.auth.token.get('boutiqueId', '');
     }
 
     function estResponsable() {
@@ -85,7 +118,7 @@ service cloud.firestore {
 
     match /boutiques/{code} {
       allow read: if estResponsable()
-                  || (connecte() && request.auth.token.boutiqueId == code);
+                  || (connecte() && boutiqueDuCompte() == code);
 
       allow create: if estResponsable()
                     && boutiqueValide(request.resource.data, code)
@@ -153,17 +186,52 @@ service cloud.firestore {
              && donnees.actif is bool;
     }
 
-    // Les trois référentiels de même forme : un nom, un état. La liste est
-    // explicite — ce n'est pas un joker sur les collections inconnues.
-    match /{referentiel}/{id} {
-      allow read: if connecte()
-                  && referentiel in ['marques', 'provenances', 'typesFrais'];
+    // Les trois référentiels de même forme : un nom, un état.
+    //
+    // **Trois blocs nommés, et non un joker.** Ils étaient écrits en un seul
+    // `match` à segment variable, avec la liste des noms autorisés à
+    // l'intérieur. C'était correct — la liste refusait tout le reste — mais un
+    // joker à la racine s'interpose sur **toutes** les collections du produit :
+    // ventes, motos, clients, boutiques, chacune voyait aussi ce bloc
+    // s'évaluer et répondre `false`. Rien n'était accordé de trop, l'accès
+    // étant accordé dès qu'une règle dit oui ; mais chaque refus du produit
+    // citait ces lignes-ci. On y cherchait la règle qui avait décidé, on
+    // tombait sur le joker, et le diagnostic partait sur les référentiels
+    // quand la question portait sur les ventes. S30 a coûté du temps ainsi :
+    // les règles y ont été accusées à tort.
+    //
+    // Trois chemins écrits en toutes lettres : chaque collection ne voit plus
+    // que ses propres règles, et un refus nomme sa cause. La répétition est le
+    // prix, et il est bon — trois blocs de sept lignes contre un joker qui
+    // brouille la lecture des refus de tout le produit.
+    match /marques/{id} {
+      allow read: if connecte();
       allow create: if estResponsable()
-                    && referentiel in ['marques', 'provenances', 'typesFrais']
                     && referentielValide(request.resource.data)
                     && traceCreation(request.resource.data);
       allow update: if estResponsable()
-                    && referentiel in ['marques', 'provenances', 'typesFrais']
+                    && referentielValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    match /provenances/{id} {
+      allow read: if connecte();
+      allow create: if estResponsable()
+                    && referentielValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && referentielValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    match /typesFrais/{id} {
+      allow read: if connecte();
+      allow create: if estResponsable()
+                    && referentielValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
                     && referentielValide(request.resource.data)
                     && traceModification(request.resource.data, resource.data);
       allow delete: if false;
@@ -267,7 +335,7 @@ service cloud.firestore {
     // arrive au comptoir doit se saisir sans attendre le responsable.
 
     function estGerantDe(boutiqueId) {
-      return connecte() && role() == 'gerant' && request.auth.token.boutiqueId == boutiqueId;
+      return connecte() && role() == 'gerant' && boutiqueDuCompte() == boutiqueId;
     }
 
     function montantValide(valeur) {

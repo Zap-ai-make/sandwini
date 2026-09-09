@@ -6,7 +6,7 @@ import {
 } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
 import { deleteDoc, doc, getDoc, getDocs, collection, setDoc, updateDoc } from "firebase/firestore";
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
  * Règles sur les comptes utilisateurs (S2).
@@ -131,5 +131,59 @@ describe("le claim fait autorité, pas le document", () => {
     const sansRole = env.authenticatedContext("sans-role").firestore();
     await assertFails(getDocs(collection(sansRole, "users")));
     await assertFails(getDoc(doc(sansRole, "users/ger-1")));
+  });
+
+  /**
+   * La différence entre « la règle refuse » et « la règle plante », rendue
+   * observable.
+   *
+   * Lire une clé absente d'une map **fait bien planter l'évaluation** : la
+   * sonde le montre, le moteur répond `Property X is undefined on object`.
+   * Mais le plantage d'une branche n'abat pas toute l'expression — un `||` le
+   * rattrape et la seconde branche décide. C'est pourquoi le défaut est resté
+   * invisible : presque partout dans ce fichier, un OU couvre la lecture du
+   * jeton.
+   *
+   * Il devient visible là où aucun OU ne rattrape, c'est-à-dire dès que les
+   * deux branches lisent le jeton. `boutiques/{code}` est ce cas : « le
+   * responsable, ou le gérant de cette boutique-là » — un compte sans claim
+   * fait planter les deux. Le refus est alors la bonne réponse rendue pour la
+   * mauvaise raison, et le client reçoit le texte de l'erreur au lieu d'un
+   * refus : le nom de la clé manquante sort des règles et arrive dans le
+   * navigateur.
+   *
+   * Ce test ne vérifie donc pas que l'accès est refusé — il l'était déjà — mais
+   * que le refus est une **décision**. Il échoue sur `token.role`, il passe sur
+   * `token.get('role', '')`.
+   *
+   * Le cas n'est pas d'école : entre la création d'un compte et la pose de ses
+   * claims par la Cloud Function il s'écoule un instant réel, et c'est
+   * exactement l'instant où l'application demande « où suis-je ».
+   */
+  it("un compte sans claim se voit refuser une boutique par décision, non par plantage", async () => {
+    const sansClaim = env.authenticatedContext("sans-claim").firestore();
+
+    let message = "";
+    try {
+      await getDoc(doc(sansClaim, "boutiques/PTG"));
+      throw new Error("la lecture aurait dû être refusée");
+    } catch (cause) {
+      message = String((cause as { message?: string }).message ?? cause);
+    }
+
+    /* Le refus, oui. Mais pas celui-là : « Property role is undefined on
+       object » est le moteur qui trébuche, pas la règle qui tranche. */
+    expect(message).not.toContain("is undefined");
+  });
+
+  /**
+   * Le même mécanisme sur la boutique, dans l'autre sens : ici le refus est la
+   * bonne réponse, et ce test dit qu'il le reste. Un gérant dont le compte
+   * existe mais à qui aucune boutique n'a encore été attribuée ne lit aucune
+   * boutique.
+   */
+  it("un gérant sans boutique attribuée se voit refuser une boutique", async () => {
+    const sansBoutique = env.authenticatedContext("ger-orphelin", { role: "gerant" }).firestore();
+    await assertFails(getDoc(doc(sansBoutique, "boutiques/PTG")));
   });
 });
