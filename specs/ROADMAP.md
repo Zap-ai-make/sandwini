@@ -58,6 +58,7 @@ avant toute spec post-MVP.
 | S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). **Mesuré en S31** : 9 échecs sur émulateurs vieillis, 6 sur émulateurs neufs, 2 en rejouant ces six, 0 en rejouant ces deux. L'ensemble qui échoue change à chaque passe ; aucun test n'échoue deux fois de suite. |
 | S32 | Recherche globale — motos, ventes, clients     | aucune      | La palette du bandeau ne cherche que des écrans ; les maquettes lui font chercher des choses. Demande un index consultable hors ligne, ce qui en fait une spec et non une ligne : relevé pendant S31, sans être codé. |
 | S33 | Renommer le nom affiché sur les reçus          | aucune      | `a9:180-191` fait de « Votre compte » une carte « Mon nom affiché » : le nom qui s'imprime au bas des reçus remis. Le produit ne sait pas renommer un compte (D72) — c'est une écriture et une règle, pas un habillage. |
+| S34 | Le numéro de version, visible au comptoir      | aucune      | Le produit n'expose aucune version (A1.3). Quand un gérant décrit un comportement au téléphone, rien ne dit ce qui tourne sur son appareil — et une PWA garde son ancienne version jusqu'à ce que le service worker passe la main. Petit, mais c'est ce qui rend un rapport de défaut exploitable. |
 
 ---
 
