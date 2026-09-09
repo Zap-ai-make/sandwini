@@ -1621,7 +1621,24 @@ tbody tr td { transition: background-color var(--duree-reponse) linear; }
 ============================================================================= */
 
 @media print {
-  :root, :root[data-theme="sombre"] {
+  /* Les quatre sélecteurs, et non deux. Chaque branche d'une liste compte sa
+     spécificité pour elle-même : `:root` vaut (0,1,0) et perd contre le sombre
+     système, `:root:not([data-theme="clair"])`, qui vaut (0,2,0) — et les deux
+     media queries sont vraies en même temps quand on imprime depuis une
+     machine réglée en sombre. La palette d'impression ne s'appliquait donc pas
+     à ce cas-là, qui est le cas courant : personne ne bascule un thème, on
+     hérite de celui du téléphone.
+
+     Le reçu n'en souffrait pas, parce que `.recu` peint en valeurs littérales
+     et non en jetons. Tout ce qui emploie les jetons, en revanche, sortait en
+     sombre — vu sur `captures/s31/c5-papier-dark.png`, où l'encadré « ce reçu
+     remplace le n° … » s'imprimait en noir sur noir. C'est D77 dans
+     `DECISIONS.md` : toute règle qui pose la palette sombre a sa jumelle
+     exacte ici, même sélecteur, plus bas dans le fichier. */
+  :root,
+  :root:not([data-theme="clair"]),
+  :root[data-theme="sombre"],
+  :root[data-theme="clair"] {
     --encre: #0f1720; --encre-doux: #4a5560;
     --papier: #ffffff; --fond: #ffffff; --bord: #b9c0c7; --bord-fort: #8a939c;
     --braise: #b3261e; --braise-surface: #ffffff;

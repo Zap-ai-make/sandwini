@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Le reçu dans l’application — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+</head>
+<body>
+
+<!--
+  C5 — le reçu tel qu'on le consulte, par opposition à C4 qui le montre tel
+  qu'il sort de l'imprimante.
+
+  POURQUOI CETTE MAQUETTE EXISTE
+  C4 dessine le papier, et c'est la seule chose qu'il dessine : il s'ouvre sur
+  fond gris, sans coquille, avec une barre de galerie qui n'appartient pas au
+  produit. Le composant `PanneauRecu` a donc été écrit sans maquette — la
+  décision 4 de S29 l'a noté, et l'audit de S31 l'a laissé intact faute de
+  référence. Ce fichier est cette référence, et il ne redessine pas le papier :
+  l'article ci-dessous est celui de C4, mot pour mot. C4 reste la source de
+  vérité du document ; C5 ne décide que de ce qui l'entoure.
+
+  CE QUE LA MAQUETTE PROPOSE, ET QUI EST À TRANCHER
+
+  1. L'écran est un bureau, le reçu est la feuille posée dessus. Fond gris,
+     feuille blanche bornée à 148 mm, l'ombre du socle : on doit reconnaître un
+     objet physique avant de lire un écran. C'est ce qui dit, sans phrase, que
+     ce qu'on a sous les yeux sortira tel quel de l'imprimante.
+
+  2. La barre d'action passe SOUS la feuille, et devient collante. Elle était
+     au-dessus : on la lisait avant le document, c'est-à-dire avant d'avoir la
+     moindre raison de cliquer. Le geste du comptoir est *lire, puis imprimer* —
+     on vérifie le montant et le nom devant le client, ensuite on imprime. Une
+     A5 à 14 mm de marges dépasse la hauteur d'un écran de comptoir : sans
+     barre collante, imprimer demande de redéfiler jusqu'en haut. `.barre-action`
+     existe déjà dans le socle, et l'impression la masque déjà (socle.css:1633).
+
+  3. « Imprimer le reçu » est le seul geste principal. Partager n'est pas son
+     égal : il envoie un récapitulatif en texte, pas le document. Deux boutons
+     de même poids auraient obligé à lire les deux à chaque ouverture.
+
+  4. Rien de la coquille ne s'imprime, et c'est déjà vrai du socle : rail,
+     colonne, bannière, barre d'action et tout ce qui porte `sans-impression`
+     disparaissent. Cette maquette n'ajoute aucune règle CSS : elle n'emploie
+     que des classes et des jetons qui existent. Si elle avait eu besoin d'une
+     règle neuve, ce serait le signe qu'elle invente au lieu de ranger.
+
+  5. La confirmation de partage vit DANS la barre. Elle était sous la feuille :
+     une A5 la poussait hors de l'écran, et on confirmait un partage que
+     personne ne voyait confirmer. Vu sur capture, pas déduit.
+
+  CE QU'ELLE NE TRAITE PAS
+  Les états. Le chargement, l'erreur de lecture et le reçu introuvable sont
+  couverts par B5, B6 et B4 : les redessiner ici ferait une seconde règle pour
+  la même chose. La réimpression d'un numéro qui a divergé (D44) est en
+  revanche montrée, parce qu'elle est propre au reçu et qu'aucune autre
+  maquette ne la porte.
+
+  CE QUE LA MAQUETTE A TROUVÉ EN SE FAISANT REGARDER
+  Son premier rendu sous média `print`, depuis un poste réglé en sombre, sortait
+  l'encadré de renumérotation en noir sur noir. Le reçu, lui, restait lisible :
+  `.recu` peint en valeurs littérales, pas en jetons. Le bloc `@media print` du
+  socle ne couvrait pas le sombre système — corrigé à socle.css:1623, et c'est
+  la même leçon que D77 côté produit.
+-->
+
+<div class="coquille-filet" aria-hidden="true"></div>
+<a class="sr" href="#travail">Aller au contenu</a>
+
+<div class="appli">
+
+<nav class="rail" aria-label="Espaces">
+  <a class="rail-marque" href="index.html" aria-label="SDI — retour à la galerie">
+    <img src="../design/marque/monogramme-se.svg" alt="">
+  </a>
+  <a class="rail-lien" href="a3-accueil-gerant.html"><span data-icone="accueil"></span><span>Accueil</span></a>
+  <a class="rail-lien" href="a4-stock-motos.html" aria-current="page"><span data-icone="moto"></span><span>Motos</span></a>
+  <a class="rail-lien" href="c1-pieces.html"><span data-icone="piece"></span><span>Pièces</span></a>
+  <a class="rail-lien" href="c2-caisse.html"><span data-icone="caisse"></span><span>Caisse</span></a>
+  <a class="rail-lien" href="a9-reglages.html"><span data-icone="reglages"></span><span>Réglages</span></a>
+  <div class="rail-pied">
+    <button class="rail-lien" type="button" data-bascule-theme aria-pressed="false"><span data-icone="soleil"></span><span data-bascule-texte>Thème clair</span></button>
+    <a class="rail-lien" href="a1-connexion.html"><span data-icone="sortir"></span><span>Se déconnecter</span></a>
+  </div>
+</nav>
+
+<nav class="colonne" id="colonne-ecrans" aria-label="Navigation principale">
+  <p class="colonne-espace"><span>Motos</span></p>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Vendre</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="a5-nouvelle-vente.html"><span data-icone="plus"></span><span>Nouvelle vente</span></a></li>
+      <li><a class="colonne-lien" href="#"><span data-icone="camion"></span><span>Faire entrer une moto</span></a></li>
+    </ul>
+  </div>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Suivre</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="a4-stock-motos.html"><span data-icone="stock"></span><span>Stock motos</span></a></li>
+      <li><a class="colonne-lien" href="a6-ventes.html"><span data-icone="vente"></span><span>Ventes</span></a></li>
+      <li><a class="colonne-lien" href="a8-paiements.html"><span data-icone="paiement"></span><span>Paiements</span><span class="colonne-compte">12<span class="sr"> à traiter</span></span></a></li>
+      <li><a class="colonne-lien" href="a7-dossiers.html"><span data-icone="dossier"></span><span>Dossiers</span><span class="colonne-compte">7<span class="sr"> à traiter</span></span></a></li>
+      <li><a class="colonne-lien" href="c5-panneau-recu.html" aria-current="page"><span data-icone="imprimer"></span><span>Reçus</span></a></li>
+    </ul>
+  </div>
+  <div class="colonne-groupe">
+    <h2 class="colonne-titre"><span>Le fichier</span></h2>
+    <ul>
+      <li><a class="colonne-lien" href="#"><span data-icone="client"></span><span>Clients</span></a></li>
+    </ul>
+  </div>
+  <button class="colonne-pied" type="button" data-ouvre="mon-nom" id="btn-mon-nom">
+    <span data-icone="utilisateur"></span>
+    <span><span class="colonne-pied-nom">Ousmane Sawadogo</span><br>Gérant · Pouytenga</span>
+  </button>
+</nav>
+
+  <div class="travail">
+<header class="banniere" role="banner" data-reseau="a-jour">
+  <button class="plier" type="button" data-plier aria-expanded="true"
+          aria-controls="colonne-ecrans" title="Replier la navigation (Ctrl B)">
+    <span data-icone="plier"></span>
+    <span class="sr" data-plier-texte>Replier la navigation</span>
+  </button>
+  <span class="plaque">PTG</span>
+  <span class="banniere-nom" id="nom-boutique">Pouytenga</span>
+  <span class="banniere-espace"></span>
+  <button class="recherche" type="button" data-ouvre="palette" id="btn-recherche">
+    <span data-icone="chercher"></span>
+    <span>Chercher une moto, une vente, un client…</span>
+    <kbd class="touche">Ctrl K</kbd>
+  </button>
+  <span class="etat" role="status" data-etat="a-jour"><span data-icone="coche"></span>À jour</span>
+</header>
+    <main class="page page-recu" id="travail" tabindex="-1">
+
+      <!-- Le retour se lit avant le document, et lui seul : le titre de l'écran
+           est sur le papier, il n'a pas à être répété au-dessus. -->
+      <p class="sans-impression" style="max-width:148mm;margin:0 auto var(--e4)">
+        <a class="btn btn-discret" href="#" style="padding-left:0"><span data-icone="fleche" style="rotate:180deg"></span>Tous les reçus</a>
+      </p>
+
+      <!-- Vu sur capture, et retire : un bandeau d'écran redisait ici, à trente
+           centimètres, ce que le document écrit lui-même — et les deux tenaient
+           dans le même coup d'œil. Le gérant lit le papier ; une seule note
+           suffit, et c'est celle qui part chez le client (DESIGN.md §14). -->
+
+      <article class="recu" aria-label="Reçu PTG-2609-0043"
+               style="box-shadow:var(--ombre-menu)">
+
+        <header class="recu-tete">
+          <img class="recu-logo" src="../design/marque/monogramme-se-mono.svg" alt="">
+          <div class="recu-raison">
+            <p class="recu-nom">Sandwidi et frère</p>
+            <p>Vente de motos et pièces détachées</p>
+            <p>Pouytenga, province du Kouritenga</p>
+            <p>Tél. <span class="code">70 12 45 88</span></p>
+          </div>
+          <div class="souche">
+            <p class="souche-numero"><span class="souche-code">PTG</span>-2609-0043</p>
+            <p class="souche-legende">5 septembre 2026 · Pouytenga</p>
+          </div>
+        </header>
+
+        <p class="recu-legaux">
+          IFU <span class="code">00071842 R</span> ·
+          RCCM <span class="code">BF-OUA-01-2016-A12-00847</span>
+        </p>
+
+        <h1 class="recu-titre">Reçu de versement</h1>
+
+        <!-- Un encadré à filet, sans fond teinté : il s'imprime avec le reste,
+             et un aplat de couleur sur une feuille vide une cartouche pour
+             rien. C'est déjà la forme du produit (`Recu.tsx`) ; la maquette
+             l'avait dessiné en `.avis`, dont le fond gris ressortait noir sur
+             une impression lancée depuis un poste sombre — c'est ce qui a
+             révélé le trou du bloc `@media print` du socle. -->
+        <p style="margin-bottom:var(--e4);padding:var(--e2) var(--e3);
+                  border:1px solid #0f1720;font-size:var(--t-petit)">
+          Ce reçu remplace le n<sup>o</sup> <span class="code">PTG-2609-0039</span>,
+          renuméroté à la synchronisation. Seul le numéro ci-dessus fait foi.
+        </p>
+
+        <dl class="recu-faits">
+          <dt>Reçu de</dt><dd>Rasmané Nikiéma</dd>
+          <dt>Téléphone</dt><dd class="code">70 12 45 88</dd>
+          <dt>Au titre de</dt><dd>Vente <span class="code">PTG-2609-0042</span></dd>
+          <dt>Moto</dt><dd>Haojue HJ 125-11 · Blanc · 2026</dd>
+          <dt>Numéro de châssis</dt><dd class="code">LC6PCJL51M0042980</dd>
+          <dt>Mode de paiement</dt><dd>Tranches</dd>
+          <dt>Moyen</dt><dd>Orange Money</dd>
+        </dl>
+
+        <p class="recu-montant">
+          <span>Montant reçu</span>
+          <span class="montant">150 000 FCFA</span>
+        </p>
+
+        <dl class="recu-faits recu-solde">
+          <dt>Prix convenu</dt><dd class="montant">830 000 FCFA</dd>
+          <dt>Total versé à ce jour</dt><dd class="montant">150 000 FCFA</dd>
+          <dt>Reste à percevoir</dt><dd class="montant">680 000 FCFA</dd>
+        </dl>
+
+        <p class="recu-mention">
+          La moto reste au magasin jusqu'au dernier versement. Elle sera remise au
+          client une fois le prix convenu atteint en totalité.
+        </p>
+
+        <footer class="recu-pied">
+          <div>
+            <p class="recu-legende">Le gérant</p>
+            <p>Ousmane Sawadogo</p>
+          </div>
+          <div>
+            <p class="recu-legende">Le client</p>
+            <p class="recu-trait"></p>
+          </div>
+        </footer>
+
+        <p class="recu-bas code">SDI · PTG-2609-0043 · 05/09/26 15:12</p>
+      </article>
+
+      <!-- La barre colle au bas de la zone de travail. On imprime après avoir
+           lu, pas avant, et une A5 dépasse la hauteur d'un écran de comptoir. -->
+      <div class="barre-action sans-impression">
+        <button class="btn btn-principal" type="button" onclick="window.print()">
+          <span data-icone="imprimer"></span>Imprimer le reçu</button>
+        <button class="btn" type="button">
+          <span data-icone="envoi"></span>Partager le récapitulatif</button>
+        <!-- La confirmation vit dans la barre, et non sous la feuille : c'est
+             là que l'œil se trouve au moment où elle arrive. Vu sur capture —
+             posée après le document, une A5 la poussait hors de l'écran, et on
+             confirmait un partage que personne ne voyait confirmer. -->
+        <p class="etat" role="status" data-etat="a-jour">
+          <span data-icone="coche"></span>Récapitulatif copié</p>
+        <a class="btn btn-discret pousse" href="a6-ventes.html">
+          Voir la vente <span class="code">PTG-2609-0042</span>
+          <span data-icone="fleche"></span></a>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<p id="annonce" role="status" aria-live="polite" class="sr"></p>
+
+<script src="coquille.js"></script>
+</body>
+</html>
