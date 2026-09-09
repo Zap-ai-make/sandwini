@@ -86,10 +86,16 @@ export function TetePage({
  * En capitales et en petit : c’est une étiquette de rangement, pas un second
  * titre d’écran. Un `h2` qui ressemblerait au `h1` ferait croire à deux écrans
  * empilés — et un lecteur d’écran, lui, entendrait bien deux niveaux.
+ *
+ * **Exactement le sur-titre d’écran**, gras et à 0,09 em (`socle.css:476`) : la
+ * maquette n’a qu’une seule étiquette de rangement, servie par la même classe
+ * au-dessus du `h1` et en tête de bloc. Le patron portait un gras plus léger et
+ * un interlettrage approximatif — deux graisses pour une même fonction, ce que
+ * D73 appelle deux listes qui finissent par répondre deux choses.
  */
-export function TitreSection({ children }: { children: ReactNode }) {
+export function TitreSection({ children, id }: { children: ReactNode; id?: string }) {
   return (
-    <h2 className="mb-3 text-micro font-semibold tracking-wide text-encre-doux uppercase">
+    <h2 id={id} className="mb-3 text-micro font-bold tracking-[0.09em] text-encre-doux uppercase">
       {children}
     </h2>
   );

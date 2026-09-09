@@ -5,7 +5,7 @@ import { useCallback, useState } from "react";
 import { IdentiteEntreprise } from "@/components/IdentiteEntreprise";
 import { ICONE_ECRAN } from "@/components/icones-ecrans";
 import { Hub, type Destination } from "@/components/patrons/Hub";
-import { TetePage } from "@/components/patrons/Page";
+import { TetePage, TitreSection } from "@/components/patrons/Page";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
 import { IDENTITE } from "@/lib/domain/entreprise";
@@ -147,10 +147,11 @@ export default function Reglages() {
       />
 
       <section aria-labelledby="titre-identite" className="mb-8">
-        <h2 id="titre-identite" className="mb-3 text-bloc font-bold tracking-tight text-encre">
-          L’identité de l’entreprise
-        </h2>
-        <div className="cadre px-4 py-2">
+        <TitreSection id="titre-identite">L’identité de l’entreprise</TitreSection>
+        {/* 20 px tout autour, comme `.identite` (`socle.css:992`) : la carte
+            porte désormais le monogramme, et deux pixels de haut le collaient
+            au filet du cadre. */}
+        <div className="cadre p-4 sm:p-5">
           <IdentiteEntreprise />
         </div>
         <p className="mt-3 max-w-prose text-corps text-encre-doux">
@@ -170,21 +171,14 @@ export default function Reglages() {
 
       {administration.length > 0 && (
         <section aria-labelledby="titre-administration" className="mb-8">
-          <h2
-            id="titre-administration"
-            className="mb-3 text-bloc font-bold tracking-tight text-encre"
-          >
-            Ce qui change
-          </h2>
+          <TitreSection id="titre-administration">Ce qui change</TitreSection>
           <Hub destinations={administration} />
         </section>
       )}
 
       {appareil.length > 0 && (
         <section aria-labelledby="titre-appareil" className="mb-8">
-          <h2 id="titre-appareil" className="mb-3 text-bloc font-bold tracking-tight text-encre">
-            Cet appareil
-          </h2>
+          <TitreSection id="titre-appareil">Cet appareil</TitreSection>
           <Hub destinations={appareil} />
           <p className="mt-3 max-w-prose text-corps text-encre-doux">
             Cette page est propre à l’appareil du comptoir : ce qui est en attente ici n’est pas en
@@ -194,9 +188,7 @@ export default function Reglages() {
       )}
 
       <section aria-labelledby="titre-compte">
-        <h2 id="titre-compte" className="mb-3 text-bloc font-bold tracking-tight text-encre">
-          Votre compte
-        </h2>
+        <TitreSection id="titre-compte">Votre compte</TitreSection>
         <dl className="cadre cadre-liste">
           <Fait titre="Nom">{utilisateur.nom}</Fait>
           <Fait titre="Adresse e-mail">

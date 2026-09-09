@@ -58,7 +58,11 @@ function Identite() {
         pas être effacées&nbsp;: un reçu sans mentions légales n’est pas conforme.
       </p>
 
-      <div className="mt-4 border-y border-bord">
+      {/* Le filet du haut et celui du bas ont sauté : les faits ne tiennent
+          plus toute la largeur depuis que le monogramme est à leur gauche, et
+          deux traits pleins au-dessus d’un bloc en retrait dessinaient un
+          cadre qui n’existait pas. */}
+      <div className="my-4">
         <IdentiteEntreprise />
       </div>
 
