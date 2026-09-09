@@ -263,10 +263,21 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /* Le corps est à 14 px, pas aux 16 px du navigateur. C'est l'autre moitié de
+     la densité bureau que les maquettes portent : une application de comptoir
+     tenue huit heures montre plus de lignes par écran, et 14 px est la taille
+     à laquelle elle a été dessinée. Le jeton existait depuis S28
+     (`--text-corps`) mais rien ne le posait par défaut ; tout ce qui n'annonce
+     pas sa taille héritait donc du navigateur.
+
+     Se change ici, donc sur les vingt écrans d'un coup — c'est pourquoi elle
+     n'est pas arrivée au détour d'un formulaire. */
   body {
     background-color: var(--color-fond);
     color: var(--color-encre);
     font-family: var(--font-sans);
+    font-size: var(--text-corps);
+    line-height: 1.5;
   }
 
   /* Focus visible sur tout parcours clavier — non négociable (DESIGN.md §11).
@@ -384,6 +395,24 @@
       var(--color-orange) 55%,
       var(--color-rouge)
     );
+  }
+
+  /* Entre 768 et 1024, la coquille n'a plus que son rail. C'est le seuil des
+     maquettes, et il est repris tel quel : jusqu'ici la colonne des écrans
+     tenait jusqu'à 768, si bien qu'un tiers de l'écran partait en navigation
+     sur une tablette — exactement ce que `CAHIER-UI.md` §2 reproche à
+     l'ancienne barre latérale. Les huit écrans de l'espace restent atteignables
+     : les pages y mènent, et le rail garde les espaces.
+
+     Deux effets suivent, et ils sont voulus. La zone de travail gagne les
+     296 px de la colonne, donc le tableau n'a plus besoin de se replier en
+     cartes avant 768 (voir `.tableau` plus bas). Et le panneau latéral, dont le
+     seuil se mesure sur la zone de travail et non sur la fenêtre (D74),
+     apparaît désormais plus tôt. */
+  @media (max-width: 1023px) {
+    .appli {
+      grid-template-columns: var(--rail) minmax(0, 1fr);
+    }
   }
 
   /* Le mobile garde son acquis : la navigation passe en bas, dans la zone du
@@ -596,13 +625,14 @@
     display: none;
   }
 
-  /* Un tableau ne se comprime pas : sous 1024 px il se replie en cartes.
+  /* Un tableau ne se comprime pas : sous 768 px il se replie en cartes.
 
-     Le repli des maquettes tombait à 768 px — mais elles escamotent la colonne
-     des écrans dès 1024, là où la coquille livrée la garde jusqu'à 768. Entre
-     les deux, le tableau a 296 px de moins que ce pour quoi il a été dessiné.
-     Le seuil suit la place réelle, pas celle de la maquette. */
-  @media (max-width: 1023px) {
+     C'est le seuil des maquettes, et il redevient tenable maintenant que la
+     coquille escamote sa colonne dès 1024 : entre 768 et 1024 le tableau
+     dispose enfin de la largeur pour laquelle il a été dessiné. S29 l'avait
+     remonté à 1024 faute de cette place — le seuil suivait la place réelle, pas
+     l'intention. Les deux se rejoignent. */
+  @media (max-width: 767px) {
     .tableau thead {
       display: none;
     }
@@ -1153,7 +1183,10 @@
     box-shadow: inset 3px 0 0 var(--color-encre);
   }
 
-  @media (max-width: 1023px) {
+  /* En cartes, le liseré passe de la première cellule à la carte entière : il
+     n'y a plus de première colonne où l'accrocher. Le seuil suit celui du
+     repli, sinon la ligne perdrait son marquage entre 768 et 1024. */
+  @media (max-width: 767px) {
     .tableau tbody tr.ligne-retard td:first-child {
       box-shadow: none;
     }

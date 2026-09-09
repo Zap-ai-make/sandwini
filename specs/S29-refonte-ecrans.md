@@ -67,9 +67,9 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       1. Le repli en cartes tombe à 1024 px et non à 768 : les maquettes escamotent la
          colonne des écrans dès 1024, la coquille livrée la garde jusqu'à 768, et le tableau
          a donc 296 px de moins que ce pour quoi il a été dessiné. Le seuil suit la place
-         réelle. **Cet écart de coquille reste à trancher** : entre 768 et 1024, un tiers de
-         l'écran part en navigation, ce qui est le défaut que `CAHIER-UI.md` §2 reproche à
-         l'ancienne barre latérale. Ce n'est pas A4 : cela touche les vingt écrans.
+         réelle. **Tranché depuis, en faveur de la maquette** : la colonne s'escamote
+         désormais dès 1024 px, et le repli en cartes redescend à 768. Voir « Ce que le
+         commanditaire a tranché » en fin de spec.
       2. L'en-tête collé des maquettes est inerte : leur `.cadre` porte `overflow: hidden`,
          qui fait du cadre la zone de défilement de référence — une boîte qui ne défile
          jamais. Ici c'est **le tableau qui défile, pas la page** : la zone du tableau prend
@@ -248,12 +248,13 @@ Un commit par écran, tests relancés à chaque fois, dans l'ordre du `CAHIER-UI
       « Boutique » répète les trois premières lettres du numéro de pièce, en A6 comme en A7,
       et c'est un pavé jaune de plus (D70). En A4 elle est nécessaire — une moto n'a pas de
       numéro de pièce. À trancher pour les trois écrans à la fois, pas dans un commit.
-      **Le défaut du dépôt de dossier s'est reproduit, et il se nomme.** `e2e/dossier.spec.ts`
-      « le cycle complet » échoue encore : après un dépôt, le formulaire reste ouvert et le
-      gérant lit `PERMISSION_DENIED: false for 'create' @ L161, evaluation error at
-      L835:24…`. Le cache local a écrit « Chez le prestataire » que le serveur refuse. C'est
-      le défaut déjà relevé en S28, il appartient à `lib/repositories/dossier.ts` et demande
-      sa propre spec — pas la refonte.
+      **Le défaut du dépôt de dossier s'est reproduit, et il a eu sa spec : S30, close.**
+      Le symptôme relevé ici était le bon — « après un dépôt, le formulaire reste ouvert » —
+      mais son explication était fausse : ce n'était pas le serveur qui refusait. L'écran
+      attendait l'accusé de réception avant de refermer, ce qui hors ligne n'arrive jamais ;
+      le `PERMISSION_DENIED` lu à côté venait d'écritures voisines. Voir
+      `specs/S30-depot-prestataire.md` et D76. Le correctif est aussi porté ici : S29 avait
+      emporté le même `await` dans `components/GestesDocument.tsx`.
 - [x] **A8 Paiements** — **deux sections séparées et nommées** : Dettes (crédit) et Tranches
       (moto retenue). Jamais mêlées dans un même tableau.
       **Elles sont désormais visibles en même temps, et c’est là tout le changement.** L’écran
@@ -456,3 +457,46 @@ même temps que la rangée, quand la tête d'écran est devenue un patron — le
 replient désormais sous le titre, vérifié sur capture à 390 px. Ce n'est pas une correction
 fonctionnelle glissée dans un autre lot (`CAHIER-UI.md` §16) : c'est la même ligne de code
 qui portait le défaut et qui a été réécrite. A4 n'a plus rien à réparer ici.
+
+---
+
+## Ce que le commanditaire a tranché
+
+Les six questions laissées ouvertes à la clôture de S29 ont été portées au
+commanditaire. Voici ce qu'il en est, et ce qui a été appliqué.
+
+**1. L'écart de coquille entre 768 et 1024 px — la maquette l'emporte.** La
+colonne des écrans s'escamote désormais dès 1024 px (`max-lg:hidden`, et la
+grille de `.appli` passe à deux colonnes), et le repli du tableau en cartes
+redescend à 768 px, comme dans `maquettes/socle.css`. Les deux moitiés sont
+inséparables : escamoter la colonne sans redescendre le repli aurait laissé des
+cartes dans une zone large ; redescendre le repli sans escamoter la colonne
+aurait donné le tableau comprimé que S29 avait justement refusé. Sur une
+tablette, un tiers de l'écran ne part plus en navigation — le reproche que
+`CAHIER-UI.md` §2 adresse à l'ancienne barre latérale.
+
+*Conséquence vue sur capture, et corrigée dans le même geste* : à 820 px le
+numéro de pièce d'A6 se coupait en trois lignes, parce que cette largeur ne
+montrait jamais de tableau auparavant. `whitespace-nowrap`, comme A7 et A8
+l'avaient déjà.
+
+**2. Le corps à 14 px — la maquette l'emporte.** `body` pose désormais
+`font-size: var(--text-corps)`. Le jeton existait depuis S28 ; rien ne le
+posait par défaut, donc tout ce qui n'annonçait pas sa taille héritait des
+16 px du navigateur. C'est l'autre moitié de la densité bureau.
+
+**3. La colonne « Boutique » d'A6, A7 et A8 — retirée.** Aucune des trois
+maquettes ne la porte, y compris pour le responsable qui regarde toutes les
+boutiques : les trois premières lettres du numéro de pièce la disent déjà sur
+chaque ligne, et un second pavé jaune juste à côté dilue le signal (D70). A4 la
+garde — une moto n'a pas de numéro de pièce, donc rien ne la porte.
+
+**4. `PanneauRecu` — repoussé.** « On en reviendra. » L'écart à la spec d'A6
+reste assumé : il n'existe aucune maquette validée de l'écran des reçus.
+
+**5. et 6. S29 est fusionnée sur `main`, et la branche est poussée.**
+
+Restent ouverts, sans échéance : la borne `max-width: 32rem` de `.saisie` (case
+non cochée ci-dessus), la fragilité des règles relevée par S30 — une clé absente
+de `request.auth.token` fait *planter* la règle au lieu de la faire refuser — et
+le joker `match /{referentiel}/{id}` qui salit tous les journaux.

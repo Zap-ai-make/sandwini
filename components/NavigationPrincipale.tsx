@@ -118,7 +118,7 @@ function Marque() {
   return (
     <span
       aria-hidden="true"
-      className="mb-3 block w-10 text-coquille-encre max-md:hidden"
+      className="mb-3 block w-10 text-coquille-encre max-lg:hidden"
       title="Sandwidi et Frères"
     >
       <Monogramme className="block w-full" />
@@ -142,7 +142,7 @@ function Colonne({
   return (
     <nav
       aria-label={`Écrans de l’espace ${ESPACES[espace].libelle}`}
-      className="colonne flex flex-col px-3 pt-4 pb-3 max-md:hidden print:hidden"
+      className="colonne flex flex-col px-3 pt-4 pb-3 max-lg:hidden print:hidden"
     >
       <div className="mb-4 flex items-center gap-2">
         <h2 className="colonne-libelle font-display text-bloc font-bold tracking-tight text-coquille-encre">

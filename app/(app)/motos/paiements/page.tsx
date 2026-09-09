@@ -124,8 +124,8 @@ export default function PagePaiements() {
 
   const toutesBoutiques = perimetre.type === "toutes";
   const communes = useMemo<Colonne<LignePaiement>[]>(
-    () => colonnesCommunes({ nomClient, toutesBoutiques }),
-    [nomClient, toutesBoutiques],
+    () => colonnesCommunes({ nomClient }),
+    [nomClient],
   );
 
   const colonnesDettes = useMemo<Colonne<LignePaiement>[]>(
@@ -395,13 +395,11 @@ function Encaisser({ vente, numero }: { vente: string; numero: string }) {
   );
 }
 
-/** Les colonnes que les deux tableaux partagent : la pièce, la boutique, le client. */
+/** Les colonnes que les deux tableaux partagent : la pièce et le client. */
 function colonnesCommunes({
   nomClient,
-  toutesBoutiques,
 }: {
   nomClient: (clientId: string) => string;
-  toutesBoutiques: boolean;
 }): Colonne<LignePaiement>[] {
   const liste: Colonne<LignePaiement>[] = [
     {
@@ -425,17 +423,12 @@ function colonnesCommunes({
     },
   ];
 
-  if (toutesBoutiques) {
-    liste.splice(1, 0, {
-      cle: "boutique",
-      titre: "Boutique",
-      rendu: (ligne) => (
-        <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-1.5 py-0.5 text-legende leading-none text-encre-fixe">
-          {ligne.vente.boutiqueId}
-        </span>
-      ),
-    });
-  }
+    /* Pas de colonne « Boutique » : les trois premières lettres du numéro de
+       pièce la disent déjà, sur chaque ligne, et un second pavé jaune juste à
+       côté ne fait que diluer le signal (D70). C'est ce que montrent les
+       maquettes A6, A7 et A8 — aucune des trois n'a cette colonne, y compris
+       pour le responsable qui regarde toutes les boutiques. Le stock (A4) la
+       garde : une moto n'a pas de numéro de pièce, donc rien ne la porte. */
   return liste;
 }
 

@@ -121,7 +121,7 @@ function Ventes() {
           <Link
             href={`/motos/ventes?vente=${ligne.vente.id}`}
             aria-current={ligne.vente.id === venteOuverte ? "true" : undefined}
-            className="plaque-code text-encre underline-offset-2 hover:underline"
+            className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
           >
             {ligne.vente.numero}
           </Link>
@@ -164,21 +164,14 @@ function Ventes() {
         rendu: (ligne) => <Paiement statut={ligne.vente.statutPaiement} />,
       },
     ];
-    /* La colonne n'existe que quand la question se pose : dans une boutique,
-       toutes les lignes portent la même. */
-    if (toutesBoutiques) {
-      liste.splice(1, 0, {
-        cle: "boutique",
-        titre: "Boutique",
-        rendu: (ligne) => (
-          <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-1.5 py-0.5 text-legende leading-none text-encre-fixe">
-            {ligne.vente.boutiqueId}
-          </span>
-        ),
-      });
-    }
+    /* Pas de colonne « Boutique » : les trois premières lettres du numéro de
+       pièce la disent déjà, sur chaque ligne, et un second pavé jaune juste à
+       côté ne fait que diluer le signal (D70). C'est ce que montrent les
+       maquettes A6, A7 et A8 — aucune des trois n'a cette colonne, y compris
+       pour le responsable qui regarde toutes les boutiques. Le stock (A4) la
+       garde : une moto n'a pas de numéro de pièce, donc rien ne la porte. */
     return liste;
-  }, [catalogue, toutesBoutiques, venteOuverte]);
+  }, [catalogue, venteOuverte]);
 
   if (perimetre.type === "aucune")
     return (
