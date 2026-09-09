@@ -940,11 +940,28 @@
   /* --------------------------------------------------------------------------
      Les boutons.
 
-     Quatre tons, et pas un de plus : la plaque pour le geste principal de
+     Quatre tons, et pas un de plus : l'encre pour le geste principal de
      l'écran, le neutre pour les autres, le discret pour ce qui accompagne, le
      destructif pour ce qui ne se rattrape pas. `h-11` (44 px) est le minimum
      tactile de `DESIGN.md` §11 ; les gestes de comptoir gardent `h-12`.
-     -------------------------------------------------------------------------- */
+
+     **Le geste principal n'est plus une plaque jaune, et c'est le sujet de
+     S31.** Il l'était depuis avant la refonte, par héritage : la direction du
+     produit était alors la plaque d'immatriculation, et l'accent en venait.
+     D70 a renversé cela — la marque prend la coquille, et le `#f5c518`
+     redevient un signal à deux emplois, le code boutique et le hors-ligne.
+     Les maquettes en tirent la conséquence que le dépôt n'avait pas tirée :
+     `socle.css:548` pose `.btn-principal { background: var(--encre) }`, et pas
+     une seule des vingt-quatre maquettes ne porte un bouton jaune.
+
+     Ce n'était pas une nuance. Trente boutons jaunes répartis sur dix-neuf
+     fichiers, plus vingt pastilles de code boutique sur un même écran de
+     stock : le signal ne signalait plus rien. C'est le reproche du
+     commanditaire — « même notre logo n'adopte pas les bonnes couleurs » —
+     pris par l'autre bout.
+
+     La classe a changé de nom avec sa couleur. `bouton-plaque` qui rend de
+     l'encre est un piège posé pour le prochain qui lira le HTML. */
   .bouton {
     display: inline-flex;
     align-items: center;
@@ -958,12 +975,27 @@
     transition: background-color var(--duree-reponse) var(--ease-sortie);
   }
 
-  .bouton-plaque {
-    border-color: var(--color-plaque-bord);
-    background: var(--color-plaque);
+  .bouton-principal {
+    border-color: var(--color-encre);
+    background: var(--color-encre);
     padding-inline: 1.25rem;
-    color: var(--color-encre-fixe);
+    /* `papier` et non un blanc figé : en sombre, l'encre devient claire et le
+       papier sombre, et le bouton s'inverse avec eux sans qu'on l'écrive deux
+       fois. C'est exactement ce que fait `socle.css:550`. */
+    color: var(--color-papier);
     font-weight: 600;
+  }
+
+  /* Le survol assombrit en clair et éclaircit en sombre — un bouton déjà noir
+     ne peut pas noircir. Les deux valeurs sont celles des maquettes. */
+  .bouton-principal:hover {
+    background: #1d2a37;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    .bouton-principal:hover {
+      background: #cfd6db;
+    }
   }
 
   .bouton-neutre {

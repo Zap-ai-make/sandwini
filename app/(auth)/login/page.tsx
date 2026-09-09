@@ -181,7 +181,7 @@ export default function Connexion() {
               <button
                 type="submit"
                 disabled={bloque}
-                className="bouton bouton-plaque w-full justify-center disabled:opacity-60"
+                className="bouton bouton-principal w-full justify-center disabled:opacity-60"
               >
                 {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
                 {pause > 0 ? `Réessayez dans ${pause} s` : envoi ? "Connexion…" : "Se connecter"}

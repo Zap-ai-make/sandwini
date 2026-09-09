@@ -225,7 +225,7 @@ export default function PageNouvelleVente() {
       {enregistree && (
         <div
           role="status"
-          className="mb-6 max-w-[40rem] rounded-champ border border-plaque-bord bg-papier p-4"
+          className="mb-6 max-w-[40rem] cadre p-4"
         >
           <p className="font-medium text-encre">
             Vente enregistrée — <span className="plaque-code">{enregistree.numero}</span>
@@ -281,7 +281,7 @@ export default function PageNouvelleVente() {
               <Link href="/motos/ventes" className="bouton bouton-neutre">
                 Annuler
               </Link>
-              <button type="button" onClick={enregistrer} className="bouton bouton-plaque">
+              <button type="button" onClick={enregistrer} className="bouton bouton-principal">
                 Enregistrer la vente
               </button>
             </div>
@@ -376,7 +376,7 @@ export default function PageNouvelleVente() {
             <EtatVide
               titre={`Aucune moto disponible dans ${perimetre.nom}.`}
               action={
-                <Link href="/motos/nouvelle" className="bouton bouton-plaque">
+                <Link href="/motos/nouvelle" className="bouton bouton-principal">
                   <Bike aria-hidden="true" className="size-4" />
                   Faire entrer une moto
                 </Link>
@@ -636,7 +636,7 @@ function Recapitulatif({
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <h2 className="text-bloc font-bold tracking-tight text-encre">Ce qui sera enregistré</h2>
         {numero && (
-          <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-legende leading-none text-encre-fixe">
+          <span className="plaque-code text-legende text-encre-doux">
             {numero}
           </span>
         )}

@@ -231,7 +231,7 @@ export function SansBoutique({
           : "Aucune boutique ne vous est attribuée. Vos écrans resteront vides tant que le responsable ne vous en aura pas donné une."}
       </p>
       {estResponsable && (
-        <Link href="/parametres/boutiques" className="bouton bouton-plaque mt-6">
+        <Link href="/parametres/boutiques" className="bouton bouton-principal mt-6">
           Créer une boutique
         </Link>
       )}

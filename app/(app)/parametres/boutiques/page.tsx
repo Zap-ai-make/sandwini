@@ -238,7 +238,7 @@ function ChampsBoutique({
                 className={[
                   "inline-flex h-12 cursor-pointer items-center gap-2.5 rounded-plaque border px-3 text-sm font-medium",
                   coche
-                    ? "border-plaque-bord bg-plaque text-encre-fixe"
+                    ? "border-2 border-encre bg-papier font-semibold text-encre"
                     : "border-bord bg-papier text-encre",
                 ].join(" ")}
               >
@@ -348,7 +348,7 @@ function FormulaireCreation({ existantes }: { existantes: Boutique[] }) {
 
       <button
         type="submit"
-        className="mt-3 inline-flex h-12 items-center justify-center rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+        className="bouton bouton-principal mt-3 justify-center"
       >
         Créer la boutique
       </button>
@@ -403,7 +403,7 @@ function FormulaireEdition({ boutique, surFin }: { boutique: Boutique; surFin: (
       <EtatErreurSaisie message={erreur} className="mt-3" />
 
       <div className="mt-3 flex gap-2">
-        <button type="submit" className="bouton bouton-plaque">
+        <button type="submit" className="bouton bouton-principal">
           Enregistrer
         </button>
         <button type="button" onClick={surFin} className="bouton bouton-neutre">

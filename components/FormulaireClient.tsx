@@ -153,7 +153,7 @@ export function FormulaireClient({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="submit"
-          className="bouton bouton-plaque"
+          className="bouton bouton-principal"
         >
           {existant ? "Enregistrer" : "Créer le client"}
         </button>

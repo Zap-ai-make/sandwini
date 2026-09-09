@@ -309,7 +309,7 @@ function Rattachement({
         type="button"
         onClick={enregistrer}
         disabled={enCours || choix === actuelle || acheminement !== null}
-        className="inline-flex h-11 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-3 text-sm font-semibold text-encre-fixe disabled:opacity-60"
+        className="bouton bouton-principal h-11 text-sm disabled:opacity-60"
       >
         {enCours && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
         {enCours ? "Enregistrement…" : "Rattacher"}
@@ -465,7 +465,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
       <button
         type="submit"
         disabled={envoi || (acheminement !== null && boutiqueId !== "")}
-        className="mt-3 inline-flex h-12 items-center justify-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe disabled:opacity-60"
+        className="bouton bouton-principal mt-3 justify-center disabled:opacity-60"
       >
         {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
         {envoi ? "Création…" : "Créer le compte"}

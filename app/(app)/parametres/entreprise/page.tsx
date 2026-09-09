@@ -163,7 +163,7 @@ function Reglages() {
         </p>
       )}
 
-      <button type="submit" className="bouton bouton-plaque mt-3">
+      <button type="submit" className="bouton bouton-principal mt-3">
         Enregistrer le réglage
       </button>
     </form>

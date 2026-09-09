@@ -43,7 +43,7 @@ export default function PageClients() {
                 setConfirmation(null);
               }}
               aria-expanded={creation}
-              className="bouton bouton-plaque"
+              className="bouton bouton-principal"
             >
               <UserPlus aria-hidden="true" className="size-4" />
               {creation ? "Fermer" : "Nouveau client"}
@@ -105,7 +105,7 @@ export default function PageClients() {
           titre="Aucun client pour l’instant."
           className="mt-6"
           action={
-            <button type="button" onClick={() => setCreation(true)} className="bouton bouton-plaque">
+            <button type="button" onClick={() => setCreation(true)} className="bouton bouton-principal">
               <Plus aria-hidden="true" className="size-4" />
               Créer le premier
             </button>

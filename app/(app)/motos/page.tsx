@@ -178,7 +178,7 @@ function Stock() {
         titre="Stock motos"
         sousTitre={toutesBoutiques ? "Toutes les boutiques" : perimetre.nom}
         actions={
-          <Link href="/motos/nouvelle" className="bouton bouton-plaque">
+          <Link href="/motos/nouvelle" className="bouton bouton-principal">
             <Plus aria-hidden="true" className="size-4" />
             Faire entrer une moto
           </Link>
@@ -385,7 +385,7 @@ function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
     <EtatVide
       titre="Aucune moto en stock pour l’instant."
       action={
-        <Link href="/motos/nouvelle" className="bouton bouton-plaque">
+        <Link href="/motos/nouvelle" className="bouton bouton-principal">
           <Plus aria-hidden="true" className="size-4" />
           Faire entrer une moto
         </Link>

@@ -220,7 +220,7 @@ function Formulaire() {
         </p>
       )}
 
-      <button type="submit" className="mt-3 bouton bouton-plaque">
+      <button type="submit" className="mt-3 bouton bouton-principal">
         Enregistrer le prestataire
       </button>
     </form>
@@ -321,7 +321,7 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
             changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
             prefixe={`edition-${prestataire.id}`}
           />
-          <button type="submit" className="mt-4 bouton bouton-plaque">
+          <button type="submit" className="mt-4 bouton bouton-principal">
             Enregistrer
           </button>
         </form>

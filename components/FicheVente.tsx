@@ -157,7 +157,7 @@ export function FicheVente({ id }: { id: string }) {
                 à la lecture : rien n'a été figé à la première impression (D61). */}
             <Link
               href={`/motos/recus?recu=${identifiantRecu(vente.id, null)}`}
-              className="bouton bouton-plaque"
+              className="bouton bouton-principal"
             >
               <Printer aria-hidden="true" className="size-4" />
               Reçu de vente
@@ -368,7 +368,7 @@ function RemiseMoto({ vente }: { vente: Vente }) {
 
       {confirmation ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={remettre} className="bouton bouton-plaque">
+          <button type="button" onClick={remettre} className="bouton bouton-principal">
             Oui, la moto est remise
           </button>
           <button
@@ -383,7 +383,7 @@ function RemiseMoto({ vente }: { vente: Vente }) {
         <button
           type="button"
           onClick={() => setConfirmation(true)}
-          className="bouton bouton-plaque mt-3"
+          className="bouton bouton-principal mt-3"
         >
           Confirmer la remise de la moto
         </button>
@@ -622,7 +622,7 @@ function FormulaireVersement({
 
       <EtatErreurSaisie message={erreur} className="mt-2" />
 
-      <button type="submit" className="bouton bouton-plaque">
+      <button type="submit" className="bouton bouton-principal">
         Enregistrer le versement
       </button>
     </form>

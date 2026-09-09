@@ -200,7 +200,7 @@ function Modeles({
             onChange={(evenement) => setNom(evenement.target.value)}
             className="saisie min-w-0 flex-1 placeholder:text-encre-doux"
           />
-          <button type="submit" className="bouton bouton-plaque">
+          <button type="submit" className="bouton bouton-principal">
             <Plus aria-hidden="true" className="size-4" />
             Ajouter
           </button>
@@ -276,7 +276,7 @@ function LigneModele({ modele, freres }: { modele: Modele; freres: Modele[] }) {
           />
           <button
             type="submit"
-            className="inline-flex h-11 items-center rounded-plaque border border-plaque-bord bg-plaque px-3 text-sm font-semibold text-encre-fixe"
+            className="bouton bouton-principal h-11 text-sm"
           >
             Enregistrer
           </button>

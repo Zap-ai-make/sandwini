@@ -188,7 +188,7 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
         <button
           type="button"
           onClick={() => window.print()}
-          className="bouton bouton-plaque"
+          className="bouton bouton-principal"
         >
           <Printer aria-hidden="true" className="size-4" />
           Imprimer le reçu

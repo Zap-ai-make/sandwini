@@ -95,7 +95,7 @@ export default function Diagnostic() {
       <button
         type="button"
         onClick={ecrireUnEssai}
-        className="mt-4 bouton bouton-plaque hover:brightness-95"
+        className="mt-4 bouton bouton-principal hover:brightness-95"
       >
         Écrire un test de synchronisation
       </button>

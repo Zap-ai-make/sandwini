@@ -201,7 +201,7 @@ export default function PagePaiements() {
             <Link
               href={`/motos/ventes?vente=${ligne.vente.id}`}
               aria-label={`Remettre la moto de ${ligne.vente.numero}`}
-              className="bouton bouton-plaque h-9 px-3 text-legende"
+              className="bouton bouton-principal h-9 px-3 text-legende"
             >
               Remettre la moto
             </Link>

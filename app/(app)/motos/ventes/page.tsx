@@ -191,7 +191,7 @@ function Ventes() {
         titre="Ventes"
         sousTitre={toutesBoutiques ? "Toutes les boutiques" : perimetre.nom}
         actions={
-          <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+          <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
             <Plus aria-hidden="true" className="size-4" />
             Nouvelle vente
           </Link>
@@ -340,7 +340,7 @@ function AucuneVente({ perimetreEnCours }: { perimetreEnCours: boolean }) {
     <EtatVide
       titre="Aucune vente enregistrée pour l’instant."
       action={
-        <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+        <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
           <Plus aria-hidden="true" className="size-4" />
           Enregistrer la première
         </Link>

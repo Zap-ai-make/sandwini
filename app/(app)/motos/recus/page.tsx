@@ -230,7 +230,9 @@ function LigneRecu({ recu, nomClient }: { recu: ContenuRecu; nomClient: string }
       href={`/motos/recus?recu=${recu.cle}`}
       className="block px-4 py-3 hover:bg-fond focus-visible:bg-fond"
     >
-      <span className="plaque-code inline-block rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-xs leading-none text-encre-fixe">
+      {/* Un numero de piece n'est pas un code boutique : seules ses trois
+          premieres lettres en sont un, et la souche les porte deja ailleurs. */}
+      <span className="plaque-code inline-block text-corps font-medium text-encre">
         {recu.numero}
       </span>
 
@@ -263,7 +265,7 @@ function AucunRecu({ perimetreEnCours }: { perimetreEnCours: boolean }) {
       titre="Aucun reçu pour l’instant."
       className="mt-6"
       action={
-        <Link href="/motos/ventes/nouvelle" className="bouton bouton-plaque">
+        <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
           Enregistrer une vente
         </Link>
       }

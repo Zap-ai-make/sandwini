@@ -153,7 +153,7 @@ function Ajout({
         />
         <button
           type="submit"
-          className="inline-flex h-12 shrink-0 items-center gap-2 rounded-plaque border border-plaque-bord bg-plaque px-4 font-semibold text-encre-fixe"
+          className="bouton bouton-principal shrink-0"
         >
           <Plus aria-hidden="true" className="size-4" />
           Ajouter
@@ -231,7 +231,7 @@ function Ligne({
           />
           <button
             type="submit"
-            className="inline-flex h-11 items-center rounded-plaque border border-plaque-bord bg-plaque px-3 text-sm font-semibold text-encre-fixe"
+            className="bouton bouton-principal h-11 text-sm"
           >
             Enregistrer
           </button>

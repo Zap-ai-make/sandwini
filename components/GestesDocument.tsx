@@ -94,7 +94,7 @@ export function GestesDocument({
                 key={vers}
                 type="button"
                 onClick={() => setDepotOuvert(true)}
-                className="bouton bouton-plaque"
+                className="bouton bouton-principal"
               >
                 Déposer chez un prestataire
               </button>
@@ -110,7 +110,7 @@ export function GestesDocument({
                   vers === "non_applicable"
                     ? "bouton bouton-discret"
                     : rang === 0
-                      ? "bouton bouton-plaque disabled:opacity-60"
+                      ? "bouton bouton-principal disabled:opacity-60"
                       : "bouton bouton-neutre disabled:opacity-60"
                 }
               >
@@ -294,7 +294,7 @@ function FormulaireDepot({
           <div className="mt-4 flex flex-wrap gap-2">
             <button
               type="submit"
-              className="bouton bouton-plaque disabled:opacity-60"
+              className="bouton bouton-principal disabled:opacity-60"
             >
               Enregistrer le dépôt
             </button>

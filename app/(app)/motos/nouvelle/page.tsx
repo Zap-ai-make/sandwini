@@ -115,7 +115,7 @@ export default function PageNouvelleMoto() {
           la même marque finit écrite de trois façons.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Link href="/parametres/catalogue" className="bouton bouton-plaque">
+          <Link href="/parametres/catalogue" className="bouton bouton-principal">
             Déclarer une marque
           </Link>
           <Link href="/parametres/referentiels" className="bouton bouton-neutre">
@@ -129,7 +129,7 @@ export default function PageNouvelleMoto() {
   return (
     <Cadre>
       {enregistree && (
-        <div role="status" className="mb-6 rounded-plaque border border-plaque-bord bg-papier p-4">
+        <div role="status" className="mb-6 cadre p-4">
           <p className="font-medium text-encre">
             Moto enregistrée dans {perimetre.nom}
             {" — "}
@@ -168,7 +168,7 @@ export default function PageNouvelleMoto() {
                   className={[
                     "flex h-12 flex-1 cursor-pointer items-center justify-center rounded-plaque border font-medium",
                     saisie.etat === etat
-                      ? "border-plaque-bord bg-plaque text-encre-fixe"
+                      ? "border-2 border-encre bg-papier font-semibold text-encre"
                       : "border-bord bg-papier text-encre hover:bg-fond",
                   ].join(" ")}
                 >
@@ -347,7 +347,7 @@ export default function PageNouvelleMoto() {
 
         <button
           type="submit"
-          className="mt-3 bouton bouton-plaque"
+          className="mt-3 bouton bouton-principal"
         >
           Faire entrer en stock
         </button>

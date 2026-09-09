@@ -103,18 +103,35 @@ export default function Accueil() {
 function GesteDuJour() {
   return (
     <div className="mt-6">
+      {/* Le nuit, et non la plaque. C'était le plus grand aplat jaune du
+          produit, sur l'écran que le gérant ouvre le premier — et le jaune ne
+          dit que deux choses (D70). La maquette le pose sur le nuit
+          (`socle.css:839`), ce qui fait du geste du jour un morceau de la
+          coquille descendu dans la page : il se vise sans se lire.
+
+          L'anneau de focus s'inverse avec le fond, comme partout où la
+          coquille descend dans le travail (cf. l'écran de connexion). */}
       <Link
         href="/motos/ventes/nouvelle"
-        className="flex items-center gap-4 rounded-carte border border-plaque-bord bg-plaque p-5 text-encre-fixe hover:brightness-105"
+        className="flex items-center gap-4 rounded-carte bg-nuit px-6 py-5 text-coquille-encre hover:bg-nuit-3 [--color-focus-halo:var(--color-nuit)] [--color-focus-trait:#ffffff]"
       >
-        <Plus aria-hidden="true" className="size-7 shrink-0" />
+        {/* La tuile de 44 px des maquettes : elle donne à l'icône le poids que
+            « le geste du jour » réclame, là où une icône nue flottait. */}
+        <span
+          aria-hidden="true"
+          className="grid size-11 shrink-0 place-items-center rounded-champ bg-nuit-3"
+        >
+          <Plus className="size-6" />
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-bloc font-semibold">Nouvelle vente</span>
-          <span className="block text-corps">
+          <span className="block font-display text-ecran font-bold tracking-tight">
+            Nouvelle vente
+          </span>
+          <span className="block text-corps text-coquille-doux">
             Client, moto, prix, mode de paiement, premier versement.
           </span>
         </span>
-        <ArrowRight aria-hidden="true" className="size-5 shrink-0" />
+        <ArrowRight aria-hidden="true" className="ml-auto size-6 shrink-0" />
       </Link>
 
       <div className="mt-3 flex flex-wrap gap-2">

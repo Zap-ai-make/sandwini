@@ -55,7 +55,9 @@ export function FicheMoto({ id }: { id: string }) {
         <EtatChargement className="mt-6">Chargement de la fiche…</EtatChargement>
       ) : (
         <>
-          <span className="plaque-code mt-3 inline-block rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe">
+          {/* Le chassis n'est pas un code boutique : il perd la plaque, comme il
+              l'a perdue dans le tableau du stock en S29 (D70). */}
+          <span className="plaque-code mt-3 inline-block text-sm text-encre-doux">
             {moto.numeroChassis}
           </span>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">

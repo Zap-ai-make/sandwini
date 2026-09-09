@@ -25,7 +25,7 @@ export default function HorsLigne() {
       </p>
       <Link
         href="/dashboard"
-        className="mt-6 inline-flex h-12 items-center self-start rounded-plaque border border-plaque-bord bg-plaque px-5 font-semibold text-encre-fixe"
+        className="bouton bouton-principal mt-6 self-start"
       >
         Revenir à l’accueil
       </Link>

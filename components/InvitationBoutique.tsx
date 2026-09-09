@@ -27,7 +27,7 @@ export function InvitationBoutique() {
   const estResponsable = session.utilisateur.role === "responsable";
 
   return (
-    <section className="mt-6 rounded-plaque border border-plaque-bord bg-papier p-4">
+    <section className="mt-6 cadre p-4">
       <h2 className="flex items-center gap-2 font-semibold text-encre">
         <Store aria-hidden="true" className="size-5 text-encre-doux" />
         {estResponsable ? "Déclarez votre première boutique" : "Aucune boutique ne vous est attribuée"}
@@ -40,7 +40,7 @@ export function InvitationBoutique() {
       {estResponsable && (
         <Link
           href="/parametres/boutiques"
-          className="mt-4 bouton bouton-plaque"
+          className="mt-4 bouton bouton-principal"
         >
           Créer une boutique
         </Link>
