@@ -69,11 +69,18 @@ par le commanditaire ; la phase 2 s'exécute comme deux specs normales.
 |-----|---------------------------------------------------|-----------|-----------|---------|
 | S28 | Refonte de l'interface — jetons, coquille, patrons | S12       | post-MVP  | terminée |
 | S29 | Refonte de l'interface — les écrans                | S28       | post-MVP  | terminée |
+| S31 | Mise en conformité — marque, coquille, états       | S29       | post-MVP  | en cours |
 
 La coupure entre les deux n'est pas administrative : à la fin de S28 l'application tourne dans la
 nouvelle coquille avec ses écrans d'aujourd'hui. Le défaut n°1 du diagnostic — le rail vide et le
 `max-w-3xl` — est corrigé et déployable **avant** qu'un seul écran métier soit réécrit. Si le
 chantier devait s'arrêter là, le produit y aurait déjà gagné.
+
+S31 s'ajoute après coup, et ce n'est pas une refonte de plus : S29 a confronté chaque écran à sa
+maquette sur sa **zone de travail**, jamais sur la coquille qui l'entoure ni sur la marque qui
+l'habille. Ce qui n'a pas été comparé ligne à ligne ne l'a pas été. L'audit
+`AUDIT-CONFORMITE-MAQUETTES.md` mesure l'écart : 48 défauts, dont trois transverses aux neuf
+écrans. S24 reste la moitié qui coûte comme une fonctionnalité, et elle garde son rang ci-dessous.
 
 ---
 
