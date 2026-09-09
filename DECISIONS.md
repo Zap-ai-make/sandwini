@@ -1815,3 +1815,80 @@ pas — c'est ce commentaire qui empêchera la fusion, pas la distance.
 un quatrième mode de paiement fait échouer la compilation aux deux endroits, et
 oblige à écrire les deux textes. C'est la garde qu'on veut ici — pas qu'ils
 restent identiques, mais qu'aucun ne soit oublié.
+
+---
+
+## D79 — Un refus de règle doit être une décision, et nommer sa cause
+
+*S31, dettes techniques. Deux défauts distincts se lisaient dans une seule
+chaîne d'erreur, et c'est elle qui a servi de mesure avant et après.*
+
+**Ce que le client recevait.** Un compte sans claim demandant `boutiques/PTG` :
+
+    Property role is undefined on object. for 'get' @ L87,
+    false for 'get' @ L159, false for 'get' @ L855
+
+Trois choses ne vont pas. Le refus est un plantage, donc rendu pour la mauvaise
+raison. Le nom de la clé manquante sort des règles et arrive dans le navigateur.
+Et trois règles sont citées pour une décision, dont un joker sans rapport.
+
+**Ce que la sonde a corrigé dans le diagnostic.** Le cahier disait « lire une
+clé absente fait planter la règle *au lieu* de la faire refuser ». Une sonde
+jetable — deux règles de trois lignes, dans un projet d'émulateur à part — a
+montré que c'est vrai à moitié : le moteur plante bien, mais le plantage d'une
+branche n'abat pas l'expression entière, un `||` le rattrape et la branche
+suivante décide. Le défaut ne mordait donc que là où **les deux** branches
+lisent le jeton. C'est pourquoi il était resté invisible : presque partout, un
+OU le couvrait. Un remède appliqué sans cette sonde aurait été correct par
+accident, et son commentaire aurait menti pour longtemps.
+
+**Deux règles, tirées de là.**
+
+1. *Toute lecture du jeton passe par `get(clé, défaut)`.* Le refus redevient une
+   décision, et rien du jeton ne fuit vers le client.
+2. *Pas de `match` à segment variable à la racine.* Il paraît économique — un
+   bloc pour trois collections de même forme — mais il s'interpose sur **toutes**
+   les collections du produit et se cite dans chacun de leurs refus. Trois
+   chemins écrits en toutes lettres coûtent quatorze lignes et rendent chaque
+   refus lisible. C'est ce joker qui a fait accuser les règles à tort en S30.
+
+**Après :**
+
+    false for 'get' @ L106, false for 'get' @ L909
+
+La règle des boutiques, et le refus par défaut.
+
+**Ce qui fige la correction.** Un test qui lit le message rendu au client et
+refuse d'y trouver `is undefined`. Le premier test écrit ne valait rien — il
+passait aussi sur l'ancienne règle, parce qu'il tombait sur un chemin couvert
+par un OU. Un test de régression se vérifie dans les deux sens : sur le code
+corrigé *et* sur le code fautif. Sans le second essai, on fige une croyance.
+
+---
+
+## D80 — La largeur d'un champ appartient à la mise en page, pas au champ
+
+*S31, dettes techniques. `.saisie` portait `max-width: 32rem`.*
+
+**Pourquoi c'était là.** Cinq écrans sans colonne tenue laissaient un champ
+« Nom » s'étirer sur 950 px. La borne posée sur `.saisie` les couvrait tous
+d'un coup.
+
+**Pourquoi c'était faux.** Elle couvrait aussi les vingt autres, y compris ceux
+dont la mise en page tenait déjà sa largeur — et une borne sur le contrôle
+répond à une question que seul l'écran peut trancher : *de quelle place
+dispose-t-on ici*. Un champ ne le sait pas. Le symptôme se voyait à l'envers :
+un formulaire dans une colonne de 40 rem gardait ses champs à 32.
+
+**La règle.** La largeur se pose là où on la voit — `.colonne-formulaire` sur le
+bloc, `sm:max-w-80` sur une recherche. Un champ qui s'étire est un écran à qui
+l'on a oublié sa colonne : cela se corrige sur cet écran-là, et cela se voit sur
+une capture.
+
+**Ce que la levée a révélé, et comment.** Un script parcourt quinze écrans à
+1600 px, compte les `.saisie` et signale ceux qui dépassent 640 px. Trois
+champs de recherche que plus rien ne bornait : les reçus à 1264 px, les ventes
+à 707, les dossiers à 690. Aucun n'aurait été vu à l'œil, parce qu'il aurait
+fallu ouvrir ces trois pages-là en pensant à les regarder. **Une borne globale
+qu'on lève se paie par une mesure, pas par une relecture** — sinon on déplace
+la dette au lieu de la payer.
