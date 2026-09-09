@@ -1,7 +1,7 @@
 # S31 — Mise en conformité : la marque, la coquille et les états
 
 ```
-Statut     : en cours
+Statut     : terminée
 Périmètre  : post-MVP — mise en conformité, cf. CAHIER-UI-ECARTS.md
 Dépend de  : S29
 ```
@@ -121,7 +121,11 @@ chaque fois.
       la même forme — un document écrit à l'instant qui n'est pas encore
       visible, pendant que le bandeau annonce « À jour ». C'est S27, et rien
       d'autre. Un défaut du code aurait échoué au même endroit à chaque fois.
-- [ ] `.env.local` retiré à la fin, serveur de développement redémarré.
+- [x] `.env.local` retiré à la fin, serveur de développement redémarré — Next
+      annonce « Environments: .env » au démarrage, ce qui est la preuve que le
+      piège du §5 est refermé : les `NEXT_PUBLIC_*` sont figés au démarrage, et
+      retirer le fichier sans redémarrer aurait laissé l'application parler aux
+      émulateurs en refusant le compte réel sans dire pourquoi.
 - [x] La checklist `DESIGN.md` §14 est passée écran par écran.
 - [x] `specs/ROADMAP.md` et `DECISIONS.md` sont à jour.
 
