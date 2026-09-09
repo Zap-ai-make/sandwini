@@ -89,12 +89,12 @@ test.describe("recherche dans le stock", () => {
     await saisirMoto(page, terrain, `BBB${marqueur}`);
 
     await page.goto("/motos", { waitUntil: "load" });
-    await page.getByLabel("Chercher un châssis").fill(`aaa${marqueur.toLowerCase()}`);
+    await page.getByLabel("Chercher dans le stock").fill(`aaa${marqueur.toLowerCase()}`);
 
     await expect(page.locator("tbody tr").filter({ hasText: `AAA${marqueur}` })).toBeVisible();
     await expect(page.locator("tbody tr").filter({ hasText: `BBB${marqueur}` })).toHaveCount(0);
 
-    await page.getByLabel("Chercher un châssis").fill("CHASSIS-INTROUVABLE");
+    await page.getByLabel("Chercher dans le stock").fill("CHASSIS-INTROUVABLE");
     await expect(contenu(page)).toContainText("Aucune moto ne correspond");
   });
 });
@@ -152,7 +152,7 @@ test.describe("le coût est réservé au responsable", () => {
 
     // Le responsable, lui, voit le montant.
     await page.goto("/motos", { waitUntil: "load" });
-    await page.getByLabel("Chercher un châssis").fill(chassis);
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
     await page.getByRole("link", { name: chassis }).click();
     await expect(contenu(page)).toContainText("775 000 FCFA");
   });

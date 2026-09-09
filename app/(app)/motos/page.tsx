@@ -112,7 +112,11 @@ function Stock() {
     const liste: Colonne<Moto>[] = [
       {
         cle: "chassis",
-        titre: "Châssis",
+        /* « Numéro de châssis » (`a4:104`), le nom qui figure sur la carte
+           grise et sur le formulaire d’entrée en stock. « Châssis » seul
+           désigne la pièce, pas son numéro. */
+        titre: "Numéro de châssis",
+        titreReplie: "Châssis",
         principal: true,
         rendu: (moto) => (
           <Link
@@ -339,8 +343,15 @@ function Recherche({
 }) {
   return (
     <div className="relative min-w-56 flex-1 sm:max-w-80">
+      {/* Le nom du contrat (`CAHIER-UI.md` §12), et celui de la maquette
+          (`a4:75`). « Chercher un châssis » disait moins que ce que le champ
+          fait — il retrouve aussi une marque et un modèle —, et surtout il
+          n’était pas le nom sous lequel le reste du produit désigne ce geste :
+          la même recherche, sur l’écran de vente, s’appelle déjà « Chercher
+          dans le stock ». Deux noms pour un même geste, et c’est la personne
+          qui l’entend au lecteur d’écran qui paie la différence. */}
       <label htmlFor="recherche-chassis" className="sr-only">
-        Chercher un châssis
+        Chercher dans le stock
       </label>
       <Search
         aria-hidden="true"

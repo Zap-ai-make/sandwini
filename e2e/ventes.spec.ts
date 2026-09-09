@@ -137,7 +137,7 @@ test.describe("enregistrer une vente", () => {
 
     // Et elle est bien passée « vendue » dans le stock.
     await page.goto("/motos", { waitUntil: "load" });
-    await page.getByLabel("Chercher un châssis").fill(chassis);
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
     /* `locator("tr")` et non `getByRole("row")` : sous 1024 px le tableau du
        stock se replie en cartes, ce qui lui retire ses rôles de tableau, et la
        suite tourne sur un Pixel 7. */
@@ -262,7 +262,7 @@ test.describe("crédit et tranches ne font pas la même chose", () => {
 
     // Réservée, pas vendue : c'est toute la différence avec le crédit.
     await page.goto("/motos", { waitUntil: "load" });
-    await page.getByLabel("Chercher un châssis").fill(chassis);
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
     /* `locator("tr")` et non `getByRole("row")` : sous 1024 px le tableau du
        stock se replie en cartes, ce qui lui retire ses rôles de tableau, et la
        suite tourne sur un Pixel 7. */

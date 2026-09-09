@@ -112,7 +112,7 @@ test.describe("la moto des tranches ne part qu’au dernier franc", () => {
 
     // Et le stock le sait : la moto n'est plus réservée, elle est vendue.
     await page.goto("/motos", { waitUntil: "load" });
-    await page.getByLabel("Chercher un châssis").fill(chassis);
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
     /* `locator("tr")` et non `getByRole("row")` : sous 1024 px le tableau du
        stock se replie en cartes, ce qui lui retire ses rôles de tableau, et la
        suite tourne sur un Pixel 7. */

@@ -43,6 +43,15 @@ export type Colonne<T> = {
   cle: string;
   /** Titre de colonne, et intitulé repris dans la cellule une fois replié. */
   titre: string;
+  /**
+   * L’intitulé une fois replié en carte, quand le titre de colonne est trop
+   * long pour y tenir. La maquette fait exactement cette distinction :
+   * « Numéro de châssis » en tête de tableau, « Châssis » dans la carte
+   * (`a4:104` contre `b8-mobile-stock:120`). En tête, la colonne se lit une
+   * fois pour tout le tableau et peut se permettre le nom complet ; dans la
+   * carte, l’intitulé se répète à chaque ligne et vole la place de la valeur.
+   */
+  titreReplie?: string;
   /** Chiffre ou code : aligné à droite, en Plex Mono, tabulaire, insécable. */
   chiffre?: boolean;
   /** Ce qui identifie la ligne — le châssis, le numéro de vente, le nom. */
@@ -162,7 +171,7 @@ function Cellule<T>({ colonne, children }: { colonne: Colonne<T>; children: Reac
     undefined;
   return (
     <td className={habillage}>
-      <span className="tableau-etiquette">{colonne.titre}</span>
+      <span className="tableau-etiquette">{colonne.titreReplie ?? colonne.titre}</span>
       {children}
     </td>
   );
