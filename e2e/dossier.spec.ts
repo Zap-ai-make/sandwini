@@ -222,11 +222,20 @@ test.describe("écarter un document", () => {
   });
 });
 
-test.describe("la liste des dossiers en attente", () => {
-  test("montre le dossier, qui le détient, et disparaît quand tout est réglé", async ({ page }) => {
+/**
+ * La file des dossiers en attente (A7).
+ *
+ * L’écran répond à une seule question — qui détient quel papier, et ce qui est
+ * en retard —, et depuis S29 il laisse aussi y répondre : le relais d’un
+ * document s’ouvre sous la file et fait avancer le papier sans quitter
+ * l’écran. C’est ce couple qui se vérifie ici : la file dit l’état des quatre
+ * documents, et le geste qu’on y fait s’y voit tout de suite.
+ */
+test.describe("la file des dossiers en attente", () => {
+  test("dit où en sont les quatre documents, et fait avancer le papier sans quitter l’écran", async ({
+    page,
+  }) => {
     await seConnecterEtEntrer(page);
-    const prestataire = nomUnique("Compaoré");
-    await creerPrestataire(page, prestataire);
     const { numero } = await vendre(page, {
       mode: "Crédit",
       prix: "1200000",
@@ -235,16 +244,52 @@ test.describe("la liste des dossiers en attente", () => {
 
     /* Une vente fraîche ouvre quatre documents : le dossier attend forcément. */
     await page.goto("/motos/dossiers", { waitUntil: "load" });
-    const dossier = contenu(page).locator("li").filter({ hasText: numero }).first();
-    await expect(dossier).toContainText("Carte grise");
+    const ligne = contenu(page).locator("tbody tr").filter({ hasText: numero });
+    await expect(ligne).toHaveCount(1);
 
-    /* Le filtre par prestataire ne doit rien rendre tant que rien n'est déposé :
-       personne ne détient encore quoi que ce soit. */
-    await contenu(page).getByLabel("Prestataire").selectOption({ label: prestataire });
+    /* Les quatre documents ont chacun leur colonne, et le nom accessible de
+       chacun dit de quel papier et de quelle pièce il s'agit — replié en carte,
+       l'en-tête de colonne n'est plus là pour le dire. */
+    for (const document of ["Quittance", "CMC", "Carte grise", "Plaque"]) {
+      await expect(
+        ligne.getByRole("button", { name: `${document} de ${numero} : À faire`, exact: true }),
+      ).toBeVisible();
+    }
+
+    /* Rien n'est encore parti : personne ne détient quoi que ce soit. */
+    await contenu(page).getByRole("button", { name: "Chez un prestataire", exact: true }).click();
     await expect(contenu(page)).toContainText("Aucun dossier ne correspond");
+    await contenu(page).getByRole("button", { name: "Ouverts", exact: true }).click();
 
-    await contenu(page).getByLabel("Prestataire").selectOption({ label: "Tous" });
-    await contenu(page).getByLabel("Document").selectOption({ label: "Plaque" });
-    await expect(dossier).toBeVisible();
+    /* Le relais s'ouvre sous la file et montre le chemin entier : la quittance
+       arrive faite, donc trois étapes et aucun passage chez un prestataire. */
+    await ligne
+      .getByRole("button", { name: `Quittance de ${numero} : À faire`, exact: true })
+      .click();
+    const relais = contenu(page).locator("section").filter({ hasText: "Quittance de" });
+    await expect(relais).toContainText("Revenu au magasin");
+    await expect(relais).toContainText("Remis au client");
+    await expect(relais.getByRole("button", { name: "Déposer chez un prestataire" })).toHaveCount(
+      0,
+    );
+
+    /* Le geste se fait là, et le relais avance : le bouton du pas suivant
+       remplace celui qu'on vient de faire. */
+    await relais.getByRole("button", { name: "Arrivé au magasin" }).click();
+    await expect(relais.getByRole("button", { name: "Remettre au client" })).toBeVisible();
+
+    /* Et la file l'a suivi, sans qu'on ait rechargé quoi que ce soit. */
+    await relais.getByRole("button", { name: "Fermer le suivi de quittance" }).click();
+    await expect(
+      contenu(page).getByRole("button", {
+        name: `Quittance de ${numero} : Revenu au magasin`,
+        exact: true,
+      }),
+    ).toBeVisible();
+
+    /* Un papier revenu au magasin est un papier à remettre aujourd'hui : c'est
+       l'une des trois questions que la file sait poser. */
+    await contenu(page).getByRole("button", { name: "À remettre", exact: true }).click();
+    await expect(ligne).toHaveCount(1);
   });
 });

@@ -62,6 +62,34 @@ export function formaterDateHeure(date: Date): string {
 }
 
 /**
+ * Ex. `14:30`. Pour un journal d’une seule journée, où la date est déjà en tête.
+ *
+ * La répéter sur chaque ligne noierait la seule chose qui distingue les lignes
+ * entre elles : l’heure.
+ */
+export function formaterHeure(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "—";
+  return heureMinute.format(date);
+}
+
+/**
+ * Le même jour civil, sur l’horloge de l’appareil.
+ *
+ * L’appareil, et pas le serveur : le gérant travaille des journées entières
+ * sans réseau, et « aujourd’hui » doit vouloir dire aujourd’hui pour lui. Un
+ * découpage calculé côté serveur ferait basculer sa journée à une heure qui
+ * n’est pas la sienne.
+ */
+export function memeJour(a: Date | null, b: Date): boolean {
+  if (!a || Number.isNaN(a.getTime())) return false;
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+/**
  * Une ancienneté en jours, dite comme on la dit à voix haute.
  *
  * « Il y a 0 jour » n’est pas du français, et c’est pourtant ce que produit un

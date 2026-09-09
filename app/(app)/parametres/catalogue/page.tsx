@@ -4,7 +4,13 @@ import { Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
 import { ListeReferentiel, type ActionsReferentiel } from "@/components/ListeReferentiel";
-import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import {
+  EtatChargement,
+  EtatErreur,
+  EtatErreurSaisie,
+  EtatSansResultat,
+} from "@/components/patrons/Etats";
+import { Champ } from "@/components/patrons/Champ";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -76,10 +82,7 @@ function Catalogue() {
 
   return (
     <div>
-      <TetePage
-        retour={{ href: "/parametres", libelle: "Réglages" }}
-        titre="Marques et modèles"
-      />
+      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Marques et modèles" />
       <p className="mt-2 max-w-prose text-encre-doux">
         Ce que vous vendez. Une moto entrée en stock choisira sa marque puis son modèle dans ces
         listes — jamais en texte libre, sinon le même modèle finit écrit de trois façons.
@@ -167,26 +170,25 @@ function Modeles({
     <section>
       <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Modèles</h2>
 
-      <div className="mt-3">
-        <label htmlFor="marque-active" className="block text-sm font-medium text-encre">
-          Marque
-        </label>
-        <select
-          id="marque-active"
-          value={marqueActive?.id ?? ""}
-          onChange={(evenement) => choisir(evenement.target.value)}
-          className="saisie mt-1.5"
-        >
-          {marques.map((marque) => (
-            <option key={marque.id} value={marque.id}>
-              {marque.nom}
-            </option>
-          ))}
-        </select>
+      <div className="colonne-formulaire mt-3 max-w-[40rem]">
+        <Champ id="marque-active" libelle="Marque">
+          <select
+            id="marque-active"
+            value={marqueActive?.id ?? ""}
+            onChange={(evenement) => choisir(evenement.target.value)}
+            className="saisie"
+          >
+            {marques.map((marque) => (
+              <option key={marque.id} value={marque.id}>
+                {marque.nom}
+              </option>
+            ))}
+          </select>
+        </Champ>
       </div>
 
-      <form onSubmit={ajouter} className="mt-3" noValidate>
-        <label htmlFor="ajout-modele" className="block text-sm font-medium text-encre">
+      <form onSubmit={ajouter} className="colonne-formulaire mt-3 max-w-[40rem]" noValidate>
+        <label htmlFor="ajout-modele" className="block font-medium text-encre">
           Ajouter un modèle {marqueActive ? `chez ${marqueActive.nom}` : ""}
         </label>
         <div className="mt-1.5 flex gap-2">
@@ -198,10 +200,7 @@ function Modeles({
             onChange={(evenement) => setNom(evenement.target.value)}
             className="saisie min-w-0 flex-1 placeholder:text-encre-doux"
           />
-          <button
-            type="submit"
-            className="bouton bouton-plaque"
-          >
+          <button type="submit" className="bouton bouton-plaque">
             <Plus aria-hidden="true" className="size-4" />
             Ajouter
           </button>

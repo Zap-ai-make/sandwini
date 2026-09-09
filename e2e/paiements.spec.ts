@@ -87,9 +87,9 @@ test.describe("la moto des tranches ne part qu’au dernier franc", () => {
 
     // Tant qu'il reste à verser, le geste n'existe pas.
     await expect(contenu(page)).toContainText("reste 500 000 FCFA à verser");
-    await expect(
-      page.getByRole("button", { name: "Confirmer la remise de la moto" }),
-    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Confirmer la remise de la moto" })).toHaveCount(
+      0,
+    );
 
     await encaisser(page, "500000");
     await expect(contenu(page)).toContainText("Tranches soldées", { timeout: 20_000 });
@@ -99,21 +99,45 @@ test.describe("la moto des tranches ne part qu’au dernier franc", () => {
     await page.getByRole("button", { name: "Confirmer la remise de la moto" }).click();
     await page.getByRole("button", { name: "Oui, la moto est remise" }).click();
 
-    await expect(contenu(page)).toContainText("Remise au client", { timeout: 20_000 });
-    await expect(
-      page.getByRole("button", { name: "Confirmer la remise de la moto" }),
-    ).toHaveCount(0);
+    /* La fiche disait « Remise au client : Oui, le … » sur une ligne de faits ;
+       depuis A6 elle l'écrit en toutes lettres, au même endroit que la phrase
+       qui disait l'inverse tant que la moto restait au magasin. Le fait n'a pas
+       changé, sa formulation si (`CAHIER-UI.md` §12). */
+    await expect(contenu(page)).toContainText("La moto a été remise au client", {
+      timeout: 20_000,
+    });
+    await expect(page.getByRole("button", { name: "Confirmer la remise de la moto" })).toHaveCount(
+      0,
+    );
 
     // Et le stock le sait : la moto n'est plus réservée, elle est vendue.
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher un châssis").fill(chassis);
-    await expect(page.getByRole("listitem").filter({ hasText: chassis })).toContainText("Vendue", {
+    /* `locator("tr")` et non `getByRole("row")` : sous 1024 px le tableau du
+       stock se replie en cartes, ce qui lui retire ses rôles de tableau, et la
+       suite tourne sur un Pixel 7. */
+    await expect(page.locator("tbody tr").filter({ hasText: chassis })).toContainText("Vendue", {
       timeout: 20_000,
     });
   });
 });
 
-test.describe("les trois listes de suivi", () => {
+/**
+ * Les deux sections de l’écran des paiements (A8).
+ *
+ * Depuis S29 elles sont visibles en même temps, nommées, chacune avec son
+ * total et sa phrase : la moto est partie, ou la moto est retenue. C’est la
+ * distinction que tout le produit refuse de relâcher, et la voir c’est
+ * l’apprendre — trois boutons dont un seul était pressé empêché de se
+ * tromper, mais cachait la différence.
+ */
+const sectionDettes = (page: import("@playwright/test").Page) =>
+  contenu(page).getByRole("region", { name: /^Dettes/ });
+
+const sectionTranches = (page: import("@playwright/test").Page) =>
+  contenu(page).getByRole("region", { name: /^Tranches/ });
+
+test.describe("les deux sections de paiement", () => {
   test("une dette et une tranche ne se mélangent jamais", async ({ page }) => {
     await seConnecterEtEntrer(page);
     const { client } = await vendre(page, {
@@ -124,19 +148,18 @@ test.describe("les trois listes de suivi", () => {
 
     await page.goto("/motos/paiements", { waitUntil: "load" });
 
-    // La dette : ce qui manque au magasin.
-    await expect(contenu(page)).toContainText("Total dû par les clients", { timeout: 30_000 });
-    await expect(contenu(page)).toContainText("750 000 FCFA");
-    await expect(page.getByRole("listitem").filter({ hasText: client })).toContainText("reste dû");
+    /* La dette : ce qui manque au magasin, et la phrase qui dit pourquoi. */
+    await expect(sectionDettes(page)).toContainText("750 000 FCFA dus", { timeout: 30_000 });
+    await expect(sectionDettes(page)).toContainText("Le client doit cet argent au magasin");
+    await expect(sectionDettes(page).locator("tbody tr").filter({ hasText: client })).toContainText(
+      "750 000",
+    );
 
-    /* Les tranches : de l'argent que le magasin détient. Cette vente-ci est un
-       crédit — elle n'a donc rien à y faire, et c'est tout l'enjeu. */
-    await page.getByRole("button", { name: /Tranches en cours/ }).click();
-    await expect(contenu(page)).toContainText("Total détenu pour le compte des clients");
-    await expect(contenu(page)).toContainText("Aucune moto retenue au magasin");
-
-    await page.getByRole("button", { name: /Tranches inactives/ }).click();
-    await expect(contenu(page)).toContainText("Aucune tranche sans versement depuis 30 jours");
+    /* Les tranches : de l’argent que le magasin détient. Cette vente-ci est un
+       crédit — elle n’a donc rien à y faire, et c’est tout l’enjeu. */
+    await expect(sectionTranches(page)).toContainText("Le magasin détient l’argent déjà versé");
+    await expect(sectionTranches(page)).toContainText("Aucune moto retenue au magasin");
+    await expect(sectionTranches(page)).not.toContainText(client);
   });
 
   test("une vente en tranches compte dans le total détenu, pas dans les dettes", async ({
@@ -150,12 +173,38 @@ test.describe("les trois listes de suivi", () => {
     });
 
     await page.goto("/motos/paiements", { waitUntil: "load" });
-    await expect(contenu(page)).toContainText("Aucune dette", { timeout: 30_000 });
 
-    await page.getByRole("button", { name: /Tranches en cours/ }).click();
-    await expect(contenu(page)).toContainText("300 000 FCFA");
-    await expect(contenu(page)).toContainText("1 moto à livrer");
-    await expect(page.getByRole("listitem").filter({ hasText: client })).toContainText("détenu");
+    await expect(sectionTranches(page)).toContainText("300 000 FCFA détenus", {
+      timeout: 30_000,
+    });
+    await expect(sectionTranches(page)).toContainText("1 moto");
+    await expect(
+      sectionTranches(page).locator("tbody tr").filter({ hasText: client }),
+    ).toContainText("600 000");
+
+    await expect(sectionDettes(page)).toContainText("Aucune dette");
+    await expect(sectionDettes(page)).not.toContainText(client);
+  });
+
+  test("une moto soldée s’annonce depuis la liste, avec le geste qui l’attend", async ({
+    page,
+  }) => {
+    await seConnecterEtEntrer(page);
+    const { client } = await vendre(page, {
+      mode: "Tranches",
+      prix: "500000",
+      encaisse: "200000",
+    });
+    await encaisser(page, "300000");
+    await expect(contenu(page)).toContainText("Tranches soldées", { timeout: 20_000 });
+
+    /* Sans cette ligne, une moto payée jusqu’au dernier franc dort au magasin
+       sans que personne le sache : c’est le seul endroit du produit où la
+       liste, et non la fiche, dit qu’un geste attend. */
+    await page.goto("/motos/paiements", { waitUntil: "load" });
+    const ligne = sectionTranches(page).locator("tbody tr").filter({ hasText: client });
+    await expect(ligne).toContainText("Soldée", { timeout: 30_000 });
+    await expect(ligne.getByRole("link", { name: /^Remettre la moto de / })).toBeVisible();
   });
 });
 
@@ -178,7 +227,10 @@ test.describe("hors ligne", () => {
       timeout: 30_000,
     });
     await page.reload({ waitUntil: "load" });
-    await expect(contenu(page).getByRole("heading", { level: 1 })).toContainText(client, {
+    /* Depuis A6, la fiche est un panneau de l'écran des ventes et non plus une
+     page : l'unique `h1` reste « Ventes », et c'est le repère `complementary`,
+     nommé « Vente <numéro> », qui porte la vente ouverte. */
+    await expect(contenu(page).getByRole("complementary")).toContainText(client, {
       timeout: 30_000,
     });
 

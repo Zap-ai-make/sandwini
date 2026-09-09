@@ -290,7 +290,10 @@ export async function vendre(
   const numero = (await confirmation.locator(".plaque-code").textContent())!.trim();
 
   await page.getByRole("link", { name: "Voir la vente" }).click();
-  await expect(contenu(page).getByRole("heading", { level: 1 })).toContainText(client);
+  /* Depuis A6, la fiche est un panneau de l'écran des ventes et non plus une
+     page : l'unique `h1` reste « Ventes », et c'est le repère `complementary`,
+     nommé « Vente <numéro> », qui porte la vente ouverte. */
+  await expect(contenu(page).getByRole("complementary")).toContainText(client);
 
   return { terrain, client, chassis, numero };
 }

@@ -16,6 +16,9 @@ import {
   transitionAutorisee,
   validerDepot,
   dossiersEnAttente,
+  chercherDossiers,
+  etapesRelais,
+  joursEcoules,
   FILTRES_DOSSIERS_VIDES,
   type EtatDossier,
   type FiltresDossiers,
@@ -307,6 +310,69 @@ describe("validerDepot", () => {
   });
 });
 
+describe("etapesRelais", () => {
+  const noms = (type: TypeDocument, statut: StatutDocument) =>
+    etapesRelais(type, statut).map((etape) => `${etape.statut}:${etape.etat}`);
+
+  /* Le parcours dessiné n'est pas le même pour les quatre : en montrer une
+     étape « chez le prestataire » sur une quittance ferait attendre un retour
+     que personne n'a promis (D65). */
+  it("ne dessine d’étape chez un prestataire que pour ce qui y passe", () => {
+    expect(etapesRelais("quittance", "a_faire").map((e) => e.statut)).toEqual([
+      "a_faire",
+      "revenu_magasin",
+      "remis_client",
+    ]);
+    expect(etapesRelais("carte_grise", "a_faire").map((e) => e.statut)).toEqual([
+      "a_faire",
+      "chez_prestataire",
+      "revenu_magasin",
+      "remis_client",
+    ]);
+  });
+
+  it("marque le passé, le présent et ce qui reste", () => {
+    expect(noms("carte_grise", "chez_prestataire")).toEqual([
+      "a_faire:fait",
+      "chez_prestataire:cours",
+      "revenu_magasin:attente",
+      "remis_client:attente",
+    ]);
+  });
+
+  /* Le voyage est fini : un point « en cours » sur la dernière étape dirait que
+     le document est encore en route. */
+  it("ne laisse rien « en cours » sur une étape terminale", () => {
+    expect(noms("plaque", "remis_client")).toEqual([
+      "a_faire:fait",
+      "chez_prestataire:fait",
+      "revenu_magasin:fait",
+      "remis_client:fait",
+    ]);
+  });
+
+  it("ne donne aucun parcours à un document écarté", () => {
+    expect(etapesRelais("cmc", "non_applicable")).toEqual([]);
+  });
+});
+
+describe("joursEcoules", () => {
+  const MATIN = new Date("2026-09-03T08:00:00");
+
+  /* Même règle que `estEnRetard` : c'est ainsi qu'un gérant compte l'attente
+     d'un client, et un dépôt d'hier soir fait bien un jour ce matin. */
+  it("compte de jour à jour, pas d’heure à heure", () => {
+    expect(joursEcoules(new Date("2026-09-02T17:00:00"), MATIN)).toBe(1);
+    expect(joursEcoules(new Date("2026-09-03T07:00:00"), MATIN)).toBe(0);
+    expect(joursEcoules(new Date("2026-07-27T12:00:00"), MATIN)).toBe(38);
+  });
+
+  it("ne compte pas de jours négatifs, ni sans date", () => {
+    expect(joursEcoules(new Date("2026-09-10T12:00:00"), MATIN)).toBe(0);
+    expect(joursEcoules(null, MATIN)).toBeNull();
+  });
+});
+
 describe("dossiersEnAttente", () => {
   const AUJOURDHUI = new Date("2026-09-03T10:00:00");
 
@@ -339,13 +405,7 @@ describe("dossiersEnAttente", () => {
     ventes: VenteDuDossier[],
     documents: DocumentDossier[],
     filtres: Partial<FiltresDossiers> = {},
-  ) =>
-    dossiersEnAttente(
-      ventes,
-      documents,
-      { ...FILTRES_DOSSIERS_VIDES, ...filtres },
-      AUJOURDHUI,
-    );
+  ) => dossiersEnAttente(ventes, documents, { ...FILTRES_DOSSIERS_VIDES, ...filtres }, AUJOURDHUI);
 
   it("ne garde que les dossiers ouverts", () => {
     const liste = lister(
@@ -372,23 +432,52 @@ describe("dossiersEnAttente", () => {
     const liste = lister(
       [vente()],
       [
-        document({ id: "quittance", type: "quittance", statut: "remis_client" }),
+        document({
+          id: "quittance",
+          type: "quittance",
+          statut: "remis_client",
+        }),
         document({ id: "cmc", type: "cmc", statut: "non_applicable" }),
       ],
     );
     expect(liste).toEqual([]);
   });
 
-  it("ne montre que les documents qui restent à traiter, dans l’ordre du cahier", () => {
+  it("ne garde en cours que ce qui reste à traiter, dans l’ordre du cahier", () => {
     const liste = lister(
       [vente()],
       [
         document({ id: "plaque", type: "plaque" }),
-        document({ id: "quittance", type: "quittance", statut: "remis_client" }),
+        document({
+          id: "quittance",
+          type: "quittance",
+          statut: "remis_client",
+        }),
         document({ id: "cmc", type: "cmc" }),
       ],
     );
     expect(liste[0].enCours.map((d) => d.type)).toEqual(["cmc", "plaque"]);
+  });
+
+  /* L'écran montre une colonne par document : « remis » y compte autant que
+     « à faire », c'est en voyant les trois premiers réglés qu'on comprend qu'il
+     ne manque que le quatrième. */
+  it("rend les quatre documents par type, réglés compris, et rien pour ceux qui manquent", () => {
+    const liste = lister(
+      [vente()],
+      [
+        document({ id: "plaque", type: "plaque" }),
+        document({
+          id: "quittance",
+          type: "quittance",
+          statut: "remis_client",
+        }),
+      ],
+    );
+    expect(liste[0].documents.quittance?.statut).toBe("remis_client");
+    expect(liste[0].documents.plaque?.statut).toBe("a_faire");
+    expect(liste[0].documents.cmc).toBeNull();
+    expect(liste[0].documents.carte_grise).toBeNull();
   });
 
   it("signale le retard d’après la date annoncée, jamais d’après une requête figée", () => {
@@ -420,41 +509,134 @@ describe("dossiersEnAttente", () => {
     expect(liste[0].enRetard).toBe(false);
   });
 
-  describe("les quatre filtres", () => {
-    const ventes = [vente(), vente({ id: "v2", boutiqueId: "KDG" })];
+  describe("qui détient le dossier", () => {
+    it("nomme le prestataire, et compte les jours depuis le dépôt", () => {
+      const liste = lister(
+        [vente()],
+        [
+          document({
+            statut: "chez_prestataire",
+            prestataireNom: "Zongo Prestations",
+            deposeLe: new Date("2026-07-27T12:00:00"),
+          }),
+        ],
+      );
+      expect(liste[0].detention).toEqual({
+        chez: "prestataire",
+        nom: "Zongo Prestations",
+        depuisJours: 38,
+      });
+    });
+
+    /* Deux documents peuvent être chez deux prestataires : la colonne n'en
+       nomme qu'un, et c'est celui dont le délai s'allonge. */
+    it("nomme le plus ancien dépôt quand deux prestataires détiennent un papier", () => {
+      const liste = lister(
+        [vente()],
+        [
+          document({
+            id: "plaque",
+            type: "plaque",
+            statut: "chez_prestataire",
+            prestataireNom: "Récent",
+            deposeLe: new Date("2026-09-01T12:00:00"),
+          }),
+          document({
+            statut: "chez_prestataire",
+            prestataireNom: "Ancien",
+            deposeLe: new Date("2026-08-01T12:00:00"),
+          }),
+        ],
+      );
+      expect(liste[0].detention).toMatchObject({ nom: "Ancien" });
+    });
+
+    it("dit « au magasin » dès qu’un papier est revenu, et rien quand rien n’est parti", () => {
+      const revenu = lister([vente()], [document({ statut: "revenu_magasin" })]);
+      expect(revenu[0].detention).toEqual({ chez: "magasin" });
+
+      const rienParti = lister([vente()], [document()]);
+      expect(rienParti[0].detention).toBeNull();
+    });
+  });
+
+  describe("les trois questions qu’on pose à la file", () => {
+    const ventes = [vente(), vente({ id: "v2" }), vente({ id: "v3" })];
     const documents = [
       document({
         statut: "chez_prestataire",
         prestataireId: "p1",
+        prestataireNom: "Zongo Prestations",
         disponibleLe: new Date("2026-09-01T10:00:00"),
       }),
-      document({ id: "plaque", type: "plaque", venteId: "v2", boutiqueId: "KDG" }),
+      document({
+        id: "d2",
+        venteId: "v2",
+        statut: "chez_prestataire",
+        prestataireNom: "Nikiéma Services",
+        disponibleLe: new Date("2026-09-20T10:00:00"),
+      }),
+      document({
+        id: "d3",
+        venteId: "v3",
+        type: "plaque",
+        statut: "revenu_magasin",
+      }),
     ];
 
-    it("par boutique", () => {
-      expect(lister(ventes, documents, { boutiqueId: "KDG" }).map((d) => d.venteId)).toEqual([
-        "v2",
-      ]);
-    });
-
-    it("par prestataire", () => {
-      expect(lister(ventes, documents, { prestataireId: "p1" }).map((d) => d.venteId)).toEqual([
+    it("ce qui a dépassé la date annoncée", () => {
+      expect(lister(ventes, documents, { etat: "en_retard" }).map((d) => d.venteId)).toEqual([
         "v1",
       ]);
     });
 
-    it("par type de document", () => {
-      expect(lister(ventes, documents, { type: "plaque" }).map((d) => d.venteId)).toEqual(["v2"]);
-    });
-
-    it("par retard", () => {
-      expect(lister(ventes, documents, { enRetardSeulement: true }).map((d) => d.venteId)).toEqual(
-        ["v1"],
+    it("ce qui est chez quelqu’un", () => {
+      expect(lister(ventes, documents, { etat: "chez_prestataire" }).map((d) => d.venteId)).toEqual(
+        ["v1", "v2"],
       );
     });
 
-    it("se combinent, et peuvent ne rien rendre", () => {
-      expect(lister(ventes, documents, { boutiqueId: "KDG", enRetardSeulement: true })).toEqual([]);
+    it("ce qui peut se remettre aujourd’hui", () => {
+      expect(lister(ventes, documents, { etat: "a_remettre" }).map((d) => d.venteId)).toEqual([
+        "v3",
+      ]);
+    });
+
+    /* Les trois façons dont un dossier revient à l'esprit au comptoir : le
+       client appelle, il tend un reçu, ou le prestataire passe. */
+    describe("chercherDossiers", () => {
+      const cherchables = (etat: Partial<FiltresDossiers> = {}) =>
+        lister(ventes, documents, etat).map((dossier) => ({
+          dossier,
+          nomNormalise: dossier.venteId === "v1" ? "salifou kabore" : "rasmane nikiema",
+        }));
+
+      const normaliser = (brut: string) => brut.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
+
+      const chercher = (texte: string) =>
+        chercherDossiers(cherchables(), texte, normaliser).map((l) => l.dossier.venteId);
+
+      it("rend tout quand on ne cherche rien", () => {
+        expect(chercher("  ")).toEqual(["v1", "v2", "v3"]);
+      });
+
+      it("trouve par le nom du client", () => {
+        expect(chercher("Kaboré")).toEqual(["v1"]);
+      });
+
+      it("trouve par le nom du prestataire qui détient un papier", () => {
+        expect(chercher("Zongo")).toEqual(["v1"]);
+      });
+
+      /* Personne ne retape les tirets à l'identique depuis un reçu froissé. */
+      it("trouve par le numéro, avec ou sans ses tirets", () => {
+        expect(chercher("PTG26090001")).toEqual(["v1", "v2", "v3"]);
+        expect(chercher("PTG-2609-0001")).toEqual(["v1", "v2", "v3"]);
+      });
+
+      it("ne rend rien plutôt que de rendre tout", () => {
+        expect(chercher("Ouedraogo")).toEqual([]);
+      });
     });
   });
 });

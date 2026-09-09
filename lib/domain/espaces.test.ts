@@ -189,11 +189,20 @@ describe("les écrans d’administration", () => {
     }
   });
 
-  /* « Synchronisation » n'est pas une administration : elle ne demande aucun
-     droit, elle décrit l'état de l'appareil. Elle vit dans la colonne et pas
-     dans le hub, et c'est voulu. */
-  it("laissent la synchronisation hors du hub", () => {
+  /*
+   * « Synchronisation » n'est pas une administration : elle ne demande aucun
+   * droit, elle décrit l'état de l'appareil — ce qui attend ici n'attend pas
+   * ailleurs. S29 tranche autrement que S28 : au lieu de l'écarter du hub, on
+   * l'y range sous son propre titre, « Cet appareil » (maquette A9). L'écarter
+   * la laissait dans la colonne seule, et un écran qu'un hub ne mentionne pas
+   * est un écran qu'on croit disparu.
+   *
+   * Ce qui reste vrai, et que ce test garde : elle n'exige aucune capacité, donc
+   * elle ne se range pas avec ce qui en exige une.
+   */
+  it("rangent la synchronisation à part : une phrase, mais aucun droit exigé", () => {
     const diagnostic = ECRANS_DE.reglages.find(({ href }) => href === "/diagnostic");
-    expect(diagnostic?.quoi).toBeUndefined();
+    expect(diagnostic?.quoi).toBeTruthy();
+    expect(diagnostic?.capacite).toBeUndefined();
   });
 });

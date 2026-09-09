@@ -1,6 +1,7 @@
 import { ChevronRight } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 
 /**
  * Le hub : une liste de destinations, chacune avec ce qu’on y fait.
@@ -30,6 +31,12 @@ export function Hub({ destinations }: { destinations: readonly Destination[] }) 
               <span className="block font-medium text-encre">{destination.libelle}</span>
               <span className="block text-corps text-encre-doux">{destination.quoi}</span>
             </span>
+            {/* Ce qu’on y trouverait, dit avant d’y aller. « 3 prestataires » et
+                « aucun prestataire » ne demandent pas la même visite — et sur une
+                installation neuve, c’est ce compte qui dit ce qui reste à poser. */}
+            {destination.etat && (
+              <span className="shrink-0 text-legende text-encre-doux">{destination.etat}</span>
+            )}
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
           </Link>
         </li>
@@ -43,5 +50,7 @@ export type Destination = {
   libelle: string;
   /** Ce qu’on y fait, en une ligne. Pas une définition : un geste. */
   quoi: string;
+  /** Ce qu’on y trouve déjà : un compte, un état. Facultatif. */
+  etat?: ReactNode;
   icone: LucideIcon;
 };

@@ -263,10 +263,21 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  /* Le corps est à 14 px, pas aux 16 px du navigateur. C'est l'autre moitié de
+     la densité bureau que les maquettes portent : une application de comptoir
+     tenue huit heures montre plus de lignes par écran, et 14 px est la taille
+     à laquelle elle a été dessinée. Le jeton existait depuis S28
+     (`--text-corps`) mais rien ne le posait par défaut ; tout ce qui n'annonce
+     pas sa taille héritait donc du navigateur.
+
+     Se change ici, donc sur les vingt écrans d'un coup — c'est pourquoi elle
+     n'est pas arrivée au détour d'un formulaire. */
   body {
     background-color: var(--color-fond);
     color: var(--color-encre);
     font-family: var(--font-sans);
+    font-size: var(--text-corps);
+    line-height: 1.5;
   }
 
   /* Focus visible sur tout parcours clavier — non négociable (DESIGN.md §11).
@@ -386,6 +397,24 @@
     );
   }
 
+  /* Entre 768 et 1024, la coquille n'a plus que son rail. C'est le seuil des
+     maquettes, et il est repris tel quel : jusqu'ici la colonne des écrans
+     tenait jusqu'à 768, si bien qu'un tiers de l'écran partait en navigation
+     sur une tablette — exactement ce que `CAHIER-UI.md` §2 reproche à
+     l'ancienne barre latérale. Les huit écrans de l'espace restent atteignables
+     : les pages y mènent, et le rail garde les espaces.
+
+     Deux effets suivent, et ils sont voulus. La zone de travail gagne les
+     296 px de la colonne, donc le tableau n'a plus besoin de se replier en
+     cartes avant 768 (voir `.tableau` plus bas). Et le panneau latéral, dont le
+     seuil se mesure sur la zone de travail et non sur la fenêtre (D74),
+     apparaît désormais plus tôt. */
+  @media (max-width: 1023px) {
+    .appli {
+      grid-template-columns: var(--rail) minmax(0, 1fr);
+    }
+  }
+
   /* Le mobile garde son acquis : la navigation passe en bas, dans la zone du
      pouce, et la colonne disparaît — ses écrans restent atteignables par les
      pages elles-mêmes. Le placement est explicite pour que l'ordre visuel ne
@@ -468,6 +497,366 @@
     padding: 1rem;
   }
 
+  /* --------------------------------------------------------------------------
+     Le cadre d'un tableau.
+
+     `clip` et non `hidden`. Les deux rognent les coins — sans quoi la première
+     ligne dépasse de l'arrondi au survol. Mais `hidden` fait du cadre une zone
+     de défilement, et l'en-tête collé s'accrocherait alors à une boîte qui ne
+     défile jamais : il resterait immobile en haut du tableau, c'est-à-dire
+     nulle part. `clip` rogne sans créer de zone de défilement, et l'en-tête
+     reste accroché à `main`, qui défile pour de bon.
+
+     Le débordement horizontal n'a pas besoin d'être repris ici : `main` porte
+     déjà `overflow-y: auto`, ce qui rend son `overflow-x` défilant lui aussi.
+     Un tableau trop large défile donc dans la zone de travail, jamais en
+     emportant la page de travers (`DESIGN.md` §13).
+     -------------------------------------------------------------------------- */
+  .cadre-tableau {
+    display: flex;
+    flex-direction: column;
+    overflow: clip;
+  }
+
+  /* Sur bureau, c'est le tableau qui défile, pas la page. Deux raisons, et
+     aucune n'est cosmétique. La barre de filtres reste posée au-dessus au lieu
+     de partir vers le haut dès la dixième ligne — c'est ça, des filtres
+     persistants. Et une colonne trop large devient **atteignable** : le premier
+     rendu la voyait rognée par le cadre, donc perdue, la date d'entrée coupée
+     en « 07/0 » sur la capture à 1280 px.
+
+     La hauteur haute est celle de la fenêtre moins ce qui la surmonte : le
+     bandeau, la marge de `main`, la tête d'écran et sa marge basse. Approchée,
+     pas calculée au pixel — si elle tombe court, la page reprend le défilement,
+     ce qui ne casse rien. */
+  @media (min-width: 1024px) {
+    .cadre-tableau {
+      max-height: calc(100dvh - 14rem);
+    }
+
+    .tableau-defilant {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+    }
+  }
+
+  /* La barre d'un cadre de liste : la recherche, les filtres, le comptage.
+     Elle se replie d'elle-même — trois blocs côte à côte ne tiennent pas dans
+     360 px, et les comprimer les rend illisibles. */
+  .cadre-tete {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--color-bord);
+  }
+
+  .tableau {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--text-corps);
+  }
+
+  .tableau thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--color-papier);
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-bord);
+    text-align: left;
+    font-size: var(--text-micro);
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--color-encre-doux);
+  }
+
+  .tableau tbody td {
+    height: 2.5rem; /* 40 px : la densité bureau des maquettes */
+    padding: 0.5rem 0.75rem;
+    border-bottom: 1px solid var(--color-bord);
+    vertical-align: middle;
+  }
+
+  .tableau tbody tr:last-child td {
+    border-bottom: 0;
+  }
+
+  /* La ligne ouverte dans le panneau. Le fond seul ne suffit pas — il disparaît
+     au soleil sur un écran de comptoir, et il ne dit rien à qui ne voit pas les
+     nuances : le filet à gauche le double (`DESIGN.md` §5). Le lien de la
+     première cellule porte en plus `aria-current`, qui, lui, s'entend. */
+  .tableau tbody tr.ligne-active td {
+    background: var(--color-survol);
+  }
+
+  .tableau tbody tr.ligne-active td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-encre);
+  }
+
+  .tableau tbody tr:hover td {
+    background: var(--color-survol);
+  }
+
+  /* Un châssis se dicte au téléphone, un montant se recopie : ni l'un ni
+     l'autre ne se coupe en deux. Les chiffres s'alignent à droite pour se
+     comparer d'une colonne à l'autre sans les lire. */
+  .tableau .num {
+    text-align: right;
+  }
+
+  .tableau td.num {
+    font-family: var(--font-code);
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .tableau .principal {
+    font-weight: 600;
+  }
+
+  /* L'intitulé de colonne recopié dans la cellule : muet sur bureau, où
+     l'en-tête le porte déjà. */
+  .tableau-etiquette {
+    display: none;
+  }
+
+  /* Un tableau ne se comprime pas : sous 768 px il se replie en cartes.
+
+     C'est le seuil des maquettes, et il redevient tenable maintenant que la
+     coquille escamote sa colonne dès 1024 : entre 768 et 1024 le tableau
+     dispose enfin de la largeur pour laquelle il a été dessiné. S29 l'avait
+     remonté à 1024 faute de cette place — le seuil suivait la place réelle, pas
+     l'intention. Les deux se rejoignent. */
+  @media (max-width: 767px) {
+    .tableau thead {
+      display: none;
+    }
+
+    .tableau tbody tr {
+      display: grid;
+      gap: 0.125rem;
+      padding: 0.75rem;
+      border-bottom: 1px solid var(--color-bord);
+    }
+
+    .tableau tbody tr:last-child {
+      border-bottom: 0;
+    }
+
+    .tableau tbody td {
+      display: flex;
+      justify-content: space-between;
+      gap: 0.75rem;
+      height: auto;
+      padding: 0.125rem 0;
+      border: 0;
+    }
+
+    /* Le survol se déplace sur la carte entière : une cellule seule surlignée
+       au milieu d'une carte ne veut plus rien dire. Le marquage de la ligne
+       ouverte suit le même chemin — replié, il n'y a plus de première cellule
+       où accrocher le filet. */
+    .tableau tbody tr:hover td,
+    .tableau tbody tr.ligne-active td {
+      background: transparent;
+    }
+
+    .tableau tbody tr.ligne-active {
+      background: var(--color-survol);
+      box-shadow: inset 3px 0 0 var(--color-encre);
+    }
+
+    /* Le repli casse les rôles de tableau — un `tr` en grille n'est plus une
+       ligne pour un lecteur d'écran. L'intitulé redevient donc du texte lu,
+       sinon la carte annonce huit valeurs sans dire de quoi. */
+    .tableau-etiquette {
+      display: inline;
+      color: var(--color-encre-doux);
+      /* La police et la graisse sont reposées : l'étiquette hérite sinon du
+         `principal` et du `num` de sa cellule, et l'intitulé « Prix conseillé »
+         sortait en Plex Mono — une police réservée à ce qui se dicte, jamais à
+         de la prose. Vu sur la capture à 390 px. */
+      font-family: var(--font-sans);
+      font-weight: 400;
+      font-size: var(--text-legende);
+    }
+  }
+
+  /* La ligne fantôme du chargement. Elle a la taille du contenu à venir : un
+     texte « Chargement… » remplacé par cent lignes fait bondir l'écran au
+     moment où l'œil s'y pose. Le glissement s'arrête si le système demande
+     moins de mouvement — la règle globale de `@layer base` s'en charge. */
+  .squelette {
+    display: block;
+    height: 12px;
+    border-radius: 3px;
+    background: linear-gradient(
+      90deg,
+      var(--color-fond),
+      var(--color-survol),
+      var(--color-fond)
+    );
+    background-size: 200% 100%;
+    animation: glisse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes glisse {
+    to {
+      background-position: -200% 0;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     La pastille de statut.
+
+     Jamais la couleur seule : le mot est toujours écrit, la pastille ne fait
+     que le doubler (`DESIGN.md` §5). Le soleil sur un écran bon marché efface
+     les nuances bien avant les mots.
+     -------------------------------------------------------------------------- */
+  .pastille {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3125rem;
+    padding: 0.125rem 0.5rem;
+    border-radius: var(--radius-plaque);
+    background: var(--color-fond);
+    color: var(--color-encre-doux);
+    font-size: var(--text-legende);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .pastille::before {
+    content: "";
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-radius: 2px;
+    background: currentColor;
+  }
+
+  .pastille-solde {
+    background: var(--color-solde-surface);
+    color: var(--color-solde);
+  }
+
+  .pastille-transit {
+    background: var(--color-goutte-surface);
+    color: var(--color-goutte);
+  }
+
+  /* Le retard et l'impayé : la braise. Elle ne travaille jamais seule non plus
+     — « Impayée » est écrit à côté du point. */
+  .pastille-retard {
+    background: var(--color-alerte-surface);
+    color: var(--color-alerte);
+  }
+
+  /* --------------------------------------------------------------------------
+     LA SOUCHE — la signature du produit (D70).
+
+     Le numéro de pièce dessiné comme un pavé arraché du carnet à souches, bord
+     cranté à gauche. Il vient du métier : c'est le numéro que le gérant dicte
+     au téléphone quand un client rappelle, et le carnet à souches est l'objet
+     que ce logiciel remplace. La plaque d'immatriculation, elle, a été
+     rétrogradée en signal pur — deux signatures n'en font aucune.
+
+     Le crantage est un masque, pas une image : il tient à l'impression, il
+     suit la couleur de la surface, et il ne pèse rien. Une demi-perforation
+     tous les 14 px, comme sur le carnet.
+
+     Ni jaune ni plaque : le numéro complet n'est pas un code boutique, et le
+     jaune n'a que deux emplois (D70). Seules les trois lettres de tête, qui
+     *sont* le code boutique, se détachent — en gris, pas en jaune : un pavé
+     jaune de trois lettres au milieu d'un numéro ferait un troisième emploi.
+     -------------------------------------------------------------------------- */
+  .souche {
+    display: inline-grid;
+    gap: 2px;
+    padding: 0.5rem 1rem 0.5rem 1.25rem;
+    border-radius: 0 var(--radius-champ) var(--radius-champ) 0;
+    background: var(--color-fond);
+    color: var(--color-encre);
+    -webkit-mask: radial-gradient(circle 3.5px at left 50%, transparent 3.5px, #000 4px) left top /
+      100% 14px repeat-y;
+    mask: radial-gradient(circle 3.5px at left 50%, transparent 3.5px, #000 4px) left top / 100%
+      14px repeat-y;
+  }
+
+  .souche-numero {
+    font-family: var(--font-code);
+    font-size: var(--text-bloc);
+    font-weight: 500;
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+
+  .souche-code {
+    color: var(--color-encre-doux);
+  }
+
+  .souche-legende {
+    font-size: var(--text-legende);
+    color: var(--color-encre-doux);
+  }
+
+  /* --------------------------------------------------------------------------
+     Les filtres d'une liste.
+
+     Ils restent posés au-dessus du tableau, valeur visible : un filtre replié
+     dans un menu se laisse oublier, et on cherche ensuite pourquoi la moto
+     n'est pas là (`CAHIER-UI.md` §8.1, « filtres persistants et lisibles »).
+     -------------------------------------------------------------------------- */
+  .filtre {
+    display: inline-flex;
+    align-items: center;
+    height: 2rem;
+    padding-inline: 0.75rem;
+    border: 1px solid var(--color-bord);
+    border-radius: 999px;
+    background: var(--color-papier);
+    color: var(--color-encre-doux);
+    font-size: var(--text-legende);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .filtre:hover {
+    background: var(--color-survol);
+  }
+
+  .filtre[aria-pressed="true"] {
+    border-color: var(--color-encre);
+    background: var(--color-encre);
+    color: var(--color-papier);
+  }
+
+  .filtre-choix {
+    height: 2rem;
+    padding-inline: 0.5rem;
+    border: 1px solid var(--color-bord);
+    border-radius: var(--radius-champ);
+    background: var(--color-papier);
+    color: var(--color-encre);
+    font-size: var(--text-legende);
+    font-weight: 600;
+  }
+
+  /* 32 px est la densité bureau. Au doigt, c'est sous la cible minimale de
+     `DESIGN.md` §11 : sur téléphone les filtres reprennent leurs 44 px. */
+  @media (max-width: 767px) {
+    .filtre,
+    .filtre-choix {
+      height: 2.75rem;
+    }
+  }
+
   /* La saisie.
 
      La bordure prend `--color-bord-fort` et non `--color-bord` : le filet des
@@ -477,11 +866,14 @@
      un élément d'interface). Le jeton existait déjà et portait ce calcul dans
      son commentaire ; il n'était employé nulle part.
 
-     La hauteur reste celle d'aujourd'hui (48 px, la cible tactile). Les
-     maquettes descendent à 38 px pour la densité bureau : c'est une reprise
-     de chaque formulaire, donc S29, pas ici. */
+     La hauteur est celle des maquettes : 38 px, la densité bureau. Les 48 px
+     d'avant étaient la cible tactile d'un produit dessiné pour le téléphone ;
+     la cible du produit est désormais l'ordinateur (`CAHIER-UI.md` §1), et
+     56 px de hauteur de ligne partout est « un réglage tactile appliqué à une
+     souris » (§7). Sous 768 px la saisie reprend ses 44 px, comme les filtres :
+     là, c'est bien un doigt qui vise. */
   .saisie {
-    height: 3rem;
+    height: 2.375rem;
     width: 100%;
     /* Un champ ne gagne rien à dépasser 32 rem, et il y perd : l'œil ne
        retrouve plus le début de la ligne. La borne est ici, sur le champ, et
@@ -489,9 +881,15 @@
        depuis la refonte de la coquille, et sans cette limite un champ « Nom »
        s'étirait sur 950 px. Vu sur la capture de `/parametres/prestataires`.
 
-       Ce n'est pas la réponse complète : les écrans de formulaire ont besoin
-       que leur colonne entière soit tenue, pas seulement leurs champs. C'est
-       le travail d'A5 et d'A9 dans S29, et c'est noté là-bas. */
+       Elle ne vaut que pour les écrans qui n'ont pas encore leur colonne :
+       dans une colonne tenue (`.colonne-formulaire`), elle est levée juste en
+       dessous. S29 devait l'emporter avec A9 ; A9 tient désormais ses quatre
+       formulaires de réglages, mais cette ligne reste, parce qu'elle protège
+       encore cinq écrans qui n'appartiennent pas au groupe A et n'ont donc pas
+       de maquette à confronter : `/motos/nouvelle`, `/clients`,
+       `FormulaireClient`, `ListeReferentiel` et la connexion. La retirer
+       aujourd'hui les laisserait s'étirer sur toute la largeur. Elle
+       disparaîtra quand ces cinq-là tiendront leur colonne à leur tour. */
     max-width: 32rem;
     padding-inline: 0.75rem;
     border: 1px solid var(--color-bord-fort);
@@ -510,6 +908,33 @@
   .saisie[aria-invalid="true"] {
     border-color: var(--color-alerte);
     border-width: 2px;
+  }
+
+  /* 38 px passe sous la cible tactile de `DESIGN.md` §11 : au doigt, la saisie
+     reprend ses 44 px. `textarea.saisie` n'est pas concernée — sa hauteur est
+     déjà libre, et sa spécificité l'emporte sur celle-ci. */
+  @media (max-width: 767px) {
+    .saisie {
+      height: 2.75rem;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     La colonne d'un écran de formulaire.
+
+     La borne posée sur `.saisie` réparait le pire — un champ « Nom » étiré sur
+     950 px — sans répondre à la question : c'est la **colonne** qu'il faut
+     tenir, pas seulement ce qu'elle contient. Sans elle, un titre et son bouton
+     flottent encore aux deux bouts d'une bande vide.
+
+     La colonne tenue, la borne du champ n'a plus de raison d'être : le champ
+     reprend toute sa largeur, comme dans les maquettes. Une seule règle, parce
+     qu'une seule chose se dit ici — le reste de la disposition (l'aparté de
+     droite, la barre collée en bas) a une structure, donc c'est un composant :
+     `components/patrons/Formulaire.tsx` (D73).
+     -------------------------------------------------------------------------- */
+  .colonne-formulaire .saisie {
+    max-width: none;
   }
 
   /* --------------------------------------------------------------------------
@@ -584,6 +1009,195 @@
     font-weight: 500;
     letter-spacing: 0.08em;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* --------------------------------------------------------------------------
+     A7 — LE RELAIS D'UN DOCUMENT.
+
+     Les quatre statuts d'un papier sont un déplacement physique entre le
+     magasin, un prestataire et le client : l'ordre porte une information dont
+     le gérant a besoin. C'est le seul endroit du produit où une suite numérotée
+     est légitime (`DESIGN.md` §6) — ailleurs, un numéro devant une liste
+     promet un ordre que la donnée ne tient pas.
+
+     Le rang n'est pas rempli de blanc comme dans la maquette : en sombre,
+     `--color-solde` devient un vert clair, et du blanc dessus tombe sous le
+     seuil. Le texte prend la surface de sa propre sémantique — clair sur foncé
+     au jour, foncé sur clair la nuit, sans rien décider ici.
+     -------------------------------------------------------------------------- */
+  .relais {
+    display: grid;
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+    gap: 0.75rem;
+  }
+
+  .relais > li {
+    position: relative;
+    display: grid;
+    gap: 2px;
+    padding-top: 1.75rem;
+  }
+
+  /* Le trait qui relie les rangs, tiré d'un rang à l'autre et coupé aux
+     extrémités : la ligne ne part pas dans le vide à gauche du premier ni à
+     droite du dernier. */
+  .relais > li::before {
+    content: "";
+    position: absolute;
+    top: 9px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--color-bord);
+  }
+
+  .relais > li:first-child::before {
+    left: 9px;
+  }
+
+  .relais > li:last-child::before {
+    right: calc(100% - 9px);
+  }
+
+  .relais-rang {
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    display: grid;
+    place-items: center;
+    width: 20px;
+    height: 20px;
+    border: 2px solid var(--color-bord);
+    border-radius: 999px;
+    background: var(--color-papier);
+    color: var(--color-encre-doux);
+    font-family: var(--font-code);
+    font-size: 0.625rem;
+    font-weight: 700;
+  }
+
+  .relais > li[data-etape="fait"] .relais-rang {
+    border-color: var(--color-solde);
+    background: var(--color-solde);
+    color: var(--color-solde-surface);
+  }
+
+  .relais > li[data-etape="fait"]::before {
+    background: var(--color-solde);
+  }
+
+  .relais > li[data-etape="cours"] .relais-rang {
+    border-color: var(--color-goutte);
+    background: var(--color-goutte);
+    color: var(--color-goutte-surface);
+  }
+
+  .relais-nom {
+    font-weight: 700;
+  }
+
+  .relais > li[data-etape="attente"] .relais-nom {
+    color: var(--color-encre-doux);
+    font-weight: 600;
+  }
+
+  .relais-quand {
+    color: var(--color-encre-doux);
+    font-size: var(--text-legende);
+  }
+
+  /* Sous 768 px, le relais se lit de haut en bas. Quatre colonnes de 90 px
+     coupent « Chez le prestataire » en trois lignes, et le parcours ne se lit
+     plus. Le trait bascule avec : il devient vertical, et relie les rangs
+     comme il le faisait horizontalement. */
+  @media (max-width: 767px) {
+    .relais {
+      grid-auto-flow: row;
+      grid-auto-columns: auto;
+      gap: 0;
+    }
+
+    .relais > li {
+      padding: 0.375rem 0 0.375rem 1.875rem;
+    }
+
+    .relais > li::before {
+      top: 0;
+      bottom: 0;
+      left: 9px;
+      right: auto;
+      width: 2px;
+      height: auto;
+    }
+
+    .relais > li:first-child::before {
+      top: 1.125rem;
+      left: 9px;
+    }
+
+    .relais > li:last-child::before {
+      bottom: calc(100% - 1.125rem);
+      right: auto;
+    }
+
+    .relais-rang {
+      top: 0.375rem;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     A7 — La pastille qui se clique.
+
+     Dans la file des dossiers, chaque document a sa colonne et son mot ; le
+     mot est aussi la porte vers son parcours, sous le tableau. Le geste doit se
+     voir avant le clic, et le choix rester visible après : sinon on ne sait
+     plus lequel des vingt-huit documents de l'écran le relais raconte.
+     -------------------------------------------------------------------------- */
+  .pastille-bouton {
+    cursor: pointer;
+  }
+
+  .pastille-bouton:hover {
+    box-shadow: 0 0 0 1px currentColor;
+  }
+
+  .pastille-bouton[aria-current="true"] {
+    box-shadow: 0 0 0 2px var(--color-encre);
+  }
+
+  /* La ligne dont un document a dépassé la date annoncée. Le filet double le
+     mot « En retard » déjà écrit dans la colonne du document — il ne le
+     remplace pas (`DESIGN.md` §5) ; il sert à retrouver la ligne de loin dans
+     une file de quarante.
+
+     Les deux règles qui suivent rejouent le marquage de la ligne ouverte, après
+     celle du retard : quand une ligne est les deux à la fois, c'est celle qu'on
+     regarde qui l'emporte — le retard, lui, est encore écrit dans sa colonne. */
+  .tableau tbody tr.ligne-retard td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-alerte);
+  }
+
+  .tableau tbody tr.ligne-active td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-encre);
+  }
+
+  /* En cartes, le liseré passe de la première cellule à la carte entière : il
+     n'y a plus de première colonne où l'accrocher. Le seuil suit celui du
+     repli, sinon la ligne perdrait son marquage entre 768 et 1024. */
+  @media (max-width: 767px) {
+    .tableau tbody tr.ligne-retard td:first-child {
+      box-shadow: none;
+    }
+
+    .tableau tbody tr.ligne-retard {
+      box-shadow: inset 3px 0 0 var(--color-alerte);
+    }
+
+    .tableau tbody tr.ligne-active {
+      box-shadow: inset 3px 0 0 var(--color-encre);
+    }
   }
 }
 

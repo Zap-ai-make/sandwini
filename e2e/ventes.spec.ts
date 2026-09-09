@@ -138,17 +138,28 @@ test.describe("enregistrer une vente", () => {
     // Et elle est bien passée « vendue » dans le stock.
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher un châssis").fill(chassis);
-    await expect(page.getByRole("listitem").filter({ hasText: chassis })).toContainText("Vendue", {
+    /* `locator("tr")` et non `getByRole("row")` : sous 1024 px le tableau du
+       stock se replie en cartes, ce qui lui retire ses rôles de tableau, et la
+       suite tourne sur un Pixel 7. */
+    await expect(page.locator("tbody tr").filter({ hasText: chassis })).toContainText("Vendue", {
       timeout: 20_000,
     });
 
     // La recherche du §6.4 : on tape le numéro de téléphone du client.
     await page.goto("/motos/ventes", { waitUntil: "load" });
     await page.getByLabel("Chercher une vente").fill(telephone);
-    const ligne = page.getByRole("listitem").filter({ hasText: numero });
+    /* `locator("tbody tr")` et non `getByRole("row")` : sous 1024 px le tableau
+       des ventes se replie en cartes, ce qui lui retire ses rôles de tableau,
+       et la suite tourne sur un Pixel 7. */
+    const ligne = page.locator("tbody tr").filter({ hasText: numero });
     await expect(ligne).toContainText(client, { timeout: 20_000 });
     await expect(ligne).toContainText("Soldée");
-    await expect(ligne).toContainText("4 à faire");
+
+    /* L'état du dossier a quitté la ligne pour la fiche : le tableau dit ce qui
+       se compare d'une vente à l'autre — le reste dû et le paiement — et le
+       détail des quatre papiers appartient au panneau, où l'on agit dessus. */
+    await ligne.getByRole("link").first().click();
+    await expect(contenu(page).getByRole("complementary")).toContainText("4 à faire");
   });
 
   test("la fiche montre le dossier entier, ses quatre documents et le versement", async ({
@@ -168,7 +179,10 @@ test.describe("enregistrer une vente", () => {
     });
     await page.getByRole("link", { name: "Voir la vente" }).click();
 
-    await expect(contenu(page).getByRole("heading", { level: 1 })).toContainText(client);
+  /* Depuis A6, la fiche est un panneau de l'écran des ventes et non plus une
+     page : l'unique `h1` reste « Ventes », et c'est le repère `complementary`,
+     nommé « Vente <numéro> », qui porte la vente ouverte. */
+    await expect(contenu(page).getByRole("complementary")).toContainText(client);
     await expect(contenu(page)).toContainText("800 000 FCFA"); // reste dû
     await expect(contenu(page)).toContainText("Partiellement payée");
 
@@ -249,14 +263,20 @@ test.describe("crédit et tranches ne font pas la même chose", () => {
     // Réservée, pas vendue : c'est toute la différence avec le crédit.
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher un châssis").fill(chassis);
-    await expect(page.getByRole("listitem").filter({ hasText: chassis })).toContainText(
+    /* `locator("tr")` et non `getByRole("row")` : sous 1024 px le tableau du
+       stock se replie en cartes, ce qui lui retire ses rôles de tableau, et la
+       suite tourne sur un Pixel 7. */
+    await expect(page.locator("tbody tr").filter({ hasText: chassis })).toContainText(
       "Réservée",
       { timeout: 20_000 },
     );
 
     await page.goto("/motos/ventes", { waitUntil: "load" });
     await page.getByLabel("Chercher une vente").fill(chassis);
-    await page.getByRole("listitem").filter({ hasText: chassis }).click();
+    /* Le châssis ne figure plus dans la ligne — il est dans la fiche —, mais la
+       recherche l'accepte toujours : elle ne laisse qu'une vente, et c'est
+       celle-là qu'on ouvre. */
+    await page.locator("tbody tr").getByRole("link").first().click();
     await expect(contenu(page)).toContainText("la moto reste au magasin");
   });
 });
@@ -321,7 +341,10 @@ test.describe("la marge est réservée au responsable", () => {
        un déclencheur : elle arrive après la vente, jamais avec elle. */
     await page.goto("/motos/ventes", { waitUntil: "load" });
     await page.getByLabel("Chercher une vente").fill(chassis);
-    await page.getByRole("listitem").filter({ hasText: chassis }).click();
+    /* Le châssis ne figure plus dans la ligne — il est dans la fiche —, mais la
+       recherche l'accepte toujours : elle ne laisse qu'une vente, et c'est
+       celle-là qu'on ouvre. */
+    await page.locator("tbody tr").getByRole("link").first().click();
     await expect(contenu(page)).toContainText("850 000 FCFA", { timeout: 60_000 });
     await expect(contenu(page)).toContainText("350 000 FCFA");
   });
@@ -392,7 +415,9 @@ test.describe("hors ligne", () => {
 
     // La fiche s'ouvre : la vente est déjà dans le cache local.
     await page.getByRole("link", { name: "Voir la vente" }).click();
-    await expect(contenu(page).getByRole("heading", { level: 1 })).toContainText(client);
+    /* Même raison qu'aux deux autres endroits : depuis A6 la fiche est un
+       panneau de l'écran des ventes, et l'unique `h1` reste « Ventes ». */
+    await expect(contenu(page).getByRole("complementary")).toContainText(client);
     await expect(contenu(page)).toContainText("750 000 FCFA"); // reste dû
     await expect(contenu(page)).toContainText("la moto reste au magasin");
 

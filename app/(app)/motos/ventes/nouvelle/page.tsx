@@ -1,10 +1,12 @@
 "use client";
 
-import { ArrowLeft, Bike, CircleAlert, Lock, Search, UserPlus } from "lucide-react";
+import { Bike, Info, Lock, Search, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { FormulaireClient } from "@/components/FormulaireClient";
-import { EtatErreur, EtatErreurSaisie } from "@/components/patrons/Etats";
+import { Champ } from "@/components/patrons/Champ";
+import { EtatErreur, EtatErreurSaisie, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { Formulaire, Groupe } from "@/components/patrons/Formulaire";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import { chercherClients, formaterTelephone, type Client } from "@/lib/domain/client";
@@ -40,14 +42,34 @@ import { ecouterVentes, enregistrerVente, messageErreurVente } from "@/lib/repos
  *
  * Un seul écran, comme l'exige le §6.1 — parce que la vente se conclut debout,
  * le client en face, et qu'un assistant en quatre étapes se ferait fermer avant
- * la deuxième. L'ordre des sections suit celui de la conversation réelle :
- * quelle moto, pour qui, à quel prix, payée comment, combien aujourd'hui.
+ * la deuxième. L'ordre des groupes suit celui de la maquette validée : qui
+ * achète, quelle moto, à quel prix, payée comment, combien aujourd'hui.
+ *
+ * **« Long, doit rester serein » (`CAHIER-UI.md` §9).** Trois choses le tiennent
+ * maintenant, et aucune n'est décorative. La saisie garde **une colonne** de
+ * 40 rem au lieu de s'étaler sur toute la zone de travail — la place gagnée à
+ * droite ne sert pas à étirer les champs, elle porte le récapitulatif, qui
+ * reste sous les yeux pendant qu'on saisit. La **barre de validation reste
+ * collée en bas**, avec le reste dû, le chiffre qu'on relit à voix haute. Et
+ * les groupes sont **courts et titrés**, un seul champ par ligne.
+ *
+ * **Ce que la maquette montre et qu'on n'a pas construit.** Elle replie le
+ * groupe résolu sur une fiche « Haojue HJ 125-11 · Changer », ce qui raccourcit
+ * franchement l'écran. Essayé, puis retiré : la liste est un vrai groupe de
+ * boutons radio, et dans un groupe de boutons radio les flèches du clavier
+ * **déplacent et choisissent à la fois**. Une première flèche vers le bas
+ * aurait donc détruit le groupe sous les doigts de la personne en train de le
+ * parcourir, en emportant le focus avec lui (`DESIGN.md` §11). Le dessin de la
+ * maquette suppose une liste déroulante à recherche — que D72 laisse hors de
+ * S29, faute de composant accessible pour la porter. La liste reste donc
+ * ouverte, et le choix se marque sur sa ligne.
  *
  * **Ce n'est délibérément pas un `<form>`.** Il en contient un — celui de la
  * création d'un client à la volée — et deux formulaires ne s'imbriquent pas.
  * L'absence de validation par la touche Entrée est un gain ici, pas une perte :
- * le premier champ de l'écran est une recherche de châssis, et enregistrer une
- * vente en tapant Entrée après un numéro serait une catastrophe silencieuse.
+ * un des premiers champs de l'écran est une recherche de châssis, et
+ * enregistrer une vente en tapant Entrée après un numéro serait une catastrophe
+ * silencieuse.
  *
  * Tout ce que l'écran lit — stock, clients, ventes du mois — est déjà chargé
  * entier dans le cache Firestore. Rien ici n'attend le réseau, y compris le
@@ -125,6 +147,8 @@ export default function PageNouvelleVente() {
   const motoChoisie = vendables.find((moto) => moto.id === saisie.motoId);
   const clientChoisi = clients.find((client) => client.id === saisie.clientId);
 
+  const estGerant = session.statut === "connecte" && session.utilisateur.role === "gerant";
+
   const numeroAVenir =
     boutiqueId && perimetre.type === "boutique"
       ? prochainNumero(
@@ -177,37 +201,44 @@ export default function PageNouvelleVente() {
 
   if (perimetre.type !== "boutique") {
     return (
-      <Cadre>
+      <div>
+        <TetePage titre="Nouvelle vente" />
         <p className="max-w-prose text-encre-doux">
           Une vente appartient à une boutique précise — son numéro en porte le code. Choisissez-en
           une dans le bandeau, en haut de l’écran, avant d’enregistrer.
         </p>
-      </Cadre>
+      </div>
     );
   }
 
+  const prixConvenu = lireMontant(saisie.prixConvenu) ?? 0;
+  const encaisse = lireMontantEncaisse(saisie.montantEncaisse) ?? 0;
+  const { resteDu } = agregatsPaiement(
+    prixConvenu,
+    encaisse > 0 && encaisse <= prixConvenu ? [{ montant: encaisse }] : [],
+  );
+
   return (
-    <Cadre>
+    <div>
+      <TetePage titre="Nouvelle vente" sousTitre={perimetre.nom} />
+
       {enregistree && (
-        <div role="status" className="mb-6 rounded-plaque border border-plaque-bord bg-papier p-4">
+        <div
+          role="status"
+          className="mb-6 max-w-[40rem] rounded-champ border border-plaque-bord bg-papier p-4"
+        >
           <p className="font-medium text-encre">
             Vente enregistrée — <span className="plaque-code">{enregistree.numero}</span>
           </p>
-          <p className="mt-1 max-w-prose text-sm text-encre-doux">
+          <p className="mt-1 max-w-prose text-corps text-encre-doux">
             Le dossier est ouvert avec ses quatre documents à traiter. Si le réseau manque, la vente
             partira seule dès son retour.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link
-              href={`/motos/ventes?vente=${enregistree.id}`}
-              className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-            >
+            <Link href={`/motos/ventes?vente=${enregistree.id}`} className="bouton bouton-neutre">
               Voir la vente
             </Link>
-            <Link
-              href="/motos/ventes"
-              className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-            >
+            <Link href="/motos/ventes" className="bouton bouton-neutre">
               Voir les ventes
             </Link>
           </div>
@@ -216,185 +247,258 @@ export default function PageNouvelleVente() {
 
       <EtatErreur message={erreurStock} className="mb-4" />
 
-      <fieldset className="cadre p-4">
-        <legend className="px-1 font-semibold text-encre">La moto</legend>
+      <Formulaire
+        recapitulatif={
+          <Recapitulatif
+            saisie={saisie}
+            moto={motoChoisie}
+            client={clientChoisi}
+            catalogue={catalogue}
+            numero={numeroAVenir}
+          />
+        }
+        barre={
+          <>
+            {/* L'erreur vit dans la barre, et pas au pied de la colonne : le
+                bouton étant collé en bas, un message resté à deux mille pixels
+                de là ne serait jamais lu.
 
-        {stock === null ? (
-          <p className="mt-2 text-sm text-encre-doux">Chargement du stock…</p>
-        ) : vendables.length === 0 ? (
-          <div className="mt-2">
-            <p className="text-encre">Aucune moto disponible dans {perimetre.nom}.</p>
-            <p className="mt-1 max-w-prose text-sm text-encre-doux">
+                Elle ne réserve pas sa ligne, contrairement à ce que fait
+                `EtatErreurSaisie` partout ailleurs, et pour la raison même qui
+                l'y oblige ailleurs : la réserve existe pour que le bouton ne
+                se dérobe pas sous le doigt. Ici la barre est ancrée par le bas
+                — elle grandit vers le haut, et le bouton ne bouge pas. Une
+                ligne vide en permanence n'aurait fait qu'épaissir une barre
+                qui reste à l'écran toute la saisie. */}
+            {erreur && <EtatErreurSaisie message={erreur} className="w-full" />}
+            <p className="flex items-baseline gap-2">
+              <span className="text-corps text-encre-doux">Reste dû</span>
+              <span className="font-code text-bloc font-medium whitespace-nowrap text-encre">
+                {formaterMontant(resteDu)}
+              </span>
+            </p>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Link href="/motos/ventes" className="bouton bouton-neutre">
+                Annuler
+              </Link>
+              <button type="button" onClick={enregistrer} className="bouton bouton-plaque">
+                Enregistrer la vente
+              </button>
+            </div>
+          </>
+        }
+      >
+        <Groupe titre="Le client">
+          <ChampRecherche
+            id="recherche-client-vente"
+            libelle="Chercher un client"
+            aide="Un nom, ou le début d’un numéro de téléphone."
+            placeholder="Un numéro, ou le début d’un nom"
+            valeur={rechercheClient}
+            changer={setRechercheClient}
+          />
+
+          {clientsEnCours ? (
+            <p className="mt-3 text-corps text-encre-doux">Chargement du fichier clients…</p>
+          ) : resultatsClients.length === 0 ? (
+            <EtatSansResultat className="mt-3">
+              {clients.length === 0
+                ? "Le fichier clients est vide. Créez la fiche de cet acheteur, elle servira à toutes les boutiques."
+                : "Personne ne correspond. Vérifiez le numéro, ou créez la fiche."}
+            </EtatSansResultat>
+          ) : (
+            <ul className="mt-3 space-y-2">
+              {resultatsClients.map((client) => (
+                <li key={client.id}>
+                  <Choix
+                    nom="client-vente"
+                    choisi={saisie.clientId === client.id}
+                    surChoix={() => changer({ clientId: client.id })}
+                  >
+                    <span className="min-w-0 flex-1">
+                      <span className="block font-medium text-encre">{client.nom}</span>
+                      <span className="block text-corps text-encre-doux">
+                        {formaterTelephone(client.telephone)}
+                        {client.adresse ? ` · ${client.adresse}` : ""}
+                      </span>
+                    </span>
+                  </Choix>
+                </li>
+              ))}
+            </ul>
+          )}
+          <Tronquee montres={resultatsClients.length} total={clientsTrouves.length} mot="clients" />
+
+          <button
+            type="button"
+            onClick={() => setCreationClient((ouvert) => !ouvert)}
+            aria-expanded={creationClient}
+            className="bouton bouton-neutre mt-3"
+          >
+            <UserPlus aria-hidden="true" className="size-4" />
+            {creationClient ? "Fermer" : "Nouveau client"}
+          </button>
+        </Groupe>
+
+        {/* Hors du groupe précédent : `FormulaireClient` est lui-même un
+            `<form>`, et un formulaire ne se range pas dans le `fieldset` d'un
+            autre. Il reste à sa place dans la lecture de l'écran, juste sous le
+            choix du client. */}
+        {creationClient && (
+          <section className="mb-8 rounded-champ border border-bord bg-fond p-4">
+            <h2 className="font-semibold text-encre">Nouveau client</h2>
+            <p className="mt-1 text-corps text-encre-doux">
+              Il sera rattaché à cette vente immédiatement, réseau ou pas.
+            </p>
+            <div className="mt-4">
+              <FormulaireClient
+                clients={clients}
+                surEnregistrement={(id, saisieClient) => {
+                  changer({ clientId: id });
+                  setCreationClient(false);
+                  /* La recherche se cale sur le nom saisi plutôt que de se
+                     vider : si le gérant revient changer de client, la liste ne
+                     montre que ses premiers résultats, et un fichier de deux
+                     cents clients aurait fait disparaître celui qu'il vient
+                     tout juste de créer. */
+                  setRechercheClient(saisieClient.nom.trim());
+                }}
+                surAnnulation={() => setCreationClient(false)}
+              />
+            </div>
+          </section>
+        )}
+
+        <Groupe titre="La moto">
+          {stock === null ? (
+            <p className="text-corps text-encre-doux">Chargement du stock…</p>
+          ) : vendables.length === 0 ? (
+            <EtatVide
+              titre={`Aucune moto disponible dans ${perimetre.nom}.`}
+              action={
+                <Link href="/motos/nouvelle" className="bouton bouton-plaque">
+                  <Bike aria-hidden="true" className="size-4" />
+                  Faire entrer une moto
+                </Link>
+              }
+            >
               Les motos vendues et réservées ne réapparaissent pas ici. Faites-en entrer une pour
               pouvoir vendre.
-            </p>
-            <Link
-              href="/motos/nouvelle"
-              className="mt-4 bouton bouton-plaque"
+            </EtatVide>
+          ) : (
+            <>
+              <ChampRecherche
+                id="recherche-moto-vente"
+                libelle="Chercher dans le stock"
+                aide={`Seules les motos en stock à ${perimetre.nom} sont proposées.`}
+                placeholder="Châssis, marque ou modèle"
+                valeur={rechercheMoto}
+                changer={setRechercheMoto}
+                monospace
+              />
+
+              {resultatsMotos.length === 0 ? (
+                <EtatSansResultat className="mt-3">
+                  Aucune moto disponible ne correspond. Vérifiez le châssis, ou effacez la recherche.
+                </EtatSansResultat>
+              ) : (
+                <ul className="mt-3 space-y-2">
+                  {resultatsMotos.map((moto) => (
+                    <li key={moto.id}>
+                      <Choix
+                        nom="moto-vendue"
+                        choisi={saisie.motoId === moto.id}
+                        surChoix={() => choisirMoto(moto)}
+                      >
+                        <span className="plaque-code shrink-0 text-legende leading-none text-encre">
+                          {moto.numeroChassis}
+                        </span>
+                        {/* Une seule colonne de texte, pas deux : sur un écran
+                            de téléphone, un prix aligné à droite venait
+                            chevaucher un nom de modèle un peu long — vu en
+                            regardant la capture, pas en lisant le code. Le prix
+                            conseillé descend donc sur la ligne secondaire, où il
+                            se lit aussi bien. */}
+                        <span className="min-w-0 flex-1">
+                          <span className="block font-medium text-encre">
+                            {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
+                          </span>
+                          <span className="block text-corps text-encre-doux">
+                            {moto.couleur || "Couleur non notée"}
+                            {moto.annee ? ` · ${moto.annee}` : ""}
+                            {moto.prixVenteConseille !== null && (
+                              <>
+                                {" · conseillé "}
+                                <span className="font-medium text-encre">
+                                  {formaterMontant(moto.prixVenteConseille)}
+                                </span>
+                              </>
+                            )}
+                          </span>
+                        </span>
+                      </Choix>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <Tronquee montres={resultatsMotos.length} total={motosTrouvees.length} mot="motos" />
+            </>
+          )}
+        </Groupe>
+
+        <Groupe titre="Le prix">
+          <div className="max-w-[16rem]">
+            <Champ
+              id="prix-convenu"
+              libelle="Prix convenu"
+              aide="En FCFA entiers, sans centimes."
             >
-              <Bike aria-hidden="true" className="size-4" />
-              Faire entrer une moto
-            </Link>
+              <input
+                id="prix-convenu"
+                inputMode="numeric"
+                aria-describedby="prix-convenu-aide"
+                value={saisie.prixConvenu}
+                onChange={(evenement) => changer({ prixConvenu: evenement.target.value })}
+                className="plaque-code saisie"
+              />
+            </Champ>
           </div>
-        ) : (
-          <>
-            <ChampRecherche
-              id="recherche-moto-vente"
-              libelle="Chercher dans le stock"
-              placeholder="Châssis, marque ou modèle"
-              valeur={rechercheMoto}
-              changer={setRechercheMoto}
-              monospace
+
+          {/* La frontière de D2, dite là où la question se pose — devant le
+              montant. Un gérant qui ne voit pas de marge doit savoir qu'elle
+              existe et qu'elle ne lui est pas cachée par accident. */}
+          {estGerant && (
+            <p className="mt-2 flex items-center gap-2 text-legende text-encre-doux">
+              <Lock aria-hidden="true" className="size-3.5 shrink-0" />
+              La marge de cette vente est calculée pour le responsable seul.
+            </p>
+          )}
+
+          <div className="mt-4 space-y-4">
+            <ListeLibre
+              id="inclus"
+              libelle="Inclus dans la vente"
+              aide="Un par ligne : casque, plaque, carte grise…"
+              valeur={saisie.inclus}
+              changer={(inclus) => changer({ inclus })}
             />
-
-            {resultatsMotos.length === 0 ? (
-              <p className="mt-3 rounded-plaque border border-dashed border-bord p-3 text-sm text-encre-doux">
-                Aucune moto disponible ne correspond. Vérifiez le châssis, ou effacez la recherche.
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {resultatsMotos.map((moto) => (
-                  <li key={moto.id}>
-                    <Choix
-                      nom="moto-vendue"
-                      choisi={saisie.motoId === moto.id}
-                      surChoix={() => choisirMoto(moto)}
-                    >
-                      <span className="plaque-code shrink-0 rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-xs leading-none text-encre-fixe">
-                        {moto.numeroChassis}
-                      </span>
-                      {/* Une seule colonne de texte, pas deux : sur un écran de
-                          téléphone, un prix aligné à droite venait chevaucher un
-                          nom de modèle un peu long — vu en regardant la capture,
-                          pas en lisant le code. Le prix conseillé descend donc
-                          sur la ligne secondaire, où il se lit aussi bien. */}
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-medium text-encre">
-                          {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
-                        </span>
-                        <span className="block text-sm text-encre-doux">
-                          {moto.couleur || "Couleur non notée"}
-                          {moto.annee ? ` · ${moto.annee}` : ""}
-                          {moto.prixVenteConseille !== null && (
-                            <>
-                              {" · conseillé "}
-                              <span className="font-medium text-encre">
-                                {formaterMontant(moto.prixVenteConseille)}
-                              </span>
-                            </>
-                          )}
-                        </span>
-                      </span>
-                    </Choix>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <Tronquee montres={resultatsMotos.length} total={motosTrouvees.length} mot="motos" />
-          </>
-        )}
-      </fieldset>
-
-      <fieldset className="mt-6 cadre p-4">
-        <legend className="px-1 font-semibold text-encre">Le client</legend>
-
-        <ChampRecherche
-          id="recherche-client-vente"
-          libelle="Chercher un client"
-          placeholder="Un numéro, ou le début d’un nom"
-          valeur={rechercheClient}
-          changer={setRechercheClient}
-        />
-
-        {clientsEnCours ? (
-          <p className="mt-3 text-sm text-encre-doux">Chargement du fichier clients…</p>
-        ) : resultatsClients.length === 0 ? (
-          <p className="mt-3 rounded-plaque border border-dashed border-bord p-3 text-sm text-encre-doux">
-            {clients.length === 0
-              ? "Le fichier clients est vide. Créez la fiche de cet acheteur, elle servira à toutes les boutiques."
-              : "Personne ne correspond. Vérifiez le numéro, ou créez la fiche."}
-          </p>
-        ) : (
-          <ul className="mt-3 space-y-2">
-            {resultatsClients.map((client) => (
-              <li key={client.id}>
-                <Choix
-                  nom="client-vente"
-                  choisi={saisie.clientId === client.id}
-                  surChoix={() => changer({ clientId: client.id })}
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-medium text-encre">{client.nom}</span>
-                    <span className="block text-sm text-encre-doux">
-                      {formaterTelephone(client.telephone)}
-                      {client.adresse ? ` · ${client.adresse}` : ""}
-                    </span>
-                  </span>
-                </Choix>
-              </li>
-            ))}
-          </ul>
-        )}
-        <Tronquee montres={resultatsClients.length} total={clientsTrouves.length} mot="clients" />
-
-        <button
-          type="button"
-          onClick={() => setCreationClient((ouvert) => !ouvert)}
-          aria-expanded={creationClient}
-          className="mt-3 inline-flex h-11 items-center gap-2 rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-        >
-          <UserPlus aria-hidden="true" className="size-4" />
-          {creationClient ? "Fermer" : "Nouveau client"}
-        </button>
-      </fieldset>
-
-      {/* Hors du bloc précédent : `FormulaireClient` est lui-même un `<form>`,
-          et un formulaire ne s'imbrique pas dans un autre. Il reste à sa place
-          dans la lecture de l'écran, juste sous le choix du client. */}
-      {creationClient && (
-        <section className="mt-2 rounded-plaque border border-bord bg-fond p-4">
-          <h2 className="font-semibold text-encre">Nouveau client</h2>
-          <p className="mt-1 text-sm text-encre-doux">
-            Il sera rattaché à cette vente immédiatement, réseau ou pas.
-          </p>
-          <div className="mt-4">
-            <FormulaireClient
-              clients={clients}
-              surEnregistrement={(id, saisieClient) => {
-                changer({ clientId: id });
-                setCreationClient(false);
-                /* La recherche se cale sur le nom saisi plutôt que de se vider :
-                   la liste ne montre que ses premiers résultats, et un fichier
-                   de deux cents clients aurait fait disparaître de l'écran
-                   celui qu'on vient tout juste de créer. */
-                setRechercheClient(saisieClient.nom.trim());
-              }}
-              surAnnulation={() => setCreationClient(false)}
+            <ListeLibre
+              id="non-inclus"
+              libelle="Non inclus"
+              aide="Ce que le client fera de son côté."
+              valeur={saisie.nonInclus}
+              changer={(nonInclus) => changer({ nonInclus })}
             />
           </div>
-        </section>
-      )}
+        </Groupe>
 
-      <fieldset className="mt-6 cadre p-4">
-        <legend className="px-1 font-semibold text-encre">La vente</legend>
+        <Groupe titre="Le mode de paiement">
+          <p className="mb-3 text-corps text-encre-doux">
+            Ce choix décide si la moto part avec le client ou reste au magasin. Il ne se change pas
+            après l’enregistrement.
+          </p>
 
-        <div className="mt-2">
-          <label htmlFor="prix-convenu" className="block text-sm font-medium text-encre">
-            Prix convenu
-          </label>
-          <input
-            id="prix-convenu"
-            inputMode="numeric"
-            value={saisie.prixConvenu}
-            onChange={(evenement) => changer({ prixConvenu: evenement.target.value })}
-            className="saisie mt-1.5 text-lg"
-          />
-          <p className="mt-1 text-sm text-encre-doux">En FCFA entiers, sans centimes.</p>
-        </div>
-
-        <div className="mt-4">
-          <span className="block text-sm font-medium text-encre">Mode de paiement</span>
-          <div className="mt-1.5 space-y-2">
+          <div className="space-y-2" role="radiogroup" aria-label="Mode de paiement">
             {MODES_PAIEMENT.map((mode) => (
               <Choix
                 key={mode}
@@ -405,123 +509,106 @@ export default function PageNouvelleVente() {
                     modePaiement: mode as ModePaiement,
                     /* Le comptant impose le montant entier : le pré-remplir
                        évite de faire retaper ce que la règle exige déjà. */
-                    montantEncaisse: mode === "comptant" ? saisie.prixConvenu : saisie.montantEncaisse,
+                    montantEncaisse:
+                      mode === "comptant" ? saisie.prixConvenu : saisie.montantEncaisse,
                   })
                 }
               >
                 <span className="min-w-0 flex-1">
-                  <span className="block font-medium text-encre">{LIBELLE_MODE[mode]}</span>
-                  <span className="block text-sm text-encre-doux">{EFFET_MODE[mode]}</span>
+                  <span className="block font-semibold text-encre">{LIBELLE_MODE[mode]}</span>
+                  <span className="block text-corps text-encre-doux">{EFFET_MODE[mode]}</span>
                 </span>
               </Choix>
             ))}
           </div>
-        </div>
 
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <ListeLibre
-            id="inclus"
-            libelle="Inclus dans la vente"
-            aide="Un par ligne : casque, plaque, carte grise…"
-            valeur={saisie.inclus}
-            changer={(inclus) => changer({ inclus })}
-          />
-          <ListeLibre
-            id="non-inclus"
-            libelle="Non inclus"
-            aide="Ce que le client fera de son côté."
-            valeur={saisie.nonInclus}
-            changer={(nonInclus) => changer({ nonInclus })}
-          />
-        </div>
-      </fieldset>
+          {/* La conséquence, redite en clair juste au-dessus de la zone de
+              saisie qu'elle commande : ce qui suit est un montant, et selon le
+              mode ce montant est une recette ou un engagement. C'est la
+              confusion la plus coûteuse du produit — crédit, la moto part ;
+              tranches, elle reste — et elle se paie au comptoir, pas ici. */}
+          <p className="mt-4 flex gap-2 rounded-champ border-l-[3px] border-l-goutte bg-goutte-surface p-3 text-encre">
+            <Info aria-hidden="true" className="mt-0.5 size-[18px] shrink-0 text-goutte" />
+            <span>
+              <strong className="font-semibold">
+                {LIBELLE_MODE[saisie.modePaiement]} choisi.
+              </strong>{" "}
+              {EFFET_MODE[saisie.modePaiement]}
+            </span>
+          </p>
+        </Groupe>
 
-      <fieldset className="mt-6 cadre p-4">
-        <legend className="px-1 font-semibold text-encre">Encaissé aujourd’hui</legend>
-
-        <div className="mt-2">
-          <label htmlFor="montant-encaisse" className="block text-sm font-medium text-encre">
-            Montant reçu{" "}
-            {saisie.modePaiement === "comptant" ? (
-              <span className="font-normal text-encre-doux">(le prix convenu en entier)</span>
-            ) : (
-              <span className="font-normal text-encre-doux">(vide si le client ne verse rien)</span>
-            )}
-          </label>
-          <input
-            id="montant-encaisse"
-            inputMode="numeric"
-            value={saisie.montantEncaisse}
-            onChange={(evenement) => changer({ montantEncaisse: evenement.target.value })}
-            className="saisie mt-1.5 text-lg"
-          />
-        </div>
-
-        <div className="mt-4">
-          <label htmlFor="moyen-paiement" className="block text-sm font-medium text-encre">
-            Moyen de paiement
-          </label>
-          <select
-            id="moyen-paiement"
-            value={saisie.moyenPaiement}
-            onChange={(evenement) =>
-              changer({ moyenPaiement: evenement.target.value as MoyenPaiement })
-            }
-            className="saisie mt-1.5"
-          >
-            {MOYENS_PAIEMENT.map((moyen) => (
-              <option key={moyen} value={moyen}>
-                {LIBELLE_MOYEN[moyen]}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {saisie.moyenPaiement !== "especes" && (
-          <div className="mt-4">
-            <label htmlFor="reference-paiement" className="block text-sm font-medium text-encre">
-              Référence du transfert{" "}
-              <span className="font-normal text-encre-doux">(facultatif)</span>
-            </label>
-            <input
-              id="reference-paiement"
-              value={saisie.reference}
-              maxLength={60}
-              onChange={(evenement) => changer({ reference: evenement.target.value })}
-              className="plaque-code saisie mt-1.5"
-            />
+        <Groupe titre="Le premier versement">
+          <div className="max-w-[16rem]">
+            <Champ
+              id="montant-encaisse"
+              libelle="Montant reçu"
+              aide={
+                saisie.modePaiement === "comptant"
+                  ? "Au comptant, le prix convenu en entier."
+                  : "Laissez vide si le client ne verse rien aujourd’hui."
+              }
+            >
+              <input
+                id="montant-encaisse"
+                inputMode="numeric"
+                aria-describedby="montant-encaisse-aide"
+                value={saisie.montantEncaisse}
+                onChange={(evenement) => changer({ montantEncaisse: evenement.target.value })}
+                className="plaque-code saisie"
+              />
+            </Champ>
           </div>
-        )}
-      </fieldset>
 
-      <Recapitulatif
-        saisie={saisie}
-        moto={motoChoisie}
-        client={clientChoisi}
-        catalogue={catalogue}
-        numero={numeroAVenir}
-      />
+          <div className="mt-4 max-w-[16rem]">
+            <Champ id="moyen-paiement" libelle="Moyen de paiement">
+              <select
+                id="moyen-paiement"
+                value={saisie.moyenPaiement}
+                onChange={(evenement) =>
+                  changer({ moyenPaiement: evenement.target.value as MoyenPaiement })
+                }
+                className="saisie"
+              >
+                {MOYENS_PAIEMENT.map((moyen) => (
+                  <option key={moyen} value={moyen}>
+                    {LIBELLE_MOYEN[moyen]}
+                  </option>
+                ))}
+              </select>
+            </Champ>
+          </div>
 
-      <EtatErreurSaisie message={erreur} className="mt-3" />
-
-      <button
-        type="button"
-        onClick={enregistrer}
-        className="mt-3 bouton bouton-plaque"
-      >
-        Enregistrer la vente
-      </button>
-    </Cadre>
+          {saisie.moyenPaiement !== "especes" && (
+            <div className="mt-4">
+              <Champ id="reference-paiement" libelle="Référence du transfert" facultatif>
+                <input
+                  id="reference-paiement"
+                  value={saisie.reference}
+                  maxLength={60}
+                  onChange={(evenement) => changer({ reference: evenement.target.value })}
+                  className="plaque-code saisie"
+                />
+              </Champ>
+            </div>
+          )}
+        </Groupe>
+      </Formulaire>
+    </div>
   );
 }
 
 /**
  * Le récapitulatif — la signature de cet écran.
  *
- * Dessiné comme le talon d'un carnet à souches, parce que c'est exactement son
- * rôle : ce qui sera écrit sur le reçu, relu à voix haute avant de valider. Il
- * répond aux trois questions qu'on se pose à cet instant précis — quel numéro,
- * combien reste-t-il dû, et est-ce que le client repart avec la moto.
+ * Il répond aux quatre questions qu'on se pose à cet instant précis : quel
+ * numéro portera la pièce, qui achète quoi, combien, et est-ce que le client
+ * repart avec la moto. Sur grand écran il reste collé en haut de la colonne de
+ * droite : on relit sans remonter le formulaire.
+ *
+ * **Il ne redit pas le châssis.** La moto retenue le porte déjà, deux blocs
+ * plus haut, et un second numéro dans la même colonne se lit comme un autre
+ * numéro — or il n'y en a qu'un qui compte ici, celui de la pièce.
  */
 function Recapitulatif({
   saisie,
@@ -538,62 +625,46 @@ function Recapitulatif({
 }) {
   const prixConvenu = lireMontant(saisie.prixConvenu) ?? 0;
   const encaisse = lireMontantEncaisse(saisie.montantEncaisse) ?? 0;
-  const { totalPaye, resteDu } = agregatsPaiement(
+  const { totalPaye } = agregatsPaiement(
     prixConvenu,
     encaisse > 0 && encaisse <= prixConvenu ? [{ montant: encaisse }] : [],
   );
   const remise = motoRemiseA(saisie.modePaiement);
 
   return (
-    <section
-      aria-label="Récapitulatif de la vente"
-      className="mt-6 overflow-hidden rounded-plaque border-2 border-plaque-bord bg-papier"
-    >
-      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b-2 border-dashed border-bord px-4 py-3">
-        <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
-          Ce qui sera enregistré
-        </h2>
+    <section aria-label="Récapitulatif de la vente" className="cadre rounded-carte p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
+        <h2 className="text-bloc font-bold tracking-tight text-encre">Ce qui sera enregistré</h2>
         {numero && (
-          <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe">
+          <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-legende leading-none text-encre-fixe">
             {numero}
           </span>
         )}
       </div>
 
-      <dl className="divide-y divide-bord">
+      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
+        <LigneRecap titre="Client" valeur={client?.nom ?? "à choisir"} absent={!client} />
         <LigneRecap
           titre="Moto"
           valeur={
             moto
-              ? `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)} — ${moto.numeroChassis}`
+              ? `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)}`
               : "à choisir"
           }
           absent={!moto}
         />
-        <LigneRecap titre="Client" valeur={client?.nom ?? "à choisir"} absent={!client} />
+        <LigneRecap titre="Mode" valeur={LIBELLE_MODE[saisie.modePaiement]} />
         <LigneRecap
           titre="Prix convenu"
           valeur={prixConvenu > 0 ? formaterMontant(prixConvenu) : "à saisir"}
           absent={prixConvenu <= 0}
+          montant={prixConvenu > 0}
         />
-        <LigneRecap titre="Encaissé aujourd’hui" valeur={formaterMontant(totalPaye)} />
-        <div className="flex items-baseline justify-between gap-4 bg-fond px-4 py-3">
-          <dt className="text-sm font-medium text-encre">Reste dû</dt>
-          {/* Le vert ne se met qu'une fois un prix saisi : sur un formulaire
-              vide, « 0 FCFA » en vert se lit « soldé », ce qui est faux. */}
-          <dd
-            className={[
-              "text-right text-lg font-semibold",
-              prixConvenu > 0 && resteDu === 0 ? "text-solde" : "text-encre",
-            ].join(" ")}
-          >
-            {formaterMontant(resteDu)}
-          </dd>
-        </div>
+        <LigneRecap titre="Versement" valeur={formaterMontant(totalPaye)} montant />
       </dl>
 
-      <p className="flex gap-2 border-t border-bord px-4 py-3 text-sm text-encre-doux">
-        <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+      <p className="mt-4 flex gap-2 border-t border-bord pt-3 text-corps text-encre-doux">
+        <Info aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
         <span>
           {remise
             ? "Le client repart avec la moto. Elle passera au statut « vendue »."
@@ -608,18 +679,26 @@ function LigneRecap({
   titre,
   valeur,
   absent = false,
+  montant = false,
 }: {
   titre: string;
   valeur: string;
   absent?: boolean;
+  montant?: boolean;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-4 px-4 py-2.5">
-      <dt className="text-sm text-encre-doux">{titre}</dt>
-      <dd className={["text-right", absent ? "text-sm text-encre-doux italic" : "text-encre"].join(" ")}>
+    <>
+      <dt className="text-corps text-encre-doux">{titre}</dt>
+      <dd
+        className={[
+          "text-right font-semibold text-encre",
+          montant ? "font-code whitespace-nowrap" : "",
+          absent ? "font-normal text-corps text-encre-doux italic" : "",
+        ].join(" ")}
+      >
         {valeur}
       </dd>
-    </div>
+    </>
   );
 }
 
@@ -645,9 +724,14 @@ function Choix({
   return (
     <label
       className={[
-        "flex cursor-pointer items-center gap-3 rounded-plaque border px-3 py-2.5",
+        "flex cursor-pointer items-center gap-3 rounded-champ border px-4 py-3",
         "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-encre",
-        choisi ? "border-plaque-bord bg-plaque/15" : "border-bord bg-papier hover:bg-fond",
+        /* Le mode retenu se distingue par la bordure et par la graisse, jamais
+           par la seule couleur — l'état natif du bouton radio reste la source
+           de vérité (`DESIGN.md` §5). */
+        choisi
+          ? "border-2 border-encre bg-papier px-[15px] py-[11px]"
+          : "border-bord bg-papier hover:bg-survol",
       ].join(" ")}
     >
       <input
@@ -655,7 +739,7 @@ function Choix({
         name={nom}
         checked={choisi}
         onChange={surChoix}
-        className="size-5 shrink-0 accent-encre"
+        className="size-[18px] shrink-0 accent-encre"
       />
       {children}
     </label>
@@ -670,7 +754,7 @@ function Choix({
 function Tronquee({ montres, total, mot }: { montres: number; total: number; mot: string }) {
   if (total <= montres) return null;
   return (
-    <p className="mt-2 text-sm text-encre-doux">
+    <p className="mt-2 text-corps text-encre-doux">
       {montres} {mot} sur {total}. Affinez la recherche pour voir les autres.
     </p>
   );
@@ -679,6 +763,7 @@ function Tronquee({ montres, total, mot }: { montres: number; total: number; mot
 function ChampRecherche({
   id,
   libelle,
+  aide,
   placeholder,
   valeur,
   changer,
@@ -686,17 +771,15 @@ function ChampRecherche({
 }: {
   id: string;
   libelle: string;
+  aide: string;
   placeholder: string;
   valeur: string;
   changer: (valeur: string) => void;
   monospace?: boolean;
 }) {
   return (
-    <div className="mt-2">
-      <label htmlFor={id} className="block text-sm font-medium text-encre">
-        {libelle}
-      </label>
-      <div className="relative mt-1.5">
+    <Champ id={id} libelle={libelle} aide={aide}>
+      <div className="relative">
         <Search
           aria-hidden="true"
           className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
@@ -707,6 +790,7 @@ function ChampRecherche({
           inputMode="search"
           autoComplete="off"
           placeholder={placeholder}
+          aria-describedby={`${id}-aide`}
           value={valeur}
           onChange={(evenement) => changer(evenement.target.value)}
           className={[
@@ -715,7 +799,7 @@ function ChampRecherche({
           ].join(" ")}
         />
       </div>
-    </div>
+    </Champ>
   );
 }
 
@@ -733,43 +817,15 @@ function ListeLibre({
   changer: (valeur: string) => void;
 }) {
   return (
-    <div>
-      <label htmlFor={id} className="block text-sm font-medium text-encre">
-        {libelle} <span className="font-normal text-encre-doux">(facultatif)</span>
-      </label>
+    <Champ id={id} libelle={libelle} facultatif aide={aide}>
       <textarea
         id={id}
-        rows={3}
+        rows={2}
+        aria-describedby={`${id}-aide`}
         value={valeur}
         onChange={(evenement) => changer(evenement.target.value)}
-        className="saisie mt-1.5"
+        className="saisie"
       />
-      <p className="mt-1 text-sm text-encre-doux">{aide}</p>
-    </div>
-  );
-}
-
-function Cadre({ children }: { children: React.ReactNode }) {
-  const session = useSession();
-  const estGerant = session.statut === "connecte" && session.utilisateur.role === "gerant";
-
-  return (
-    <div>
-      <Link
-        href="/motos/ventes"
-        className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
-      >
-        <ArrowLeft aria-hidden="true" className="size-4" />
-        Ventes
-      </Link>
-      <TetePage titre="Nouvelle vente" />
-      {estGerant && (
-        <p className="mt-1 flex items-center gap-2 text-sm text-encre-doux">
-          <Lock aria-hidden="true" className="size-3.5 shrink-0" />
-          La marge de cette vente est calculée pour le responsable seul.
-        </p>
-      )}
-      <div className="mt-6">{children}</div>
-    </div>
+    </Champ>
   );
 }

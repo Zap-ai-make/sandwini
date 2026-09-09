@@ -3,7 +3,13 @@
 import { Pencil, Store } from "lucide-react";
 import { useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
-import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import {
+  EtatChargement,
+  EtatErreur,
+  EtatErreurSaisie,
+  EtatSansResultat,
+} from "@/components/patrons/Etats";
+import { Champ } from "@/components/patrons/Champ";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -53,11 +59,7 @@ function Boutiques() {
       <TetePage
         retour={{ href: "/parametres", libelle: "Réglages" }}
         titre="Boutiques"
-        sousTitre={
-          <>
-            Ce que vend une boutique décide des espaces que son gérant voit.
-          </>
-        }
+        sousTitre={<>Ce que vend une boutique décide des espaces que son gérant voit.</>}
       />
 
       <FormulaireCreation existantes={boutiques} />
@@ -185,25 +187,31 @@ function ChampsBoutique({
   codeModifiable: boolean;
 }) {
   return (
-    <div className="mt-4 space-y-4">
-      <div>
-        <label htmlFor={`${prefixe}-nom`} className="block text-sm font-medium text-encre">
-          Nom de la boutique
-        </label>
+    <div className="colonne-formulaire mt-4 max-w-[40rem] space-y-4">
+      <Champ id={`${prefixe}-nom`} libelle="Nom de la boutique">
         <input
           id={`${prefixe}-nom`}
           required
           maxLength={LONGUEUR_NOM_MAX}
           value={saisie.nom}
           onChange={(e) => changer({ nom: e.target.value })}
-          className="saisie mt-1.5"
+          className="saisie"
         />
-      </div>
+      </Champ>
 
-      <div>
-        <label htmlFor={`${prefixe}-code`} className="block text-sm font-medium text-encre">
-          Code {!codeModifiable && <span className="font-normal text-encre-doux">(définitif)</span>}
-        </label>
+      {/* Le « (définitif) » qui suivait l’intitulé a rejoint la phrase d’aide,
+          qui dit déjà pourquoi : des reçus portent ce code. Un mot entre
+          parenthèses dans un intitulé se lit deux fois à voix haute et
+          n’explique rien. */}
+      <Champ
+        id={`${prefixe}-code`}
+        libelle="Code"
+        aide={
+          codeModifiable
+            ? "Trois lettres — PTG pour Pouytenga, par exemple. Elles ouvrent les numéros de reçus : PTG-2608-0042."
+            : "Définitif : des reçus portent déjà ce code, le changer rendrait leurs numéros faux."
+        }
+      >
         <input
           id={`${prefixe}-code`}
           required
@@ -211,14 +219,10 @@ function ChampsBoutique({
           maxLength={LONGUEUR_CODE}
           value={saisie.code}
           onChange={(e) => changer({ code: normaliserCode(e.target.value) })}
-          className="plaque-code saisie mt-1.5 w-24 disabled:opacity-60"
+          aria-describedby={`${prefixe}-code-aide`}
+          className="plaque-code saisie w-24 disabled:opacity-60"
         />
-        <p className="mt-1 text-sm text-encre-doux">
-          {codeModifiable
-            ? "Trois lettres — PTG pour Pouytenga, par exemple. Elles ouvrent les numéros de reçus : PTG-2608-0042."
-            : "Des reçus portent déjà ce code : le changer rendrait leurs numéros faux."}
-        </p>
-      </div>
+      </Champ>
 
       {/* Un `fieldset` avec sa `legend` : c’est le regroupement que les lecteurs
           d’écran annoncent avant chaque case, et il n’y a rien à écrire de plus
@@ -254,23 +258,22 @@ function ChampsBoutique({
         </p>
       </fieldset>
 
-      <div>
-        <label htmlFor={`${prefixe}-adresse`} className="block text-sm font-medium text-encre">
-          Adresse <span className="font-normal text-encre-doux">(imprimée sur les reçus)</span>
-        </label>
+      <Champ
+        id={`${prefixe}-adresse`}
+        libelle="Adresse"
+        aide="Elle s’imprime en tête des reçus de cette boutique."
+      >
         <input
           id={`${prefixe}-adresse`}
           maxLength={LONGUEUR_ADRESSE_MAX}
           value={saisie.adresse}
           onChange={(e) => changer({ adresse: e.target.value })}
-          className="saisie mt-1.5"
+          aria-describedby={`${prefixe}-adresse-aide`}
+          className="saisie"
         />
-      </div>
+      </Champ>
 
-      <div>
-        <label htmlFor={`${prefixe}-telephone`} className="block text-sm font-medium text-encre">
-          Téléphone
-        </label>
+      <Champ id={`${prefixe}-telephone`} libelle="Téléphone">
         <input
           id={`${prefixe}-telephone`}
           type="tel"
@@ -278,9 +281,9 @@ function ChampsBoutique({
           maxLength={LONGUEUR_TELEPHONE_MAX}
           value={saisie.telephone}
           onChange={(e) => changer({ telephone: e.target.value })}
-          className="saisie mt-1.5"
+          className="saisie"
         />
-      </div>
+      </Champ>
     </div>
   );
 }
@@ -323,11 +326,7 @@ function FormulaireCreation({ existantes }: { existantes: Boutique[] }) {
   }
 
   return (
-    <form
-      onSubmit={soumettre}
-      className="mt-6 cadre p-4"
-      noValidate
-    >
+    <form onSubmit={soumettre} className="mt-6 cadre p-4" noValidate>
       <h2 className="flex items-center gap-2 font-semibold text-encre">
         <Store aria-hidden="true" className="size-5 text-encre-doux" />
         Ajouter une boutique
@@ -404,17 +403,10 @@ function FormulaireEdition({ boutique, surFin }: { boutique: Boutique; surFin: (
       <EtatErreurSaisie message={erreur} className="mt-3" />
 
       <div className="mt-3 flex gap-2">
-        <button
-          type="submit"
-          className="bouton bouton-plaque"
-        >
+        <button type="submit" className="bouton bouton-plaque">
           Enregistrer
         </button>
-        <button
-          type="button"
-          onClick={surFin}
-          className="bouton bouton-neutre"
-        >
+        <button type="button" onClick={surFin} className="bouton bouton-neutre">
           Annuler
         </button>
       </div>
