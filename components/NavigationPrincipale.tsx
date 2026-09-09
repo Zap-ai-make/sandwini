@@ -278,10 +278,14 @@ function LienColonne({
           : "border-l-transparent text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
       ].join(" ")}
     >
-      <Icone className="size-4 shrink-0 opacity-85" />
-      <span className="colonne-libelle min-w-0 flex-1 truncate">{libelle}</span>
+      <Icone className="mt-0.5 size-4 shrink-0 self-start opacity-85" />
+      {/* Le libellé se replie plutôt que de se couper : « Versements
+          attendus » sortait en « Versements attend… », et une navigation qui
+          tronque le mot qu'on cherche ne sert plus à chercher. 224 px ne
+          tiennent pas tous les intitulés du métier sur une ligne. */}
+      <span className="colonne-libelle min-w-0 flex-1">{libelle}</span>
       {compte !== null && (
-        <span className="colonne-libelle colonne-compte">
+        <span className="colonne-libelle colonne-compte mt-0.5 self-start">
           {compte}
           {quoiCompte && <span className="sr-only"> {quoiCompte}</span>}
         </span>
@@ -336,8 +340,8 @@ function LesBoutiques({ repliee, chemin }: { repliee: boolean; chemin: string })
                     : "border-l-transparent text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
                 ].join(" ")}
               >
-                <Store aria-hidden="true" className="size-4 shrink-0 opacity-85" />
-                <span className="colonne-libelle min-w-0 flex-1 truncate">{boutique.nom}</span>
+                <Store aria-hidden="true" className="mt-0.5 size-4 shrink-0 self-start opacity-85" />
+                <span className="colonne-libelle min-w-0 flex-1">{boutique.nom}</span>
                 {/* Le même creux que les comptes voisins, et non la plaque
                     jaune. D70 autorise le jaune sur un code boutique, mais la
                     maquette `b2:47` ne le prend pas ici — et elle a raison :

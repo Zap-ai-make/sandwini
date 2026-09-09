@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Settings } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import Link from "next/link";
 import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
@@ -109,18 +109,6 @@ export default function Supervision() {
 
       <CeQuiDemandeUneDecision className="mt-8" />
 
-      <Link
-        href="/parametres/boutiques"
-        className="bouton bouton-neutre mt-6"
-      >
-        <Settings aria-hidden="true" className="size-4" />
-        Gérer les boutiques
-      </Link>
-
-      <p className="mt-8 max-w-prose text-corps text-encre-doux">
-        Les chiffres du jour — ventes, encaissements, totaux dus et détenus, toutes boutiques
-        réunies — s’installeront ici quand les données à agréger existeront (S24).
-      </p>
     </div>
   );
 }

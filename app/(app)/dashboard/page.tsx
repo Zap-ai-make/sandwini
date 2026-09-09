@@ -4,7 +4,7 @@ import { ArrowRight, Coins, Plus, Store, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
-import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
+import { AFaireAujourdhui } from "@/components/CeQuiDemandeUneDecision";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
 import { JourneeDuGerant } from "@/components/JourneeDuGerant";
 import { TetePage } from "@/components/patrons/Page";
@@ -84,7 +84,7 @@ export default function Accueil() {
           {/* Deux colonnes sur un écran de comptoir, l’une sous l’autre sur un
               téléphone : ce qui reste à faire d’abord, ce qui est fait ensuite. */}
           <div className="mt-8 grid gap-8 lg:grid-cols-2">
-            <CeQuiDemandeUneDecision titre="À faire aujourd’hui" />
+            <AFaireAujourdhui />
             <JourneeDuGerant />
           </div>
         </>
