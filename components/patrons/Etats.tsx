@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { useSession } from "@/lib/auth/session";
 import { accueilDuRole } from "@/lib/domain/espaces";
 import { formaterDateHeure } from "@/lib/domain/format";
+import { LIBELLE_STATUT_PAIEMENT, type StatutPaiement } from "@/lib/domain/vente";
 import type { Echec } from "@/lib/repositories/abonnement";
 
 /**
@@ -231,6 +232,27 @@ export function EtatSansResultat({
   className?: string;
 }) {
   return <p className={`encadre-vide text-encre-doux ${className ?? ""}`}>{children}</p>;
+}
+
+/**
+ * Où en est le paiement d’une vente : impayée, partielle, soldée.
+ *
+ * Trois listes la montrent — les ventes, les paiements, et les dernières
+ * ventes de la supervision. La table des tons vivait dans l’écran des ventes ;
+ * la copier ailleurs aurait fini par teinter « partiellement payée » en orange
+ * ici et en jaune là, pour le même état (D73). Le libellé est écrit : la
+ * couleur ne porte jamais le sens à elle seule (`DESIGN.md` §5).
+ */
+const TON_PAIEMENT: Record<StatutPaiement, string> = {
+  impaye: "pastille-retard",
+  partiel: "pastille-transit",
+  solde: "pastille-solde",
+};
+
+export function PastillePaiement({ statut }: { statut: StatutPaiement }) {
+  return (
+    <span className={`pastille ${TON_PAIEMENT[statut]}`}>{LIBELLE_STATUT_PAIEMENT[statut]}</span>
+  );
 }
 
 /**

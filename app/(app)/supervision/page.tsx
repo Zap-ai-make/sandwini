@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
+import { Check, ChevronRight, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
+import { DernieresVentes } from "@/components/DernieresVentes";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
 import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
@@ -10,6 +11,7 @@ import { LIBELLE_METIER, reunirMetiers, type Metier } from "@/lib/domain/boutiqu
 import { ESPACES } from "@/lib/domain/espaces";
 import { formaterMois } from "@/lib/domain/format";
 import { CODE_ENTREPRISE, usePerimetre } from "@/lib/perimetre/perimetre";
+import { useCeQuiAttend } from "@/lib/repositories/comptes";
 
 /**
  * L’entrée de la supervision — le troisième espace (`prompt.md` §1).
@@ -34,6 +36,18 @@ export default function Supervision() {
   const actives = boutiques.filter((boutique) => boutique.actif);
   const fermees = boutiques.length - actives.length;
   const toutesLesMetiers = reunirMetiers(actives);
+
+  /* Le même calcul que le tableau du dessous, réparti par boutique (D73). Les
+     lignes sont déjà celles des dossiers *en retard* — la carte n'invente
+     aucun agrégat : elle compte des dossiers nommés, ouvrables, que le tableau
+     de la section suivante liste un par un. C'est ce qui la sépare de la carte
+     de tableau de bord que D63 repousse jusqu'à S24. */
+  const { lignes, chargement: attentesEnCours } = useCeQuiAttend();
+  const retardsParBoutique = new Map<string, number>();
+  for (const ligne of lignes) {
+    if (ligne.sorte !== "dossier") continue;
+    retardsParBoutique.set(ligne.boutiqueId, (retardsParBoutique.get(ligne.boutiqueId) ?? 0) + 1);
+  }
 
   return (
     <div>
@@ -92,6 +106,10 @@ export default function Supervision() {
                   dessous={boutique.metiers.map((metier) => LIBELLE_METIER[metier]).join(" et ")}
                   href={destination(boutique.metiers)}
                   choisir={() => choisir(boutique.id)}
+                  /* `null` tant que le calcul n'est pas revenu : « aucun
+                     dossier en retard » sur une base qui n'a pas répondu est
+                     un mensonge rassurant, et c'est le pire des deux. */
+                  retards={attentesEnCours ? null : (retardsParBoutique.get(boutique.id) ?? 0)}
                 />
               </li>
             ))}
@@ -109,6 +127,10 @@ export default function Supervision() {
 
       <CeQuiDemandeUneDecision className="mt-8" />
 
+      {/* Ce qui attend d'abord, ce qui vient de se passer ensuite (`a2:184`).
+          L'ordre est celui de la maquette et il n'est pas indifférent : on
+          ouvre la supervision pour décider, pas pour se féliciter. */}
+      <DernieresVentes className="mt-8" />
     </div>
   );
 }
@@ -125,27 +147,56 @@ function CarteBoutique({
   dessous,
   href,
   choisir,
+  retards,
 }: {
   code: string;
   nom: string;
   dessous: string;
   href: string;
   choisir: () => void;
+  /** Dossiers en retard dans cette boutique ; `null` : le calcul n’est pas revenu. */
+  retards?: number | null;
 }) {
   return (
     <Link
       href={href}
       onClick={choisir}
-      className="cadre flex h-full items-start gap-3 p-4 hover:border-bord-fort hover:bg-survol focus-visible:bg-survol"
+      className="cadre flex h-full flex-col gap-3 p-4 hover:border-bord-fort hover:bg-survol focus-visible:bg-survol"
     >
-      <span className="plaque-code flex h-8 shrink-0 items-center rounded-plaque border border-plaque-bord bg-plaque px-2 text-sm leading-none text-encre-fixe">
-        {code}
+      <span className="flex items-start gap-3">
+        <span className="plaque-code flex h-8 shrink-0 items-center rounded-plaque border border-plaque-bord bg-plaque px-2 text-sm leading-none text-encre-fixe">
+          {code}
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block font-medium text-encre">{nom}</span>
+          <span className="block text-corps text-encre-doux">{dessous}</span>
+        </span>
+        <ChevronRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-encre-doux" />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block font-medium text-encre">{nom}</span>
-        <span className="block text-corps text-encre-doux">{dessous}</span>
-      </span>
-      <ChevronRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-encre-doux" />
+
+      {/* La ligne d'alerte de la maquette (`a2:97, 107, 117`). Elle répond à la
+          question qui fait ouvrir cet écran : *laquelle je regarde d'abord*.
+          Le calme s'écrit aussi — « aucun dossier en retard » est une réponse,
+          et une carte muette laisse croire que la question n'a pas été posée.
+          Jamais la couleur seule : les mots portent le sens (DESIGN.md §5). */}
+      {retards !== null && retards !== undefined && (
+        <span
+          className={`mt-auto flex items-center gap-1.5 border-t border-bord pt-3 text-legende font-semibold ${
+            retards > 0 ? "text-alerte" : "text-encre-doux"
+          }`}
+        >
+          {retards > 0 ? (
+            <TriangleAlert aria-hidden="true" className="size-4 shrink-0" />
+          ) : (
+            <Check aria-hidden="true" className="size-4 shrink-0" />
+          )}
+          {retards === 0
+            ? "Aucun dossier en retard"
+            : retards === 1
+              ? "1 dossier en retard"
+              : `${retards} dossiers en retard`}
+        </span>
+      )}
     </Link>
   );
 }

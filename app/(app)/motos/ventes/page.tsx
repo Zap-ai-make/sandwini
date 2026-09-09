@@ -9,6 +9,7 @@ import {
   ErreurDeLecture,
   EtatSansResultat,
   EtatVide,
+  PastillePaiement,
   SansBoutique,
 } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
@@ -173,7 +174,7 @@ function Ventes() {
       {
         cle: "paiement",
         titre: "Paiement",
-        rendu: (ligne) => <Paiement statut={ligne.vente.statutPaiement} />,
+        rendu: (ligne) => <PastillePaiement statut={ligne.vente.statutPaiement} />,
       },
     ];
     /* Pas de colonne « Boutique » : les trois premières lettres du numéro de
@@ -313,18 +314,6 @@ type Cherchable = VenteCherchable & {
 /* Jamais la couleur seule : le mot est écrit, la pastille ne fait que le
    doubler. L'impayé prend la braise — c'est du retard —, le partiel le bleu de
    la goutte : quelque chose est parti et n'est pas revenu (D70). */
-const TON_PAIEMENT: Record<StatutPaiement, string> = {
-  impaye: "pastille-retard",
-  partiel: "pastille-transit",
-  solde: "pastille-solde",
-};
-
-function Paiement({ statut }: { statut: StatutPaiement }) {
-  return (
-    <span className={`pastille ${TON_PAIEMENT[statut]}`}>{LIBELLE_STATUT_PAIEMENT[statut]}</span>
-  );
-}
-
 function Recherche({
   valeur,
   changer,
