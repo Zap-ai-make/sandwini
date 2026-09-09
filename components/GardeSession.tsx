@@ -73,9 +73,20 @@ export function GardeCapacite({
 
   if (!peut(session.utilisateur.role, capacite)) {
     return (
-      <EtatRefus titre="Réservé au responsable">
+      <EtatRefus
+        titre="Réservé au responsable"
+        sortie={{ href: "/motos", libelle: "Voir le stock" }}
+        recours={
+          <>
+            Si vous devez piloter plusieurs boutiques, le responsable peut changer votre rôle
+            depuis Réglages · Utilisateurs.
+          </>
+        }
+      >
         Cet écran gère les comptes et les paramètres de l’entreprise. Votre compte de gérant n’y a
-        pas accès&nbsp;; ce n’est pas une erreur de votre part.
+        pas accès&nbsp;; ce n’est pas une erreur de votre part. Ces données ne sont pas seulement
+        cachées à l’écran, elles sont hors de portée de votre compte dans la base&nbsp;: il n’y a
+        donc rien à débloquer ici.
       </EtatRefus>
     );
   }

@@ -4,7 +4,7 @@ import { ChevronRight, Settings } from "lucide-react";
 import Link from "next/link";
 import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
-import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
+import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { LIBELLE_METIER, reunirMetiers, type Metier } from "@/lib/domain/boutique";
 import { ESPACES } from "@/lib/domain/espaces";
@@ -51,7 +51,15 @@ export default function Supervision() {
 
       <InvitationBoutique />
 
-      <EtatErreur message={erreur} className="mt-6" />
+      {erreur && (
+        <ErreurDeLecture
+          titre="La liste des boutiques n’a pas pu être lue"
+          sortie={{ href: "/parametres/boutiques", libelle: "Gérer les boutiques" }}
+        >
+          {erreur} Sans elle, la supervision ne sait pas quoi comparer. Les écrans d’une boutique
+          déjà ouverte restent accessibles.
+        </ErreurDeLecture>
+      )}
 
       {chargement ? (
         <EtatChargement className="mt-6">Chargement des boutiques…</EtatChargement>

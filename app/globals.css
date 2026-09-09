@@ -483,6 +483,12 @@
       border-top: 1px solid var(--color-nuit-filet);
       overflow-x: auto;
       overflow-y: visible;
+      /* La zone sûre du téléphone, que le dépôt ne réservait nulle part
+         (`socle.css:1561`). L'application est une PWA installée : sur un
+         iPhone, la barre d'espaces passait sous l'indicateur d'accueil, et
+         « Motos » se cliquait à moitié. `viewport-fit: cover` est déjà posé
+         dans `app/layout.tsx` — c'est lui qui rend cette variable non nulle. */
+      padding-bottom: env(safe-area-inset-bottom);
     }
   }
 
@@ -534,6 +540,35 @@
 
   /* L'encadré pointillé : ce qui n'est pas encore là. Le trait interrompu dit
      « place réservée » sans le mot, et il ne se confond avec aucune surface. */
+  /* --------------------------------------------------------------------------
+     Le vide, l'erreur et le refus : les blocs qui occupent un cadre à la place
+     de ce qui n'a pas pu s'y mettre.
+
+     Les maquettes leur donnent 64 px de respiration, un centrage, et une icône
+     de 40 px (`socle.css:722`). Le dépôt les rendait en encadré pointillé de
+     16 px, aligné à gauche, sans icône — ce qui lit comme une note de bas de
+     page là où `DESIGN.md` §10 veut une invitation à agir.
+     -------------------------------------------------------------------------- */
+  .bloc-etat {
+    padding: 4rem 1.25rem;
+    text-align: center;
+  }
+
+  .bloc-etat > svg {
+    display: block;
+    margin: 0 auto;
+    width: 2.5rem;
+    height: 2.5rem;
+    color: var(--color-encre-doux);
+  }
+
+  .bloc-etat p {
+    /* 46ch : la largeur au-delà de laquelle une phrase centrée cesse de se
+       lire d'un trait. */
+    margin-inline: auto;
+    max-width: 46ch;
+  }
+
   .encadre-vide {
     border: 1px dashed var(--color-bord);
     border-radius: var(--radius-champ);

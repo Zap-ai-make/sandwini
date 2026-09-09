@@ -80,6 +80,9 @@ const PREMIERS_RESULTATS = 8;
 
 export default function PageNouvelleVente() {
   const { perimetre } = usePerimetre();
+  /* Avant tout retour anticipé : un hook appelé sous condition change l'ordre
+     des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
+  const surTitre = useSurTitre("Motos");
   const session = useSession();
   const catalogue = useCatalogue();
   const { clients, chargement: clientsEnCours } = useFichierClients();
@@ -211,7 +214,6 @@ export default function PageNouvelleVente() {
     );
   }
 
-  const surTitre = useSurTitre("Motos");
   const prixConvenu = lireMontant(saisie.prixConvenu) ?? 0;
   const encaisse = lireMontantEncaisse(saisie.montantEncaisse) ?? 0;
   const { resteDu } = agregatsPaiement(

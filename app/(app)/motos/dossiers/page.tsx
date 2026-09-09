@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { RelaisDocument } from "@/components/RelaisDocument";
 import { Avis } from "@/components/patrons/Avis";
-import { EtatErreur, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { ErreurDeLecture, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { normaliserNom } from "@/lib/domain/client";
@@ -71,7 +71,12 @@ export default function PageDossiers() {
       ecouterVentes(boutiqueId, auChangement, enErreur),
     [boutiqueId],
   );
-  const { valeur: ventes, erreur } = useAbonnement(
+  const {
+    valeur: ventes,
+    erreur,
+    echec,
+    reessayer,
+  } = useAbonnement(
     souscrireVentes,
     "Les ventes n’ont pas pu être chargées.",
   );
@@ -199,7 +204,17 @@ export default function PageDossiers() {
         sousTitre="Les quatre documents ne suivent pas le même chemin. Un dossier se ferme quand les quatre sont remis, ou déclarés sans objet."
       />
 
-      <EtatErreur message={erreur} className="mb-4" />
+      {erreur && (
+        <ErreurDeLecture
+          titre="La file des dossiers n’a pas pu être lue"
+          echec={echec}
+          reessayer={reessayer}
+          sortie={{ href: "/motos/ventes", libelle: "Aller aux ventes" }}
+        >
+          {erreur} Un document se fait aussi avancer depuis la fiche de sa vente, qui n’a pas
+          besoin de cette lecture.
+        </ErreurDeLecture>
+      )}
 
       {/* Ce qui dépasse la date annoncée se dit avant la liste, et se nomme :
           un compteur au-dessus d’un tableau se lit comme une décoration, un nom

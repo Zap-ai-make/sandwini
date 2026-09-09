@@ -1,12 +1,12 @@
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { Bike, Plus, Search } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheMoto } from "@/components/FicheMoto";
 import {
-  EtatErreur,
+  ErreurDeLecture,
   EtatSansResultat,
   EtatVide,
   SansBoutique,
@@ -83,6 +83,9 @@ function Stock() {
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const catalogue = useCatalogue();
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
+  /* Avant tout retour anticipé : un hook appelé sous condition change
+     l'ordre des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
+  const surTitre = useSurTitre("Motos");
 
   const boutiqueId = perimetre.boutiqueId;
   const souscrire = useCallback(
@@ -92,7 +95,12 @@ function Stock() {
   );
 
   const sansPerimetre = perimetre.type === "aucune";
-  const { valeur: stock, erreur } = useAbonnement(souscrire, "Le stock n’a pas pu être chargé.");
+  const {
+    valeur: stock,
+    erreur,
+    echec,
+    reessayer,
+  } = useAbonnement(souscrire, "Le stock n’a pas pu être chargé.");
 
   const resultats = useMemo(() => filtrerMotos(stock ?? [], filtres), [stock, filtres]);
   const modelesDeLaMarque = filtres.marqueId
@@ -166,7 +174,6 @@ function Stock() {
       />
     );
 
-  const surTitre = useSurTitre("Motos");
   const total = (stock ?? []).length;
   /* Compté sur ce que l'écran montre, pas sur le stock entier : « 12 motos sur
      128 · 96 en stock » ferait croire que 96 des 12 lignes sont disponibles. */
@@ -186,14 +193,26 @@ function Stock() {
         }
       />
 
-      <EtatErreur message={erreur} className="mb-4" />
-
       {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
-          vide, filtres compris, ferait croire à un stock à zéro. */}
-      {erreur && stock === null ? null : !chargement && total === 0 ? (
+          vide, filtres compris, ferait croire à un stock à zéro. C'est le bloc
+          de `b6` qui prend la place — il nomme, il explique, il propose de
+          réessayer et il offre une sortie. */}
+      {erreur && stock === null ? (
+        <ErreurDeLecture
+          titre="Le stock n’a pas pu être lu"
+          echec={echec}
+          reessayer={reessayer}
+          sortie={{ href: "/motos/ventes", libelle: "Aller aux ventes" }}
+        >
+          {erreur} Les motos déjà lues aujourd’hui restent sur cet appareil. Faire entrer une moto
+          fonctionne normalement&nbsp;: ce geste n’a pas besoin de cette lecture.
+        </ErreurDeLecture>
+      ) : !chargement && total === 0 ? (
         <StockVide perimetreEnCours={perimetreEnCours} />
       ) : (
-        <div className="cadre cadre-tableau">
+        /* `aria-busy` pendant la lecture : les lignes fantômes disent à l'œil
+           que ça arrive, cet attribut le dit à qui ne les voit pas. */
+        <div className="cadre cadre-tableau" aria-busy={chargement || undefined}>
           <div className="cadre-tete">
             <Recherche filtres={filtres} changer={setFiltres} />
 
@@ -382,8 +401,15 @@ function Filtre({
 
 function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
   if (perimetreEnCours) return null;
+  /* Le cadre reste, et le vide s'y installe : c'est ce que montre `b4:92`. Un
+     vide qui remplace aussi la boîte laisse la page nue, et l'écran a l'air
+     cassé plutôt que neuf. La tête du cadre — recherche et filtres — ne
+     revient pas : filtrer un stock vide n'a pas de sens, et la maquette ne la
+     garde pas non plus. */
   return (
+    <div className="cadre">
     <EtatVide
+      icone={<Bike aria-hidden="true" />}
       titre="Aucune moto en stock pour l’instant."
       action={
         <Link href="/motos/nouvelle" className="bouton bouton-principal">
@@ -395,5 +421,6 @@ function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
       La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se
       déclarent dans les réglages.
     </EtatVide>
+    </div>
   );
 }

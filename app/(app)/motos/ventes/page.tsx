@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheVente } from "@/components/FicheVente";
-import { EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import {
+  ErreurDeLecture,
+  EtatSansResultat,
+  EtatVide,
+  SansBoutique,
+} from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -59,6 +64,9 @@ export default function PageVentes() {
 function Ventes() {
   const venteOuverte = useSearchParams().get("vente");
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
+  /* Avant tout retour anticipé : un hook appelé sous condition change l'ordre
+     des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
+  const surTitre = useSurTitre("Motos");
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
   const [recherche, setRecherche] = useState("");
@@ -71,7 +79,12 @@ function Ventes() {
       ecouterVentes(boutiqueId, auChangement, enErreur),
     [boutiqueId],
   );
-  const { valeur: ventes, erreur } = useAbonnement(
+  const {
+    valeur: ventes,
+    erreur,
+    echec,
+    reessayer,
+  } = useAbonnement(
     souscrireVentes,
     "Les ventes n’ont pas pu être chargées.",
   );
@@ -110,7 +123,6 @@ function Ventes() {
     return statut ? trouves.filter((ligne) => ligne.vente.statutPaiement === statut) : trouves;
   }, [cherchables, recherche, statut]);
 
-  const toutesBoutiques = perimetre.type === "toutes";
   const colonnes = useMemo<Colonne<Cherchable>[]>(() => {
     const liste: Colonne<Cherchable>[] = [
       {
@@ -181,7 +193,6 @@ function Ventes() {
       />
     );
 
-  const surTitre = useSurTitre("Motos");
   const total = cherchables.length;
   const enCours = resultats.filter((ligne) => ligne.vente.resteDu > 0).length;
   const chargement = ventes === null && !erreur;
@@ -199,14 +210,23 @@ function Ventes() {
         }
       />
 
-      <EtatErreur message={erreur} className="mb-4" />
-
       <AvecPanneau
         panneau={venteOuverte ? <FicheVente id={venteOuverte} /> : null}
       >
         {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
             vide, filtres compris, ferait croire à une boutique sans vente. */}
-        {erreur && ventes === null ? null : !chargement && total === 0 ? (
+        {erreur && ventes === null ? (
+          <ErreurDeLecture
+            titre="La liste des ventes n’a pas pu être lue"
+            echec={echec}
+            reessayer={reessayer}
+            sortie={{ href: "/motos", libelle: "Aller au stock" }}
+          >
+            {erreur} Les ventes déjà lues aujourd’hui restent consultables sur cet appareil, et une
+            nouvelle vente peut être enregistrée normalement&nbsp;: elle n’a pas besoin de cette
+            lecture.
+          </ErreurDeLecture>
+        ) : !chargement && total === 0 ? (
           <AucuneVente perimetreEnCours={perimetreEnCours} />
         ) : (
           <div className="cadre cadre-tableau">

@@ -3,7 +3,7 @@
 import { Bike, Warehouse } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, type ReactNode } from "react";
-import { EtatErreur, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
@@ -69,7 +69,12 @@ export default function PagePaiements() {
       ecouterVentes(boutiqueId, auChangement, enErreur),
     [boutiqueId],
   );
-  const { valeur: ventes, erreur } = useAbonnement(
+  const {
+    valeur: ventes,
+    erreur,
+    echec,
+    reessayer,
+  } = useAbonnement(
     souscrireVentes,
     "Les ventes n’ont pas pu être chargées.",
   );
@@ -124,7 +129,6 @@ export default function PagePaiements() {
     [stock],
   );
 
-  const toutesBoutiques = perimetre.type === "toutes";
   const communes = useMemo<Colonne<LignePaiement>[]>(
     () => colonnesCommunes({ nomClient }),
     [nomClient],
@@ -232,7 +236,17 @@ export default function PagePaiements() {
         titre="Paiements"
       />
 
-      <EtatErreur message={erreur ?? erreurVersements} className="mb-4" />
+      {(erreur ?? erreurVersements) && (
+        <ErreurDeLecture
+          titre="Les paiements n’ont pas pu être lus"
+          echec={echec}
+          reessayer={reessayer}
+          sortie={{ href: "/motos/ventes", libelle: "Aller aux ventes" }}
+        >
+          {erreur ?? erreurVersements} Un versement s’enregistre aussi depuis la fiche de sa vente,
+          qui n’a pas besoin de cette lecture.
+        </ErreurDeLecture>
+      )}
 
       <Section
         titre="Dettes — crédit"

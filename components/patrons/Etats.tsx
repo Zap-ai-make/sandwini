@@ -1,10 +1,12 @@
 "use client";
 
-import { LoaderCircle, ShieldAlert } from "lucide-react";
+import { Inbox, LoaderCircle, RotateCw, ShieldAlert, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useSession } from "@/lib/auth/session";
 import { accueilDuRole } from "@/lib/domain/espaces";
+import { formaterDateHeure } from "@/lib/domain/format";
+import type { Echec } from "@/lib/repositories/abonnement";
 
 /**
  * Les états d’un écran, écrits une fois.
@@ -128,18 +130,88 @@ export function EtatVide({
   titre,
   children,
   action,
+  icone,
   className,
 }: {
   titre: string;
   children?: ReactNode;
   action?: ReactNode;
+  /** Le pictogramme du sujet — un stock, une file, un carnet. */
+  icone?: ReactNode;
   className?: string;
 }) {
   return (
-    <div className={`encadre-vide ${className ?? ""}`}>
-      <p className="text-encre">{titre}</p>
-      {children && <p className="mt-1 max-w-prose text-corps text-encre-doux">{children}</p>}
-      {action && <div className="mt-4 flex flex-wrap gap-2">{action}</div>}
+    <div className={`bloc-etat ${className ?? ""}`}>
+      {icone ?? <Inbox aria-hidden="true" />}
+      <h2 className="mt-3 text-bloc font-bold tracking-tight text-encre">{titre}</h2>
+      {children && <p className="mt-1 text-corps text-encre-doux">{children}</p>}
+      {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
+    </div>
+  );
+}
+
+/**
+ * La lecture a échoué — le bloc, pas la ligne.
+ *
+ * **C’était le seul endroit où le produit passait franchement sous
+ * `DESIGN.md` §10.** L’écran rendait `<p role="alert">{message}</p>` : une
+ * ligne rouge qui dit *que* ça a raté, jamais quoi faire. La maquette `b6`
+ * dessine autre chose — un titre qui nomme, une explication qui n’accuse
+ * aucune cause non vérifiée, un bouton pour réessayer, une sortie, et le code
+ * du refus horodaté en petit.
+ *
+ * **Pourquoi ce n’est pas `EtatErreur` avec une option.** Les deux répondent à
+ * des situations différentes : ici la liste entière manque et l’écran n’a plus
+ * rien à montrer ; là une section a échoué au milieu d’un écran qui tient
+ * encore debout. Un composant, une chose (`DESIGN.md` §7) — et un drapeau
+ * `bloc` aurait fait choisir entre deux dessins à chaque appel.
+ *
+ * L’explication est celle de l’appelant, parce qu’elle dépend de ce qui n’a pas
+ * pu être lu : ce qui reste possible sans cette lecture n’est pas le même sur
+ * un stock et sur une file de dossiers.
+ */
+export function ErreurDeLecture({
+  titre,
+  echec,
+  reessayer,
+  sortie,
+  children,
+}: {
+  /** Ce qui n’a pas pu être lu, en toutes lettres. */
+  titre: string;
+  echec?: Echec | null;
+  reessayer?: () => void;
+  /** Là où l’on peut aller en attendant, et qui n’a pas besoin de cette lecture. */
+  sortie?: { href: string; libelle: string };
+  children?: ReactNode;
+}) {
+  return (
+    <div role="alert" className="cadre bloc-etat">
+      <TriangleAlert aria-hidden="true" className="text-alerte!" />
+      <h2 className="mt-3 text-bloc font-bold tracking-tight text-encre">{titre}</h2>
+      {children && <p className="mt-1 text-corps text-encre-doux">{children}</p>}
+
+      <div className="mt-5 flex flex-wrap justify-center gap-2">
+        {reessayer && (
+          <button type="button" onClick={reessayer} className="bouton bouton-principal">
+            <RotateCw aria-hidden="true" className="size-4" />
+            Réessayer
+          </button>
+        )}
+        {sortie && (
+          <Link href={sortie.href} className="bouton bouton-neutre">
+            {sortie.libelle}
+          </Link>
+        )}
+      </div>
+
+      {/* Pour la personne qu'on appelle, pas pour celle qui lit l'écran. */}
+      {echec && (
+        <p className="mt-5 text-legende text-encre-doux">
+          Code du refus&nbsp;: <span className="font-code">{echec.code}</span> ·{" "}
+          {formaterDateHeure(echec.quand)}
+        </p>
+      )}
     </div>
   );
 }
@@ -173,28 +245,53 @@ export function EtatRefus({
   icone = "refus",
   titre,
   children,
+  sortie,
+  recours,
 }: {
   icone?: "refus" | ReactNode;
   titre: string;
   children: ReactNode;
+  /**
+   * La seconde sortie : celle qui mène là où la personne a le droit d’aller,
+   * et qui est souvent ce qu’elle cherchait vraiment.
+   *
+   * Les maquettes en posent deux (`b7:90`) — « Retour à mon accueil » et
+   * « Voir le stock de Pouytenga ». Une seule sortie renvoie à la case départ ;
+   * la seconde reconnaît qu’on allait quelque part.
+   */
+  sortie?: { href: string; libelle: string };
+  /**
+   * Qui peut y remédier, et comment.
+   *
+   * Un refus qui ne dit pas ça laisse croire qu’il n’y a rien à faire. Ici il y
+   * a quelqu’un à qui demander — c’est le responsable, et il a l’écran pour.
+   */
+  recours?: ReactNode;
 }) {
   const session = useSession();
   if (session.statut !== "connecte") return null;
 
   return (
-    <section className="max-w-prose">
-      <h1 className="flex items-center gap-3 text-ecran font-semibold tracking-tight text-encre">
-        {icone === "refus" ? (
-          <ShieldAlert aria-hidden="true" className="size-6 shrink-0 text-alerte" />
-        ) : (
-          icone
-        )}
-        {titre}
-      </h1>
+    <section className="max-w-[60ch] py-10">
+      <span className="mb-4 block text-encre-doux">
+        {icone === "refus" ? <ShieldAlert aria-hidden="true" className="size-9" /> : icone}
+      </span>
+      <h1 className="text-ecran font-bold tracking-tight text-encre">{titre}</h1>
       <div className="mt-3 text-encre-doux">{children}</div>
-      <Link href={accueilDuRole(session.utilisateur.role)} className="bouton bouton-neutre mt-6">
-        Revenir à l’accueil
-      </Link>
+      <div className="mt-5 flex flex-wrap gap-2">
+        <Link
+          href={accueilDuRole(session.utilisateur.role)}
+          className="bouton bouton-principal"
+        >
+          Revenir à l’accueil
+        </Link>
+        {sortie && (
+          <Link href={sortie.href} className="bouton bouton-neutre">
+            {sortie.libelle}
+          </Link>
+        )}
+      </div>
+      {recours && <p className="mt-6 text-corps text-encre-doux">{recours}</p>}
     </section>
   );
 }
