@@ -1,10 +1,10 @@
 import { formaterTelephone, type Client } from "@/lib/domain/client";
 import { IDENTITE } from "@/lib/domain/entreprise";
-import { formaterDate, formaterMontant } from "@/lib/domain/format";
+import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
 import type { Boutique } from "@/lib/domain/boutique";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_TYPE_RECU, type ContenuRecu } from "@/lib/domain/recu";
-import { LIBELLE_MODE, LIBELLE_MOYEN } from "@/lib/domain/vente";
+import { LIBELLE_MODE, LIBELLE_MOYEN, MENTION_RECU } from "@/lib/domain/vente";
 import { Monogramme } from "@/components/Monogramme";
 
 /**
@@ -75,30 +75,49 @@ export function Recu({
               {IDENTITE.raisonSociale}
             </p>
             <p className="text-sm text-encre-doux">{IDENTITE.activite}</p>
-            {boutique && <p className="text-sm text-encre-doux">{boutique.nom}</p>}
+            {/* Le nom de la boutique a quitté cette pile : il est désormais
+                dans la légende de la souche, avec la date, et il s'imprimait
+                deux fois — vu sur capture. La maquette range l'en-tête ainsi
+                (`c4:27-31`) : qui vend, quoi, où, à quel numéro. */}
             <p className="text-sm text-encre-doux">{adresse}</p>
             <p className="text-sm text-encre-doux">{telephones.join(" · ")}</p>
             <p className="text-sm text-encre-doux">{IDENTITE.email}</p>
           </div>
         </div>
 
-        {/* Le numéro dessiné comme une plaque : c'est la signature du produit,
-            et sur le papier c'est ce que le client cherchera du regard en
-            revenant au comptoir. À l'impression, le fond jaune cède la place à
-            un cadre — de l'encre en moins, et un aplat de couleur ne sort pas
-            en noir et blanc. */}
-        <p className="plaque-code shrink-0 rounded-plaque border border-plaque-bord bg-plaque px-2 py-1 text-sm leading-none text-encre-fixe print:border-encre print:bg-transparent print:text-encre">
-          {contenu.numero}
-        </p>
+        {/* La souche, et non la plaque jaune (`c4:32-35`). C'est la signature
+            du produit depuis D70 : le carnet à souches est précisément l'objet
+            que ce logiciel remplace, et le numéro est ce que le client
+            cherchera du regard en revenant au comptoir. Le jaune, lui, n'a que
+            deux emplois, et le numéro complet n'en est aucun — seules les
+            trois lettres de tête, qui *sont* le code boutique, se détachent,
+            en gris. Un aplat jaune ne sortait de toute façon pas en noir et
+            blanc, ce que le reçu est la plupart du temps. */}
+        <Souche
+          numero={contenu.numero}
+          legende={[contenu.date ? formaterDate(contenu.date) : null, boutique?.nom]
+            .filter(Boolean)
+            .join(" · ")}
+        />
       </header>
 
-      <h1 className="mt-6 border-t-2 border-encre pt-3 font-display text-xl font-semibold tracking-tight">
+      {/* IFU et RCCM sont obligatoires **en tête** d'un document commercial au
+          Burkina Faso : ils étaient en pied, ce qui est le seul endroit où ils
+          n'ont pas le droit d'être. Sur toute la largeur, et non serrés contre
+          la raison sociale, où « BF-OUA-01-2016-A12-00847 » se coupait en deux
+          (`c4:38-45`). Posés à l'installation, jamais saisis (D71 ; D11 disait
+          l'inverse, quand ils étaient un champ qu'on pouvait laisser vide). */}
+      <p className="mt-3 border-t border-bord pt-2 text-micro text-encre-doux">
+        IFU <span className="plaque-code">{IDENTITE.ifu}</span> · RCCM{" "}
+        <span className="plaque-code">{IDENTITE.rccm}</span>
+      </p>
+
+      {/* Le filet passe sous le titre, comme dans la maquette : il sépare
+          l'en-tête de l'entreprise du corps de la pièce, et il ne peut pas le
+          faire depuis au-dessus du titre. */}
+      <h1 className="mt-5 border-b-2 border-encre pb-2 font-display text-lg font-semibold tracking-tight">
         {LIBELLE_TYPE_RECU[contenu.type]}
       </h1>
-      <p className="text-sm text-encre-doux">
-        {contenu.date ? formaterDate(contenu.date) : "Date inconnue"}
-        {contenu.type === "versement" ? ` · vente ${vente.numero}` : ""}
-      </p>
 
       {/* L'écart de numéro se dit sur le papier, pas seulement à l'écran : c'est
           le document qui doit expliquer pourquoi il ne porte plus le numéro que
@@ -110,49 +129,65 @@ export function Recu({
         </p>
       )}
 
-      <dl className="mt-5 divide-y divide-bord border-y border-bord">
-        <Ligne titre="Client">
-          <span className="block">{client?.nom ?? "Client inconnu"}</span>
-          {client && (
-            <span className="block text-sm text-encre-doux">
-              {formaterTelephone(client.telephone)}
-            </span>
-          )}
-        </Ligne>
-        <Ligne titre="Moto">
-          <span className="block">{moto ? modele : "Moto introuvable"}</span>
-          {moto && <span className="plaque-code block text-sm">{moto.numeroChassis}</span>}
-        </Ligne>
-        <Ligne titre="Mode de paiement">{LIBELLE_MODE[vente.modePaiement]}</Ligne>
-      </dl>
-
-      <dl className="mt-5">
-        <Montant titre="Prix convenu" valeur={vente.prixConvenu} />
-        {contenu.versement && (
-          <Montant
-            titre={
-              contenu.moyenPaiement
-                ? `Reçu ce jour — ${LIBELLE_MOYEN[contenu.moyenPaiement]}`
-                : "Reçu ce jour"
-            }
-            valeur={contenu.montantEncaisse}
-          />
+      {/* Sept lignes, une par fait (`c4:47-57`). Elles tenaient à trois, avec
+          le téléphone et le châssis en sous-ligne serrée sous le nom : c'est
+          exactement l'endroit où l'on recopie un numéro de châssis en le
+          lisant à voix haute, et une sous-ligne grise de 12 px ne se lit pas
+          comme une donnée mais comme un commentaire. */}
+      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
+        <Fait titre="Reçu de">{client?.nom ?? "Client inconnu"}</Fait>
+        {client && (
+          <Fait titre="Téléphone" code>
+            {formaterTelephone(client.telephone)}
+          </Fait>
         )}
-        <Montant titre="Total payé" valeur={contenu.totalPaye} />
-        {/* Le chiffre que le client vient chercher. Il est écrit en toutes
-            lettres à côté du nombre : « reste dû » ne se déduit pas d'une
-            graisse de caractère (DESIGN.md §5). */}
-        <div className="mt-1 flex items-baseline justify-between gap-4 border-t-2 border-encre pt-2">
-          <dt className="font-semibold">Reste dû</dt>
-          <dd className="text-right text-lg font-bold tabular-nums">
-            {formaterMontant(contenu.resteDu)}
-          </dd>
-        </div>
+        {contenu.type === "versement" && (
+          <Fait titre="Au titre de">
+            Vente <span className="plaque-code">{vente.numero}</span>
+          </Fait>
+        )}
+        <Fait titre="Moto">{moto ? modele : "Moto introuvable"}</Fait>
+        {moto && (
+          <Fait titre="Numéro de châssis" code>
+            {moto.numeroChassis}
+          </Fait>
+        )}
+        <Fait titre="Mode de paiement">{LIBELLE_MODE[vente.modePaiement]}</Fait>
+        {contenu.moyenPaiement && (
+          <Fait titre="Moyen">{LIBELLE_MOYEN[contenu.moyenPaiement]}</Fait>
+        )}
+        {contenu.reference && <Fait titre="Référence">{contenu.reference}</Fait>}
       </dl>
 
-      {contenu.reference && (
-        <p className="mt-3 text-sm text-encre-doux">Référence : {contenu.reference}</p>
+      {/* Le montant encaissé se détache du reste (`c4:59-62`). C'est la raison
+          d'être du papier : le client tient la preuve d'avoir versé cette
+          somme-là, ce jour-là. Noyé dans la liste des montants, il se
+          confondait avec le prix convenu et le total — trois nombres de même
+          taille, dont un seul est ce qu'il vient de payer. */}
+      {contenu.montantEncaisse > 0 && (
+        <p className="mt-5 flex items-baseline gap-3 rounded-plaque border-2 border-encre px-4 py-3 font-bold">
+          <span>Montant reçu</span>
+          <span className="ml-auto text-2xl tabular-nums">
+            {formaterMontant(contenu.montantEncaisse)}
+          </span>
+        </p>
       )}
+
+      {/* Les trois montants de situation, à égalité : la mise en avant est
+          prise par « Montant reçu », et deux mises en avant n'en font aucune.
+          Chaque nombre garde son intitulé en toutes lettres — « reste dû » ne
+          se déduit pas d'une graisse de caractère (DESIGN.md §5). */}
+      <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 border-t border-bord pt-3 text-sm">
+        <Fait titre="Prix convenu" montant>
+          {formaterMontant(vente.prixConvenu)}
+        </Fait>
+        <Fait titre="Total payé" montant>
+          {formaterMontant(contenu.totalPaye)}
+        </Fait>
+        <Fait titre="Reste dû" montant>
+          {formaterMontant(contenu.resteDu)}
+        </Fait>
+      </dl>
 
       {(vente.inclus.length > 0 || vente.nonInclus.length > 0) && contenu.type === "vente" && (
         <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2 print:grid-cols-2">
@@ -161,43 +196,100 @@ export function Recu({
         </div>
       )}
 
-      <footer className="mt-6 border-t border-bord pt-3 text-sm">
-        <p>
-          Établi par{" "}
-          <span className="font-medium">{contenu.operateur || "opérateur non enregistré"}</span>
-        </p>
-        {/* Les mentions légales sont obligatoires en tête d'un document
-            commercial au Burkina Faso. Elles ne dépendent plus de ce que
-            quelqu'un a pensé à saisir (D71 ; D11 disait l'inverse, quand elles
-            étaient un champ qu'on pouvait laisser vide). */}
-        <p className="mt-1 text-encre-doux">
-          IFU {IDENTITE.ifu} · RCCM {IDENTITE.rccm}
-        </p>
+      {/* Ce que le mode change pour le client, imprimé (`c4:70-73`). Sans
+          cette phrase, un reçu de tranches ne dit nulle part pourquoi le
+          client rentre les mains vides — et c'est la question qu'il posera
+          trois semaines plus tard, papier à la main. */}
+      <p className="mt-4 text-sm text-encre-doux">{MENTION_RECU[vente.modePaiement]}</p>
 
-        <div className="mt-8 hidden justify-between gap-8 print:flex">
-          <Signature titre="Le magasin" />
-          <Signature titre="Le client" />
+      {/* Les deux signatures, sur l'écran comme sur le papier (`c4:76-86`).
+          Elles n'apparaissaient qu'à l'impression, au nom de « un écran ne se
+          signe pas » : mais D60 dit que le rendu de l'écran et celui du papier
+          sont le même arbre, et un bloc qui n'existe qu'en `print:` est
+          précisément le genre de chose qu'on ne revoit plus jamais. « Le
+          gérant » plutôt que « Établi par » : c'est la légende d'une
+          signature, en regard du trait du client, pas une phrase. */}
+      <footer className="mt-10 grid grid-cols-2 gap-6 text-sm">
+        <div>
+          <p className="text-encre-doux">Le gérant</p>
+          <p className="mt-5 font-medium">
+            {contenu.operateur || "opérateur non enregistré"}
+          </p>
+        </div>
+        <div>
+          <p className="text-encre-doux">Le client</p>
+          <p aria-hidden="true" className="mt-5 border-b border-encre">
+            &nbsp;
+          </p>
         </div>
       </footer>
+
+      {/* Le pied de page du carnet (`c4:88`). Il porte l'heure, que rien
+          d'autre ne porte : deux reçus du même jour, réimprimés, se
+          distinguent par là. C'est la date de la pièce et non celle de
+          l'impression — un reçu réimprimé le mois suivant ne doit pas
+          contredire celui que le client a chez lui. */}
+      <p className="plaque-code mt-6 border-t border-bord pt-2 text-center text-micro text-encre-doux">
+        SDI · {contenu.numero} ·{" "}
+        {contenu.date ? formaterDateHeure(contenu.date) : "date inconnue"}
+      </p>
     </article>
   );
 }
 
-function Ligne({ titre, children }: { titre: string; children: React.ReactNode }) {
+/**
+ * La souche : le numéro de pièce en talon cranté, arraché du carnet.
+ *
+ * Les trois lettres de tête *sont* le code boutique et se détachent en gris
+ * (`socle.css:519-523`). Le crantage est un masque, pas une image : il tient à
+ * l’impression et ne demande aucune requête réseau.
+ */
+function Souche({ numero, legende }: { numero: string; legende: string }) {
+  const separation = numero.indexOf("-");
+  const code = separation > 0 ? numero.slice(0, separation) : null;
+  const suite = separation > 0 ? numero.slice(separation) : numero;
+
   return (
-    <div className="flex items-baseline justify-between gap-4 py-2">
-      <dt className="shrink-0 text-sm text-encre-doux">{titre}</dt>
-      <dd className="min-w-0 text-right">{children}</dd>
+    <div className="souche shrink-0 text-right">
+      <p className="souche-numero">
+        {code && <span className="souche-code">{code}</span>}
+        {suite}
+      </p>
+      {legende && <p className="souche-legende">{legende}</p>}
     </div>
   );
 }
 
-function Montant({ titre, valeur }: { titre: string; valeur: number }) {
+/**
+ * Un fait du reçu : son intitulé à gauche, sa valeur à droite.
+ *
+ * Un fragment et non une boîte : la grille à deux colonnes de `.recu-faits`
+ * aligne les valeurs entre elles d’une ligne à l’autre, ce qu’une suite de
+ * boîtes en `justify-between` ne fait pas — chaque ligne y trouve son propre
+ * alignement, et la colonne des montants ondule.
+ */
+function Fait({
+  titre,
+  children,
+  code,
+  montant,
+}: {
+  titre: string;
+  children: React.ReactNode;
+  /** Un numéro qu’on recopie : châssis, téléphone. */
+  code?: boolean;
+  /** Un montant : chiffres tabulaires, pour que les colonnes s’alignent. */
+  montant?: boolean;
+}) {
   return (
-    <div className="flex items-baseline justify-between gap-4 py-1">
-      <dt className="text-sm text-encre-doux">{titre}</dt>
-      <dd className="text-right tabular-nums">{formaterMontant(valeur)}</dd>
-    </div>
+    <>
+      <dt className="text-encre-doux">{titre}</dt>
+      <dd
+        className={`text-right font-semibold ${code ? "plaque-code" : ""} ${montant ? "tabular-nums" : ""}`}
+      >
+        {children}
+      </dd>
+    </>
   );
 }
 
@@ -212,16 +304,6 @@ function Convenu({ titre, valeurs }: { titre: string; valeurs: string[] }) {
         ))}
       </ul>
     </section>
-  );
-}
-
-/** Deux traits de signature, sur le papier seulement : un écran ne se signe pas. */
-function Signature({ titre }: { titre: string }) {
-  return (
-    <div className="flex-1">
-      <p className="text-encre-doux">{titre}</p>
-      <div aria-hidden="true" className="mt-10 border-t border-encre" />
-    </div>
   );
 }
 

@@ -263,13 +263,25 @@
    valeurs d'encre pour qu'un en-tête de reçu ne sorte jamais en aplat noir. */
 @layer theme {
   @media print {
-    /* Les trois sélecteurs, et non `:root` seul : `[data-theme="sombre"]` est
-       plus spécifique, et un reçu imprimé depuis un poste basculé en sombre
-       serait sorti blanc sur noir — une cartouche vidée et un papier illisible
-       sur un comptoir. C'est la leçon de S10, que la bascule explicite de S31
-       aurait défaite en silence. Même spécificité et plus loin dans la source :
-       l'impression gagne. (`socle.css:1624` fait exactement cela.) */
+    /* Quatre sélecteurs, et non `:root` seul. Chaque branche d'une liste
+       compte sa spécificité pour elle-même : `:root` vaut (0,1,0), et perd
+       contre les deux règles sombres, qui valent (0,2,0) — la bascule
+       explicite `[data-theme="sombre"]`, et surtout le sombre système,
+       `:root:not([data-theme="clair"])`. Les deux media queries sont vraies en
+       même temps quand on imprime depuis une machine réglée en sombre : à
+       spécificité égale, l'ordre de la source tranche, et l'impression est
+       plus bas.
+
+       Vu sur capture, et non déduit : `captures/s31/recu-papier-dark.png`
+       sortait le reçu blanc sur nuit. Le correctif précédent avait couvert la
+       bascule explicite et manqué le réglage système, qui est le cas courant
+       — personne ne bascule un thème, on hérite de celui du téléphone. C'est
+       la leçon de S10 : la feuille d'impression ne se laisse jamais défaire,
+       parce que c'est le seul rendu qui devient un objet physique et qu'une
+       cartouche vidée ne se rattrape pas. (`socle.css:1624` porte le même
+       trou : la maquette ne l'a jamais imprimée depuis un poste sombre.) */
     :root,
+    :root:not([data-theme="clair"]),
     :root[data-theme="sombre"],
     :root[data-theme="clair"] {
       --color-encre: #0f1720;

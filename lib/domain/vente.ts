@@ -35,6 +35,27 @@ export const EFFET_MODE: Record<ModePaiement, string> = {
   tranches: "La moto reste au magasin jusqu’au dernier versement. L’argent reçu est un engagement.",
 };
 
+/**
+ * La même conséquence, écrite pour le client, sur le reçu qu'il emporte.
+ *
+ * **Deux textes, et c'est voulu.** `EFFET_MODE` s'adresse au gérant à la
+ * seconde où il valide : « l'argent reçu est un engagement » lui dit ce qu'il
+ * prend sur lui. Sur le papier du client, la même phrase ne dit plus rien
+ * d'utile — ce que le client doit pouvoir relire trois semaines plus tard,
+ * c'est quand il repartira avec sa moto. Ce n'est pas le même énoncé traduit,
+ * c'est une autre information ; les fondre en une aurait servi mal les deux.
+ *
+ * La maquette `c4:70-73` porte ce texte, et l'imprime : sans lui, un reçu de
+ * tranches ne dit nulle part pourquoi le client rentre les mains vides.
+ */
+export const MENTION_RECU: Record<ModePaiement, string> = {
+  comptant: "La moto est payée en entier et remise au client ce jour.",
+  credit:
+    "La moto est remise au client. Le reste à percevoir indiqué ci-dessus demeure dû à l’entreprise.",
+  tranches:
+    "La moto reste au magasin jusqu’au dernier versement. Elle sera remise au client une fois le prix convenu atteint en totalité.",
+};
+
 export const STATUTS_PAIEMENT = ["impaye", "partiel", "solde"] as const;
 export type StatutPaiement = (typeof STATUTS_PAIEMENT)[number];
 

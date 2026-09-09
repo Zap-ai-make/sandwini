@@ -94,23 +94,28 @@ test.describe("le reçu de vente", () => {
     await expect(recu).toContainText("400 000 FCFA");
     await expect(recu).toContainText("800 000 FCFA");
     await expect(recu).toContainText("Espèces");
-    await expect(recu).toContainText("Établi par");
+    /* Le pied nomme le gérant en regard du trait du client (`c4:76-86`) : la
+       légende d'une signature, et non plus la phrase « Établi par ». */
+    await expect(recu).toContainText("Le gérant");
+    /* La conséquence du mode s'imprime : sans elle, le client ne lit nulle
+       part pourquoi il repart avec la moto, ou sans elle (`c4:70-73`). */
+    await expect(recu).toContainText("La moto est remise au client");
     /* Les mentions légales s'impriment toujours : elles ne dépendent plus de ce
        que quelqu'un a pensé à saisir (D71). */
     await expect(recu).toContainText(IDENTITE.ifu);
     await expect(recu).toContainText(IDENTITE.rccm);
 
-    /* Le rendu imprimé, pas le rendu à l'écran : c'est un autre document, et
-       c'est celui qu'on remet au client. */
-    const signature = recu.getByText("Le magasin", { exact: true });
-    await expect(signature).toBeHidden();
+    /* Les deux signatures sont là avant l'impression, et le restent après :
+       l'écran et le papier sont le même arbre (D60), et un bloc qui n'existe
+       qu'en `print:` est celui qu'on ne revoit plus jamais. */
+    const signature = recu.getByText("Le client", { exact: true });
+    await expect(signature).toBeVisible();
 
     await page.emulateMedia({ media: "print" });
     await expect(recu).toBeVisible();
     await expect(page.getByRole("banner")).toBeHidden();
     await expect(page.getByRole("navigation", { name: "Navigation principale" })).toBeHidden();
     await expect(page.getByRole("button", { name: "Imprimer le reçu" })).toBeHidden();
-    // Les traits de signature n’apparaissent que sur le papier.
     await expect(signature).toBeVisible();
     await page.emulateMedia({ media: "screen" });
 
