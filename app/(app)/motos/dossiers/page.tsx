@@ -6,7 +6,7 @@ import { useCallback, useMemo, useState } from "react";
 import { RelaisDocument } from "@/components/RelaisDocument";
 import { Avis } from "@/components/patrons/Avis";
 import { EtatErreur, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
-import { TetePage } from "@/components/patrons/Page";
+import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { normaliserNom } from "@/lib/domain/client";
 import {
@@ -184,6 +184,7 @@ export default function PageDossiers() {
   const filtreActif = Boolean(etat) || recherche.trim().length > 0;
   /* Rien à encadrer : un cadre vide, recherche et filtres compris, ferait
      croire à une file qu'on aurait mal interrogée (même règle qu'en A6). */
+  const surTitre = useSurTitre("Motos");
   const fileVide = !chargement && !filtreActif && resultats.length === 0;
   /* Sauf si l'on est en train de regarder un papier : le dernier geste d'un
      dossier le fait sortir de la file, et voir le relais disparaître avec lui
@@ -193,6 +194,7 @@ export default function PageDossiers() {
   return (
     <div>
       <TetePage
+        surTitre={surTitre}
         titre="Dossiers en attente"
         sousTitre="Les quatre documents ne suivent pas le même chemin. Un dossier se ferme quand les quatre sont remis, ou déclarés sans objet."
       />

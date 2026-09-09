@@ -4,7 +4,7 @@ import { Bike, Warehouse } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { EtatErreur, EtatVide, SansBoutique } from "@/components/patrons/Etats";
-import { TetePage } from "@/components/patrons/Page";
+import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
 import { formaterDateCourte, formaterMontant, formaterNombre } from "@/lib/domain/format";
@@ -101,6 +101,8 @@ export default function PagePaiements() {
     "Le seuil d’inactivité n’a pas pu être lu.",
   );
   const seuil = reglages?.seuilInactiviteTranches ?? SEUIL_INACTIVITE_DEFAUT;
+
+  const surTitre = useSurTitre("Motos");
 
   const lignes = useMemo(
     () => suivrePaiements(ventes ?? [], versements ?? [], new Date()),
@@ -226,8 +228,8 @@ export default function PagePaiements() {
   return (
     <div>
       <TetePage
+        surTitre={surTitre}
         titre="Paiements"
-        sousTitre={toutesBoutiques ? "Toutes les boutiques" : perimetre.nom}
       />
 
       <EtatErreur message={erreur ?? erreurVersements} className="mb-4" />

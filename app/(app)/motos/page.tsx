@@ -11,7 +11,7 @@ import {
   EtatVide,
   SansBoutique,
 } from "@/components/patrons/Etats";
-import { TetePage } from "@/components/patrons/Page";
+import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import {
@@ -166,6 +166,7 @@ function Stock() {
       />
     );
 
+  const surTitre = useSurTitre("Motos");
   const total = (stock ?? []).length;
   /* Compté sur ce que l'écran montre, pas sur le stock entier : « 12 motos sur
      128 · 96 en stock » ferait croire que 96 des 12 lignes sont disponibles. */
@@ -175,8 +176,8 @@ function Stock() {
   return (
     <div>
       <TetePage
+        surTitre={surTitre}
         titre="Stock motos"
-        sousTitre={toutesBoutiques ? "Toutes les boutiques" : perimetre.nom}
         actions={
           <Link href="/motos/nouvelle" className="bouton bouton-principal">
             <Plus aria-hidden="true" className="size-4" />

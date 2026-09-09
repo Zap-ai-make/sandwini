@@ -7,7 +7,7 @@ import { FormulaireClient } from "@/components/FormulaireClient";
 import { Champ } from "@/components/patrons/Champ";
 import { EtatErreur, EtatErreurSaisie, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
 import { Formulaire, Groupe } from "@/components/patrons/Formulaire";
-import { TetePage } from "@/components/patrons/Page";
+import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import { chercherClients, formaterTelephone, type Client } from "@/lib/domain/client";
 import { formaterMontant } from "@/lib/domain/format";
@@ -211,6 +211,7 @@ export default function PageNouvelleVente() {
     );
   }
 
+  const surTitre = useSurTitre("Motos");
   const prixConvenu = lireMontant(saisie.prixConvenu) ?? 0;
   const encaisse = lireMontantEncaisse(saisie.montantEncaisse) ?? 0;
   const { resteDu } = agregatsPaiement(
@@ -220,7 +221,11 @@ export default function PageNouvelleVente() {
 
   return (
     <div>
-      <TetePage titre="Nouvelle vente" sousTitre={perimetre.nom} />
+      <TetePage
+        surTitre={surTitre}
+        titre="Nouvelle vente"
+        sousTitre="Le numéro de la pièce sera attribué à l’enregistrement, même sans réseau."
+      />
 
       {enregistree && (
         <div

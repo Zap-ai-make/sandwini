@@ -8,6 +8,7 @@ import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { LIBELLE_METIER, reunirMetiers, type Metier } from "@/lib/domain/boutique";
 import { ESPACES } from "@/lib/domain/espaces";
+import { formaterMois } from "@/lib/domain/format";
 import { CODE_ENTREPRISE, usePerimetre } from "@/lib/perimetre/perimetre";
 
 /**
@@ -29,7 +30,7 @@ import { CODE_ENTREPRISE, usePerimetre } from "@/lib/perimetre/perimetre";
  * tableau de bord qui ment (D63).
  */
 export default function Supervision() {
-  const { boutiques, chargement, erreur, choisir } = usePerimetre();
+  const { perimetre, boutiques, chargement, erreur, choisir } = usePerimetre();
   const actives = boutiques.filter((boutique) => boutique.actif);
   const fermees = boutiques.length - actives.length;
   const toutesLesMetiers = reunirMetiers(actives);
@@ -37,6 +38,7 @@ export default function Supervision() {
   return (
     <div>
       <TetePage
+        surTitre={`${perimetre.type === "boutique" ? perimetre.nom : "Toutes les boutiques"} · ${formaterMois(new Date())}`}
         titre="Supervision"
         sousTitre={
           <>

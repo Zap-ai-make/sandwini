@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheVente } from "@/components/FicheVente";
 import { EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
-import { TetePage } from "@/components/patrons/Page";
+import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { normaliserNom, type Client } from "@/lib/domain/client";
@@ -181,6 +181,7 @@ function Ventes() {
       />
     );
 
+  const surTitre = useSurTitre("Motos");
   const total = cherchables.length;
   const enCours = resultats.filter((ligne) => ligne.vente.resteDu > 0).length;
   const chargement = ventes === null && !erreur;
@@ -188,8 +189,8 @@ function Ventes() {
   return (
     <div>
       <TetePage
+        surTitre={surTitre}
         titre="Ventes"
-        sousTitre={toutesBoutiques ? "Toutes les boutiques" : perimetre.nom}
         actions={
           <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
             <Plus aria-hidden="true" className="size-4" />

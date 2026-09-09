@@ -10,7 +10,7 @@ import { JourneeDuGerant } from "@/components/JourneeDuGerant";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import { accueilDuRole } from "@/lib/domain/espaces";
-import { formaterDate } from "@/lib/domain/format";
+import { formaterJour } from "@/lib/domain/format";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 
 /**
@@ -73,7 +73,7 @@ export default function Accueil() {
       {/* Le sous-titre porte le lieu et le jour. C’est la seule chose qu’un
           gérant a besoin de vérifier d’un coup d’œil avant de saisir : où
           part ce que j’écris, et à quelle date il sera compté. */}
-      <TetePage titre="Aujourd’hui" sousTitre={`${ou} · ${formaterDate(new Date())}`} />
+      <TetePage surTitre={`${ou} · ${formaterJour(new Date())}`} titre="Aujourd’hui" />
 
       <InvitationBoutique />
 

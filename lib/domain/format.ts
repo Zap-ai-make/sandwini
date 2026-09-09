@@ -43,6 +43,39 @@ const heureMinute = new Intl.DateTimeFormat(LOCALE, {
   minute: "2-digit",
 });
 
+const jourLong = new Intl.DateTimeFormat(LOCALE, {
+  weekday: "long",
+  day: "numeric",
+  month: "long",
+  year: "numeric",
+});
+
+const moisLong = new Intl.DateTimeFormat(LOCALE, { month: "long", year: "numeric" });
+
+/**
+ * Ex. `vendredi 5 septembre 2026`. Pour le sur-titre de l'accueil du gérant.
+ *
+ * Le jour de la semaine y est, et il n'est pas décoratif : c'est ce qu'on
+ * vérifie d'un coup d'œil en ouvrant le rideau, avant la date elle-même — et
+ * ce qui distingue un samedi d'un jour de semaine dans l'organisation du
+ * comptoir.
+ */
+export function formaterJour(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "—";
+  return jourLong.format(date);
+}
+
+/**
+ * Ex. `septembre 2026`. Pour le sur-titre de la supervision.
+ *
+ * Le responsable regarde un mois, pas un jour : ses chiffres se comparent d'un
+ * mois sur l'autre, et le sur-titre dit donc la période qu'il a sous les yeux.
+ */
+export function formaterMois(date: Date): string {
+  if (Number.isNaN(date.getTime())) return "—";
+  return moisLong.format(date);
+}
+
 /** Ex. `25 août 2026`. Pour les en-têtes de documents et les reçus. */
 export function formaterDate(date: Date): string {
   if (Number.isNaN(date.getTime())) return "—";

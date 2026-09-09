@@ -8,6 +8,7 @@ import { Hub, type Destination } from "@/components/patrons/Hub";
 import { TetePage } from "@/components/patrons/Page";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
+import { IDENTITE } from "@/lib/domain/entreprise";
 import { ecransVisibles } from "@/lib/domain/espaces";
 import type { Prestataire } from "@/lib/domain/prestataire";
 import { LIBELLE_ROLE, peut } from "@/lib/domain/roles";
@@ -140,6 +141,7 @@ export default function Reglages() {
   return (
     <div>
       <TetePage
+        surTitre={`Réglages · ${IDENTITE.raisonSociale}`}
         titre="Réglages"
         sousTitre="Ce que vous changez ici s’applique à toutes les boutiques."
       />
