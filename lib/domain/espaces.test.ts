@@ -7,6 +7,7 @@ import {
   ecransVisibles,
   espaceDuChemin,
   espacesVisibles,
+  groupesVisibles,
 } from "./espaces";
 
 describe("espacesVisibles — le gérant", () => {
@@ -100,7 +101,7 @@ describe("accueilDuRole", () => {
 });
 
 describe("le second niveau de navigation", () => {
-  it("met les huit écrans de l’espace motos à portée, groupés par intention", () => {
+  it("met les huit écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
     const ecrans = ecransVisibles("motos", "gerant");
     expect(ecrans).toHaveLength(8);
     expect(ecrans.map((e) => e.href)).toEqual(
@@ -114,9 +115,65 @@ describe("le second niveau de navigation", () => {
         "/motos/recus",
       ]),
     );
-    expect(new Set(ecrans.map((e) => e.intention))).toEqual(
-      new Set(["vendre", "suivre", "administrer"]),
-    );
+    /* Les titres sont ceux de `maquettes/b1-rail-gerant.html`, et non les trois
+       intentions globales que le dépôt imposait aux quatre espaces. « Le
+       fichier » plutôt qu'« Administrer » : on ne gère pas un client, on le
+       retrouve. */
+    expect(groupesVisibles("motos", "gerant").map((g) => g.titre)).toEqual([
+      "Vendre",
+      "Suivre",
+      "Le fichier",
+    ]);
+  });
+
+  /*
+   * Chaque espace nomme ses groupes, et deux espaces ne les nomment pas pareil.
+   * Sans ce test, réintroduire un jeu de titres commun passerait inaperçu — le
+   * rendu resterait plausible, et seule la confrontation aux maquettes le
+   * démentirait.
+   */
+  it("laisse chaque espace nommer ses propres groupes", () => {
+    expect(groupesVisibles("supervision", "responsable").map((g) => g.titre)).toEqual([
+      "Le commerce",
+    ]);
+    expect(groupesVisibles("accueil", "gerant").map((g) => g.titre)).toEqual([
+      "Ma journée",
+      "Ce qui m’attend",
+    ]);
+    expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
+      "L’entreprise",
+      "Le catalogue",
+      "Cet appareil",
+    ]);
+  });
+
+  /*
+   * Un titre de groupe sans entrée sous lui est un rangement qui ment : le
+   * gérant n'a droit à aucun écran d'administration, il ne doit pas lire
+   * « L'entreprise » suivi de rien.
+   */
+  it("retire les groupes que les droits ont vidés", () => {
+    expect(groupesVisibles("reglages", "gerant").map((g) => g.titre)).toEqual(["Cet appareil"]);
+  });
+
+  /*
+   * L'accueil du gérant renvoie vers les dossiers et les paiements, qui vivent
+   * dans l'espace motos (maquette `a3`, « Ce qui m'attend »). Sans le drapeau
+   * `renvoi`, `espaceDuChemin` les attribuerait à l'accueil — qui les mentionne
+   * le premier — et le gérant lisant sa file verrait la colonne de son accueil
+   * au lieu de celle des motos.
+   *
+   * Le responsable, lui, n'a pas de renvoi : sa maquette `b2` garde la colonne
+   * de supervision en affichant les ventes.
+   */
+  it("ne laisse pas un renvoi voler l’espace de l’écran qu’il mentionne", () => {
+    const gerant = espacesVisibles("gerant", ["motos"]);
+    expect(espaceDuChemin("/motos/dossiers", gerant)).toBe("motos");
+    expect(ecranCourant("accueil", "gerant", "/motos/dossiers")).toBeNull();
+
+    const responsable = espacesVisibles("responsable", ["motos"]);
+    expect(espaceDuChemin("/motos/ventes", responsable)).toBe("supervision");
+    expect(ecranCourant("supervision", "responsable", "/motos/ventes")).toBe("/motos/ventes");
   });
 
   it("cache au gérant les écrans d’administration qu’une garde lui refuserait", () => {
@@ -131,20 +188,20 @@ describe("le second niveau de navigation", () => {
     expect(espaceDuChemin("/motos", ouverts)).toBe("motos");
   });
 
-  /* `/clients` est un fichier commun (D16) : il vit dans plusieurs espaces à la
-     fois. Sans la contrainte des espaces ouverts, un gérant y voyait la colonne
-     de la supervision — et un lien que sa propre garde lui aurait refusé.
+  /* `/clients` est un fichier commun (D16), et il n'a plus qu'un seul foyer :
+     le groupe « Le fichier » de l'espace motos, où `maquettes/b1` le range —
+     et non « Administrer » de trois espaces à la fois, comme le dépôt le
+     faisait. Les deux rôles y trouvent donc la même colonne, ce qui est
+     précisément ce qu'on veut d'un fichier commun : le même endroit pour tout
+     le monde.
 
-     Entre les espaces qui restent, on prend le premier de la liste, c'est-à-dire
-     celui où la personne atterrit en se connectant : sa journée pour un gérant,
-     la supervision pour un responsable. Ce n'est pas le seul choix défendable —
-     garder l'espace d'où l'on vient en serait un autre — mais c'est le seul qui
-     donne la même réponse quel que soit le chemin parcouru pour arriver là. */
+     Un périmètre sans métier motos n'a alors aucun espace qui le revendique.
+     Ce n'est pas un trou : `NavigationPrincipale` retombe sur le premier
+     espace ouvert, celui où la personne atterrit en se connectant. */
   it("ne déduit jamais un espace fermé à cette personne", () => {
-    expect(espaceDuChemin("/clients", espacesVisibles("gerant", ["motos"]))).toBe("accueil");
-    expect(espaceDuChemin("/clients", espacesVisibles("responsable", ["motos"]))).toBe(
-      "supervision",
-    );
+    expect(espaceDuChemin("/clients", espacesVisibles("gerant", ["motos"]))).toBe("motos");
+    expect(espaceDuChemin("/clients", espacesVisibles("responsable", ["motos"]))).toBe("motos");
+    expect(espaceDuChemin("/clients", espacesVisibles("responsable", ["pieces"]))).toBeNull();
     expect(espaceDuChemin("/supervision", espacesVisibles("gerant", ["motos"]))).toBeNull();
   });
 });

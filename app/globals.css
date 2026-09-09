@@ -186,9 +186,19 @@
    cette direction. Ce sont les surfaces de travail qui se réétagent, et les
    trois sémantiques qui s'éclaircissent pour tenir le contraste. Le jaune de
    plaque, lui, ne bouge pas. */
+/* Deux écritures pour une seule palette, et c'est délibéré (`socle.css:155`).
+   Un basculeur explicite doit gagner **dans les deux sens** : forcer le clair
+   sur une machine réglée en sombre est le cas qui compte au comptoir, et une
+   seule règle `prefers-color-scheme` ne sait pas le faire. D'où le
+   `:not([data-theme="clair"])` qui laisse le choix explicite reprendre la
+   main, et le bloc `[data-theme="sombre"]` qui force dans l'autre sens.
+
+   Les valeurs sont volontairement recopiées plutôt qu'indirectes : une
+   indirection par variables intermédiaires aurait dupliqué la même liste
+   d'affectations sans rien économiser, en ajoutant un niveau à lire. */
 @layer theme {
   @media (prefers-color-scheme: dark) {
-    :root {
+    :root:not([data-theme="clair"]) {
       color-scheme: dark;
 
       --color-encre: #e8ecef;
@@ -212,6 +222,31 @@
       --color-focus-halo: #0b0f14;
     }
   }
+
+  /* Le sombre forcé, quel que soit le réglage de la machine. */
+  :root[data-theme="sombre"] {
+    color-scheme: dark;
+
+    --color-encre: #e8ecef;
+    --color-encre-doux: #97a3af;
+    --color-papier: #151c24;
+    --color-fond: #0b0f14;
+    --color-bord: #2a343f;
+    --color-bord-fort: #6a7783;
+    --color-survol: #1c242e;
+
+    --color-accent-actif: #f5c518;
+
+    --color-alerte: #ff8a7a;
+    --color-alerte-surface: #3a211e;
+    --color-goutte: #7fb2ec;
+    --color-goutte-surface: #16233a;
+    --color-solde: #56c08d;
+    --color-solde-surface: #12291f;
+
+    --color-focus-trait: #ffffff;
+    --color-focus-halo: #0b0f14;
+  }
 }
 
 /* Impression — la feuille dédiée des reçus (`prompt.md` §10, S10).
@@ -228,7 +263,15 @@
    valeurs d'encre pour qu'un en-tête de reçu ne sorte jamais en aplat noir. */
 @layer theme {
   @media print {
-    :root {
+    /* Les trois sélecteurs, et non `:root` seul : `[data-theme="sombre"]` est
+       plus spécifique, et un reçu imprimé depuis un poste basculé en sombre
+       serait sorti blanc sur noir — une cartouche vidée et un papier illisible
+       sur un comptoir. C'est la leçon de S10, que la bascule explicite de S31
+       aurait défaite en silence. Même spécificité et plus loin dans la source :
+       l'impression gagne. (`socle.css:1624` fait exactement cela.) */
+    :root,
+    :root[data-theme="sombre"],
+    :root[data-theme="clair"] {
       --color-encre: #0f1720;
       --color-papier: #ffffff;
       --color-fond: #ffffff;
@@ -993,9 +1036,13 @@
   }
 
   @media (prefers-color-scheme: dark) {
-    .bouton-principal:hover {
+    :root:not([data-theme="clair"]) .bouton-principal:hover {
       background: #cfd6db;
     }
+  }
+
+  :root[data-theme="sombre"] .bouton-principal:hover {
+    background: #cfd6db;
   }
 
   .bouton-neutre {
@@ -1032,6 +1079,21 @@
   .bouton[aria-disabled="true"] {
     opacity: 0.55;
     cursor: not-allowed;
+  }
+
+  /* Le compte annoncé par une entrée de la colonne : « Paiements 31 ».
+
+     Sur le nuit, un cran plus sombre que la colonne — c'est un creux, pas une
+     pastille de couleur. Le jaune serait un troisième emploi (D70), et le
+     rouge dirait « en retard », ce qu'un compte de file ne dit pas : parmi ces
+     31 paiements, la plupart se passent bien. */
+  .colonne-compte {
+    border-radius: 999px;
+    background: var(--color-nuit);
+    padding: 1px 6px;
+    font-family: var(--font-code);
+    font-size: var(--text-micro);
+    color: var(--color-coquille-doux);
   }
 
   /* La signature du produit : le bandeau dessiné comme une plaque.

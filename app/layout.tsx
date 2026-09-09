@@ -71,7 +71,15 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           dangerouslySetInnerHTML={{
             __html:
               'try{if(localStorage.getItem("sdi.nav.repliee")==="1")' +
-              'document.documentElement.dataset.nav="repliee"}catch(e){}',
+              'document.documentElement.dataset.nav="repliee";' +
+              /* Le thème choisi, posé avant la peinture pour la même raison que
+                 le repli : sans cela l'écran s'ouvre en clair puis vire au
+                 sombre sous les yeux, à chaque page. Rien n'est posé quand
+                 aucun choix n'a été fait — l'absence d'attribut vaut « comme le
+                 système », et c'est `prefers-color-scheme` qui décide. */
+              'var t=localStorage.getItem("sdi.theme");' +
+              'if(t==="clair"||t==="sombre")document.documentElement.dataset.theme=t;' +
+              "}catch(e){}",
           }}
         />
         <FournisseurSession>

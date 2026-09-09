@@ -1,25 +1,54 @@
 "use client";
 
-import { Activity, Bike, Building2, Coins, LayoutGrid, PanelLeft, Settings, Wrench } from "lucide-react";
+import {
+  Activity,
+  Bike,
+  Building2,
+  Coins,
+  LayoutGrid,
+  LogOut,
+  PanelLeft,
+  Settings,
+  Store,
+  UserRound,
+  Wrench,
+} from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useCallback, useEffect, useSyncExternalStore, type ComponentType } from "react";
+import {
+  useCallback,
+  useEffect,
+  useSyncExternalStore,
+  type ComponentType,
+  type ReactNode,
+} from "react";
+import { BasculeTheme } from "@/components/BasculeTheme";
 import { ICONE_ECRAN } from "@/components/icones-ecrans";
 import { Monogramme } from "@/components/Monogramme";
-import { useSession } from "@/lib/auth/session";
+import { seDeconnecter, useSession } from "@/lib/auth/session";
 import {
   ESPACES,
-  INTENTIONS,
-  LIBELLE_INTENTION,
   ecranCourant,
-  ecransVisibles,
   espaceDuChemin,
   espacesVisibles,
+  groupesVisibles,
   type Espace,
 } from "@/lib/domain/espaces";
+import { LIBELLE_ROLE, type Role } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
+import { useComptes } from "@/lib/repositories/comptes";
 
 type Icone = ComponentType<{ className?: string }>;
+
+/* Une entrée du rail. Écrite une fois : trois appelants la portent désormais —
+   les espaces, la bascule de thème et la déconnexion —, et une divergence de
+   quelques pixels entre eux se verrait tout de suite sur 72 px de large. */
+const LIEN_RAIL = [
+  /* « Se déconnecter » et « Supervision » débordaient du rail : le mot le plus
+     long commande la largeur, pas l'inverse. */
+  "grid w-[62px] justify-items-center gap-[3px] rounded-champ px-0.5 pt-2 pb-1 text-center text-[10px] leading-tight",
+  "[overflow-wrap:anywhere] text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
+].join(" ");
 
 /* L'icône de chaque espace. Le reste — route et intitulé — vit dans
    `lib/domain/espaces.ts`, avec la règle qui décide qui voit quoi ; ici on ne
@@ -88,13 +117,9 @@ export function NavigationPrincipale() {
               href={href}
               aria-current={active ? "page" : undefined}
               className={[
-                /* « Se déconnecter » et « Supervision » débordaient du rail : le
-                   mot le plus long commande la largeur, pas l'inverse. */
-                "grid w-[62px] justify-items-center gap-[3px] rounded-champ px-0.5 pt-2 pb-1 text-center text-[10px] leading-tight",
-                "[overflow-wrap:anywhere] max-md:h-14 max-md:w-auto max-md:flex-1 max-md:content-center",
-                active
-                  ? "bg-nuit-3 font-semibold text-coquille-encre"
-                  : "text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
+                LIEN_RAIL,
+                "max-md:h-14 max-md:w-auto max-md:flex-1 max-md:content-center",
+                active ? "bg-nuit-3 font-semibold text-coquille-encre" : "",
               ].join(" ")}
             >
               <Icone className="size-5" />
@@ -102,6 +127,18 @@ export function NavigationPrincipale() {
             </Link>
           );
         })}
+
+        {/* Le pied du rail, que le produit n'avait pas : les maquettes y
+            posent la bascule de thème et la déconnexion. Sur téléphone le rail
+            passe en bas et devient une barre d'espaces — y ajouter deux
+            entrées la surchargerait, et les réglages portent déjà les deux. */}
+        <div className="mt-auto flex flex-col items-center gap-1 max-md:hidden">
+          <BasculeTheme className={LIEN_RAIL} />
+          <button type="button" onClick={() => void seDeconnecter()} className={LIEN_RAIL}>
+            <LogOut aria-hidden="true" className="size-5" />
+            Se déconnecter
+          </button>
+        </div>
       </nav>
 
       {courant && <Colonne espace={courant} chemin={chemin} role={role} />}
@@ -134,11 +171,12 @@ function Colonne({
 }: {
   espace: Espace;
   chemin: string;
-  role: Parameters<typeof ecransVisibles>[1];
+  role: Role;
 }) {
-  const ecrans = ecransVisibles(espace, role);
+  const groupes = groupesVisibles(espace, role);
   const courant = ecranCourant(espace, role, chemin);
   const repliee = useRepli();
+  const comptes = useComptes();
 
   return (
     <nav
@@ -152,56 +190,222 @@ function Colonne({
         <BoutonRepli repliee={repliee} />
       </div>
 
-      {INTENTIONS.map((intention) => {
-        const groupe = ecrans.filter((ecran) => ecran.intention === intention);
-        if (groupe.length === 0) return null;
-        return (
-          <section key={intention} className="pt-4 first-of-type:pt-0">
-            {/* Le groupe dit une intention du métier — vendre, suivre,
-                administrer — et non un type d'objet. C'est ce qui rend la
-                colonne lisible sans la lire. Replié, il ne reste que le filet :
-                un sur-titre de onze pixels écrasé à 64 px de large ne dirait
-                plus rien. */}
-            <h3
-              className={[
-                "px-2 pb-2 text-micro font-bold tracking-[0.09em] text-coquille-muet uppercase",
-                repliee ? "sr-only" : "",
-              ].join(" ")}
-            >
-              {LIBELLE_INTENTION[intention]}
-            </h3>
+      {/* La colonne défile, pas la coquille : à trois groupes plus la liste des
+          boutiques, elle dépasse la fenêtre sur un portable — et le pied, qui
+          dit qui est connecté, partait avec. */}
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        {groupes.map((groupe) => (
+          <section key={groupe.titre} className="pt-4 first-of-type:pt-0">
+            {/* Chaque espace nomme ses groupes, et ce sont les mots de sa
+                maquette. Replié, il ne reste que le filet : un sur-titre de
+                onze pixels écrasé à 64 px de large ne dirait plus rien. */}
+            <TitreGroupe repliee={repliee}>{groupe.titre}</TitreGroupe>
             <ul>
-              {groupe.map(({ href, libelle }) => {
-                const Icone = ICONE_ECRAN[href] ?? Activity;
-                const active = href === courant;
-                return (
-                  <li key={href}>
-                    <Link
-                      href={href}
-                      aria-current={active ? "page" : undefined}
-                      title={repliee ? libelle : undefined}
-                      className={[
-                        "flex items-center gap-2 rounded-champ border-l-2 px-2 py-[7px]",
-                        repliee ? "justify-center px-0" : "",
-                        /* Jamais la couleur seule : l'écran courant est marqué
-                           par le fond, le filet, la graisse et `aria-current`. */
-                        active
-                          ? "border-l-coquille-encre bg-nuit-3 font-semibold text-coquille-encre"
-                          : "border-l-transparent text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
-                      ].join(" ")}
-                    >
-                      <Icone className="size-4 shrink-0 opacity-85" />
-                      <span className="colonne-libelle">{libelle}</span>
-                    </Link>
-                  </li>
-                );
-              })}
+              {groupe.ecrans.map(({ href, libelle, compteur }) => (
+                <li key={href}>
+                  <LienColonne
+                    href={href}
+                    libelle={libelle}
+                    icone={ICONE_ECRAN[href] ?? Activity}
+                    actif={href === courant}
+                    repliee={repliee}
+                    compte={compteur ? comptes[compteur] : null}
+                    quoiCompte="à traiter"
+                  />
+                </li>
+              ))}
             </ul>
           </section>
-        );
-      })}
+        ))}
+
+        {espace === "supervision" && <LesBoutiques repliee={repliee} chemin={chemin} />}
+      </div>
+
+      <PiedColonne repliee={repliee} />
     </nav>
   );
+}
+
+function TitreGroupe({ repliee, children }: { repliee: boolean; children: ReactNode }) {
+  return (
+    <h3
+      className={[
+        "px-2 pb-2 text-micro font-bold tracking-[0.09em] text-coquille-muet uppercase",
+        repliee ? "sr-only" : "",
+      ].join(" ")}
+    >
+      {children}
+    </h3>
+  );
+}
+
+/**
+ * Une entrée de la colonne, et son compte s’il y en a un à dire.
+ *
+ * Le compte est un `span` avant tout, jamais une couleur : « 18 » suivi de
+ * « à traiter » pour qui écoute l’écran, et le nombre seul pour qui le voit —
+ * le libellé à côté dit déjà de quoi il s’agit.
+ */
+function LienColonne({
+  href,
+  libelle,
+  icone: Icone,
+  actif,
+  repliee,
+  compte,
+  quoiCompte,
+}: {
+  href: string;
+  libelle: string;
+  icone: Icone;
+  actif: boolean;
+  repliee: boolean;
+  compte: number | string | null;
+  quoiCompte?: string;
+}) {
+  return (
+    <Link
+      href={href}
+      aria-current={actif ? "page" : undefined}
+      title={repliee ? libelle : undefined}
+      className={[
+        "flex items-center gap-2 rounded-champ border-l-2 px-2 py-[7px]",
+        repliee ? "justify-center px-0" : "",
+        /* Jamais la couleur seule : l'écran courant est marqué par le fond, le
+           filet, la graisse et `aria-current`. */
+        actif
+          ? "border-l-coquille-encre bg-nuit-3 font-semibold text-coquille-encre"
+          : "border-l-transparent text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
+      ].join(" ")}
+    >
+      <Icone className="size-4 shrink-0 opacity-85" />
+      <span className="colonne-libelle min-w-0 flex-1 truncate">{libelle}</span>
+      {compte !== null && (
+        <span className="colonne-libelle colonne-compte">
+          {compte}
+          {quoiCompte && <span className="sr-only"> {quoiCompte}</span>}
+        </span>
+      )}
+    </Link>
+  );
+}
+
+/**
+ * Les boutiques, dans la colonne du responsable.
+ *
+ * Ce n’est pas un ajout, c’est un déplacement de responsabilité : dans la
+ * maquette `b2`, **naviguer vers une boutique se fait par la colonne**, ce qui
+ * libère les cartes de l’écran de supervision pour porter des chiffres. Le
+ * produit faisait l’inverse — ses cartes servaient à naviguer, et la colonne
+ * était vide.
+ *
+ * Choisir une boutique ici change le périmètre **et** ouvre son espace : c’est
+ * un seul geste dans la maquette, et le couper en deux ferait cliquer deux
+ * fois pour une seule intention. Le bandeau confirme ensuite où l’on écrit.
+ *
+ * Les boutiques fermées n’y sont pas : elles restent lisibles dans les
+ * réglages, et une navigation vers une boutique fermée ne mène nulle part.
+ */
+function LesBoutiques({ repliee, chemin }: { repliee: boolean; chemin: string }) {
+  const { boutiques, perimetre, choisir } = usePerimetre();
+  const actives = boutiques.filter((boutique) => boutique.actif);
+  if (actives.length === 0) return null;
+
+  return (
+    <section className="pt-4">
+      <TitreGroupe repliee={repliee}>Les boutiques</TitreGroupe>
+      <ul>
+        {actives.map((boutique) => {
+          /* « Courante » veut dire : c'est cette boutique que je regarde, et je
+             suis sur un écran qui en dépend. Sur la vue d'ensemble, aucune ne
+             l'est — on y regarde justement le choix lui-même. */
+          const actif =
+            perimetre.boutiqueId === boutique.id && !sousChemin(chemin, ESPACES.supervision.href);
+          return (
+            <li key={boutique.id}>
+              <button
+                type="button"
+                onClick={() => choisir(boutique.id)}
+                title={repliee ? boutique.nom : undefined}
+                aria-current={actif ? "true" : undefined}
+                className={[
+                  "flex w-full items-center gap-2 rounded-champ border-l-2 px-2 py-[7px] text-left",
+                  repliee ? "justify-center px-0" : "",
+                  actif
+                    ? "border-l-coquille-encre bg-nuit-3 font-semibold text-coquille-encre"
+                    : "border-l-transparent text-coquille-doux hover:bg-nuit-3 hover:text-coquille-encre",
+                ].join(" ")}
+              >
+                <Store aria-hidden="true" className="size-4 shrink-0 opacity-85" />
+                <span className="colonne-libelle min-w-0 flex-1 truncate">{boutique.nom}</span>
+                {/* Le même creux que les comptes voisins, et non la plaque
+                    jaune. D70 autorise le jaune sur un code boutique, mais la
+                    maquette `b2:47` ne le prend pas ici — et elle a raison :
+                    huit pavés jaunes empilés dans une colonne de navigation
+                    referaient d'un signal une couleur de décor, ce que ce lot
+                    corrige partout ailleurs. Le jaune reste où il tranche : le
+                    bandeau, qui dit où l'on écrit. */}
+                <span className="colonne-libelle colonne-compte">{boutique.code}</span>
+              </button>
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Le pied de la colonne : qui est connecté, en permanence.
+ *
+ * Les maquettes le posent sous les groupes, et trois boutiques plus deux rôles
+ * le rendent utile — sur un poste partagé au comptoir, savoir sous quel compte
+ * on écrit vaut mieux que de s’en souvenir. Les réglages gardent la fiche
+ * complète : l’un répond à *qui suis-je en ce moment*, l’autre à *que sait
+ * l’application de moi* (arbitrage du commanditaire, 9 septembre 2026).
+ *
+ * Il mène aux réglages plutôt qu’à un dialogue de renommage : le produit ne
+ * sait pas renommer un compte, et l’écrire ici serait ajouter une fonction
+ * sous couvert de conformité (D72).
+ */
+function PiedColonne({ repliee }: { repliee: boolean }) {
+  const session = useSession();
+  const { perimetre, boutiques } = usePerimetre();
+  if (session.statut !== "connecte") return null;
+
+  const { nom, email, role } = session.utilisateur;
+  const affiche = nom || email;
+  const dessous =
+    role === "responsable"
+      ? `${LIBELLE_ROLE[role]} · ${compter(boutiques.filter((b) => b.actif).length, "boutique")}`
+      : perimetre.type === "boutique"
+        ? `${LIBELLE_ROLE[role]} · ${perimetre.nom}`
+        : `${LIBELLE_ROLE[role]} · aucune boutique`;
+
+  return (
+    <Link
+      href="/parametres"
+      title={repliee ? `${affiche} — ${dessous}` : undefined}
+      className={[
+        "mt-3 flex shrink-0 items-center gap-2 rounded-champ border-t border-t-nuit-filet px-2 pt-3 pb-1 text-coquille-muet hover:text-coquille-encre",
+        repliee ? "justify-center px-0" : "",
+      ].join(" ")}
+    >
+      <UserRound aria-hidden="true" className="size-4 shrink-0" />
+      <span className="colonne-libelle min-w-0 flex-1">
+        <span className="block truncate font-semibold text-coquille-doux">{affiche}</span>
+        <span className="block truncate text-micro">{dessous}</span>
+      </span>
+    </Link>
+  );
+}
+
+function compter(nombre: number, mot: string): string {
+  return `${nombre} ${mot}${nombre > 1 ? "s" : ""}`;
+}
+
+function sousChemin(chemin: string, href: string): boolean {
+  return chemin === href || chemin.startsWith(`${href}/`);
 }
 
 /**
