@@ -46,6 +46,16 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fr" className={`${archivo.variable} ${plexMono.variable}`}>
       <body className="min-h-dvh antialiased">
+        {/* Le seul endroit où le dégradé du monogramme sort du logo : un filet
+            de deux pixels en tête de coquille (D70, `CAHIER-UI.md` §4).
+
+            Il vit ici et non dans la navigation, parce qu'il coiffe la marque
+            et non les liens : posé dans `NavigationPrincipale`, il manquait à
+            l'écran de connexion, qui n'a pas de rail pour le porter — et c'est
+            précisément l'écran où la marque se présente. Toutes les maquettes
+            l'ouvrent par ce filet, `a1-connexion.html` comprise. */}
+        <span aria-hidden="true" className="coquille-filet print:hidden" />
+
         {/* L'état de la navigation, posé **avant** le premier rendu.
 
             Sans ce script, la colonne s'ouvrait grande puis se refermait sous

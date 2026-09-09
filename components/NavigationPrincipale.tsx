@@ -70,8 +70,9 @@ export function NavigationPrincipale() {
 
   return (
     <>
-      <span aria-hidden="true" className="coquille-filet print:hidden" />
-
+      {/* Le filet de coquille a quitté ce composant pour `app/layout.tsx` : il
+          coiffe la marque, pas la navigation, et l'écran de connexion — qui
+          n'a pas de rail — en était privé. */}
       <nav
         aria-label="Navigation principale"
         className="rail flex flex-col items-center gap-1 px-0 pt-4 pb-3 max-md:flex-row max-md:justify-around max-md:pt-1 print:hidden"

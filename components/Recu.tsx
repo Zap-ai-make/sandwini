@@ -66,7 +66,10 @@ export function Recu({
     >
       <header className="flex items-start justify-between gap-4">
         <div className="flex min-w-0 items-start gap-3">
-          <Monogramme className="mt-0.5 h-8 w-auto shrink-0 text-encre" />
+          {/* Monochrome, et c’est ce que sert la maquette `c4-recu.html` : le
+              reçu devient un objet physique, souvent tiré en noir et blanc, et
+              un aplat de couleur y vide une cartouche pour rien. */}
+          <Monogramme variante="monochrome" className="mt-0.5 h-8 w-auto shrink-0 text-encre" />
           <div className="min-w-0">
             <p className="font-display text-lg leading-tight font-bold tracking-tight">
               {IDENTITE.raisonSociale}
