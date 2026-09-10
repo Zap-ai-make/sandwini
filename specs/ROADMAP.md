@@ -132,8 +132,6 @@ sa boutique pour le gérant, marge exclue. Elle n'a pas été demandée.
 
 ---
 
----
-
 ## Défauts ouverts
 
 Un défaut qui survit à la spec qui l'a produit devient une spec à lui : il a un symptôme daté, des
@@ -152,7 +150,7 @@ accusait, et il était faux. La leçon est en D76.
 
 ## Ce que le MVP ne fait volontairement pas
 
-Espace pièces détachées · inventaires · caisse et clôture · chiffres de la supervision · pages publiques
+Espace pièces détachées · inventaires · caisse et clôture · pages publiques
 client et prestataire · WhatsApp · échanges et reprises · transferts inter-boutiques · stock de CMC ·
 photos de motos · annulation de vente.
 
