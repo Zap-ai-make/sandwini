@@ -275,3 +275,59 @@ codée.
 **6. Un mois vide.** Une phrase et aucune carte quand le mois entier est à zéro ;
 les cartes dès qu'un seul chiffre est non nul, sinon la grille se troue et l'œil
 cherche ce qui manque.
+
+---
+
+## Ce qui a été livré, et ce que la vérification a changé
+
+**État : terminée.**
+
+L'écran `/supervision/chiffres`, atteint par « Voir les chiffres » depuis la
+supervision. Quatre cartes — motos vendues (avec le mois précédent en regard),
+encaissé, marge brute, et la carte à deux lignes créances / dépôts. Deux
+répartitions en barres, par boutique et par mode de paiement. Un sélecteur de
+douze mois. Une phrase à la place des cartes quand le mois est vide.
+
+Le calcul vit dans `lib/domain/chiffres.ts` — pur, sans Firestore, sans horloge —
+et vingt tests unitaires y figent chaque arbitrage en le nommant. Ce qui écoute
+vit dans l'écran, ce qui se dessine dans `components/ChiffresDuMois.tsx`. Trois
+endroits, trois questions.
+
+### Les trois arbitrages pris par défaut restent marqués comme tels
+
+Rien n'a été validé en cours de route. Douze mois offerts, aucun chiffre pour le
+gérant, une phrase pour un mois vide : chacun se change en un commit, et la
+section plus haut dit lequel.
+
+### Ce que la suite bout en bout a trouvé
+
+`e2e/chiffres.spec.ts` protège le sens des nombres, pas leur affichage : que la
+marge porte la phrase qui l'empêche d'être lue comme de l'argent en caisse, que
+la carte du restant dû ait **exactement deux valeurs** — une troisième
+signifierait qu'un total est revenu —, qu'un mois vide remplace les cartes au
+lieu de s'y ajouter, et qu'un gérant se voie refuser l'écran plutôt que le voir
+vidé.
+
+Le premier passage a échoué sur la marge, restée à « — » pendant soixante
+secondes. Deux causes se cachaient derrière ce tiret :
+
+1. **Un défaut de produit.** `getDoc` lève `unavailable` quand le document n'est
+   pas en cache et que la connexion est encombrée par la file d'écritures — ce
+   qui est l'état d'un appareil qui vient d'enregistrer une vente. Le code
+   rangeait cet échec avec « pas de marge » et marquait la vente comme demandée :
+   le chiffre était perdu jusqu'au rechargement. `useMarges` passe désormais la
+   main à une écoute bornée à ce qui n'a pas répondu. C'est **D82**.
+2. **Un défaut de test.** L'écran s'ouvrait avant que la file d'écritures soit
+   vide, ce qui faisait mesurer la reprise de connexion du SDK (D50, S27) au lieu
+   des chiffres. Le test attend maintenant « À jour », comme le fait déjà le test
+   de marge de S8.
+
+L'ordre a compté : c'est en expliquant l'échec au lieu de rallonger le délai
+qu'on a trouvé le premier. Un test qu'on rend patient sans l'avoir compris
+efface exactement ce qu'il venait de trouver.
+
+### Ce qui n'a pas été fait
+
+La variante de la question 5 — les mêmes chiffres bornés à sa boutique pour le
+gérant, marge exclue — reste au backlog. Elle n'a pas été demandée, et un écran
+de chiffres sur l'accueil d'un comptoir concurrencerait le geste du jour.
