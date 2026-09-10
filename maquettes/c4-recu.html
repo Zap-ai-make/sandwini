@@ -29,10 +29,6 @@
         <p>Pouytenga, province du Kouritenga</p>
         <p>Tél. <span class="code">70 12 45 88</span></p>
       </div>
-      <div class="souche">
-  <p class="souche-numero"><span class="souche-code">PTG</span>-2609-0043</p>
-  <p class="souche-legende">5 septembre 2026 · Pouytenga</p>
-</div>
     </header>
 
     <!-- IFU et RCCM sont obligatoires en tête d'un document commercial au
@@ -44,16 +40,35 @@
       RCCM <span class="code">BF-OUA-01-2016-A12-00847</span>
     </p>
 
-    <h1 class="recu-titre">Reçu de versement</h1>
+    <!-- La souche est ici, et non dans l'en-tête. Elle y volait la
+         largeur de la raison sociale, qui se cassait en quatre lignes
+         — vu sur capture. À côté du titre, elle se lit pour ce
+         qu'elle est : « reçu de versement n° PTG-2609-0043 ». -->
+    <div class="recu-titre" style="display:flex;align-items:baseline;gap:var(--e4)">
+      <h1 style="flex:1;min-width:0;border:0;padding:0;margin:0;font-size:inherit">Reçu de versement</h1>
+      <span class="souche" style="flex:none">
+        <span class="souche-numero"><span class="souche-code">PTG</span>-2609-0043</span>
+      </span>
+    </div>
 
+    <!-- La date, le lieu et l'heure sur une seule ligne. La date a quitté la
+         souche — c'est le numéro qu'on dicte au téléphone, et lui seul — et
+         l'heure a quitté le pied de page, qui n'existait que pour la porter. -->
+    <p class="aide" style="margin-top:calc(var(--e4) * -1);margin-bottom:var(--e5)">
+      Pouytenga, le 5 septembre 2026 à 15:12
+    </p>
+
+    <!-- Six lignes, et non huit. « Mode de paiement » et « Moyen » se lisaient
+         comme deux fois la même question ; ils tiennent sur une ligne, séparés
+         par le point médian qui sert déjà partout ailleurs. Le téléphone rejoint
+         le nom : c'est ce qui distingue deux clients homonymes, pas un fait
+         distinct. -->
     <dl class="recu-faits">
-      <dt>Reçu de</dt><dd>Rasmané Nikiéma</dd>
-      <dt>Téléphone</dt><dd class="code">70 12 45 88</dd>
+      <dt>Reçu de</dt><dd>Rasmané Nikiéma · <span class="code">70 12 45 88</span></dd>
       <dt>Au titre de</dt><dd>Vente <span class="code">PTG-2609-0042</span></dd>
       <dt>Moto</dt><dd>Haojue HJ 125-11 · Blanc · 2026</dd>
-      <dt>Numéro de châssis</dt><dd class="code">LC6PCJL51M0042980</dd>
-      <dt>Mode de paiement</dt><dd>Tranches</dd>
-      <dt>Moyen</dt><dd>Orange Money</dd>
+      <dt>Châssis</dt><dd class="code">LC6PCJL51M0042980</dd>
+      <dt>Règlement</dt><dd>Tranches · Orange Money</dd>
     </dl>
 
     <p class="recu-montant">
@@ -67,10 +82,6 @@
       <dt>Reste à percevoir</dt><dd class="montant">680 000 FCFA</dd>
     </dl>
 
-    <p class="recu-mention">
-      La moto reste au magasin jusqu’au dernier versement. Elle sera remise au
-      client une fois le prix convenu atteint en totalité.
-    </p>
 
     <footer class="recu-pied">
       <div>
@@ -85,7 +96,6 @@
       </div>
     </footer>
 
-    <p class="recu-bas code">SDI · PTG-2609-0043 · 05/09/26 15:12</p>
   </article>
 </main>
 

@@ -54,16 +54,24 @@
   CE QU'ELLE NE TRAITE PAS
   Les états. Le chargement, l'erreur de lecture et le reçu introuvable sont
   couverts par B5, B6 et B4 : les redessiner ici ferait une seconde règle pour
-  la même chose. La réimpression d'un numéro qui a divergé (D44) est en
-  revanche montrée, parce qu'elle est propre au reçu et qu'aucune autre
-  maquette ne la porte.
+  la même chose.
+
+  Deux mentions ont été retirées sur demande du commanditaire : l'encadré de
+  renumérotation (D44) et la phrase qui dit ce que le mode change pour le
+  client. Elles restent dans le produit — `Recu.tsx` les imprime toutes les
+  deux — mais elles ne figurent plus ici, parce que cette maquette décide de ce
+  qui entoure le document et non de ce qu'il contient. Si le retrait devait
+  valoir aussi pour le produit, ce serait une décision à part : la seconde est
+  la seule chose qui dise à un client de tranches pourquoi il rentre les mains
+  vides.
 
   CE QUE LA MAQUETTE A TROUVÉ EN SE FAISANT REGARDER
   Son premier rendu sous média `print`, depuis un poste réglé en sombre, sortait
-  l'encadré de renumérotation en noir sur noir. Le reçu, lui, restait lisible :
-  `.recu` peint en valeurs littérales, pas en jetons. Le bloc `@media print` du
-  socle ne couvrait pas le sombre système — corrigé à socle.css:1623, et c'est
-  la même leçon que D77 côté produit.
+  un encadré en noir sur noir. Le reçu, lui, restait lisible : `.recu` peint en
+  valeurs littérales, pas en jetons. Le bloc `@media print` du socle ne couvrait
+  pas le sombre système — corrigé à socle.css:1623, et c'est la même leçon que
+  D77 côté produit. L'encadré qui l'a révélé a depuis été retiré ; le correctif,
+  lui, reste.
 -->
 
 <div class="coquille-filet" aria-hidden="true"></div>
@@ -158,10 +166,6 @@
             <p>Pouytenga, province du Kouritenga</p>
             <p>Tél. <span class="code">70 12 45 88</span></p>
           </div>
-          <div class="souche">
-            <p class="souche-numero"><span class="souche-code">PTG</span>-2609-0043</p>
-            <p class="souche-legende">5 septembre 2026 · Pouytenga</p>
-          </div>
         </header>
 
         <p class="recu-legaux">
@@ -169,28 +173,35 @@
           RCCM <span class="code">BF-OUA-01-2016-A12-00847</span>
         </p>
 
-        <h1 class="recu-titre">Reçu de versement</h1>
+        <!-- La souche est ici, et non dans l'en-tête. Elle y volait la
+             largeur de la raison sociale, qui se cassait en quatre lignes
+             — vu sur capture. À côté du titre, elle se lit pour ce
+             qu'elle est : « reçu de versement n° PTG-2609-0043 ». -->
+        <div class="recu-titre" style="display:flex;align-items:baseline;gap:var(--e4)">
+          <h1 style="flex:1;min-width:0;border:0;padding:0;margin:0;font-size:inherit">Reçu de versement</h1>
+          <span class="souche" style="flex:none">
+            <span class="souche-numero"><span class="souche-code">PTG</span>-2609-0043</span>
+          </span>
+        </div>
 
-        <!-- Un encadré à filet, sans fond teinté : il s'imprime avec le reste,
-             et un aplat de couleur sur une feuille vide une cartouche pour
-             rien. C'est déjà la forme du produit (`Recu.tsx`) ; la maquette
-             l'avait dessiné en `.avis`, dont le fond gris ressortait noir sur
-             une impression lancée depuis un poste sombre — c'est ce qui a
-             révélé le trou du bloc `@media print` du socle. -->
-        <p style="margin-bottom:var(--e4);padding:var(--e2) var(--e3);
-                  border:1px solid #0f1720;font-size:var(--t-petit)">
-          Ce reçu remplace le n<sup>o</sup> <span class="code">PTG-2609-0039</span>,
-          renuméroté à la synchronisation. Seul le numéro ci-dessus fait foi.
+        <!-- La date, le lieu et l'heure sur une seule ligne. La date a quitté
+             la souche — c'est le numéro qu'on dicte au téléphone, et lui seul —
+             et l'heure a quitté le pied de page, qui n'existait que pour la
+             porter. -->
+        <p class="aide" style="margin-top:calc(var(--e4) * -1);margin-bottom:var(--e5)">
+          Pouytenga, le 5 septembre 2026 à 15:12
         </p>
 
+        <!-- Cinq lignes, et non sept. « Mode de paiement » et « Moyen » se
+             lisaient comme deux fois la même question ; ils tiennent sur une
+             ligne. Le téléphone rejoint le nom : c'est ce qui distingue deux
+             clients homonymes, pas un fait distinct. -->
         <dl class="recu-faits">
-          <dt>Reçu de</dt><dd>Rasmané Nikiéma</dd>
-          <dt>Téléphone</dt><dd class="code">70 12 45 88</dd>
+          <dt>Reçu de</dt><dd>Rasmané Nikiéma · <span class="code">70 12 45 88</span></dd>
           <dt>Au titre de</dt><dd>Vente <span class="code">PTG-2609-0042</span></dd>
           <dt>Moto</dt><dd>Haojue HJ 125-11 · Blanc · 2026</dd>
-          <dt>Numéro de châssis</dt><dd class="code">LC6PCJL51M0042980</dd>
-          <dt>Mode de paiement</dt><dd>Tranches</dd>
-          <dt>Moyen</dt><dd>Orange Money</dd>
+          <dt>Châssis</dt><dd class="code">LC6PCJL51M0042980</dd>
+          <dt>Règlement</dt><dd>Tranches · Orange Money</dd>
         </dl>
 
         <p class="recu-montant">
@@ -204,11 +215,6 @@
           <dt>Reste à percevoir</dt><dd class="montant">680 000 FCFA</dd>
         </dl>
 
-        <p class="recu-mention">
-          La moto reste au magasin jusqu'au dernier versement. Elle sera remise au
-          client une fois le prix convenu atteint en totalité.
-        </p>
-
         <footer class="recu-pied">
           <div>
             <p class="recu-legende">Le gérant</p>
@@ -220,7 +226,6 @@
           </div>
         </footer>
 
-        <p class="recu-bas code">SDI · PTG-2609-0043 · 05/09/26 15:12</p>
       </article>
 
       <!-- La barre colle au bas de la zone de travail. On imprime après avoir
