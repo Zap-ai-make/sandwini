@@ -38,27 +38,25 @@ export function JournalCaisse({
       chiffre: true,
       rendu: (mouvement) => (mouvement.date ? formaterHeure(mouvement.date) : "—"),
     },
-    {
-      cle: "piece",
-      titre: "Pièce",
-      /* Le numéro de la vente ou du reçu — ce qu’on rapproche d’un papier posé
-         sur le comptoir. Une sortie d’espèces n’en a pas, et le tiret le dit
-         plutôt que de laisser une case vide qu’on croirait tronquée. */
-      rendu: (mouvement) =>
-        mouvement.origineRefId ? (
-          <span className="plaque-code">{mouvement.origineRefId}</span>
-        ) : (
-          <span className="text-encre-doux">—</span>
-        ),
-    },
     { cle: "nature", titre: "Nature", rendu: (m) => LIBELLE_ORIGINE[m.origine] },
     {
-      cle: "qui",
-      titre: "Qui",
+      cle: "objet",
+      titre: "Objet",
       principal: true,
-      /* Le libellé porte le nom du client pour une vente, la raison pour une
-         sortie, le prestataire pour une avance. C’est la colonne qu’on
-         parcourt du regard en cherchant « la vente de Rasmané ». */
+      /* Le libellé écrit par le geste qui a produit le mouvement : « Vente
+         PTG-2609-0041 », « Avance Zongo — Carte grise », ou la raison d'une
+         sortie d'espèces. C'est lui qu'on rapproche du papier posé sur le
+         comptoir, parce que c'est lui qui porte le numéro.
+
+         **La maquette montrait deux colonnes ici — « Pièce » et « Qui » — et
+         le modèle n'en nourrit qu'une.** `origineRefId` est un identifiant
+         Firestore (`prompt.md` §5.9 le dit : « venteId, versementId… »), pas
+         un numéro imprimé : l'afficher mettait « hDgIoVtmr1SwOLm0axV7 » sous
+         les yeux d'un gérant. Et le nom du client ne figure nulle part dans un
+         encaissement. Vu au banc, sur la suite bout en bout, après une capture
+         qui semblait parfaite parce que le semis écrivait ce que le produit
+         n'écrit pas. Le manque est au backlog (S35) — il se comble en écrivant
+         le nom dans le libellé à l'encaissement, ce qui touche S8 et S9. */
       rendu: (mouvement) => mouvement.libelle || <span className="text-encre-doux">—</span>,
     },
     { cle: "moyen", titre: "Moyen", rendu: (m) => LIBELLE_MOYEN[m.moyenPaiement] },

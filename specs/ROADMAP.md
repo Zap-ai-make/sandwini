@@ -50,7 +50,6 @@ avant toute spec post-MVP.
 | S19 | Envois de fichiers — photos et papiers        | S5          | Débloqué par D66 : un champ d'envoi peut exister s'il annonce qu'il demande du réseau. Reste une spec à part parce qu'une file d'attente locale, elle, est un vrai chantier (D14). |
 | S20 | Pièces — catalogue, stock et mouvements       | S4          | Second métier entier ; n'empêche pas de vendre des motos. |
 | S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. |
-| S22 | Caisse — journal et clôture de journée        | S9          | Les encaissements existent dès S9 ; ici on ajoute la lecture et le comptage. |
 | S23 | Inventaires motos et pièces + comparaison     | S5, S20     | Exercice périodique, pas quotidien. |
 | S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
@@ -58,6 +57,7 @@ avant toute spec post-MVP.
 | S32 | Recherche globale — motos, ventes, clients     | aucune      | La palette du bandeau ne cherche que des écrans ; les maquettes lui font chercher des choses. Demande un index consultable hors ligne, ce qui en fait une spec et non une ligne : relevé pendant S31, sans être codé. |
 | S33 | Renommer le nom affiché sur les reçus          | aucune      | `a9:180-191` fait de « Votre compte » une carte « Mon nom affiché » : le nom qui s'imprime au bas des reçus remis. Le produit ne sait pas renommer un compte (D72) — c'est une écriture et une règle, pas un habillage. |
 | S34 | Le numéro de version, visible au comptoir      | aucune      | Le produit n'expose aucune version (A1.3). Quand un gérant décrit un comportement au téléphone, rien ne dit ce qui tourne sur son appareil — et une PWA garde son ancienne version jusqu'à ce que le service worker passe la main. Petit, mais c'est ce qui rend un rapport de défaut exploitable. |
+| S35 | Le nom du client dans le journal de caisse | S22 | La maquette `c2` montre une colonne « Qui » avec le nom du client ; un encaissement ne le contient pas. Deux voies : joindre ventes et clients à la lecture (deux écoutes de plus pour une colonne), ou l'écrire dans le libellé à l'encaissement, ce qui touche S8 et S9 et ne vaudra que pour les mouvements à venir. Rien d'urgent : le libellé porte déjà le numéro, qui est ce qu'on rapproche d'un papier. Trouvé par la suite bout en bout de S22 (D84). |
 
 ---
 
@@ -98,6 +98,7 @@ neuf. Ce qui restait « manque de données » attendait S24, sans se déguiser e
 | ID  | Spec                                          | Dépend de | Périmètre | Statut   |
 |-----|-----------------------------------------------|-----------|-----------|----------|
 | S24 | Supervision — les chiffres toutes boutiques   | S9, S11   | post-MVP  | terminée |
+| S22 | Caisse — journal du jour et clôture           | S8, S9, S11 | post-MVP  | terminée |
 
 S24 est fermée. Elle remplit ce que D63 réservait : la supervision avait sa
 section depuis S3bis et sa forme depuis S31, il lui manquait ses nombres. Quatre
@@ -129,6 +130,40 @@ ce qu'il venait de trouver.
 
 **Reste au backlog** la variante de la question 5 : les mêmes chiffres bornés à
 sa boutique pour le gérant, marge exclue. Elle n'a pas été demandée.
+
+
+S22 est fermée. Le journal d'une journée — ce qui entre, ce qui sort, par quel
+moyen — et la clôture qui compare les espèces attendues au comptage du soir.
+Les mouvements existaient depuis S8 : cette spec les lit, ajoute la sortie
+d'espèces et le document de clôture, et rien d'autre.
+
+**Six questions posées avant la première ligne, six réponses rendues.** Fonds
+reporté de la veille, dépenses enregistrées — c'est la réponse au point ouvert
+n° 3 du cahier des charges, resté sans réponse depuis le début —, le gérant
+clôture, une journée oubliée se ferme seule, un écart demande un motif au-delà
+d'un seuil, et la caisse est toujours celle d'une boutique.
+
+**La quatrième allait contre ma recommandation, et c'est elle qui a produit la
+décision.** Une journée fermée seule n'a pas un écart nul : elle n'a pas
+d'écart. D83 dit pourquoi, et deux règles Firestore le tiennent au lieu d'un
+commentaire.
+
+**Ce que la vérification a trouvé, et qu'aucune relecture n'aurait vu.** Le
+journal affichait un identifiant Firestore à la place d'un numéro de pièce, et
+répétait le numéro de vente dans la colonne du client. La capture d'écran ne
+l'avait pas montré — le script de semis écrivait ce que la maquette montrait,
+pas ce que le produit écrit. C'est D84, et c'est la leçon la plus coûteuse de ce
+lot : confronter un écran à sa maquette ne remplace pas de le confronter à ses
+données.
+
+**Une question du commanditaire reste ouverte, et elle porte sur le fond** :
+« je ne comprends même pas ce qu'est une clôture, il n'y a rien à clôturer ».
+Si personne ne compte le tiroir le soir, la clôture est un écran que personne
+n'ouvrira, et c'est le journal seul qui sert. Le retirer coûterait bien moins
+que ne l'aurait coûté de l'ajouter après coup : le panneau se cache, le domaine
+et les règles restent. La décision appartient au comptoir, pas au code.
+
+---
 
 ---
 

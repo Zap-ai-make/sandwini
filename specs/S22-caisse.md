@@ -1,7 +1,7 @@
 # S22 — La caisse : journal du jour et clôture
 
 ```
-Statut     : arbitrée — les six réponses sont rendues, le code peut commencer
+Statut     : terminée
 Périmètre  : post-MVP
 Dépend de  : S8 (ventes), S9 (versements), S11 (avances prestataires), S31 (la forme des écrans)
 ```
@@ -323,3 +323,75 @@ test qui le prouve avant d'écrire le formulaire de sortie (réponse 2).
   écart à `null`, pas à zéro**. C'est le test qui garde la réponse 4 honnête.
 - Un écart au-dessus du seuil : la clôture est refusée sans motif.
 - Un gérant d'une autre boutique qui ne voit ni le journal ni la clôture.
+
+---
+
+## Ce qui a été livré, et ce que la vérification a changé
+
+**État : terminée.**
+
+`/caisse` : le journal d'une journée à gauche, la clôture à droite, la sortie
+d'espèces dessous. Un sélecteur de jour ouvre l'historique. En périmètre
+entreprise, l'écran demande de choisir une boutique.
+
+Le calcul vit dans `lib/domain/caisse.ts` — pur, sans Firestore ni horloge — et
+trente tests unitaires y figent chaque arbitrage en le nommant. Les règles
+`cloturesCaisse` tiennent trois invariants qu'aucun formulaire ne peut tenir, et
+dix-huit tests de règles les exercent.
+
+### Deux défauts trouvés par la vérification
+
+**Le journal affichait un identifiant Firestore.** `origineRefId` porte un
+identifiant de document — `prompt.md` §5.9 le dit — et non un numéro imprimé ;
+le nom du client, lui, ne figure nulle part dans un encaissement. La maquette
+`c2` montre les deux colonnes, le modèle n'en nourrit qu'une. **La capture
+d'écran ne l'avait pas montré** parce que le script de semis écrivait ce que la
+maquette montrait au lieu de ce que le produit écrit. C'est **D84**, et c'est la
+leçon la plus coûteuse de ce lot.
+
+Le journal montre désormais cinq colonnes, toutes nourries : heure, nature,
+objet, moyen, montant. Le libellé porte le numéro de pièce, qui est ce qu'on
+rapproche d'un papier posé sur le comptoir. Le nom du client est au backlog
+(S35), avec ses deux voies chiffrées.
+
+**Un écart réputé nul est un comptage inventé.** La réponse 4 disait « l'écart
+est réputé nul » ; il est *inconnu*, et deux règles Firestore le tiennent
+maintenant. C'est **D83**.
+
+### Ce qui prouve que c'est fait
+
+- `lib/domain/caisse.test.ts` — 30 tests, dont celui qui retrouve les 742 000 de
+  la maquette et ceux qui séparent un tiroir compté à zéro d'un tiroir non
+  compté.
+- `regles/caisse.test.ts` — 18 tests : la clôture ne se réécrit ni ne se
+  supprime, l'écart est calculé et non déclaré, une clôture automatique ne peut
+  pas porter de comptage, l'identifiant porte la boutique et le jour, et la
+  sortie d'espèces n'a demandé aucune règle nouvelle.
+- `e2e/caisse.spec.ts` — 2 tests : l'argent encaissé à la vente se retrouve dans
+  la journée, et le gérant sort des espèces, compte le tiroir, se voit refuser
+  la clôture sans motif, puis ne peut plus rejouer son geste.
+- Regardé sur émulateurs, en clair et en sombre, côté gérant et côté
+  responsable ; la veille laissée ouverte s'est fermée seule, et les deux
+  clôtures cohabitent en base — `automatique/ecart:null` et `gerant/ecart:-5000`.
+
+### Ce qui n'a pas été fait
+
+**L'ouverture de caisse.** La maquette dit « ouverte à 08:00 par Ousmane
+Sawadogo ». Il n'existe aucun événement d'ouverture dans le modèle — le fonds
+est reporté, personne n'ouvre — et inventer une heure aurait été fabriquer une
+donnée. Un vrai geste d'ouverture changerait aussi la réponse 1.
+
+**La fermeture automatique ne part que sous les mains d'un gérant**, puisque
+c'est une écriture et que la clôture lui est réservée (réponse 3). Un
+responsable qui ouvre la caisse voit « journée non clôturée » sans pouvoir la
+fermer ; elle se fermera à la prochaine ouverture du gérant.
+
+### La question de fond, laissée ouverte
+
+Le commanditaire, après coup : « je ne comprends même pas ce qu'est une clôture,
+il n'y a rien à clôturer ». Trois lectures possibles, et elles n'appellent pas
+la même réponse : personne ne compte le tiroir le soir ; l'argent ne dort pas au
+magasin et ce qu'il faudrait est une *remise* ; ou l'habitude n'existe pas
+encore. Le journal du jour vaut dans les trois cas. **La clôture ne vaut que si
+quelqu'un compte réellement** — et si la réponse est non, le panneau se cache
+sans rien démonter.

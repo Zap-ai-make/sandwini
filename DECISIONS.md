@@ -1991,3 +1991,83 @@ Les deux corrections étaient nécessaires, et l'ordre importe — **c'est en
 expliquant l'échec au lieu de rallonger le délai qu'on a trouvé le défaut de
 produit**. Un test qu'on rend patient sans l'avoir compris efface exactement ce
 qu'il venait de trouver.
+
+---
+
+## D83 — Une clôture est une affirmation, pas un calcul
+
+*S22, la caisse. Le commanditaire a tranché qu'une journée oubliée se ferme
+toute seule ; il fallait que ce choix reste vrai.*
+
+**Ce qu'une clôture affirme.** Quelqu'un a ouvert le tiroir, compté les billets,
+et déclaré ce qu'il a trouvé. Tout le reste — les totaux, l'écart — se
+recalcule ; ce comptage-là, non. C'est la seule donnée de l'écran que personne
+ne peut reconstruire après coup, et c'est pourquoi les règles refusent de la
+réécrire : un écart qu'on peut corriger le lendemain cesse d'être une mesure.
+
+**Le piège de la fermeture automatique.** L'option retenue disait « la journée
+se ferme toute seule avec les espèces attendues, sans comptage, et l'écart est
+réputé nul ». Les cinq premiers mots sont un choix d'organisation, légitime :
+rien ne doit bloquer le comptoir le lendemain matin. Les cinq derniers sont une
+erreur de conception — **un écart réputé nul est un comptage inventé**. Sur un
+mois, les zéros s'additionnent et disent « tout allait bien » d'un tiroir que
+personne n'a ouvert.
+
+**La règle.** `especesComptees` et `ecart` sont nullables, et *nul* n'est pas
+*inconnu*. Une clôture porte `cloturePar: 'gerant'` **avec** un comptage, ou
+`cloturePar: 'automatique'` **sans**, et jamais un mélange des deux — la règle
+Firestore refuse les deux combinaisons bâtardes, deux tests le prouvent. La
+somme des écarts d'un mois exclut donc ce qu'on n'a pas mesuré, au lieu de le
+compter pour bon.
+
+**Ce que deux réponses produisent ensemble et qu'aucune ne montrait seule.** Le
+fonds d'ouverture est reporté de la veille (réponse 1) ; une veille peut s'être
+fermée sans comptage (réponse 4). Le report porte donc parfois un montant que
+personne n'a vérifié. `fondsOuverturePour` rend une **source** — `comptee`,
+`attendue`, `premiere` — et non un nombre nu, et l'écran l'écrit. La chaîne des
+journées continue de se tenir ; elle dit seulement où elle est faible.
+
+**Et pourquoi la fermeture vit sur l'appareil.** Un déclencheur serveur fermerait
+à minuit UTC, c'est-à-dire à minuit moins deux à Pouytenga : les ventes du soir
+tomberaient dans la journée suivante. C'est le comptoir qui sait qu'une journée
+est finie, comme c'est lui qui sait quel jour on est (`jourLocal`). Elle part
+donc à l'ouverture de l'écran, en série — chaque journée donne son fonds à la
+suivante — et un refus n'est jamais retenté, sinon un refus de règle devient une
+tempête d'écritures.
+
+---
+
+## D84 — Un semis qui n'écrit pas ce que le produit écrit ne vérifie rien
+
+*S22, le journal de caisse. La capture était parfaite. Elle était fausse.*
+
+**Ce qui s'est passé.** Pour regarder le journal, un script de semis a posé huit
+mouvements dans `encaissements`, calqués sur la maquette : `origineRefId` valait
+`FMZ-2609-0037` et `libelle` valait `Boukary Sawadogo`. L'écran affichait un
+numéro de pièce et un nom de client, exactement comme la maquette. J'ai regardé
+la capture, elle était juste, et j'ai commité.
+
+**Ce que le produit écrit vraiment.** `origineRefId` est un **identifiant
+Firestore** — `prompt.md` §5.9 le dit en toutes lettres, « venteId, versementId,
+ventePieceId… » — et `libelle` vaut `Vente PTG-2609-0041`. Le nom du client ne
+figure nulle part dans un encaissement. À l'écran, la colonne « Pièce »
+affichait donc `hDgIoVtmr1SwOLm0axV7` sous les yeux d'un gérant, et la colonne
+« Qui » répétait le numéro de vente.
+
+**Ce qui l'a trouvé.** Le premier passage de la suite bout en bout, parce qu'elle
+fait *vendre* et lit ensuite le journal — donc elle ne pouvait pas mentir sur la
+forme des données. Aucune relecture de code ne l'aurait vu : les deux champs
+existaient, étaient bien typés, et portaient des noms qui laissaient croire ce
+que je croyais.
+
+**La règle.** Un semis est un **faux témoin par construction** : il ressemble à
+la donnée sans en venir. Il sert à peupler un écran, jamais à prouver qu'un
+écran dit vrai. Ce qui prouve passe par le chemin réel — un geste dans
+l'interface, puis la lecture de ce que ce geste a produit. Quand un semis est
+inévitable, il se copie sur le **code d'écriture** et non sur la maquette : ici,
+`ventes.ts:438` donnait la réponse en deux lignes.
+
+**Le corollaire, plus large.** Une maquette décrit ce qu'on voudrait montrer ;
+elle ne dit pas si le modèle le contient. Confronter un écran à sa maquette —
+tout le travail de S29 et S31 — ne remplace pas de le confronter à ses données.
+Ce sont deux vérifications, et la seconde était absente ici.
