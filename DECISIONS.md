@@ -1991,3 +1991,32 @@ Les deux corrections étaient nécessaires, et l'ordre importe — **c'est en
 expliquant l'échec au lieu de rallonger le délai qu'on a trouvé le défaut de
 produit**. Un test qu'on rend patient sans l'avoir compris efface exactement ce
 qu'il venait de trouver.
+
+## D88 — Une erreur permanente n'est plus une erreur
+
+*S38. La console signalait un écart d'hydratation à chaque chargement, depuis le
+9 septembre. Rien n'était cassé : le thème s'appliquait, l'écran était juste.*
+
+**La cause était voulue.** Un script en tête de `<body>` pose `data-nav` et
+`data-theme` sur `<html>` avant que React hydrate — c'est la seule façon de ne
+pas ouvrir l'écran en clair avant de virer au sombre sous les yeux du gérant.
+React trouve donc, à l'hydratation, un attribut que son rendu ne produit pas, et
+le signale. Le remède tient en un mot, `suppressHydrationWarning`, et il est
+documenté par Next pour ce cas exact.
+
+**Ce qui mérite d'être retenu n'est pas le remède, c'est le délai.** Deux jours,
+pour un mot. Personne ne l'a corrigé parce que rien ne cassait — et pendant ces
+deux jours, **toute autre erreur de console arrivait dans une console qui en
+contenait déjà une**. Un signal permanent cesse d'être un signal ; il devient du
+décor, et le décor se traverse sans le lire.
+
+**C'est la troisième fois dans la même session.** Un test bout en bout échouait
+depuis deux jours, rangé dans le panier « la suite est bruitée » (S37). Un test
+de non-régression passait sans rien vérifier, et personne ne l'avait vu échouer
+(D79, appliqué en S34). Et cet écart-ci. Trois mécanismes différents, une seule
+forme : **un canal de vérification qu'on a appris à ne plus lire.**
+
+**La règle.** Un avertissement permanent se corrige ou se supprime, jamais ne se
+tolère. Si l'écart est volontaire, on le dit à l'outil — c'est à ça que servent
+les échappatoires comme `suppressHydrationWarning` — et on écrit pourquoi à côté.
+Un canal de vérification ne vaut que s'il est vide quand tout va bien.

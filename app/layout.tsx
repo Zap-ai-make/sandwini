@@ -44,7 +44,23 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="fr" className={`${archivo.variable} ${plexMono.variable}`}>
+    /* `suppressHydrationWarning` couvre exactement ce que le script en tête de
+       `<body>` fait juste en dessous : il pose `data-nav` et `data-theme` sur
+       cet élément avant que React hydrate. L'écart est donc voulu, et c'est le
+       seul moyen de ne pas ouvrir l'écran en clair avant de virer au sombre.
+
+       Sans cet attribut, React signalait l'écart à chaque chargement — une
+       erreur permanente dans la console, qui ne cassait rien et rendait la
+       suivante plus facile à ne pas voir. C'est le remède que documente Next
+       pour ce cas précis (`02-guides/preventing-flash-before-hydration.md`).
+
+       Il ne masque qu'un niveau : les attributs de cet élément-ci. Tout écart
+       à l'intérieur de l'application continue de se signaler. */
+    <html
+      lang="fr"
+      className={`${archivo.variable} ${plexMono.variable}`}
+      suppressHydrationWarning
+    >
       <body className="min-h-dvh antialiased">
         {/* Le seul endroit où le dégradé du monogramme sort du logo : un filet
             de deux pixels en tête de coquille (D70, `CAHIER-UI.md` §4).
