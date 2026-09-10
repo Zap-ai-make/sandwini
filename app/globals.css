@@ -891,6 +891,21 @@
     color: var(--color-encre-doux);
   }
 
+  /* Sur le papier, `--color-fond` vaut blanc — c'est voulu pour tout le reste
+     — et le crantage de la souche disparaît donc sur du blanc : le numéro se
+     lit comme un texte quelconque, alors que la souche est la signature du
+     produit (D70). Une valeur littérale, comme tout ce qui doit survivre à
+     l'impression, et dans `components` : la règle d'impression de `theme`
+     perdrait contre `.souche` quel que soit son sélecteur, les couches se
+     comparant avant les spécificités.
+
+     Vu sur `captures/s31/c5-papier-light.png`, où le talon avait disparu. */
+  @media print {
+    .souche {
+      background: #f1f3f5;
+    }
+  }
+
   .souche-legende {
     font-size: var(--text-legende);
     color: var(--color-encre-doux);

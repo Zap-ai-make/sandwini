@@ -1815,3 +1815,57 @@ pas — c'est ce commentaire qui empêchera la fusion, pas la distance.
 un quatrième mode de paiement fait échouer la compilation aux deux endroits, et
 oblige à écrire les deux textes. C'est la garde qu'on veut ici — pas qu'ils
 restent identiques, mais qu'aucun ne soit oublié.
+
+**Révisée par D81** pour ce qui est de `MENTION_RECU`, qui ne s'imprime plus.
+La ligne de partage, elle, tient toujours : elle a seulement cessé d'avoir un
+second lecteur à servir sur ce document-là.
+
+---
+
+## D81 — Le reçu ne porte que ce que le client y relira
+
+*C5, l'allègement du reçu. Le commanditaire a désigné deux phrases et dit :
+enlevez-les. La question n'était pas s'il fallait obéir, mais ce que le produit
+perd et qui le rattrape.*
+
+Deux mentions quittent le reçu, sur demande du commanditaire :
+
+1. **L'encadré de renumérotation** — « Ce reçu remplace le n° …, renuméroté à
+   la synchronisation. Seul le numéro ci-dessus fait foi. » (posé par D44)
+2. **La conséquence du mode** — « La moto reste au magasin jusqu'au dernier
+   versement… » (posée par D78, via `MENTION_RECU`)
+
+**Ce que ça coûte, mesuré et non supposé.** Les deux étaient les *secondes*
+occurrences de leur information, pas les seules :
+
+- La renumérotation est annoncée sur la fiche de vente, en avis d'alerte, avec
+  l'instruction qui manquait au papier : « Si le client détient un reçu portant
+  l'ancien, remettez-lui le nouveau » (`FicheVente.tsx`). C'est le gérant qui
+  agit, et c'est lui qui est prévenu.
+- La conséquence du mode est dite deux fois au gérant : à la validation de la
+  vente (`EFFET_MODE`, écran de saisie) et sur la fiche (« Non remise : la moto
+  reste au magasin, il reste … à verser »). Deux tests bout en bout la
+  vérifient — sur la fiche, pas sur le reçu : les retirer du reçu n'en casse
+  aucun, ce qui est le signe que ce n'était pas là qu'ils la lisaient.
+
+**Ce qui reste vrai, et qu'il faut dire.** Le client, lui, n'a plus la phrase
+sur son papier. Elle passe du document à la parole : c'est le gérant qui la dit
+en remettant le reçu. C'est un recul pour un client qui rouvre son papier trois
+semaines plus tard — recul assumé par le commanditaire, qui connaît ses clients
+et son comptoir mieux que ce fichier.
+
+**Pourquoi c'est réversible en une ligne.** `MENTION_RECU` est supprimée mais
+son texte est en commentaire à sa place, dans `vente.ts` ; `contenu.numeroRemis`
+reste calculé par le domaine et reste testé (`recu.test.ts`). Rien n'a été
+démonté sous la surface : seul l'affichage a été retiré. Le jour où le reçu
+doit reprendre l'une des deux, c'est un bloc à recoller, pas une donnée à
+reconstruire.
+
+**La règle qu'on en tire.** Sur un document que quelqu'un emporte, chaque bloc
+doit gagner sa place contre le silence, pas contre l'absence d'objection. Un
+reçu à onze blocs n'est pas onze fois plus informatif qu'un reçu à huit : il est
+plus difficile à parcourir, et c'est le montant reçu qu'on cherche dessus.
+
+**Note de numérotation.** D79 et D80 sont pris par la branche
+`fix/dettes-techniques`, empilée au-dessus de celle-ci ; d'où le saut. L'ordre
+du fichier se remet au moment de la fusion.
