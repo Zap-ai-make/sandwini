@@ -106,6 +106,26 @@ export function formaterHeure(date: Date): string {
 }
 
 /**
+ * Le jour d’une date, dans le fuseau de l’appareil, au format de
+ * `<input type="date">` — `2026-09-05`.
+ *
+ * Il vivait dans `recu.ts`, où il était né pour filtrer des reçus par plage de
+ * dates. Trois domaines lui posent désormais la même question — les reçus, le
+ * dépôt d’un document, et la journée de caisse — et une caisse n’a rien à
+ * savoir des reçus : il appartient donc au formateur commun (D73).
+ *
+ * **Le fuseau de l’appareil, et c’est tout l’enjeu.** Une journée de comptoir se
+ * ferme à dix-neuf heures locales. Calculé en UTC, le jour basculerait à minuit
+ * moins deux à Pouytenga, et les ventes du soir tomberaient dans la journée
+ * suivante.
+ */
+export function jourLocal(date: Date): string {
+  const mois = `${date.getMonth() + 1}`.padStart(2, "0");
+  const jour = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${mois}-${jour}`;
+}
+
+/**
  * Le même jour civil, sur l’horloge de l’appareil.
  *
  * L’appareil, et pas le serveur : le gérant travaille des journées entières

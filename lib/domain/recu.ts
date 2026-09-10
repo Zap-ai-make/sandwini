@@ -1,3 +1,4 @@
+import { jourLocal } from "./format";
 import { numeroRecuVersement, type MoyenPaiement, type Vente, type Versement } from "./vente";
 
 /**
@@ -221,13 +222,6 @@ export function chercherRecus<T extends RecuCherchable>(
     if (nom.length > 0 && ligne.nomNormalise.includes(nom)) return true;
     return brut.length >= 2 && sansSeparateur(ligne.recu.numero).includes(brut);
   });
-}
-
-/** Le jour d'une date, dans le fuseau de l'appareil, au format de `<input type="date">`. */
-export function jourLocal(date: Date): string {
-  const mois = `${date.getMonth() + 1}`.padStart(2, "0");
-  const jour = `${date.getDate()}`.padStart(2, "0");
-  return `${date.getFullYear()}-${mois}-${jour}`;
 }
 
 /**

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import { statutsSuivants, validerDepot, type SaisieDepot } from "@/lib/domain/dossier";
 import { estTypeDocument, type Prestataire } from "@/lib/domain/prestataire";
-import { jourLocal } from "@/lib/domain/recu";
+import { jourLocal } from "@/lib/domain/format";
 import {
   LIBELLE_DOCUMENT,
   LIBELLE_MOYEN,

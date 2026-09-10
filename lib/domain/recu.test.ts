@@ -1,13 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { normaliserNom } from "./client";
-import { formaterDate, formaterMontant } from "./format";
+import { formaterDate, formaterMontant, jourLocal } from "./format";
 import {
   chercherRecus,
   comparerRecus,
   composerRecus,
   filtrerParDates,
   identifiantRecu,
-  jourLocal,
   lireIdentifiantRecu,
   numeroDefinitif,
   rangInscrit,
