@@ -4,6 +4,7 @@ import { LogOut, Settings } from "lucide-react";
 import { useCallback, useState } from "react";
 import { IdentiteEntreprise } from "@/components/IdentiteEntreprise";
 import { ICONE_ECRAN } from "@/components/icones-ecrans";
+import { Avis } from "@/components/patrons/Avis";
 import { Hub, type Destination } from "@/components/patrons/Hub";
 import { TetePage, TitreSection } from "@/components/patrons/Page";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
@@ -12,12 +13,15 @@ import { IDENTITE } from "@/lib/domain/entreprise";
 import { ecransVisibles } from "@/lib/domain/espaces";
 import type { Prestataire } from "@/lib/domain/prestataire";
 import { LIBELLE_ROLE, peut } from "@/lib/domain/roles";
+import { faitsDeVersion } from "@/lib/domain/version";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterBoutiques } from "@/lib/repositories/boutiques";
 import { useCatalogue } from "@/lib/repositories/catalogue";
 import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 import { ecouterUtilisateurs, type FicheUtilisateur } from "@/lib/repositories/utilisateurs";
+import { VERSION_COURANTE } from "@/lib/version/courante";
+import { useMiseAJour } from "@/lib/version/mise-a-jour";
 
 /**
  * Les réglages : ce qui est posé une fois, et ce qui change.
@@ -176,16 +180,30 @@ export default function Reglages() {
         </section>
       )}
 
-      {appareil.length > 0 && (
-        <section aria-labelledby="titre-appareil" className="mb-8">
-          <TitreSection id="titre-appareil">Cet appareil</TitreSection>
-          <Hub destinations={appareil} />
-          <p className="mt-3 max-w-prose text-corps text-encre-doux">
-            Cette page est propre à l’appareil du comptoir : ce qui est en attente ici n’est pas en
-            attente ailleurs.
-          </p>
-        </section>
-      )}
+      {/* La section ne dépend plus de la présence du lien de synchronisation :
+          ce qui tourne sur cet appareil se lit quel que soit le rôle, et c'est
+          le gérant — celui dont l'écran est le plus susceptible d'être en
+          retard — qui appelle pour décrire un comportement (S34). */}
+      <section aria-labelledby="titre-appareil" className="mb-8">
+        <TitreSection id="titre-appareil">Cet appareil</TitreSection>
+        <dl className="cadre cadre-liste">
+          {faitsDeVersion(VERSION_COURANTE).map(({ titre, valeur }) => (
+            <Fait key={titre} titre={titre}>
+              {titre === "Empreinte" ? <span className="font-code">{valeur}</span> : valeur}
+            </Fait>
+          ))}
+        </dl>
+        <MiseAJour />
+        {appareil.length > 0 && (
+          <div className="mt-3">
+            <Hub destinations={appareil} />
+          </div>
+        )}
+        <p className="mt-3 max-w-prose text-corps text-encre-doux">
+          Cette page est propre à l’appareil du comptoir : ce qui est en attente ici n’est pas en
+          attente ailleurs.
+        </p>
+      </section>
 
       <section aria-labelledby="titre-compte">
         <TitreSection id="titre-compte">Votre compte</TitreSection>
@@ -234,6 +252,43 @@ export default function Reglages() {
         </p>
       </section>
     </div>
+  );
+}
+
+/**
+ * « Une version plus récente est prête », et ce qu’il faut faire pour l’avoir.
+ *
+ * C’est la moitié du problème que le numéro seul ne résout pas : sans elle,
+ * personne au comptoir ne sait que son appareil est en retard, ni pourquoi la
+ * correction déployée hier ne change rien chez lui (S34, réponse 4).
+ *
+ * Rien tant qu’il n’y a rien à dire — pas de carte « aucune mise à jour », qui
+ * serait une carte à zéro (D63). Le ton est `transit` et non `alerte` : la
+ * version est arrivée, elle n’est pas encore en vigueur ; rien n’est cassé.
+ * Et `role="status"` plutôt qu’`alert`, parce que l’avis décrit un état déjà
+ * là à l’ouverture de l’écran, et non la réponse à un geste qu’on vient de
+ * faire.
+ *
+ * **Pourquoi il n’y a pas de bouton « Recharger maintenant ».** Il y en avait
+ * un, et la vérification a montré qu’il ne pouvait pas tenir sa promesse : tant
+ * qu’un écran de l’application est ouvert, ses écoutes Firestore gardent le
+ * service worker actif occupé, et la version en attente ne prend jamais la
+ * main — pas même après un rechargement complet. Mesuré, chiffré, expliqué en
+ * D85. Un bouton qui ne fait rien est pire que pas de bouton : il apprend à ne
+ * plus croire l’écran. La phrase dit donc ce qui marche vraiment — fermer
+ * l’application, la rouvrir — et le bouton est au backlog, avec sa mesure.
+ */
+function MiseAJour() {
+  const { enAttente } = useMiseAJour();
+  if (!enAttente) return null;
+  return (
+    <Avis ton="transit" role="status" titre="Une version plus récente est prête" className="mt-3">
+      <p>
+        Elle est déjà téléchargée sur cet appareil, et aucune saisie en cours ne sera interrompue :
+        elle s’installera quand vous aurez <strong className="font-semibold">fermé complètement
+        l’application, puis rouverte</strong> — à la réouverture du magasin, par exemple.
+      </p>
+    </Avis>
   );
 }
 

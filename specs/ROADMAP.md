@@ -56,8 +56,8 @@ avant toute spec post-MVP.
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
 | S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). **Mesuré en S31** : 9 échecs sur émulateurs vieillis, 6 sur émulateurs neufs, 2 en rejouant ces six, 0 en rejouant ces deux. L'ensemble qui échoue change à chaque passe ; aucun test n'échoue deux fois de suite. **Remesuré en S24** : 83 passés, 4 échoués sur une suite complète de 29 min — les quatre en expiration *dans le décor*, aucun sur une assertion. Trois passent au rejeu sur émulateurs neufs ; le quatrième, qui avait échoué deux fois, passe en **7,1 s lancé seul** contre un budget de 180 s épuisé en suite chargée. Le rapport n'est pas marginal : ce n'est pas une assertion lente, c'est la file d'écritures qui étouffe sous la contention. Qui prendra S27 doit chercher là. |
 | S32 | Recherche globale — motos, ventes, clients     | aucune      | La palette du bandeau ne cherche que des écrans ; les maquettes lui font chercher des choses. Demande un index consultable hors ligne, ce qui en fait une spec et non une ligne : relevé pendant S31, sans être codé. |
+| S36 | Appliquer une version en attente sans fermer l'application | S34 | Le produit annonce la version prête, et dit d'aller la chercher en fermant puis rouvrant. Le bouton qui la prendrait sur place a été écrit et retiré : mesuré en S34, `skipWaiting` ne se résout jamais tant qu'un écran est ouvert — les écoutes Firestore gardent la version active occupée, et un rechargement complet n'y change rien. La piste non vérifiée est de fermer les écoutes (`disableNetwork`) avant d'envoyer le message. Petit confort : sans lui, la version arrive quand même à la réouverture. D85 porte les quatre mesures. |
 | S33 | Renommer le nom affiché sur les reçus          | aucune      | `a9:180-191` fait de « Votre compte » une carte « Mon nom affiché » : le nom qui s'imprime au bas des reçus remis. Le produit ne sait pas renommer un compte (D72) — c'est une écriture et une règle, pas un habillage. |
-| S34 | Le numéro de version, visible au comptoir      | aucune      | Le produit n'expose aucune version (A1.3). Quand un gérant décrit un comportement au téléphone, rien ne dit ce qui tourne sur son appareil — et une PWA garde son ancienne version jusqu'à ce que le service worker passe la main. Petit, mais c'est ce qui rend un rapport de défaut exploitable. |
 
 ---
 
@@ -98,6 +98,7 @@ neuf. Ce qui restait « manque de données » attendait S24, sans se déguiser e
 | ID  | Spec                                          | Dépend de | Périmètre | Statut   |
 |-----|-----------------------------------------------|-----------|-----------|----------|
 | S24 | Supervision — les chiffres toutes boutiques   | S9, S11   | post-MVP  | terminée |
+| S34 | Le numéro de version, visible au comptoir     | aucune    | post-MVP  | terminée |
 
 S24 est fermée. Elle remplit ce que D63 réservait : la supervision avait sa
 section depuis S3bis et sa forme depuis S31, il lui manquait ses nombres. Quatre
@@ -129,6 +130,46 @@ ce qu'il venait de trouver.
 
 **Reste au backlog** la variante de la question 5 : les mêmes chiffres bornés à
 sa boutique pour le gérant, marge exclue. Elle n'a pas été demandée.
+
+S34 est fermée. Le produit sait dire ce qui tourne : « SDI · version 1 » en pied
+de connexion comme le demande `a1:25`, et la version, la date de compilation et
+l'empreinte courte dans « Cet appareil ». Les trois voyagent dans le paquet et
+se lisent **réseau coupé** — c'est l'écran qu'on ouvre quand plus rien ne
+marche, il ne peut rien aller chercher.
+
+**Cinq questions ont précédé la première ligne de code, cinq réponses rendues**,
+toutes conformes aux recommandations. Le premier numéro est 1 et non 20 : le
+produit a connu une vingtaine de lots, mais aucun ne s'annonçait, et « aucun
+numéro affiché » devient l'information exacte *plus ancien que la version 1*.
+
+**La cinquième question touchait un comportement déjà en production**, et c'est
+elle qui a produit la décision. Le service worker déclarait `skipWaiting: true` :
+une version fraîchement déployée reprenait la main sur les onglets ouverts, et
+le morceau de code suivant — une navigation, un panneau — était cherché dans un
+cache où l'ancien fichier n'existait plus. L'échec tombait exactement sur le
+geste, donc en pleine saisie. D85 en tire la règle : D76 dit qu'un geste au
+comptoir n'attend jamais le serveur ; il n'est jamais rattrapé par lui non plus.
+
+**Ce que la vérification a trouvé, et qu'aucune relecture n'aurait vu.** Le
+bouton « Recharger maintenant » ne pouvait pas tenir sa promesse. Quatre mesures
+l'établissent : le message arrive bien au worker en attente, mais `skipWaiting`
+ne se résout jamais tant qu'un écran de l'application est ouvert — ses écoutes
+Firestore gardent la version active occupée — et un rechargement complet n'y
+change rien. Le même message depuis `/login`, sans session, active la nouvelle
+version immédiatement. L'écran dit donc ce qui marche vraiment (fermer
+l'application, la rouvrir) et il n'y a pas de bouton : un bouton qui ne fait
+rien n'échoue pas bruyamment, il apprend à ne plus croire l'écran.
+
+**Et le premier test de non-régression ne testait rien** : il cherchait la chaîne
+`SKIP_WAITING` dans le worker servi, où elle est présente dans les deux
+réglages. Il passait à l'endroit comme à l'envers. C'est en le vérifiant en sens
+inverse (D79) qu'on s'en est aperçu — et c'est cette vérification qui a mis au
+jour tout ce qui précède.
+
+**Reste au backlog** le bouton de rechargement, avec sa mesure et sa piste
+(fermer les écoutes Firestore avant d'envoyer le message, non vérifié).
+
+
 
 ---
 

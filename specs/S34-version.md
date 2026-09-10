@@ -1,7 +1,7 @@
 # S34 — Le numéro de version, visible au comptoir
 
 ```
-Statut     : en cours
+Statut     : terminée
 Périmètre  : post-MVP
 Dépend de  : aucune
 ```
@@ -283,6 +283,71 @@ lien de synchronisation, et la phrase de mise à jour quand il y en a une.
 
 ---
 
-## Ce qui a été livré
+## Ce qui a été livré, et ce que la vérification a changé
 
-*À remplir à la fermeture.*
+**Le numéro est là, aux deux endroits, et il tient hors ligne.** « SDI ·
+version 1 » en pied de connexion, comme `a1:25` ; la version, la date de
+compilation et l'empreinte courte dans « Cet appareil ». Les trois valeurs sont
+posées à la compilation et voyagent dans le paquet : l'écran qu'on ouvre quand
+plus rien ne marche ne demande rien à personne pour se remplir. Un test bout en
+bout le vérifie réseau coupé, parce que c'est la seule façon de le savoir.
+
+**Le premier numéro est 1**, et non 20. Le produit a connu une vingtaine de
+lots, mais aucun ne s'annonçait : « aucun numéro affiché » devient l'information
+exacte *plus ancien que la version 1*.
+
+**Le numéro s'incrémente à la main, dans le fichier `VERSION`**, au moment où
+l'on ferme un lot — avec la décision et la ligne de roadmap. Ce que ça vaut est
+en D86 : ce n'est tenable que parce que la date de compilation, elle, est
+automatique et rattrape l'oubli.
+
+### Ce que la vérification a trouvé, et qu'aucune relecture n'aurait vu
+
+**Le bouton « Recharger maintenant » ne pouvait pas tenir sa promesse.** Il a
+été écrit, il s'affichait, il envoyait le bon message — et la version en attente
+ne prenait jamais la main. Quatre mesures ont établi pourquoi plutôt que de le
+contourner : le message *arrive* bien au worker en attente, mais
+`self.skipWaiting()` ne se résout jamais tant qu'un écran de l'application est
+ouvert, parce que ses écoutes Firestore gardent la version active occupée. Le
+même message depuis `/login`, sans session, active la nouvelle version
+immédiatement. Un rechargement complet ne suffit pas non plus : la page qui
+repart rouvre ses écoutes trop vite. Le détail chiffré est en D85.
+
+**L'écran dit donc ce qui marche vraiment** — fermer l'application, la rouvrir —
+et il n'y a pas de bouton. Un bouton qui ne fait rien n'échoue pas bruyamment :
+il apprend à ne plus croire l'écran.
+
+**Le premier test de non-régression ne testait rien.** Il lisait le service
+worker servi et y cherchait la chaîne `SKIP_WAITING`. Il passait — et il passait
+aussi avec `skipWaiting: true`, Serwist embarquant ses deux branches et
+choisissant à l'exécution. C'est en le vérifiant **en sens inverse** (D79) qu'on
+s'en est aperçu, et c'est cette vérification-là qui a mis au jour tout ce qui
+précède. Le test actuel fait réellement exister une seconde version, puis vérifie
+les deux moitiés de la promesse : elle s'installe, **et** elle ne prend pas la
+main.
+
+**Une capture a montré ce qu'aucun diff ne montrait** : les deux prises de la
+page de connexion n'existaient qu'en mobile, où le panneau de marque — donc le
+numéro de version — est masqué. La moitié de l'écran validé par le commanditaire
+n'avait jamais été regardée. Deux prises de bureau sont entrées dans
+`scripts/captures.mjs`, avec un filtre par nom pour ne pas payer la série
+entière à chaque revue.
+
+### Ce qui prouve que c'est fait
+
+- 16 tests d'unité sur `lib/domain/version.ts`, un par arbitrage, y compris les
+  cas dégradés — pas d'empreinte, pas de date, valeur abîmée.
+- 3 tests bout en bout : le numéro sans compte, les trois faits réseau coupé, et
+  la nouvelle version qui s'installe sans prendre la main.
+- Les deux écrans regardés en clair et en sombre, sur capture, l'avis de mise à
+  jour compris.
+
+### Ce qui n'a pas été fait, et pourquoi
+
+- **Le bouton de rechargement**, ci-dessus. Il retourne au backlog avec sa
+  mesure : la piste est de fermer les écoutes Firestore (`disableNetwork`) avant
+  d'envoyer le message, ce qui n'a pas été vérifié.
+- **L'icône de l'avis** est un cadenas, parce que c'est celle du ton `transit`
+  dans le patron partagé. Pour « une version attend », elle est à côté du sens.
+  Changer la table ton → icône est une modification du système visuel, pas de ce
+  lot.

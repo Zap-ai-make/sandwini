@@ -10,7 +10,9 @@ import { Champ } from "@/components/patrons/Champ";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
 import { IDENTITE } from "@/lib/domain/entreprise";
 import { accueilDuRole } from "@/lib/domain/espaces";
+import { marqueAvecVersion } from "@/lib/domain/version";
 import { authentification, configurationPresente } from "@/lib/firebase/client";
+import { VERSION_COURANTE } from "@/lib/version/courante";
 
 /* Après cinq échecs, l’écran s’impose une pause. Ce n’est pas la protection
    principale — un attaquant sérieux n’utilise pas notre formulaire — mais
@@ -213,8 +215,15 @@ function PanneauMarque() {
       <p className="mt-2 max-w-[34ch] text-corps text-coquille-doux">
         Motos, pièces détachées et dossiers — Pouytenga, Koudougou, Ouagadougou.
       </p>
+      {/* « SDI · version 12 » (`a1:25`). L'audit de conformité classait cette
+          ligne en manque de données et non en défaut de rendu : la mise en page
+          était juste, c'est le numéro qui n'existait pas (S34).
+
+          Sans numéro, `marqueAvecVersion` rend « SDI » tout court — ce que le
+          produit affichait jusqu'ici. Écrire « version — » sur le premier écran
+          ferait passer un paquet sain pour un paquet cassé. */}
       <p className="mt-auto hidden pt-10 font-code text-micro tracking-widest text-coquille-muet md:block">
-        SDI
+        {marqueAvecVersion(VERSION_COURANTE)}
       </p>
     </div>
   );
