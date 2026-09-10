@@ -98,7 +98,7 @@ neuf. Ce qui restait « manque de données » attendait S24, sans se déguiser e
 | ID  | Spec                                          | Dépend de | Périmètre | Statut   |
 |-----|-----------------------------------------------|-----------|-----------|----------|
 | S24 | Supervision — les chiffres toutes boutiques   | S9, S11   | post-MVP  | terminée |
-| S22 | Caisse — journal du jour et clôture           | S8, S9, S11 | post-MVP  | terminée |
+| S22 | Caisse — le journal du jour                   | S8, S9, S11 | post-MVP  | terminée |
 
 S24 est fermée. Elle remplit ce que D63 réservait : la supervision avait sa
 section depuis S3bis et sa forme depuis S31, il lui manquait ses nombres. Quatre
@@ -156,12 +156,20 @@ pas ce que le produit écrit. C'est D84, et c'est la leçon la plus coûteuse de
 lot : confronter un écran à sa maquette ne remplace pas de le confronter à ses
 données.
 
-**Une question du commanditaire reste ouverte, et elle porte sur le fond** :
-« je ne comprends même pas ce qu'est une clôture, il n'y a rien à clôturer ».
-Si personne ne compte le tiroir le soir, la clôture est un écran que personne
-n'ouvrira, et c'est le journal seul qui sert. Le retirer coûterait bien moins
-que ne l'aurait coûté de l'ajouter après coup : le panneau se cache, le domaine
-et les règles restent. La décision appartient au comptoir, pas au code.
+**La question de fond a été tranchée, et elle a retiré un tiers du lot.**
+« Pas de fermeture ni d'ouverture » : personne ne compte le tiroir, et aucun
+événement d'ouverture n'existera. Le panneau de clôture, le report du fonds et
+la fermeture automatique des journées oubliées quittent l'écran ;
+`ClotureCaisse.tsx` est supprimé. Le domaine, ses tests, le dépôt et les règles
+Firestore n'ont pas bougé — les 388 tests d'unité passent sans qu'une ligne
+change.
+
+Ce que ça coûte est la mesure qui compte, et elle est en D87 : **un lot
+construit domaine d'abord, règles ensuite, écran en dernier se laisse amputer
+au dernier étage.** La question avait bien été posée avant la première ligne de
+code ; elle n'a reçu sa réponse utile qu'une fois l'écran sous les yeux. Ce
+n'est pas un échec de la méthode, c'est sa limite — et c'est la méthode qui a
+rendu la mauvaise réponse bon marché.
 
 ---
 

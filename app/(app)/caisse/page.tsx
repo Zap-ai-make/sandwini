@@ -1,44 +1,35 @@
 "use client";
 
 import { Wallet } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { ClotureCaisse } from "@/components/ClotureCaisse";
+import { useCallback, useMemo, useState, type FormEvent } from "react";
 import { JournalCaisse } from "@/components/JournalCaisse";
 import { ErreurDeLecture, EtatChargement, EtatErreurSaisie, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
-import {
-  clotureDuJour,
-  fondsOuverturePour,
-  journeesAFermer,
-  mouvementsDuJour,
-  resumerJournee,
-  type Cloture,
-  type Mouvement,
-} from "@/lib/domain/caisse";
+import { mouvementsDuJour, type Mouvement } from "@/lib/domain/caisse";
 import { formaterDate, jourLocal } from "@/lib/domain/format";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import {
-  ecouterClotures,
-  ecouterMouvements,
-  enregistrerCloture,
-  enregistrerSortieEspeces,
-} from "@/lib/repositories/caisse";
+import { ecouterMouvements, enregistrerSortieEspeces } from "@/lib/repositories/caisse";
 
 /**
- * La caisse — journal du jour et clôture (S22, `c2-caisse.html`).
+ * La caisse — le journal du jour (S22, `c2-caisse.html`).
  *
  * **Une caisse est toujours celle d’une boutique** (arbitrage 6). En périmètre
  * entreprise, l’écran demande d’en choisir une : une caisse consolidée ne
- * désigne aucun tiroir, et on ne compte pas trois tiroirs à la fois. Ce que le
- * responsable veut voir de plusieurs boutiques à la fois, S24 le lui donne au
- * mois.
+ * désigne aucun tiroir. Ce que le responsable veut voir de plusieurs boutiques
+ * à la fois, S24 le lui donne au mois.
  *
  * **Tout se calcule à la lecture** (D61), sur les mouvements déjà écrits par
- * S8, S9 et S11. La clôture est le seul document que cet écran crée, et il ne
- * duplique rien : ses totaux figés ne sont pas une seconde vérité mais **une
- * affirmation datée** — ce que quelqu’un a déclaré ce soir-là.
+ * S8, S9 et S11. Cet écran ne crée qu’une chose : la sortie d’espèces, parce
+ * qu’un billet pris dans le tiroir pour du carburant n’a aucun autre geste qui
+ * l’écrive.
+ *
+ * **Il n’y a pas de clôture, et c’est une réponse et non un manque.** « Pas de
+ * fermeture ni d’ouverture » : personne ne compte le tiroir le soir, donc rien
+ * n’affirme, donc l’écran ne réclame pas un geste que rien ne motive (D87). Le
+ * domaine et les règles de la clôture sont restés en place, prouvés et sans
+ * appelant — la question peut se rouvrir le jour où le volume la pose.
  */
 export default function EspaceCaisse() {
   const { perimetre, chargement } = usePerimetre();
@@ -82,7 +73,8 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
   /* Le gérant de cette boutique-là, et lui seul, clôture (arbitrage 3). Le
      responsable lit — et la fermeture automatique étant une écriture, elle ne
      part que sous ses mains à lui. */
-  const peutCloturer = utilisateur?.role === "gerant" && utilisateur.boutiqueId === boutiqueId;
+  const peutSortirDesEspeces =
+    utilisateur?.role === "gerant" && utilisateur.boutiqueId === boutiqueId;
 
   const aujourdhui = useMemo(() => jourLocal(new Date()), []);
   const [jour, setJour] = useState(aujourdhui);
@@ -99,39 +91,13 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
     reessayer,
   } = useAbonnement(souscrireMouvements, "Les mouvements de caisse n’ont pas pu être lus.");
 
-  const souscrireClotures = useCallback(
-    (auChangement: (c: Cloture[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterClotures(boutiqueId, auChangement, enErreur),
-    [boutiqueId],
-  );
-  const { valeur: clotures } = useAbonnement(
-    souscrireClotures,
-    "Les clôtures n’ont pas pu être lues.",
-  );
-
-  const chargement = (mouvements === null || clotures === null) && !erreur;
+  const chargement = mouvements === null && !erreur;
   const tousLesMouvements = useMemo(() => mouvements ?? [], [mouvements]);
-  const toutesLesClotures = useMemo(() => clotures ?? [], [clotures]);
 
   const duJour = useMemo(
     () => mouvementsDuJour(tousLesMouvements, jour),
     [tousLesMouvements, jour],
   );
-  const fonds = useMemo(
-    () => fondsOuverturePour(jour, toutesLesClotures),
-    [jour, toutesLesClotures],
-  );
-  const resume = useMemo(() => resumerJournee(fonds.montant, duJour), [fonds.montant, duJour]);
-  const clotureDeCeJour = clotureDuJour(toutesLesClotures, jour);
-
-  useFermetureAutomatique({
-    actif: peutCloturer && !chargement,
-    mouvements: tousLesMouvements,
-    clotures: toutesLesClotures,
-    aujourdhui,
-    auteur: utilisateur ? { uid: utilisateur.uid, nom: utilisateur.nom } : null,
-    boutiqueId,
-  });
 
   return (
     <div>
@@ -166,133 +132,26 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
           {erreur} Les ventes et les versements restent consultables depuis leurs écrans.
         </ErreurDeLecture>
       ) : (
-        <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem]">
-          <div className="min-w-0">
-            <JournalCaisse
-              mouvements={duJour}
-              chargement={chargement}
-              jourEstPasse={jour !== aujourdhui}
-            />
-            {peutCloturer && jour === aujourdhui && !clotureDeCeJour && (
-              <SortieEspeces
-                enregistrer={(saisie) =>
-                  enregistrerSortieEspeces(boutiqueId, saisie, {
-                    uid: utilisateur!.uid,
-                    nom: utilisateur!.nom,
-                  })
-                }
-              />
-            )}
-          </div>
-
-          <ClotureCaisse
-            resume={resume}
-            fonds={fonds}
-            jour={jour}
-            cloture={clotureDeCeJour}
-            peutCloturer={peutCloturer && !chargement}
-            enregistrer={(comptees, motif) =>
-              enregistrerCloture(
-                {
-                  boutiqueId,
-                  jour,
-                  fondsOuverture: fonds.montant,
-                  especesAttendues: resume.especesAttendues,
-                  especesComptees: comptees,
-                  motif,
-                },
-                { uid: utilisateur!.uid, nom: utilisateur!.nom },
-              )
-            }
+        <div className="min-w-0 max-w-4xl">
+          <JournalCaisse
+            mouvements={duJour}
+            chargement={chargement}
+            jourEstPasse={jour !== aujourdhui}
           />
+          {peutSortirDesEspeces && jour === aujourdhui && (
+            <SortieEspeces
+              enregistrer={(saisie) =>
+                enregistrerSortieEspeces(boutiqueId, saisie, {
+                  uid: utilisateur!.uid,
+                  nom: utilisateur!.nom,
+                })
+              }
+            />
+          )}
         </div>
       )}
     </div>
   );
-}
-
-/**
- * La fermeture des journées oubliées — arbitrage 4 du commanditaire.
- *
- * **Sur l’appareil, à l’ouverture de l’écran, et non par un déclencheur.** Même
- * raison que le jour local : c’est le comptoir qui sait qu’une journée est
- * finie, et un déclencheur qui fermerait à minuit UTC fermerait la journée de
- * Pouytenga à minuit moins deux.
- *
- * Chaque journée est fermée **dans l’ordre**, parce que chacune donne son fonds
- * d’ouverture à la suivante. Une journée fermée ainsi ne porte ni comptage ni
- * écart : elle n’a pas un écart nul, elle n’a pas d’écart. Les règles Firestore
- * le refusent autrement.
- *
- * Le garde-fou est une référence, lue dans l’effet et jamais pendant le rendu :
- * une écriture refusée ne doit pas être retentée à chaque rendu, sinon un refus
- * de règle devient une boucle.
- */
-function useFermetureAutomatique({
-  actif,
-  mouvements,
-  clotures,
-  aujourdhui,
-  auteur,
-  boutiqueId,
-}: {
-  actif: boolean;
-  mouvements: readonly Mouvement[];
-  clotures: readonly Cloture[];
-  aujourdhui: string;
-  auteur: { uid: string; nom: string } | null;
-  boutiqueId: string;
-}) {
-  const tentees = useRef<Set<string>>(new Set());
-  const aFermer = actif && auteur ? journeesAFermer(mouvements, clotures, aujourdhui) : [];
-  const cle = aFermer.join(",");
-
-  useEffect(() => {
-    if (cle === "" || !auteur) return;
-    const jours = cle.split(",").filter((jour) => !tentees.current.has(jour));
-    if (jours.length === 0) return;
-    for (const jour of jours) tentees.current.add(jour);
-
-    let vivant = true;
-    void (async () => {
-      /* En série, et pas en parallèle : le fonds d'ouverture de chaque journée
-         est l'attendu de la précédente, et les lancer ensemble les ferait
-         toutes partir du même montant. */
-      let reporte = fondsOuverturePour(jours[0], clotures);
-      for (const jour of jours) {
-        if (!vivant) return;
-        const resume = resumerJournee(reporte.montant, mouvementsDuJour(mouvements, jour));
-        try {
-          await enregistrerCloture(
-            {
-              boutiqueId,
-              jour,
-              fondsOuverture: reporte.montant,
-              especesAttendues: resume.especesAttendues,
-              especesComptees: null,
-              motif: "",
-            },
-            auteur,
-          );
-        } catch {
-          /* Un refus de règle ou une coupure : on n'insiste pas. La journée
-             reste ouverte, l'écran continue de la montrer comme telle, et la
-             prochaine ouverture réessaiera. Boucler ici transformerait un refus
-             en tempête d'écritures. */
-          return;
-        }
-        reporte = { montant: resume.especesAttendues, source: "attendue" };
-      }
-    })();
-
-    return () => {
-      vivant = false;
-    };
-    /* `clotures` et `mouvements` changent d'identité à chaque instantané ; la
-       clé, elle, ne change que si la liste des journées à fermer change. C'est
-       elle qui doit commander, sans quoi l'effet repartirait sans fin. */
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cle]);
 }
 
 /**

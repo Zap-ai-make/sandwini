@@ -2071,3 +2071,54 @@ inévitable, il se copie sur le **code d'écriture** et non sur la maquette : ic
 elle ne dit pas si le modèle le contient. Confronter un écran à sa maquette —
 tout le travail de S29 et S31 — ne remplace pas de le confronter à ses données.
 Ce sont deux vérifications, et la seconde était absente ici.
+
+*D85 et D86 ne manquent pas : elles ont été écrites par S34, sur sa propre
+branche, et cette décision-ci prend le numéro suivant plutôt que de leur entrer
+dedans à la fusion. Les deux lots ont avancé en parallèle, chacun sur sa
+branche, et c'est le prix ordinaire de ce parallélisme.*
+
+## D87 — La clôture se retire au panneau, parce qu'elle n'avait pas été bâtie au panneau
+
+*S22, après livraison. Le commanditaire, à qui la question avait été posée
+avant la première ligne de code, a répondu après l'avoir vue tourner : « je ne
+comprends même pas ce qu'est une clôture, il n'y a rien à clôturer ». Puis, sur
+l'ouverture de caisse : « pas de fermeture ni d'ouverture ».*
+
+**La réponse est nette, et elle invalide un tiers du lot.** Personne ne compte
+le tiroir le soir. Une clôture est une affirmation — *voici ce que j'ai
+trouvé* — et là où personne n'affirme, l'écran ne fait que réclamer un geste
+que rien ne motive. Le journal du jour, lui, garde tout son sens : il dit ce qui
+est entré, ce qui est sorti, par quel moyen. C'était l'hypothèse écrite dans la
+spec avant de construire, et elle tient.
+
+**Ce que le retrait a coûté, mesuré.** Un panneau retiré de l'écran, la
+fermeture automatique des journées oubliées qui n'avait plus rien à fermer, un
+composant supprimé, et un test bout en bout réécrit sur ce qui reste. Le
+domaine (`lib/domain/caisse.ts`), ses 388 tests, le dépôt et les règles
+Firestore n'ont pas bougé d'une ligne.
+
+**Pourquoi ça a coûté si peu, et ce n'est pas de la chance.** Le lot avait été
+construit dans l'ordre que le projet impose : le domaine pur d'abord, sans
+Firestore, sans React, sans horloge ; les règles ensuite ; le dépôt ; l'écran en
+dernier. Une décision qui change *qui fait le geste* ne touche alors que la
+dernière couche. **Un produit se juge aussi à ce qu'il coûte de lui retirer
+quelque chose**, et cette propriété-là ne s'ajoute pas après coup : elle est
+soit dans l'ordre de construction, soit nulle part.
+
+**Ce qu'on garde, et l'inconfort qu'on assume.** Le domaine de la clôture et
+ses règles restent, sans appelant. C'est du code que rien n'exécute en
+production, ce qui contredit `ARCHITECTURE.md` §1 pris à la lettre. On le garde
+pour une raison précise et bornée : la question de fond reste ouverte au
+comptoir — l'habitude de compter peut naître le jour où le volume l'exige — et
+ce qui est gardé est **prouvé**, pas seulement conservé. Revenir en arrière,
+c'est restaurer un composant depuis git et rebrancher un panneau, pas
+reconstruire un raisonnement et le revalider. Si la question se referme pour de
+bon, le reste s'enlève d'un commit.
+
+**Le corollaire sur les questions posées trop tôt.** Celle-ci *avait* été posée
+avant la première ligne, avec sa recommandation, et elle a reçu une réponse
+utile seulement une fois l'écran sous les yeux. Ce n'est pas un échec de la
+méthode : c'est sa limite. Certaines réponses n'existent pas avant la chose.
+Ce qui reste dans notre main, c'est de construire de façon que la mauvaise
+réponse se paie au panneau — et de poser la question quand même, parce que
+c'est elle qui a fait écrire le domaine séparément.

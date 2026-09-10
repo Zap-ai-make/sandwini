@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
   bandeauEtat,
   contenu,
@@ -9,30 +9,26 @@ import {
 } from "./aide";
 
 /**
- * La caisse — journal du jour et clôture (S22).
+ * La caisse — le journal du jour (S22).
  *
- * Ce que cette suite protège tient en trois affirmations, et aucune ne se
- * relit ailleurs dans le code exécuté :
+ * Ce que cette suite protège tient en deux affirmations, et aucune ne se relit
+ * ailleurs dans le code exécuté :
  *
  * 1. **Un versement encaissé au comptoir apparaît dans le journal du jour**, à
  *    sa nature et à son moyen. C'est le lien entre S9 et S22 : les mouvements
  *    sont écrits depuis S8, et S22 se contente de les lire — si ce lien casse,
  *    le journal se vide sans que rien d'autre échoue.
- * 2. **Une sortie d'espèces baisse les espèces attendues** (réponse 2 du
- *    commanditaire). Sans elle, chaque billet sorti pour du carburant devient
- *    un écart inexpliqué le soir.
- * 3. **Une clôture ne se rejoue pas.** Une fois faite, l'écran ne propose plus
- *    le geste : il relit ce qui a été affirmé. Les règles Firestore refusent la
- *    réécriture — `regles/caisse.test.ts` le prouve à ce niveau-là ; ici on
- *    vérifie que l'écran ne promet pas ce que la base refuserait.
+ * 2. **Une sortie d'espèces s'inscrit au journal, en négatif** (réponse 2 du
+ *    commanditaire). Sans elle, chaque billet sorti pour du carburant manque au
+ *    tiroir sans que rien ne l'explique.
  *
- * **Ce que cette suite ne couvre pas, et pourquoi.** La fermeture automatique
- * d'une journée oubliée demande une journée passée avec des mouvements — donc
- * d'antidater des écritures, ce qu'aucun chemin de l'interface ne permet, et
- * c'est très bien ainsi. Elle est couverte par `lib/domain/caisse.test.ts` sur
- * le calcul, par `regles/caisse.test.ts` sur ce que la base accepte, et elle a
- * été regardée sur émulateurs semés : la veille laissée ouverte s'est fermée
- * seule, avec son écart à `null` et non à zéro.
+ * **La clôture n'est plus ici, et ce n'est pas un oubli.** Le commanditaire a
+ * répondu « pas de fermeture ni d'ouverture » : personne ne compte le tiroir le
+ * soir. L'écran ne porte donc plus le panneau, et les assertions qui le
+ * visaient sont parties avec lui (D87). Ce que la clôture savait faire reste
+ * prouvé un cran plus bas — `lib/domain/caisse.test.ts` pour le calcul,
+ * `regles/caisse.test.ts` pour ce que la base accepte — de sorte qu'un retour
+ * en arrière ne repart pas de rien.
  */
 
 /* Même raison qu'en S8 et S9 : le décor consomme l'essentiel du budget, et
@@ -41,11 +37,6 @@ import {
 test.beforeEach(({}, informations) => {
   informations.setTimeout(300_000);
 });
-
-/** Le panneau de droite, celui qui porte les totaux et le geste. */
-function panneauCloture(page: Page) {
-  return contenu(page).locator(".cadre").filter({ hasText: /^La clôture/ });
-}
 
 test.describe("le journal de caisse", () => {
   test("l’argent encaissé à la vente se retrouve dans la journée, à sa nature et à son moyen", async ({
@@ -83,15 +74,16 @@ test.describe("le journal de caisse", () => {
     await expect(ligne.locator("td")).toHaveCount(5);
     await expect(ligne).toContainText(`Vente ${numero}`);
 
-    /* Les espèces attendues, pour une première journée sans fonds reporté :
-       exactement ce qui vient d'entrer. */
-    await expect(panneauCloture(page)).toContainText("400 000");
-    await expect(panneauCloture(page)).toContainText("Première journée de cette caisse");
+    /* Le montant entré se lit sur sa ligne, et c'est tout ce que le journal
+       promet : il ne totalise plus rien depuis que la clôture est partie
+       (D87). Un total attendu sans personne pour le comparer au tiroir n'est
+       un total pour personne. */
+    await expect(ligne).toContainText("400 000");
   });
 });
 
-test.describe("clôturer sa journée", () => {
-  test("le gérant sort des espèces, compte le tiroir, et ne peut plus rejouer sa clôture", async ({
+test.describe("la sortie d’espèces", () => {
+  test("le gérant sort des espèces de sa boutique, et le journal les compte en moins", async ({
     page,
     browser,
   }) => {
@@ -130,47 +122,34 @@ test.describe("clôturer sa journée", () => {
     await expect(contenu(pageGerant).locator("tbody tr").filter({ hasText: numero })).toBeVisible({
       timeout: 30_000,
     });
-    await expect(panneauCloture(pageGerant)).toContainText("400 000");
 
-    /* Réponse 2 : une sortie d'espèces se saisit, et elle baisse ce qu'on
-       s'attend à trouver dans le tiroir. 400 000 − 15 000 = 385 000. */
+    /* Réponse 2 : une sortie d'espèces se saisit, et elle s'inscrit au journal
+       en négatif — c'est ainsi qu'on lit une colonne de caisse. */
     await pageGerant.getByLabel("Montant", { exact: true }).fill("15000");
     await pageGerant.getByLabel("À quoi").fill("Carburant du groupe");
     await pageGerant.getByRole("button", { name: "Enregistrer la sortie" }).click();
-    await expect(panneauCloture(pageGerant)).toContainText("385 000", { timeout: 30_000 });
+
+    const sortie = contenu(pageGerant)
+      .locator("tbody tr")
+      .filter({ hasText: "Carburant du groupe" });
+    await expect(sortie).toBeVisible({ timeout: 30_000 });
+    await expect(sortie).toContainText("Sortie");
+    /* Le signe accepte les deux caractères, et ce n'est pas de la complaisance :
+       `Intl` rend un vrai moins typographique (U+2212) sous Chromium et un
+       trait d'union sous Node, parce que les deux n'embarquent pas la même
+       version d'ICU. Figer celui de la machine qui écrit le test le ferait
+       tomber sur l'autre — et l'échec accuserait le produit, qui n'y est pour
+       rien. */
+    await expect(sortie).toContainText(/[−-]15\s000/);
     await expect(contenu(pageGerant)).toContainText("2 mouvements");
 
-    /* Réponse 5 : un écart au-delà du seuil réclame une phrase. On compte
-       380 000 là où 385 000 sont attendus — cinq mille de moins. */
-    await pageGerant.getByLabel("Espèces comptées").fill("380000");
-    await expect(panneauCloture(pageGerant)).toContainText("Manque de 5 000 FCFA");
-    await pageGerant.getByRole("button", { name: "Clôturer la journée" }).click();
-    await expect(panneauCloture(pageGerant)).toContainText("L’écart dépasse", { timeout: 15_000 });
-
-    await pageGerant.getByLabel("D’où vient cet écart ?").fill("Monnaie rendue en trop, recomptée");
-    await pageGerant.getByRole("button", { name: "Clôturer la journée" }).click();
-
-    /* Ce qui prouve que la clôture est passée : le geste disparaît. Une
-       affirmation ne se rejoue pas — et si l'écran l'offrait encore, il
-       promettrait ce que les règles refusent. */
-    await expect(panneauCloture(pageGerant)).toContainText("Clôturée par Gérant de caisse", {
-      timeout: 30_000,
-    });
-    await expect(panneauCloture(pageGerant)).toContainText("Monnaie rendue en trop");
-    await expect(
-      pageGerant.getByRole("button", { name: "Clôturer la journée" }),
-    ).toHaveCount(0);
-    await expect(pageGerant.getByLabel("Espèces comptées")).toHaveCount(0);
-    /* Et la journée close n'accepte plus de mouvement saisi à la main : le
-       formulaire de sortie s'en va avec le reste. */
-    await expect(pageGerant.getByRole("button", { name: "Enregistrer la sortie" })).toHaveCount(0);
-
-    /* Le responsable lit cette clôture, et n'en fait pas (réponse 3). */
+    /* Le responsable lit le journal de cette boutique, et n'y saisit pas : la
+       sortie d'espèces appartient à qui tient le tiroir. */
     await page.goto("/caisse", { waitUntil: "load" });
-    await expect(panneauCloture(page)).toContainText("Clôturée par Gérant de caisse", {
-      timeout: 30_000,
-    });
-    await expect(page.getByRole("button", { name: "Clôturer la journée" })).toHaveCount(0);
+    await expect(
+      contenu(page).locator("tbody tr").filter({ hasText: "Carburant du groupe" }),
+    ).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole("button", { name: "Enregistrer la sortie" })).toHaveCount(0);
 
     await contexteGerant.close();
   });

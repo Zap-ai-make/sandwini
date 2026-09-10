@@ -53,12 +53,14 @@ Firestore durcies.
 **La refonte d'interface est livrée** (S28, S29, S31) : jetons, coquille,
 patrons, les neuf écrans, puis la mise en conformité avec les maquettes.
 
-**Deux lots post-MVP sont livrés** : S24 (les chiffres de la supervision) et
-S22 (la caisse — journal du jour et clôture).
+**Trois lots post-MVP sont livrés** : S24 (les chiffres de la supervision),
+S22 (la caisse — le journal du jour) et S34 (le numéro de version au comptoir).
 
 **Les branches** : `main` porte tout jusqu'à S24 inclus et se déploie en
-production sur Vercel à chaque poussée. `feat/S22-caisse` attend la décision du
-commanditaire (voir §6).
+production sur Vercel à chaque poussée. `feat/S22-caisse` porte la caisse sans
+sa clôture (D87) et `feat/S34-version` le numéro de version, la correction de
+`skipWaiting` (D85) et la réparation d'un test périmé (S37) ; aucune des deux
+n'est fusionnée.
 
 Pour voir précisément ce qui reste : le tableau **« Backlog post-MVP, ordonné
 par valeur »** de `specs/ROADMAP.md`.
@@ -130,18 +132,13 @@ effacent boutiques, motos et ventes.
 
 **Ces questions bloquent ou orientent du travail. Les poser tôt.**
 
-1. **La clôture de caisse a-t-elle un sens chez lui ?** Il a dit, après
-   livraison : *« je ne comprends même pas ce qu'est une clôture, il n'y a rien
-   à clôturer »*. Trois lectures — personne ne compte le tiroir ; l'argent ne
-   dort pas au magasin et ce qu'il faudrait est une *remise* ; ou l'habitude
-   n'existe pas encore. **Le journal du jour vaut dans les trois cas ; la
-   clôture ne vaut que si quelqu'un compte.** La retirer = cacher un panneau,
-   le domaine et les règles restent. `feat/S22-caisse` n'est pas fusionnée pour
-   cette raison.
-2. **L'ouverture de caisse** (`c2` dit « ouverte à 08:00 par… »). Aucun
-   événement d'ouverture n'existe dans le modèle. En ajouter un changerait aussi
-   le report du fonds.
-3. Les points ouverts de `prompt.md` §17 encore sans réponse : l'ordre CMC /
+1. ~~La clôture de caisse~~ et ~~l'ouverture de caisse~~ — **tranchées** :
+   « pas de fermeture ni d'ouverture ». Personne ne compte le tiroir, et aucun
+   événement d'ouverture n'existera. Le panneau de clôture, le report du fonds
+   et la fermeture automatique ont quitté l'écran ; le domaine, ses tests et les
+   règles Firestore sont restés intacts. Ce que ça a coûté, et pourquoi si peu,
+   est en **D87** — c'est la leçon la plus réutilisable de ce lot.
+2. Les points ouverts de `prompt.md` §17 encore sans réponse : l'ordre CMC /
    carte grise, qui crée les motos en stock, l'annulation de vente, les mentions
    légales sur les factures.
 

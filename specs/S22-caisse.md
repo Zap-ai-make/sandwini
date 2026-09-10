@@ -395,3 +395,31 @@ magasin et ce qu'il faudrait est une *remise* ; ou l'habitude n'existe pas
 encore. Le journal du jour vaut dans les trois cas. **La clôture ne vaut que si
 quelqu'un compte réellement** — et si la réponse est non, le panneau se cache
 sans rien démonter.
+
+### La question de fond, tranchée
+
+**« Pas de fermeture ni d'ouverture. »** C'est la première des trois lectures :
+personne ne compte le tiroir. La même réponse règle le point resté ouvert sur
+l'ouverture de caisse — la maquette `c2` disait « ouverte à 08:00 par… », aucun
+événement d'ouverture n'existait dans le modèle, et il n'en existera pas.
+
+**Ce qui part de l'écran** : le panneau de clôture, le report du fonds
+d'ouverture d'une journée sur l'autre — qui n'avait plus de source —, et la
+fermeture automatique des journées oubliées, qui n'avait plus rien à fermer.
+`components/ClotureCaisse.tsx` est supprimé.
+
+**Ce qui reste, et qui reste prouvé** : `lib/domain/caisse.ts` entier, ses
+tests, le dépôt et les règles Firestore. Les 388 tests d'unité passent sans
+qu'une ligne du domaine ait bougé.
+
+**Ce que le journal ne fait plus** : il ne totalise plus d'espèces attendues.
+Un attendu n'a de sens qu'en regard d'un comptage ; sans personne pour le
+comparer au tiroir, c'est un nombre pour personne. Le journal dit ce qui est
+entré, ce qui est sorti, à quelle heure et par quel moyen — et la sortie
+d'espèces reste, parce qu'un billet sorti pour du carburant doit s'inscrire
+quelque part.
+
+**Ce que ce retrait a appris** est en D87 : un lot construit domaine d'abord,
+règles ensuite, écran en dernier se laisse amputer au dernier étage. La
+propriété ne s'ajoute pas après coup — elle est dans l'ordre de construction ou
+nulle part.
