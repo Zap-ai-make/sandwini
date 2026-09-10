@@ -182,7 +182,7 @@ c'est le voir revenir sous un autre nom.
 | ID  | Spec                                              | Touche | Périmètre | Statut  |
 |-----|---------------------------------------------------|--------|-----------|---------|
 | S30 | Le dépôt chez un prestataire ne se termine jamais | S11    | MVP       | terminée |
-| S37 | Le reçu attend une phrase que D81 lui a retirée   | S10    | post-MVP  | à faire |
+| S37 | Le reçu attend une phrase que D81 lui a retirée   | S10    | post-MVP  | terminée |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
@@ -200,15 +200,15 @@ raison et le test est resté en arrière.** D81 affirmait que retirer la mention
 « n'en casse aucun » ; cette phrase n'avait pas été vérifiée, et elle est
 corrigée dans `DECISIONS.md`.
 
-La réparation est d'une ligne — retirer l'assertion, la conséquence du mode
-étant déjà vérifiée sur la fiche de vente, qui est là où le gérant la lit. Elle
-n'a pas été faite dans S34 : elle est hors de son périmètre, et une suite qu'on
-répare en passant est une suite dont personne ne sait plus ce qu'elle couvre.
+S37 est fermée sur arbitrage du commanditaire. L'assertion est retirée : la
+conséquence du mode reste vérifiée là où le gérant la lit, sur la fiche de vente
+(`paiements.spec.ts:106`) — ce que D81 affirmait sans l'avoir mesuré, et qui l'est
+maintenant. `recus.spec.ts:70` passe en 6,8 s, contre un budget de 15 s qu'il
+épuisait à chaque passe.
 
-**Ce qu'elle coûte tant qu'elle reste ouverte** : la suite bout en bout est
+**Ce que le défaut coûtait tant qu'il vivait** : la suite bout en bout était
 rouge en permanence, ce qui rend le prochain vrai défaut plus facile à ranger
-avec le bruit — précisément le mécanisme qui a caché celui-ci pendant deux
-jours.
+avec le bruit — précisément le mécanisme qui l'avait caché deux jours.
 
 ---
 
