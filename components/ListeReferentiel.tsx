@@ -138,7 +138,7 @@ function Ajout({
   }
 
   return (
-    <form onSubmit={soumettre} className="mt-3" noValidate>
+    <form onSubmit={soumettre} className="colonne-formulaire mt-3 max-w-[40rem]" noValidate>
       <label htmlFor={identifiant} className="block text-sm font-medium text-encre">
         Ajouter {determinant === "cette" ? "une" : "un"} {singulier}
       </label>
@@ -217,7 +217,7 @@ function Ligne({
   return (
     <li className="px-4 py-3">
       {edition ? (
-        <form onSubmit={enregistrer} className="flex flex-wrap gap-2" noValidate>
+        <form onSubmit={enregistrer} className="colonne-formulaire flex max-w-[40rem] flex-wrap gap-2" noValidate>
           <label className="sr-only" htmlFor={`nom-${entree.id}`}>
             Nouveau nom
           </label>

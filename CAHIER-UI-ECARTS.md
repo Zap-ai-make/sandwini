@@ -248,14 +248,19 @@ première ligne de code — point d'arrêt 1 de `WORKFLOW.md`.
   mémoire. Le commanditaire a dit « on en reviendra ».
 - **Les espaces Pièces et Caisse** (`c1`, `c2`) : maquettés comme aperçus, ils
   le restent tant que S20 à S22 ne sont pas prises.
-- **Les trois dettes techniques ouvertes**, qui ont chacune leur entrée et ne se
-  glissent pas ici : la borne `max-width: 32rem` de `.saisie` (cinq écrans hors
-  groupe A en dépendent : `/motos/nouvelle`, `/clients`, `FormulaireClient`,
-  `ListeReferentiel`, la connexion) ; la fragilité des règles Firestore — lire
-  une clé absente de `request.auth.token` **fait planter la règle au lieu de la
-  faire refuser**, remède `request.auth.token.get('boutiqueId', '')` ; et le
-  joker `match /{referentiel}/{id}` qui répond `false` sur toute collection
-  racine et rend chaque refus illisible dans les journaux.
+- ~~**Les trois dettes techniques ouvertes**~~ — **payées**, branche
+  `fix/dettes-techniques`. La borne `max-width: 32rem` de `.saisie` est levée :
+  les cinq écrans nommés tiennent leur colonne, et quinze écrans ont été mesurés
+  à 1600 px pour trouver les trois champs de recherche que plus rien ne bornait.
+  Les deux dettes de règles sont corrigées ensemble, parce qu'elles
+  apparaissaient ensemble dans la même chaîne d'erreur.
+
+  Une correction à la description ci-dessus, mesurée par une sonde : lire une
+  clé absente de `request.auth.token` **fait bien planter l'évaluation**, mais
+  le plantage d'une branche n'abat pas toute l'expression — un `||` le rattrape.
+  Le défaut ne mordait donc que là où les deux branches lisent le jeton, et il
+  y produisait un refus rendu pour la mauvaise raison, dont le message livrait
+  au navigateur le nom de la clé manquante. Voir `DECISIONS.md` D79.
 - **Toute correction fonctionnelle repérée en chemin** devient une entrée de
   backlog, pas du code immédiat.
 
