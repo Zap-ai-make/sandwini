@@ -1942,3 +1942,52 @@ reconstruire.
 doit gagner sa place contre le silence, pas contre l'absence d'objection. Un
 reçu à onze blocs n'est pas onze fois plus informatif qu'un reçu à huit : il est
 plus difficile à parcourir, et c'est le montant reçu qu'on cherche dessus.
+
+---
+
+## D82 — Un échec de lecture n'est pas une réponse
+
+*S24, la marge du mois. Le test bout en bout a regardé la carte pendant
+soixante secondes après une vente ; elle est restée à « — ».*
+
+**Le montage de départ, et son raisonnement.** Une marge est écrite une fois par
+un déclencheur, puis fermée en écriture à tout navigateur : elle ne changera
+jamais. Donc une lecture ponctuelle suffit, et les identifiants déjà demandés
+sont retenus pour ne jamais les redemander — sans quoi une vente sans marge
+serait relue à chaque rendu, sans fin. Chaque phrase est juste. La conclusion ne
+l'était pas.
+
+**Ce que la mesure a dit.** La marge existait bien dans la base — vérifié au SDK
+Admin, `marge: 500000` — et le navigateur ne la voyait pas. La trace nomme la
+cause&nbsp;:
+
+```
+FirebaseError: [code=unavailable]:
+  Failed to get document because the client is offline.
+```
+
+`getDoc` ne refuse pas : il **échoue**. Le document n'était pas en cache, et la
+connexion était encombrée — l'état exact d'un appareil qui vient d'enregistrer
+une vente et vide encore sa file d'écritures. C'est-à-dire l'ordinaire du
+comptoir, pas un cas de bord.
+
+**L'erreur de conception.** Le code rangeait cet échec avec « pas de marge » et
+marquait la vente comme demandée. Plus rien ne la redemandait : la carte disait
+« — » jusqu'au rechargement suivant. **Trois états avaient été confondus en
+deux** — *connu*, *inconnu pour de bon* (un refus de règle), et *pas encore
+su* (une lecture tombée, un déclencheur en retard). Le troisième n'est pas une
+réponse, et le traiter comme telle transforme une lenteur en perte.
+
+**La règle.** Une lecture ponctuelle qui échoue passe la main à une écoute, et
+l'écoute décide : elle délivre quand le réseau revient, elle se ferme sur un
+vrai refus. L'écoute reste bornée à ce qui n'a pas répondu — zéro abonnement
+dans le cas courant. On ne réessaie pas en boucle, on ne renonce pas non plus :
+on attend, et l'attente a une fin.
+
+**Le corollaire pour les tests.** Le premier symptôme ressemblait à un test mal
+réglé, et l'était en partie : ouvrir l'écran avant que la file d'écritures soit
+vide faisait mesurer la reprise de connexion du SDK (D50) au lieu des chiffres.
+Les deux corrections étaient nécessaires, et l'ordre importe — **c'est en
+expliquant l'échec au lieu de rallonger le délai qu'on a trouvé le défaut de
+produit**. Un test qu'on rend patient sans l'avoir compris efface exactement ce
+qu'il venait de trouver.

@@ -52,10 +52,9 @@ avant toute spec post-MVP.
 | S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. |
 | S22 | Caisse — journal et clôture de journée        | S9          | Les encaissements existent dès S9 ; ici on ajoute la lecture et le comptage. |
 | S23 | Inventaires motos et pièces + comparaison     | S5, S20     | Exercice périodique, pas quotidien. |
-| S24 | Supervision — les chiffres toutes boutiques   | S9, S11     | Pilotage ; S3bis a posé la section, il reste à la remplir — et il faut que les données à agréger existent d'abord. |
 | S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
-| S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). **Mesuré en S31** : 9 échecs sur émulateurs vieillis, 6 sur émulateurs neufs, 2 en rejouant ces six, 0 en rejouant ces deux. L'ensemble qui échoue change à chaque passe ; aucun test n'échoue deux fois de suite. |
+| S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). **Mesuré en S31** : 9 échecs sur émulateurs vieillis, 6 sur émulateurs neufs, 2 en rejouant ces six, 0 en rejouant ces deux. L'ensemble qui échoue change à chaque passe ; aucun test n'échoue deux fois de suite. **Remesuré en S24** : 83 passés, 4 échoués sur une suite complète de 29 min — les quatre en expiration *dans le décor*, aucun sur une assertion. Trois passent au rejeu sur émulateurs neufs ; le quatrième, qui avait échoué deux fois, passe en **7,1 s lancé seul** contre un budget de 180 s épuisé en suite chargée. Le rapport n'est pas marginal : ce n'est pas une assertion lente, c'est la file d'écritures qui étouffe sous la contention. Qui prendra S27 doit chercher là. |
 | S32 | Recherche globale — motos, ventes, clients     | aucune      | La palette du bandeau ne cherche que des écrans ; les maquettes lui font chercher des choses. Demande un index consultable hors ligne, ce qui en fait une spec et non une ligne : relevé pendant S31, sans être codé. |
 | S33 | Renommer le nom affiché sur les reçus          | aucune      | `a9:180-191` fait de « Votre compte » une carte « Mon nom affiché » : le nom qui s'imprime au bas des reçus remis. Le produit ne sait pas renommer un compte (D72) — c'est une écriture et une règle, pas un habillage. |
 | S34 | Le numéro de version, visible au comptoir      | aucune      | Le produit n'expose aucune version (A1.3). Quand un gérant décrit un comportement au téléphone, rien ne dit ce qui tourne sur son appareil — et une PWA garde son ancienne version jusqu'à ce que le service worker passe la main. Petit, mais c'est ce qui rend un rapport de défaut exploitable. |
@@ -83,7 +82,7 @@ S31 s'ajoute après coup, et ce n'est pas une refonte de plus : S29 a confronté
 maquette sur sa **zone de travail**, jamais sur la coquille qui l'entoure ni sur la marque qui
 l'habille. Ce qui n'a pas été comparé ligne à ligne ne l'a pas été. L'audit
 `AUDIT-CONFORMITE-MAQUETTES.md` mesure l'écart : 48 défauts, dont trois transverses aux neuf
-écrans. S24 reste la moitié qui coûte comme une fonctionnalité, et elle garde son rang ci-dessous.
+écrans. S24 était la moitié qui coûte comme une fonctionnalité ; elle est livrée depuis.
 
 S31 est fermée. Elle a repris la marque (le monogramme et ses deux dégradés, le jaune ramené à ses
 deux emplois), la coquille (les groupes nommés de la colonne, les deux pieds, la bascule de thème),
@@ -91,7 +90,45 @@ le sur-titre des neuf écrans, les états, les deux formes d'A2 et d'A3, A9, A4 
 défauts qu'aucun diff ne montrait sont sortis sur capture : une colonne tronquée, une phrase cassée
 en trois, et surtout un reçu qui s'imprimait blanc sur nuit depuis une machine réglée en sombre
 (D77). A2.4 et A2.8 y sont entrées en commit détachable — aucune des deux ne demandait d'agrégat
-neuf. Ce qui restait « manque de données » attend S24, et ne se déguise pas en carte à zéro (D63).
+neuf. Ce qui restait « manque de données » attendait S24, sans se déguiser en carte à zéro (D63). S24 l'a rempli.
+
+
+## Post-MVP livré, hors refonte
+
+| ID  | Spec                                          | Dépend de | Périmètre | Statut   |
+|-----|-----------------------------------------------|-----------|-----------|----------|
+| S24 | Supervision — les chiffres toutes boutiques   | S9, S11   | post-MVP  | terminée |
+
+S24 est fermée. Elle remplit ce que D63 réservait : la supervision avait sa
+section depuis S3bis et sa forme depuis S31, il lui manquait ses nombres. Quatre
+cartes, deux répartitions, douze mois au choix ; un mois vide s'écrit en une
+phrase plutôt qu'en quatre zéros alignés.
+
+**Six questions ont précédé la première ligne de code, parce qu'aucune n'était
+technique.** Le commanditaire en a tranché trois — la marge entière au mois de
+la vente, créances et dépôts séparés, l'encaissé brut. Les trois autres portent
+sur la portée et sont **prises par défaut**, marquées comme telles dans la spec
+et chacune réversible en un commit : douze mois offerts, aucun chiffre pour le
+gérant, et une phrase pour un mois vide. Chaque arbitrage est figé par un test
+qui le nomme, de sorte qu'on ne le change pas sans le voir.
+
+**Le calcul se fait à la lecture, sur les collections déjà écoutées** : aucun
+agrégat entretenu par déclencheur, donc rien qui puisse diverger de ce dont il
+est tiré, et l'écran continue de fonctionner hors ligne (D61). Le seuil où ce
+choix cesse d'être bon — environ 20 000 ventes — est écrit dans la spec pour
+être connu d'avance plutôt qu'improvisé.
+
+**Ce que la suite bout en bout a trouvé, et qu'aucune relecture n'aurait vu.**
+La carte de marge restait à « — » après une vente. La marge était pourtant
+dans la base. `getDoc` levait `unavailable` — le document n'était pas en cache
+et la connexion était encombrée par la file d'écritures — et le code rangeait
+cet échec avec « pas de marge », perdant le chiffre jusqu'au rechargement
+suivant. C'est l'ordinaire du comptoir, pas un cas de bord. D82 en tire la
+règle et le corollaire : un test qu'on rend patient sans l'avoir compris efface
+ce qu'il venait de trouver.
+
+**Reste au backlog** la variante de la question 5 : les mêmes chiffres bornés à
+sa boutique pour le gérant, marge exclue. Elle n'a pas été demandée.
 
 ---
 
@@ -113,7 +150,7 @@ accusait, et il était faux. La leçon est en D76.
 
 ## Ce que le MVP ne fait volontairement pas
 
-Espace pièces détachées · inventaires · caisse et clôture · chiffres de la supervision · pages publiques
+Espace pièces détachées · inventaires · caisse et clôture · pages publiques
 client et prestataire · WhatsApp · échanges et reprises · transferts inter-boutiques · stock de CMC ·
 photos de motos · annulation de vente.
 

@@ -2,6 +2,7 @@ import {
   collection,
   collectionGroup,
   doc,
+  getDoc,
   onSnapshot,
   query,
   Timestamp,
@@ -288,6 +289,24 @@ export function ecouterVersementsDuPerimetre(
  * seulement une fois la vente parvenue au serveur. Une vente saisie hors ligne
  * n'a pas encore de marge, et l'écran le dit plutôt que d'afficher zéro.
  */
+/**
+ * La marge d'une vente, lue une fois.
+ *
+ * Elle est écrite une seule fois par `figerMargeVente` puis fermée en écriture
+ * à tout navigateur : il n'y a rien à écouter. Une lecture ponctuelle suffit,
+ * et le cache local la sert ensuite — y compris hors ligne, ce qui permet à un
+ * mois déjà consulté de se relire sans réseau.
+ *
+ * Rend `null` quand le document n'existe pas encore (le déclencheur n'a pas
+ * tourné, ou la vente a été saisie hors ligne) : l'écran écrit alors « — »
+ * plutôt qu'un zéro qui affirmerait une marge nulle.
+ */
+export async function lireMargeVente(id: string): Promise<number | null> {
+  const instantane = await getDoc(doc(db(), "ventesMotos", id, "prive", "marge"));
+  const valeur = instantane.data()?.marge;
+  return typeof valeur === "number" ? valeur : null;
+}
+
 export function ecouterMargeVente(
   id: string,
   auChangement: (marge: MargeVente | null) => void,

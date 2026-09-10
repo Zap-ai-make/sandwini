@@ -7,7 +7,7 @@
  * cesse de faire confiance au document.
  */
 
-const LOCALE = "fr-FR";
+export const LOCALE = "fr-FR";
 
 /* Le FCFA ne se divise pas : aucun montant du système n’a de décimale
    (prompt.md §0). Un décimal qui arriverait ici est un bug ailleurs — on

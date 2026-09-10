@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, TriangleAlert } from "lucide-react";
+import { Check, ChevronRight, TrendingUp, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
 import { DernieresVentes } from "@/components/DernieresVentes";
@@ -9,9 +9,10 @@ import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { LIBELLE_METIER, reunirMetiers, type Metier } from "@/lib/domain/boutique";
 import { ESPACES } from "@/lib/domain/espaces";
-import { formaterMois } from "@/lib/domain/format";
+import { formaterMois, formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { CODE_ENTREPRISE, usePerimetre } from "@/lib/perimetre/perimetre";
 import { useCeQuiAttend } from "@/lib/repositories/comptes";
+import { PESEE_VIDE, usePeseeDesBoutiques, type PeseeBoutique } from "@/lib/repositories/pesee";
 
 /**
  * L’entrée de la supervision — le troisième espace (`prompt.md` §1).
@@ -43,6 +44,14 @@ export default function Supervision() {
      de la section suivante liste un par un. C'est ce qui la sépare de la carte
      de tableau de bord que D63 repousse jusqu'à S24. */
   const { lignes, chargement: attentesEnCours } = useCeQuiAttend();
+
+  /* Les trois chiffres de chaque carte (A2.3, `a2:93-97`), calculés sur les
+     collections déjà écoutées — S24 n'ajoute aucune lecture ici, elle ajoute un
+     `useMemo` sur ce qui est là. « Reste dû » est le total à ce jour de cette
+     boutique, et non celui des ventes du mois : sur une carte qui sert à
+     choisir où aller, c'est ce qui attend là-bas qui compte, pas ce que le mois
+     a produit. L'écran des chiffres, lui, raisonne par mois. */
+  const { pesee, chargement: peseeEnCours } = usePeseeDesBoutiques();
   const retardsParBoutique = new Map<string, number>();
   for (const ligne of lignes) {
     if (ligne.sorte !== "dossier") continue;
@@ -54,6 +63,15 @@ export default function Supervision() {
       <TetePage
         surTitre={`${perimetre.type === "boutique" ? perimetre.nom : "Toutes les boutiques"} · ${formaterMois(new Date())}`}
         titre="Supervision"
+        /* `a2:86`. Il est en tête et non dans la colonne : c'est une lecture du
+           mois en cours, pas un écran où l'on travaille — on y va, on regarde,
+           on revient. */
+        actions={
+          <Link href="/supervision/chiffres" className="bouton bouton-neutre">
+            <TrendingUp aria-hidden="true" className="size-4" />
+            Voir les chiffres
+          </Link>
+        }
         /* Une phrase, celle de la maquette (`a2:81`). La seconde — « ce que
            vous ouvrez s'inscrit dans le bandeau… » — expliquait un mécanisme
            que le bandeau montre lui-même, deux centimètres plus haut, et
@@ -93,6 +111,26 @@ export default function Supervision() {
                 }
                 href={destination(toutesLesMetiers)}
                 choisir={() => choisir(null)}
+                /* Les mêmes trois faits, additionnés sur ce que la carte
+                   représente. Sans eux elle était la seule à ne rien annoncer,
+                   et la rangée se trouait — vu sur capture. Ce n'est pas un
+                   agrégat que D63 repousse : c'est la somme de ce qui est
+                   écrit juste à côté, et le lecteur peut la refaire. */
+                chiffres={
+                  peseeEnCours
+                    ? null
+                    : actives.reduce(
+                        (somme, boutique) => {
+                          const part = pesee.get(boutique.id) ?? PESEE_VIDE;
+                          return {
+                            enStock: somme.enStock + part.enStock,
+                            ventesDuMois: somme.ventesDuMois + part.ventesDuMois,
+                            resteDu: somme.resteDu + part.resteDu,
+                          };
+                        },
+                        { ...PESEE_VIDE },
+                      )
+                }
               />
             </li>
             {actives.map((boutique) => (
@@ -109,6 +147,7 @@ export default function Supervision() {
                      dossier en retard » sur une base qui n'a pas répondu est
                      un mensonge rassurant, et c'est le pire des deux. */
                   retards={attentesEnCours ? null : (retardsParBoutique.get(boutique.id) ?? 0)}
+                  chiffres={peseeEnCours ? null : (pesee.get(boutique.id) ?? PESEE_VIDE)}
                 />
               </li>
             ))}
@@ -147,6 +186,7 @@ function CarteBoutique({
   href,
   choisir,
   retards,
+  chiffres,
 }: {
   code: string;
   nom: string;
@@ -155,6 +195,8 @@ function CarteBoutique({
   choisir: () => void;
   /** Dossiers en retard dans cette boutique ; `null` : le calcul n’est pas revenu. */
   retards?: number | null;
+  /** Ce que la boutique pèse ; `null` tant que le calcul n’est pas revenu. */
+  chiffres?: PeseeBoutique | null;
 }) {
   return (
     <Link
@@ -172,6 +214,20 @@ function CarteBoutique({
         </span>
         <ChevronRight aria-hidden="true" className="mt-1 size-4 shrink-0 text-encre-doux" />
       </span>
+
+      {/* Les trois faits de la maquette (`a2:93-97`). En `dl` parce que ce
+          sont des couples intitulé/valeur, et un lecteur d'écran les annonce
+          alors par paires au lieu d'égrener six fragments. */}
+      {chiffres && (
+        <dl className="grid gap-1 text-corps">
+          <Fait titre="Motos en stock" valeur={formaterNombre(chiffres.enStock)} />
+          <Fait titre="Ventes ce mois" valeur={formaterNombre(chiffres.ventesDuMois)} />
+          <Fait
+            titre="Reste dû"
+            valeur={chiffres.resteDu === 0 ? "—" : formaterMontant(chiffres.resteDu)}
+          />
+        </dl>
+      )}
 
       {/* La ligne d'alerte de la maquette (`a2:97, 107, 117`). Elle répond à la
           question qui fait ouvrir cet écran : *laquelle je regarde d'abord*.
@@ -208,6 +264,15 @@ function CarteBoutique({
  * siens : la garde d’espace refuserait `/motos` à une entreprise qui ne
  * vendrait que des pièces.
  */
+function Fait({ titre, valeur }: { titre: string; valeur: string }) {
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="text-encre-doux">{titre}</dt>
+      <dd className="font-code tabular-nums text-encre">{valeur}</dd>
+    </div>
+  );
+}
+
 function destination(metiers: readonly Metier[]): string {
   return metiers.length > 0 && !metiers.includes("motos")
     ? ESPACES.pieces.href
