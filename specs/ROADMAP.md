@@ -182,10 +182,33 @@ c'est le voir revenir sous un autre nom.
 | ID  | Spec                                              | Touche | Périmètre | Statut  |
 |-----|---------------------------------------------------|--------|-----------|---------|
 | S30 | Le dépôt chez un prestataire ne se termine jamais | S11    | MVP       | terminée |
+| S37 | Le reçu attend une phrase que D81 lui a retirée   | S10    | post-MVP  | à faire |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
 accusait, et il était faux. La leçon est en D76.
+
+S37 est ouverte, et c'est S34 qui l'a trouvée en refusant de classer un échec
+bout en bout comme du bruit. `e2e/recus.spec.ts:101` attend « La moto est remise
+au client » sur le reçu. L'assertion y a été posée le 9 septembre (`7916082`) ;
+le lendemain, `8fb2a7d` retirait `MENTION_RECU` du reçu sur demande du
+commanditaire (D81). Le test échoue depuis, **sur `main`**, à chaque passe —
+mesuré quatre fois, sur les deux branches, sur émulateurs neufs comme vieillis.
+
+Ce n'est donc ni de la contention ni un défaut de produit : **le produit a
+raison et le test est resté en arrière.** D81 affirmait que retirer la mention
+« n'en casse aucun » ; cette phrase n'avait pas été vérifiée, et elle est
+corrigée dans `DECISIONS.md`.
+
+La réparation est d'une ligne — retirer l'assertion, la conséquence du mode
+étant déjà vérifiée sur la fiche de vente, qui est là où le gérant la lit. Elle
+n'a pas été faite dans S34 : elle est hors de son périmètre, et une suite qu'on
+répare en passant est une suite dont personne ne sait plus ce qu'elle couvre.
+
+**Ce qu'elle coûte tant qu'elle reste ouverte** : la suite bout en bout est
+rouge en permanence, ce qui rend le prochain vrai défaut plus facile à ranger
+avec le bruit — précisément le mécanisme qui a caché celui-ci pendant deux
+jours.
 
 ---
 

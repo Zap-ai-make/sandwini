@@ -1925,6 +1925,16 @@ occurrences de leur information, pas les seules :
   vérifient — sur la fiche, pas sur le reçu : les retirer du reçu n'en casse
   aucun, ce qui est le signe que ce n'était pas là qu'ils la lisaient.
 
+> **Correction du 10 septembre 2026, apportée par S34.** La dernière phrase
+> était fausse, et elle n'avait pas été mesurée. `e2e/recus.spec.ts:101`
+> attendait bien « La moto est remise au client » **sur le reçu** — l'assertion
+> y avait été posée la veille (`7916082`, 9 septembre). Le retrait de
+> `MENTION_RECU` l'a donc cassée le jour même, et elle échoue depuis, sur
+> `main`, à chaque passe. Elle n'a pas été vue parce qu'elle tombait dans le
+> panier « la suite est bruitée » de D50 — or D50 dit exactement l'inverse :
+> un échec s'explique avant d'être écarté. Le raisonnement de D81 reste juste ;
+> c'est sa vérification qui n'avait pas eu lieu. Le défaut est ouvert en S37.
+
 **Ce qui reste vrai, et qu'il faut dire.** Le client, lui, n'a plus la phrase
 sur son papier. Elle passe du document à la parole : c'est le gérant qui la dit
 en remettant le reçu. C'est un recul pour un client qui rouvre son papier trois
