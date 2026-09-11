@@ -226,6 +226,8 @@ c'est le voir revenir sous un autre nom.
 | S30 | Le dépôt chez un prestataire ne se termine jamais | S11    | MVP       | terminée |
 | S37 | Le reçu attend une phrase que D81 lui a retirée   | S10    | post-MVP  | terminée |
 
+| S38 | La console signale un écart d'hydratation à chaque chargement | S28 | post-MVP | terminée |
+
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
 accusait, et il était faux. La leçon est en D76.
@@ -251,6 +253,19 @@ maintenant. `recus.spec.ts:70` passe en 6,8 s, contre un budget de 15 s qu'il
 **Ce que le défaut coûtait tant qu'il vivait** : la suite bout en bout était
 rouge en permanence, ce qui rend le prochain vrai défaut plus facile à ranger
 avec le bruit — précisément le mécanisme qui l'avait caché deux jours.
+
+S38 est fermée. Le script qui pose le thème avant la peinture — sans lui l'écran
+s'ouvre en clair puis vire au sombre — modifie `<html>` avant que React hydrate,
+et React signalait l'écart à chaque chargement depuis le 9 septembre.
+`suppressHydrationWarning` sur cet élément le dit à React, et ne masque qu'un
+niveau : tout écart à l'intérieur de l'application continue de se signaler.
+
+Vérifié dans les deux sens (D79) : une erreur avant, zéro après, l'attribut
+toujours posé. **Ce qui vaut d'être retenu n'est pas le remède mais le délai** —
+deux jours pour un mot, parce que rien ne cassait. Pendant ce temps, toute autre
+erreur arrivait dans une console qui en contenait déjà une. D88 en tire la
+règle, et note que c'est la troisième fois dans la même session qu'un canal de
+vérification avait cessé d'être lu.
 
 ---
 
