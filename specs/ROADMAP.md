@@ -229,6 +229,8 @@ c'est le voir revenir sous un autre nom.
 
 | S38 | La console signale un écart d'hydratation à chaque chargement | S28 | post-MVP | terminée |
 | S40 | Le contrôle d'unicité répond avant de savoir | S5, S20, S39 | post-MVP | terminée |
+| S27 | La suite bout en bout rend un verdict qu'on peut croire | aucune | post-MVP | terminée |
+| S41 | Le second lecteur ne voit pas une sortie de caisse déjà publiée | S22, S27 | post-MVP | **ouverte** |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
@@ -268,6 +270,55 @@ deux jours pour un mot, parce que rien ne cassait. Pendant ce temps, toute autre
 erreur arrivait dans une console qui en contenait déjà une. D88 en tire la
 règle, et note que c'est la troisième fois dans la même session qu'un canal de
 vérification avait cessé d'être lu.
+
+S27 est fermée — deuxième étape du `CAHIER-DU-RESTE`, et son verdict n'est pas
+celui qu'on attendait. Le nom du lot disait « reconnexion » ; la mesure dit
+autre chose. Une passe complète sur émulateurs neufs a rendu huit échecs, et
+**sept avaient deux causes, aucune dans le produit** : une écriture du décor
+perdue au rechargement de page, et un second navigateur qui lit le serveur avant
+que la file soit vide. Le produit confirme de façon optimiste — c'est sa promesse
+au comptoir et elle est juste (D76) — mais `page.goto` et `browser.newContext()`
+détruisent ce qui n'est pas encore parti.
+
+Le remède tient en une ligne, écrite une fois dans `aide.ts` :
+`attendreLaFileVide(page)`, **à la frontière** — avant de quitter la page qui
+vient d'écrire, avant d'ouvrir un second navigateur, avant de couper le réseau.
+Jamais document par document : attendre le serveur à chaque écriture fabrique la
+contention qu'on mesurait ensuite. Une nuance a coûté une passe entière :
+l'attente doit précéder la navigation, pas la suivre — placée après, elle
+constate une file vide **parce que l'écriture n'y est plus**.
+
+**Mesuré** : sur les quatre fichiers qui portaient les huit échecs, il en reste
+un ; les tests corrigés ont perdu une minute chacun, n'expirant plus sur une
+donnée absente. Chaque attente coûte environ trente secondes — elle paie
+l'établissement de la connexion Firestore, pas la file. Mauvais échange à
+l'unité, bon échange en tout.
+
+**La borne du cahier est atteinte et assumée** : la suite ne redescend pas sous
+quinze minutes. Cent tests qui font chacun six chargements de page complets n'y
+tiennent pas, et les y faire tenir demanderait de semer le décor par l'Admin SDK
+— ce qui perdrait la vérification du « vrai chemin d'un premier jour ». La parade
+est donc outillée : `npm run test:e2e:propre` démarre son propre jeu
+d'émulateurs et l'éteint après, et `e2e/README.md` porte le protocole de tri en
+cinq étapes — dont celle que personne ne faisait, **aller voir si la donnée est
+au serveur**, qui tranche entre « mal écrit », « perdu » et « pas lu » (D99).
+
+**Trois choses trouvées en chemin.** Les émulateurs ne vieillissent pas avec le
+temps mais avec les données, et le mécanisme est nommé (D98). Un test peut rester
+suspendu **bien au-delà de son budget** quand l'émulateur Functions perd sa
+socket — 45 minutes et 1 h 30 mesurées —, d'où un `globalTimeout` de deux heures.
+Et la sortie d'espèces attendait l'accusé de réception du serveur, dernier geste
+de comptoir à le faire, contre D76 : hors ligne, le bouton serait resté désactivé
+indéfiniment. Corrigé, avec son test réseau coupé.
+
+S41 est ouverte, et c'est S27 qui l'a trouvée en refusant de classer son dernier
+échec avec le bruit. `caisse.spec.ts` « la sortie d'espèces » échoue toujours.
+Le protocole a donné le diagnostic : le document **est au serveur**, exact dans
+tous ses champs, et le gérant qui l'a saisi le voit. C'est le **responsable**,
+rechargeant le journal de cette boutique juste après, qui ne le voit pas dans les
+trente secondes qu'on lui laisse. Ni écriture perdue, ni défaut de droits : une
+lecture qui n'arrive pas chez un second lecteur, pour un document déjà publié —
+la famille de D82. À reprendre avec cette preuve en main.
 
 S40 est fermée — première étape du `CAHIER-DU-RESTE`. Les six écrans que D95
 annonçait posaient leur question de doublon à une liste encore vide pendant son

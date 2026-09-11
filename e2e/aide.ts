@@ -59,6 +59,39 @@ export async function seConnecterEtEntrer(page: Page) {
   await expect(page.getByRole("heading", { name: "Supervision", level: 1 })).toBeVisible();
 }
 
+/**
+ * Attend que **tout ce qui vient d'être écrit soit parti au serveur**.
+ *
+ * `À jour` au bandeau veut dire : la file d'écritures Firestore est vide. Rien
+ * d'autre dans le produit ne dit cela, et c'est exactement la question que le
+ * décor doit se poser avant deux gestes précis.
+ *
+ * **Avant d'ouvrir un second navigateur** (S27, D97). Un navigateur qui vient
+ * d'écrire lit son propre cache et n'a rien à attendre — c'est la promesse du
+ * produit. Mais le cache n'est pas partagé : le gérant qui se connecte dans un
+ * second contexte lit le **serveur**, et ne voit rien tant que la file n'a pas
+ * été vidée. Sans cette attente, le test échoue sur une fiche absente, et
+ * l'échec accuse le produit d'un défaut de droits qu'il n'a pas.
+ *
+ * **Avant de couper le réseau.** Même raison, prise par l'autre bout : une
+ * écriture encore en file n'est pas durablement en cache, et un rechargement
+ * de page la perd. Le test se retrouve alors hors ligne sans la donnée qu'il
+ * vient de fabriquer — c'est ce qui a fait échouer le test hors ligne des motos
+ * pendant S40, sur une option de liste manquante.
+ *
+ * **Une fois, à la frontière — jamais document par document.** Attendre le
+ * serveur à chaque écriture du décor fabriquerait la contention que S27 mesure
+ * (`CAHIER-DU-RESTE` §3.3) : la suite deviendrait plus lente **et** plus
+ * fragile, l'attente elle-même finissant par expirer.
+ *
+ * Le budget est large parce que le SDK Firestore reste dans son cycle de
+ * reconnexion à attente croissante (D50) : après une coupure, la file peut
+ * mettre près d'une minute à repartir.
+ */
+export async function attendreLaFileVide(page: Page) {
+  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 120_000 });
+}
+
 /** L'indicateur de périmètre du bandeau : sélecteur pour le responsable, texte pour le gérant. */
 export function selecteurPerimetre(page: Page) {
   return page.getByRole("banner").getByRole("combobox", { name: "Boutique affichée" });
@@ -203,6 +236,14 @@ export async function preparerTerrain(page: Page): Promise<Terrain> {
   // On se place dans la boutique : une moto entre quelque part de précis.
   await selecteurPerimetre(page).selectOption(code);
 
+  /* **Une fois, à la sortie du décor** (S27, D97). Ce qui vient d'être écrit
+     l'a été de façon optimiste : l'écran le montre avant que Firestore l'ait
+     posé durablement. Le prochain `page.goto` recharge la page entière et
+     repart du cache sur disque — une écriture encore en vol n'y est pas, et le
+     modèle disparaît de la liste des choix. Mesuré pendant S40 : le serveur
+     avait le document, le navigateur ne l'avait plus. */
+  await attendreLaFileVide(page);
+
   return { code, marque, modele, provenance };
 }
 
@@ -282,6 +323,15 @@ export async function vendre(
 
   const client = `Zongo ${Date.now().toString(36)}`;
   await creerClientDepuisLeFichier(page, client, `78${String(Date.now()).slice(-6)}`);
+
+  /* **La frontière de ce décor-ci**, et elle a coûté quatre échecs par passe
+     avant d'être vue (S27). L'écran de saisie s'ouvre par un chargement complet
+     et cherche ensuite la moto puis le client dans le cache Firestore. Le
+     client vient d'être créé ; sa confirmation à l'écran est optimiste, et ne
+     dit rien de sa persistance. Sans cette attente, le test expirait sur un
+     `radio` de client qui n'existait nulle part — ni au cache, ni au serveur —
+     et l'échec ressemblait trait pour trait à de la lenteur. */
+  await attendreLaFileVide(page);
 
   await page.goto("/motos/ventes/nouvelle", { waitUntil: "load" });
   await page.getByLabel("Chercher dans le stock").fill(chassis);

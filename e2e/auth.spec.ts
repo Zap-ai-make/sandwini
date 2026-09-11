@@ -1,11 +1,12 @@
 import { expect, test } from "@playwright/test";
 import {
-  RESPONSABLE,
+  attendreLaFileVide,
   contenu,
   emailUnique,
   messageErreur,
   messageSucces,
   prendreLaMainEtMettreEnCache,
+  RESPONSABLE,
   seConnecter,
   seConnecterEtEntrer,
 } from "./aide";
@@ -150,6 +151,11 @@ test.describe("gestion des comptes", () => {
     await page.getByLabel("Mot de passe provisoire").fill(motDePasse);
     await page.getByRole("button", { name: /Créer le compte/ }).click();
     await expect(messageSucces(page)).toContainText("Compte créé", { timeout: 20_000 });
+
+    /* Le second navigateur lit le **serveur**, pas le cache du premier : tant
+       que la file d'écritures n'est pas vide, il ne verra rien de ce que le
+       décor vient de fabriquer, et l'échec accusera les droits (D97). */
+    await attendreLaFileVide(page);
 
     const contexteGerant = await browser.newContext();
     const pageGerant = await contexteGerant.newPage();

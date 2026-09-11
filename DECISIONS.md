@@ -2626,3 +2626,73 @@ fabriquerait exactement la contention que S27 mesure (`CAHIER-DU-RESTE` §3.3).
 *Conséquence :* le test est passé de 90 s d'expiration à **7,1 s**. Et une
 catégorie entière de faux échecs disparaît : tout test qui coupe le réseau après
 avoir écrit était exposé au même hasard.
+
+---
+
+## D98 — Un émulateur ne vieillit pas avec le temps, il vieillit avec les données
+
+*S27, après une passe complète mesurée sur émulateurs neufs.*
+
+Trois mesures antérieures avaient décrit la même chose sans la nommer : une
+suite bout en bout qui prend vingt-cinq minutes sur des émulateurs neufs et une
+heure quarante sur ceux du matin, avec deux à trois fois plus d'échecs. Le mot
+employé était « vieillis », et il suggérait une dérive du processus — une fuite
+de mémoire, un index qui se dégrade.
+
+**Ce n'est pas ça.** `e2e/preparation.ts` vide la base **une fois par passe**,
+puis les cent tests y accumulent chacun une boutique, une marque, un modèle, une
+provenance, un client. Or presque chaque écran du produit écoute ses collections
+**en entier** — c'est D16, et c'est le bon choix pour un comptoir qui doit
+chercher sans réseau. Au centième test, chaque ouverture d'écran relit ce que
+les quatre-vingt-dix-neuf précédents ont écrit, et un test de vente ouvre six
+écrans.
+
+Le coût d'une passe n'est donc **pas linéaire en nombre de tests**, et une passe
+lancée sur des émulateurs qui ont déjà servi part avec la charge de la veille.
+
+**La conséquence pratique**, et c'est elle qui compte : « redémarrer les
+émulateurs » n'est pas une superstition de développeur fatigué, c'est la seule
+façon de ramener la mesure à une base connue. `npm run test:e2e:propre` démarre
+son propre jeu pour la durée de la passe et l'éteint après — et **refuse de
+partir** si des émulateurs tournent déjà, parce qu'une mesure faite sur ceux d'à
+côté ne mesure pas ce qu'on croit.
+
+*Conséquence assumée :* une passe complète coûte le démarrage d'un jeu
+d'émulateurs, environ quarante secondes. Le rejeu d'un test isolé continue de
+passer par `npm run test:e2e` contre les émulateurs qu'on a sous la main — c'est
+le geste du diagnostic, pas celui de la mesure.
+
+---
+
+## D99 — Un échec bout en bout se diagnostique en allant voir le serveur
+
+*S27. L'étape que personne ne faisait, et celle qui tranche.*
+
+Un test qui expire sur `waiting for getByRole(…)` peut vouloir dire trois choses
+très différentes, et rien dans le rapport ne les distingue :
+
+1. le produit a écrit une mauvaise valeur ;
+2. l'écriture s'est perdue et n'existe nulle part ;
+3. l'écriture est bien là, et c'est la **lecture** qui n'a pas eu lieu.
+
+Tant qu'on ne sait pas laquelle, toute correction est une hypothèse. Et la
+tentation est toujours la même : rendre le test plus patient, ce qui transforme
+les trois cas en un seul — un test qui passe parfois.
+
+**L'émulateur Firestore répond en REST avec un jeton d'administration**, et
+donne la réponse en une commande :
+
+```bash
+curl -s -H "Authorization: Bearer owner" \
+  "http://127.0.0.1:8181/v1/projects/sdi-dev/databases/(default)/documents/clients?pageSize=100"
+```
+
+C'est cette commande qui a réglé S40 — le serveur avait le modèle avec le bon
+`marqueId`, donc le filtre du produit était juste et c'est le cache du navigateur
+qui ne l'avait pas — et c'est elle qui a réglé S27 : sur huit clients fabriqués
+par une passe, deux seulement étaient arrivés au serveur, ce qui disqualifiait
+d'emblée toute explication par la lenteur.
+
+*Conséquence :* le protocole est écrit dans `e2e/README.md`, avec le tableau des
+trois réponses et ce que chacune veut dire. Il y est plutôt que dans un message
+de commit parce que c'est là qu'on le cherchera.

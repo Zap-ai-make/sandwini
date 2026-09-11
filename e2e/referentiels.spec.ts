@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { IDENTITE } from "@/lib/domain/entreprise";
 import {
+  attendreLaFileVide,
   contenu,
   emailUnique,
   nomUnique,
@@ -265,6 +266,11 @@ test.describe("droits", () => {
         timeout: 20_000,
       },
     );
+
+    /* Le second navigateur lit le **serveur**, pas le cache du premier : tant
+       que la file d'écritures n'est pas vide, il ne verra rien de ce que le
+       décor vient de fabriquer, et l'échec accusera les droits (D97). */
+    await attendreLaFileVide(page);
 
     const contexteGerant = await browser.newContext();
     const pageGerant = await contexteGerant.newPage();

@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  attendreLaFileVide,
   bandeauEtat,
   contenu,
   emailUnique,
@@ -127,6 +128,14 @@ test.describe("droits", () => {
     await page.goto("/clients", { waitUntil: "load" });
     await creerClient(page, nomDuResponsable, telephoneUnique());
 
+    /* **Avant de quitter la page qui vient d'écrire**, et non avant d'ouvrir le
+       second navigateur — la nuance a coûté une passe. `page.goto` recharge
+       l'application entière : ce que Firestore n'a pas encore posé disparaît
+       avec le contexte, et la fiche n'existe alors ni au cache ni au serveur.
+       L'attente placée plus bas arrivait trop tard, elle constatait une file
+       vide parce que l'écriture n'y était plus (D97). */
+    await attendreLaFileVide(page);
+
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
     const email = emailUnique("clients");
     const motDePasse = "gerant-clients-001";
@@ -140,6 +149,11 @@ test.describe("droits", () => {
     await expect(contenu(page).getByRole("status")).toContainText("Compte créé", {
       timeout: 20_000,
     });
+
+    /* Le second navigateur lit le **serveur**, pas le cache du premier : tant
+       que la file d'écritures n'est pas vide, il ne verra rien de ce que le
+       décor vient de fabriquer, et l'échec accusera les droits (D97). */
+    await attendreLaFileVide(page);
 
     const contexteGerant = await browser.newContext();
     const pageGerant = await contexteGerant.newPage();

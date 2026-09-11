@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  attendreLaFileVide,
   bandeauEtat,
   codeUnique,
   contenu,
@@ -186,6 +187,11 @@ test.describe("le coût est réservé au responsable", () => {
     });
 
     // Le gérant saisit la moto, coût compris.
+    /* Le second navigateur lit le **serveur**, pas le cache du premier : tant
+       que la file d'écritures n'est pas vide, il ne verra rien de ce que le
+       décor vient de fabriquer, et l'échec accusera les droits (D97). */
+    await attendreLaFileVide(page);
+
     const contexteGerant = await browser.newContext();
     const pageGerant = await contexteGerant.newPage();
     await seConnecter(pageGerant, email, motDePasse);
@@ -302,7 +308,7 @@ test.describe("hors ligne", () => {
        l'attend une fois, à la frontière, plutôt que d'attendre le serveur à
        chaque document du décor — ce qui fabriquerait la contention que S27
        mesure (§3.3 du cahier). */
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 60_000 });
+    await attendreLaFileVide(page);
 
     await context.setOffline(true);
     await expect(bandeauEtat(page)).toContainText("Hors ligne", { timeout: 30_000 });
