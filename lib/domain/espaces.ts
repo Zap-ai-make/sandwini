@@ -173,6 +173,12 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
         { href: "/motos/ventes", libelle: "Ventes" },
         { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
         { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },
+        /* S39. Le prix d'achat ne se saisit plus au comptoir : c'est ici qu'il
+           se pose, et cet écran est le seul endroit d'où l'on sait quelles
+           motos en attendent un. Sans cette entrée il n'était atteignable que
+           par un bouton de la vue d'ensemble — et le rail surlignait « Vue
+           d'ensemble » pendant qu'on y travaillait. */
+        { href: "/supervision/couts", libelle: "Prix d’achat" },
       ],
     },
     /* « Les boutiques » n'est pas ici : c'est une liste de données, pas

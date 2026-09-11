@@ -15,6 +15,7 @@ import {
   LONGUEUR_TEXTE_MAX,
   SAISIE_VIDE,
   chassisDejaPris,
+  coutRenseigne,
   coutTotalSaisie,
   normaliserChassis,
   validerMoto,
@@ -371,10 +372,19 @@ export default function PageNouvelleMoto() {
               types={catalogue.typesFrais.filter((t) => t.actif)}
             />
 
-            <p className="mt-4 flex items-baseline justify-between gap-4 border-t border-bord pt-3">
-              <span className="text-sm font-medium text-encre">Coût total d’entrée</span>
-              <span className="text-lg font-semibold text-encre">{formaterMontant(total)}</span>
-            </p>
+            {/* **Pas de total tant qu'il n'y a rien à totaliser** (S39).
+                Le bloc affichait « 0 FCFA » sur un formulaire vide : tant que
+                le prix d'achat était obligatoire, ce zéro était un compteur qui
+                attendait. Devenu facultatif, il dit « cette moto a coûté
+                zéro » — c'est-à-dire acquise gratuitement — là où la réponse
+                est « on ne sait pas encore » (D82). Vu à la capture, pas à la
+                relecture. */}
+            {coutRenseigne(saisie) && (
+              <p className="mt-4 flex items-baseline justify-between gap-4 border-t border-bord pt-3">
+                <span className="text-sm font-medium text-encre">Coût total d’entrée</span>
+                <span className="text-lg font-semibold text-encre">{formaterMontant(total)}</span>
+              </p>
+            )}
           </fieldset>
         )}
 

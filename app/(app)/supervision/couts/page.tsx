@@ -96,7 +96,10 @@ export default function PageCouts() {
           type="button"
           onClick={() => setOuverte(ouverte === moto.id ? null : moto.id)}
           aria-expanded={ouverte === moto.id}
-          className="text-left font-medium text-encre underline-offset-2 hover:underline"
+          /* Souligne toujours, pas au survol : c'est le seul moyen d'ouvrir
+             la saisie, et il n'y a pas de survol au doigt. Un element qui
+             agit doit se voir agir (DESIGN.md §11). */
+          className="text-left font-medium text-encre underline decoration-bord underline-offset-4 hover:decoration-encre"
         >
           {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
         </button>
@@ -174,7 +177,14 @@ export default function PageCouts() {
       </div>
 
       {lignes.length === 0 && !chargement ? (
-        <EtatVide titre={VIDE[filtre].titre}>{VIDE[filtre].phrase}</EtatVide>
+        /* **Le filtre ne décide de la phrase que s'il y a quelque chose à
+           filtrer.** Sur une base sans aucune moto, « tout est renseigné » se
+           félicite d'un travail que personne n'a fait — un état vide qui ment
+           dans le sens rassurant, ce que D63 refuse pour les cartes à zéro et
+           qui vaut tout autant pour une phrase. */
+        <EtatVide titre={VIDE[comptes.total === 0 ? "toutes" : filtre].titre}>
+          {VIDE[comptes.total === 0 ? "toutes" : filtre].phrase}
+        </EtatVide>
       ) : (
         <Tableau
           legende="Les motos en stock et l’état de leur prix d’achat"

@@ -13,14 +13,170 @@ const BASE = process.env.BASE_URL ?? "http://127.0.0.1:3000";
 const DOSSIER = "captures";
 
 const RESPONSABLE = { email: "responsable@sdi.test", motDePasse: "responsable-sdi-2026" };
+const GERANT = { email: "gerant-captures@sdi.test", motDePasse: "gerant-captures-2026", nom: "Gérant des captures" };
+
+/**
+ * Le compte gérant des captures, semé au SDK Admin.
+ *
+ * **Pourquoi il a fallu l'ajouter** (S39). Ce script ne savait ouvrir qu'une
+ * session de responsable, et le disait en commentaire sans y remédier. Depuis
+ * que le formulaire d'entrée en stock n'affiche plus les mêmes blocs selon le
+ * rôle, la revue visuelle de cet écran ne voyait qu'une de ses deux formes —
+ * et l'espace pièces (S20) est un espace de gérant de bout en bout.
+ *
+ * Il est semé ici plutôt que par `amorcer.mjs` : `amorcer` casse la boucle du
+ * premier responsable et n'a pas à connaître les besoins d'un outil de revue.
+ * On passe par l'Admin SDK plutôt que par `creerGerant`, pour la même raison
+ * qu'`amorcer` : un script de développement n'a pas à rejouer l'interface.
+ *
+ * Il vise une boutique qui porte **les deux métiers** : sans `pieces`, la garde
+ * d'espace refuserait l'onglet des pièces, et les captures de S20 montreraient
+ * un refus (D62).
+ */
+async function semerLeGerant() {
+  process.env.FIREBASE_AUTH_EMULATOR_HOST = "127.0.0.1:9399";
+  process.env.FIRESTORE_EMULATOR_HOST = "127.0.0.1:8181";
+  process.env.GCLOUD_PROJECT = "sdi-dev";
+
+  const { getApps, initializeApp } = await import("firebase-admin/app");
+  const { getAuth } = await import("firebase-admin/auth");
+  const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
+  if (getApps().length === 0) initializeApp({ projectId: "sdi-dev" });
+  const auth = getAuth();
+  const base = getFirestore();
+
+  /* La boutique d'abord : un gérant sans boutique se connecte sur une
+     application vide, et la capture montrerait « aucune boutique attribuée ». */
+  const boutiques = await base.collection("boutiques").where("actif", "==", true).get();
+  let code = boutiques.docs.find((d) => (d.get("metiers") ?? []).includes("pieces"))?.id;
+  if (!code) {
+    code = "CAP";
+    const trace = {
+      createdAt: FieldValue.serverTimestamp(),
+      createdBy: "captures",
+      createdByName: "Captures",
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: "captures",
+      updatedByName: "Captures",
+    };
+    await base.doc(`boutiques/${code}`).set({
+      nom: "Boutique des captures",
+      code,
+      metiers: ["motos", "pieces"],
+      adresse: "Pouytenga",
+      telephone: "70 00 00 00",
+      actif: true,
+      ...trace,
+    });
+  }
+
+  let compte;
+  try {
+    compte = await auth.getUserByEmail(GERANT.email);
+    await auth.updateUser(compte.uid, { password: GERANT.motDePasse, disabled: false });
+  } catch {
+    compte = await auth.createUser({
+      email: GERANT.email,
+      password: GERANT.motDePasse,
+      displayName: GERANT.nom,
+    });
+  }
+  await auth.setCustomUserClaims(compte.uid, { role: "gerant", boutiqueId: code });
+  await base.doc(`users/${compte.uid}`).set(
+    {
+      nom: GERANT.nom,
+      email: GERANT.email,
+      role: "gerant",
+      boutiqueId: code,
+      actif: true,
+      updatedAt: FieldValue.serverTimestamp(),
+    },
+    { merge: true },
+  );
+  await semerLeStock(base, FieldValue, code);
+  return code;
+}
+
+/**
+ * Deux motos, dont une sans coût.
+ *
+ * **Un écran photographié vide ne se revoit pas.** `/supervision/couts` existe
+ * pour lister ce qui attend un prix d'achat : sans stock, la revue visuelle ne
+ * voit qu'un état vide — utile à vérifier une fois, inutile pour juger des
+ * colonnes, du repli en cartes et du formulaire de pose.
+ *
+ * L'une porte son coût, l'autre non : c'est exactement la situation que S39
+ * crée, et les deux lignes doivent se distinguer d'un coup d'œil.
+ *
+ * Rien n'est écrasé si le décor est déjà là — relancer la campagne ne doit pas
+ * multiplier les motos.
+ */
+async function semerLeStock(base, FieldValue, code) {
+  const marque = "marque-captures";
+  const modele = "modele-captures";
+  const provenance = "provenance-captures";
+  const trace = () => ({
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: "captures",
+    createdByName: "Captures",
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: "captures",
+    updatedByName: "Captures",
+  });
+
+  await base.doc(`marques/${marque}`).set({ nom: "Apsonic", actif: true, ...trace() });
+  await base
+    .doc(`modeles/${modele}`)
+    .set({ nom: "AP 125", marqueId: marque, actif: true, ...trace() });
+  await base.doc(`provenances/${provenance}`).set({ nom: "Lomé", actif: true, ...trace() });
+
+  const motos = [
+    { id: "moto-captures-1", chassis: "LC6PCJ1A9K0000111", cout: 850_000 },
+    { id: "moto-captures-2", chassis: "LC6PCJ1A9K0000222", cout: null },
+  ];
+  for (const { id, chassis, cout } of motos) {
+    await base.doc(`motos/${id}`).set({
+      boutiqueId: code,
+      etat: "neuve",
+      marqueId: marque,
+      modeleId: modele,
+      couleur: "Rouge",
+      annee: 2025,
+      numeroChassis: chassis,
+      numeroMoteur: "",
+      prixVenteConseille: 1_100_000,
+      provenanceId: provenance,
+      papiersFournis: [],
+      photos: [],
+      statut: "en_stock",
+      dateEntree: new Date("2026-09-01T09:00:00Z"),
+      quittanceChemin: null,
+      cmcChemin: null,
+      ...trace(),
+    });
+    if (cout === null) {
+      await base.doc(`motos/${id}/prive/cout`).delete();
+      continue;
+    }
+    await base.doc(`motos/${id}/prive/cout`).set({
+      boutiqueId: code,
+      prixAchat: cout,
+      fraisEntree: [],
+      coutTotal: cout,
+      updatedAt: FieldValue.serverTimestamp(),
+      updatedBy: "captures",
+      updatedByName: "Captures",
+    });
+  }
+}
 
 /** Ouvre une session : la plupart des écrans en exigent une depuis S2. */
-async function seConnecter(page) {
+async function seConnecter(page, identifiants = RESPONSABLE, arrivee = "**/supervision") {
   await page.goto(`${BASE}/login`, { waitUntil: "load" });
-  await page.getByLabel("Adresse e-mail").fill(RESPONSABLE.email);
-  await page.getByLabel("Mot de passe", { exact: true }).fill(RESPONSABLE.motDePasse);
+  await page.getByLabel("Adresse e-mail").fill(identifiants.email);
+  await page.getByLabel("Mot de passe", { exact: true }).fill(identifiants.motDePasse);
   await page.getByRole("button", { name: /Se connecter/ }).click();
-  await page.waitForURL("**/supervision");
+  await page.waitForURL(arrivee);
 }
 
 const PRISES = [
@@ -62,6 +218,31 @@ const PRISES = [
   { nom: "motos-bureau-sombre", chemin: "/motos", theme: "dark", mobile: false },
   { nom: "motos-nouvelle-mobile-clair", chemin: "/motos/nouvelle", theme: "light", mobile: true, boutique: true },
   { nom: "motos-nouvelle-bureau-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: false, boutique: true },
+  /* **Le même écran vu par un gérant** (S39). Il n'y a plus le bloc « Ce
+     qu'elle a coûté » : le prix d'achat se pose depuis la supervision. Sans
+     cette prise, la revue visuelle ne verrait qu'une des deux formes de cet
+     écran — et c'est celle que personne n'utilise au comptoir. */
+  { nom: "motos-nouvelle-gerant-mobile-clair", chemin: "/motos/nouvelle", theme: "light", mobile: true, gerant: true },
+  { nom: "motos-nouvelle-gerant-bureau-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: false, gerant: true },
+  /* La liste de choix ouverte sur sa saisie : c'est l'état que S39 ajoute, et
+     il ne se voit sur aucune prise au repos. */
+  { nom: "motos-nouvelle-gerant-ajout-marque", chemin: "/motos/nouvelle", theme: "light", mobile: true, gerant: true, ajoutMarque: true },
+  /* **Le bas des formulaires, et pourquoi il lui faut sa propre prise.** La
+     coquille fixe la barre latérale et le bandeau, et fait défiler une zone
+     intérieure : la hauteur du document vaut celle de la fenêtre, `fullPage`
+     rend donc la même image qu'une prise ordinaire, et viser l'élément ne
+     peint pas ce que le conteneur clippe. Un formulaire de dix champs se
+     laissait photographier jusqu'au quatrième, et la revue croyait l'avoir vu
+     en entier (S39). On fait défiler, comme le fait la personne devant
+     l'écran, et on prend la seconde moitié. */
+  { nom: "motos-nouvelle-bas-bureau-clair", chemin: "/motos/nouvelle", theme: "light", mobile: false, boutique: true, bas: true },
+  { nom: "motos-nouvelle-gerant-bas-bureau-clair", chemin: "/motos/nouvelle", theme: "light", mobile: false, gerant: true, bas: true },
+  { nom: "motos-nouvelle-gerant-bas-mobile-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: true, gerant: true, bas: true },
+  /* Les prix d'achat, l'écran que S39 crée pour que le responsable pose ce que
+     le gérant ne saisit plus. */
+  { nom: "couts-mobile-clair", chemin: "/supervision/couts", theme: "light", mobile: true },
+  { nom: "couts-bureau-clair", chemin: "/supervision/couts", theme: "light", mobile: false },
+  { nom: "couts-bureau-sombre", chemin: "/supervision/couts", theme: "dark", mobile: false },
   { nom: "ventes-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, boutique: true },
   { nom: "ventes-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, boutique: true },
   { nom: "vente-nouvelle-mobile-clair", chemin: "/motos/ventes/nouvelle", theme: "light", mobile: true, boutique: true },
@@ -104,6 +285,10 @@ const filtre = process.argv[2] ? new RegExp(process.argv[2]) : null;
 const aPrendre = filtre ? PRISES.filter(({ nom }) => filtre.test(nom)) : PRISES;
 
 await mkdir(DOSSIER, { recursive: true });
+if (aPrendre.some((prise) => prise.gerant || prise.chemin.startsWith("/supervision/couts"))) {
+  const code = await semerLeGerant();
+  console.log(`compte gérant prêt : ${GERANT.email} (boutique ${code})`);
+}
 const navigateur = await chromium.launch();
 
 for (const {
@@ -117,6 +302,9 @@ for (const {
   premiereVente,
   premierRecu,
   impression,
+  gerant,
+  ajoutMarque,
+  bas,
 } of aPrendre) {
   const contexte = await navigateur.newContext({
     ...(mobile ? devices["Pixel 7"] : { viewport: { width: 1280, height: 820 } }),
@@ -124,7 +312,13 @@ for (const {
   });
   const page = await contexte.newPage();
   let boutiqueChoisie = null;
-  if (!publique) await seConnecter(page);
+  if (gerant) {
+    /* Le gérant atterrit sur son accueil, pas sur la supervision (D63), et son
+       périmètre est sa boutique : rien à choisir dans le bandeau. */
+    await seConnecter(page, GERANT, "**/dashboard");
+  } else if (!publique) {
+    await seConnecter(page);
+  }
 
   /* Certains écrans n'ont de sens que dans une boutique précise : le formulaire
      d'entrée en stock demande où ranger la moto. On en choisit une, comme le
@@ -173,6 +367,15 @@ for (const {
     .first()
     .waitFor({ state: "detached", timeout: 15000 })
     .catch(() => {});
+  /* Le patron `Tableau` ne dit pas "Chargement" : il occupe la place du
+     contenu a venir avec des lignes fantomes (`.squelette`). La campagne les
+     photographiait donc comme si c'etait le rendu -- un ecran gris, et une
+     revue qui croit avoir vu un tableau. */
+  await page
+    .locator(".squelette")
+    .first()
+    .waitFor({ state: "detached", timeout: 20000 })
+    .catch(() => {});
   if (premiereVente || premierRecu) {
     /* Dans le contenu, pas n'importe où : la navigation principale est elle
        aussi une liste, et sa première entrée renvoyait à l'accueil.
@@ -202,6 +405,13 @@ for (const {
       .catch(() => {});
     await page.waitForTimeout(1500);
   }
+  /* « + Ajouter une marque… » remplace le select par un champ : c'est l'état
+     que S39 ajoute, et il n'existe sur aucune capture au repos. */
+  if (ajoutMarque) {
+    await page.getByLabel("Marque", { exact: true }).selectOption("__nouvelle__");
+    await page.getByLabel(/^Nouvelle marque/).fill("Apsonic");
+    await page.waitForTimeout(300);
+  }
   if (coupe) {
     await contexte.setOffline(true);
     await page.getByRole("status").getByText("Hors ligne").waitFor({ timeout: 5000 });
@@ -210,6 +420,11 @@ for (const {
      feuille `@media print` retire la coquille, repasse la palette en clair et
      ajoute les traits de signature (DESIGN.md §14 — regarder le rendu réel). */
   if (impression) await page.emulateMedia({ media: "print" });
+
+  if (bas) {
+    await page.getByRole("button", { name: /Faire entrer en stock/ }).scrollIntoViewIfNeeded();
+    await page.waitForTimeout(400);
+  }
   await page.screenshot({ path: `${DOSSIER}/${nom}.png`, fullPage: !mobile });
   console.log(`capturé  ${DOSSIER}/${nom}.png`);
   await contexte.close();

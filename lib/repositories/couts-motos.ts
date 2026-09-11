@@ -103,7 +103,13 @@ export function useCoutsDesMotos(motos: readonly Moto[] | null): {
 
   const reessayer = useCallback(() => setTour((precedent) => precedent + 1), []);
 
-  const chargement = motos !== null && motos.some((moto) => !etats.has(moto.id));
+  /* **`motos === null` veut dire « on ne sait pas encore », pas « aucune ».**
+     La première version rendait `false` dans ce cas — la liste n'étant pas
+     arrivée, aucune moto n'avait de coût manquant, donc rien ne chargeait. À
+     l'écran, cela donnait « Aucune moto en stock » affiché pendant que le
+     stock arrivait, c'est-à-dire une réponse rendue avant de l'avoir. Vu à la
+     capture sur une base qui contenait deux motos (D82, encore lui). */
+  const chargement = motos === null || motos.some((moto) => !etats.has(moto.id));
 
   return { etats, chargement, noter, reessayer };
 }

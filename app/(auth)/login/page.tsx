@@ -143,7 +143,43 @@ export default function Connexion() {
           ) : session.statut === "sans_role" ? (
             <SansRole />
           ) : (
-            <form onSubmit={connecter} className="mt-6 space-y-4" noValidate>
+            <form
+              onSubmit={connecter}
+              method="post"
+              action="/login"
+              className="mt-6 space-y-4"
+              noValidate
+            >
+              {/* **`method="post"` sur un formulaire qui ne part jamais au
+                  serveur, et ce n'est pas une précaution de style.**
+
+                  Un `<form>` sans méthode vaut GET. Tant que React est hydraté,
+                  `onSubmit` intercepte et rien ne part ; mais si l'hydratation
+                  n'a pas eu lieu — un chunk manquant, un service worker qui
+                  sert un cache incomplet, un réseau coupé au mauvais moment —
+                  le navigateur envoie le formulaire lui-même. En GET, il
+                  recopie alors les champs dans la barre d'adresse :
+
+                    /login?email=…&mot-de-passe=le-mot-de-passe-en-clair
+
+                  Vu au banc pendant S39, pas imaginé : un build dont les chunks
+                  rendaient 403 a produit exactement cette URL. Le mot de passe
+                  se retrouve alors dans l'historique du navigateur — un
+                  appareil de comptoir est partagé —, dans les journaux d'accès
+                  de l'hébergeur, et dans le `Referer` de la requête suivante.
+                  Il y reste après la connexion, et changer de mot de passe ne
+                  l'en retire pas.
+
+                  En POST le geste échoue toujours — aucune route ne reçoit ce
+                  formulaire, la connexion passe par le SDK Firebase — mais il
+                  échoue **sans rien écrire nulle part** (`SECURITY.md` §2 : un
+                  secret ne traverse jamais une URL). `action` vise la page
+                  elle-même pour que la soumission n'invente pas de route.
+
+                  Vérifié par un test bout en bout qui charge cette page dans un
+                  contexte **sans JavaScript** : c'est le seul moyen de prouver
+                  que le secret ne fuit pas, là où une assertion sur l'attribut
+                  prouverait seulement que l'attribut est là. */}
               {/* L’avis vit au-dessus des champs, comme dans la maquette : on
                   lit ce qui s’est passé avant de reposer les doigts sur le
                   clavier, pas après avoir cherché le bouton. */}

@@ -21,6 +21,46 @@ import {
 
 const MOT_DE_PASSE_FAUX = "mauvais-mot-de-passe";
 
+test.describe("le mot de passe ne traverse jamais une URL", () => {
+  /* **Le formulaire non hydraté, simulé pour de vrai.** Tant que React tient la
+     page, `onSubmit` intercepte et rien ne part. Mais un `<form>` sans méthode
+     vaut GET, et si l'hydratation n'a pas eu lieu -- un chunk manquant, un
+     service worker qui sert un cache incomplet -- le navigateur envoie le
+     formulaire lui-même et recopie les champs dans la barre d'adresse.
+
+     Un contexte sans JavaScript reproduit exactement cet état. C'est la seule
+     façon honnête de le vérifier : une assertion sur l'attribut `method`
+     prouverait que l'attribut est là, pas que le secret ne fuit pas.
+
+     Vu au banc pendant S39 sur un build dont les chunks rendaient 403 : l'URL
+     portait « ?email=...&mot-de-passe=... » en clair. Il y serait reste dans
+     l'historique du navigateur -- un appareil de comptoir est partage --, dans
+     les journaux d'acces de l'hebergeur, et dans le `Referer` de la requete
+     suivante. */
+  test("un formulaire non hydraté n’écrit pas le mot de passe dans la barre d’adresse", async ({
+    browser,
+  }) => {
+    const contexte = await browser.newContext({ javaScriptEnabled: false });
+    const page = await contexte.newPage();
+    await page.goto("/login", { waitUntil: "load" });
+
+    await page.getByLabel("Adresse e-mail").fill(RESPONSABLE.email);
+    await page.getByLabel("Mot de passe", { exact: true }).fill(RESPONSABLE.motDePasse);
+    await page.getByRole("button", { name: /Se connecter/ }).click();
+    await page.waitForTimeout(2000);
+
+    /* Le geste échoue -- il n'y a pas de route qui reçoive ce POST, et c'est
+       voulu : la connexion passe par le SDK Firebase, jamais par le serveur.
+       Ce qui compte est qu'il échoue sans rien écrire nulle part. */
+    const url = page.url();
+    expect(url).not.toContain(RESPONSABLE.motDePasse);
+    expect(url).not.toContain("mot-de-passe=");
+    expect(url).not.toContain("email=");
+
+    await contexte.close();
+  });
+});
+
 test.describe("accès", () => {
   test("sans session, l’application renvoie vers la connexion", async ({ page }) => {
     await page.goto("/dashboard");
