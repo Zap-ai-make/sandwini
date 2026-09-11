@@ -1,7 +1,7 @@
 # S20 — Pièces : catalogue, stock et mouvements
 
 ```
-Statut     : en cours — spec écrite, questions posées, en attente de réponses
+Statut     : en cours — questions tranchées, prêt à construire
 Périmètre  : post-MVP
 Dépend de  : S4 (référentiels), S3 (boutiques et périmètre)
 ```
@@ -204,6 +204,86 @@ peut pas tenir.
 
 ---
 
+## Ce que le commanditaire a tranché
+
+**1. Le prix d'achat est hors de portée du gérant — et plus largement, il ne le
+saisit même pas.** « Il peut ajouter les articles (moto ou pièce), mais c'est
+depuis l'espace superviseur que les prix d'achat sont ajoutés. » C'est plus fort
+que la recommandation (a), qui laissait le gérant écrire sans relire : le
+formulaire ne le lui demande plus du tout. Conséquence directe : les règles
+Firestore de `pieces/{id}/prive/cout` s'ouvrent au **seul responsable**, et non
+« responsable ou gérant de la boutique » comme celles des motos aujourd'hui.
+
+**Cette réponse déborde S20** : le formulaire d'entrée d'une moto demande
+aujourd'hui le prix d'achat au gérant, et les règles le lui permettent. Le
+commanditaire l'a dit explicitement — « si le formulaire d'entrée de moto dans
+l'espace gérant demande le prix d'achat, faudra corriger ». C'est S39.
+
+**2. Le stock se calcule à la lecture** (recommandation suivie), depuis les
+mouvements, avec le seuil écrit d'avance.
+
+**3. Aucune compatibilité, et aucun lien avec les motos.** « L'espace pièces
+détachées n'a rien à voir avec les motos, chaque espace est indépendant. » La
+recommandation (b) — lier les pièces aux marques du référentiel motos — était à
+côté : elle faisait entrer un métier dans l'autre. La colonne « Compatible » de
+`c1:101` **ne sera pas reprise**, et rien ne remplace `marquesCompatibles`.
+Ce que la maquette montrait là relevait d'un produit que le commanditaire ne
+veut pas.
+
+**4. Le responsable seul tient le catalogue** (option a). Pas de création par le
+gérant : une référence porte un prix, et les prix appartiennent à la
+supervision. Cohérent avec la réponse 1.
+
+**5. La déclaration doit être aussi libre que possible.** « Le client doit avoir
+le choix de déclarer comme il veut, ce qu'il veut. » Donc **pas de référentiel
+fermé de catégories** : un champ libre, avec les valeurs déjà saisies proposées
+en suggestion — jamais imposées, jamais à déclarer d'avance. Une catégorie naît
+d'un usage, pas d'un écran de paramétrage.
+
+**6. Pas de stock négatif.**
+
+---
+
+## La contradiction entre 2 et 6, et comment elle se tranche
+
+**Les réponses 2 et 6 ne peuvent pas être vraies toutes les deux au sens fort,
+et le hors-ligne en est la cause.** Ce n'est pas une limite d'implémentation :
+c'est une propriété du problème.
+
+Une règle Firestore ne sait pas additionner une collection. Pour refuser une
+quantité négative *au niveau de la base*, il faudrait un document qui porte la
+quantité — et alors deux appareils hors ligne, vendant chacun la dernière
+pièce, écriraient tous deux « 0 » depuis leur cache. La règle passerait, et la
+quantité cesserait d'être égale à la somme des mouvements. **On aurait échangé
+un négatif visible contre un faux positif invisible**, ce qui est strictement
+pire : l'un se voit et se corrige, l'autre se croit.
+
+À l'inverse, calculée depuis les mouvements, la quantité est toujours exacte —
+et peut donc descendre sous zéro si une entrée n'a pas été saisie.
+
+**Ce qu'on fait, et qui respecte les deux réponses là où chacune a un sens :**
+
+- **« Pas de négatif » est une règle du geste**, tenue là où les gestes se
+  font : l'écran de vente (S21) refuse de sortir plus que le stock disponible,
+  et le dit. C'est ce que le commanditaire veut dire — le logiciel ne laisse pas
+  vendre ce qu'on n'a pas.
+- **La quantité reste calculée**, donc toujours égale à ce que les mouvements
+  racontent. Elle ne ment jamais.
+- **Si un négatif apparaît malgré tout** — deux appareils hors ligne sur la même
+  référence, ou une entrée oubliée —, l'écran l'affiche comme une **anomalie
+  nommée**, pas comme une quantité ordinaire : « −3 : il manque une entrée ».
+  Le masquer reviendrait à cacher une saisie manquante, et c'est exactement
+  l'erreur que D82 décrit sous un autre nom — ranger « je ne sais pas » avec
+  « rien ».
+
+**Ce que ça coûte, dit franchement** : sur un comptoir à un seul appareil — le
+cas de Pouytenga —, le négatif ne peut venir que d'une entrée non saisie, donc
+il est toujours une information juste. Le cas à deux appareils hors ligne
+simultanés est réel mais rare, et il se solde par un chiffre visible plutôt que
+par un stock faux.
+
+---
+
 ## Ce que ce lot ne fait pas, et pourquoi
 
 - **La vente au comptoir et les alertes de rupture** — c'est S21, la suite
@@ -212,7 +292,11 @@ peut pas tenir.
   `transfert_sortie` sont prévus dans le modèle mais aucun écran ne les écrit.
 - **L'inventaire** — S23, qui apportera aussi l'arrêté périodique dont la
   question 2 dit qu'il manque.
-- **L'écran des catégories** — voir question 5.
+- **L'écran des catégories** — il n'y en aura pas : la réponse 5 en fait un champ
+  libre à suggestions, sans écran de paramétrage.
+- **Le prix d'achat du formulaire moto et la marque à déclarer d'avance** — ce
+  sont deux corrections demandées par le commanditaire en répondant à ce lot,
+  mais elles portent sur S4 et S5. Elles vivent dans leur propre spec, S39.
 
 ---
 
