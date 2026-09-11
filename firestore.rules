@@ -907,6 +907,74 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // --- La clôture de journée (S22) --------------------------------------
+    // Une clôture est une **affirmation datée** : quelqu'un a compté le tiroir
+    // ce soir-là et a déclaré ce qu'il y avait dedans. C'est ce qui la rend
+    // immuable — un brouillon qu'on retouche n'affirme rien, et l'écart qu'on
+    // peut corriger le lendemain cesse d'être une mesure.
+    //
+    // Trois invariants ne tiennent qu'ici, parce qu'un formulaire ne protège
+    // rien et qu'un navigateur modifié contourne un formulaire :
+    //
+    // 1. **L'écart est calculé, jamais déclaré.** Il vaut exactement
+    //    `comptées − attendues`. Le laisser libre permettrait d'annoncer un
+    //    tiroir juste avec un comptage qui ne l'est pas.
+    // 2. **Compter et clôturer volontairement sont la même chose.** Une
+    //    clôture `gerant` porte un comptage ; une clôture `automatique` n'en
+    //    porte aucun, et son écart est `null` et non zéro. C'est la réponse 4
+    //    du commanditaire tenue honnête : une journée fermée seule n'a pas un
+    //    écart nul, elle n'a pas d'écart. Un zéro s'additionnerait sur un mois
+    //    et dirait « tout allait bien ».
+    // 3. **L'identifiant dit la boutique et le jour.** `PTG_2026-09-05` n'est
+    //    pas une convention de nommage mais une contrainte d'unicité : deux
+    //    clôtures du même jour dans la même boutique sont structurellement
+    //    impossibles, et deux appareils qui clôturent hors ligne entrent en
+    //    collision — ce qui est le comportement voulu (D30).
+    //
+    // Le gérant clôture, et lui seul : c'est lui qui tient le tiroir, et un
+    // geste de fin de journée qui attend quelqu'un d'autre n'est pas fait le
+    // soir même. Le responsable lit sans écrire — arbitrage du commanditaire,
+    // question 3 de `specs/S22-caisse.md`.
+
+    function jourValide(valeur) {
+      return valeur is string && valeur.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$');
+    }
+
+    function clotureValide(donnees, clotureId) {
+      return donnees.keys().hasOnly(['boutiqueId', 'jour', 'fondsOuverture', 'especesAttendues',
+                                     'especesComptees', 'ecart', 'motif', 'cloturePar',
+                                     'clotureLe', 'clotureParNom'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'jour', 'fondsOuverture', 'especesAttendues',
+                                       'especesComptees', 'ecart', 'motif', 'cloturePar',
+                                       'clotureLe', 'clotureParNom'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && jourValide(donnees.jour)
+             // L'identifiant n'est pas libre : il est la boutique et le jour.
+             && clotureId == donnees.boutiqueId + '_' + donnees.jour
+             && montantValide(donnees.fondsOuverture)
+             && montantValide(donnees.especesAttendues)
+             && donnees.cloturePar in ['gerant', 'automatique']
+             // Compter et clôturer volontairement sont la même chose.
+             && (donnees.cloturePar == 'gerant'
+                   ? (montantValide(donnees.especesComptees)
+                      && donnees.ecart is int
+                      && donnees.ecart == donnees.especesComptees - donnees.especesAttendues)
+                   : (donnees.especesComptees == null && donnees.ecart == null))
+             && texteBorne(donnees.motif, 300)
+             && dateAppareil(donnees.clotureLe)
+             && texteBorne(donnees.clotureParNom, 200);
+    }
+
+    match /cloturesCaisse/{clotureId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+      allow create: if clotureValide(request.resource.data, clotureId)
+                    && traceCreation(request.resource.data)
+                    && estGerantDe(request.resource.data.boutiqueId);
+      // Une affirmation ne se retouche pas. Corriger une journée close, si le
+      // besoin apparaît, sera une contre-passation tracée — pas une réécriture.
+      allow update, delete: if false;
+    }
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.
