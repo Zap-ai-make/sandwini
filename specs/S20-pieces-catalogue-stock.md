@@ -240,47 +240,68 @@ fermé de catégories** : un champ libre, avec les valeurs déjà saisies propos
 en suggestion — jamais imposées, jamais à déclarer d'avance. Une catégorie naît
 d'un usage, pas d'un écran de paramétrage.
 
-**6. Pas de stock négatif.**
+**6. Pas de stock négatif.** Et l'argument que cette spec avançait pour nuancer
+cette réponse a été écarté, à raison :
+
+> « L'article se trouve dans une boutique et la vente se fera à la boutique,
+> alors ton histoire de vendre à distance ne tient pas. »
+
+C'est exact. Le scénario invoqué — deux appareils hors ligne vendant chacun la
+dernière pièce — supposait deux comptoirs pour un même stock, ce que
+l'organisation ne produit pas : une pièce est dans une boutique, et elle s'y
+vend. **Cet argument tombe.** Ce qui suit ne le recycle pas ; il repart de la
+seule contrainte qui reste, et qui n'est pas une opinion.
 
 ---
 
-## La contradiction entre 2 et 6, et comment elle se tranche
+## Comment « pas de négatif » se tient réellement
 
-**Les réponses 2 et 6 ne peuvent pas être vraies toutes les deux au sens fort,
-et le hors-ligne en est la cause.** Ce n'est pas une limite d'implémentation :
-c'est une propriété du problème.
+**Il ne peut pas se tenir dans les règles Firestore, et ce n'est pas un
+arbitrage.** Une règle ne sait pas additionner une collection : elle lit le
+document qu'on écrit, pas la somme des autres. Refuser un total négatif *au
+niveau de la base* exigerait donc un document portant la quantité — c'est-à-dire
+l'agrégat entretenu que la réponse 2 vient d'écarter, avec l'écran qui ment au
+comptoir dès que le réseau manque.
 
-Une règle Firestore ne sait pas additionner une collection. Pour refuser une
-quantité négative *au niveau de la base*, il faudrait un document qui porte la
-quantité — et alors deux appareils hors ligne, vendant chacun la dernière
-pièce, écriraient tous deux « 0 » depuis leur cache. La règle passerait, et la
-quantité cesserait d'être égale à la somme des mouvements. **On aurait échangé
-un négatif visible contre un faux positif invisible**, ce qui est strictement
-pire : l'un se voit et se corrige, l'autre se croit.
+Une transaction ne sauve pas non plus : **les transactions Firestore ne
+fonctionnent pas hors ligne.** Une vente passée par transaction échouerait
+précisément le jour sans réseau, c'est-à-dire dans la situation que ce produit
+promet de servir.
 
-À l'inverse, calculée depuis les mouvements, la quantité est toujours exacte —
-et peut donc descendre sous zéro si une entrée n'a pas été saisie.
+**La règle se tient donc là où le geste se fait**, et c'est le seul endroit où
+elle peut se tenir : l'écran de vente (S21) refuse de sortir plus que le stock
+disponible, calculé depuis les mouvements que l'appareil a en cache. Hors ligne
+comme en ligne, il refuse. C'est ce que le commanditaire demande — le logiciel
+ne laisse pas vendre ce qu'on n'a pas — et c'est effectif, pas décoratif.
 
-**Ce qu'on fait, et qui respecte les deux réponses là où chacune a un sens :**
+### La conséquence qui compte, et qu'il faut traiter dans ce lot
 
-- **« Pas de négatif » est une règle du geste**, tenue là où les gestes se
-  font : l'écran de vente (S21) refuse de sortir plus que le stock disponible,
-  et le dit. C'est ce que le commanditaire veut dire — le logiciel ne laisse pas
-  vendre ce qu'on n'a pas.
-- **La quantité reste calculée**, donc toujours égale à ce que les mouvements
-  racontent. Elle ne ment jamais.
-- **Si un négatif apparaît malgré tout** — deux appareils hors ligne sur la même
-  référence, ou une entrée oubliée —, l'écran l'affiche comme une **anomalie
-  nommée**, pas comme une quantité ordinaire : « −3 : il manque une entrée ».
-  Le masquer reviendrait à cacher une saisie manquante, et c'est exactement
-  l'erreur que D82 décrit sous un autre nom — ranger « je ne sais pas » avec
-  « rien ».
+Un refus n'est pas gratuit. **Le cas qui va se produire à Pouytenga n'est pas un
+stock négatif : c'est une vente refusée sur une pièce physiquement présente.**
+Un carton arrive, il n'est pas encore saisi, un client demande la pièce — et
+l'écran dit non alors qu'elle est sur l'étagère. Le logiciel aurait tort, et le
+gérant apprendrait à s'en méfier.
 
-**Ce que ça coûte, dit franchement** : sur un comptoir à un seul appareil — le
-cas de Pouytenga —, le négatif ne peut venir que d'une entrée non saisie, donc
-il est toujours une information juste. Le cas à deux appareils hors ligne
-simultanés est réel mais rare, et il se solde par un chiffre visible plutôt que
-par un stock faux.
+**Ce qu'on fait** : là où l'écran refuse, il propose l'entrée manquante au même
+endroit — « cette référence n'est pas en stock ici ; faire entrer un lot » —
+sans quitter la vente en cours. C'est exactement le principe de S39 appliqué
+au comptoir des pièces : **une condition préalable ne bloque pas, elle se
+répare sur place.**
+
+C'est ce qui rend « pas de négatif » vivable. Sans ce geste, la règle serait
+juste et le comptoir la contournerait.
+
+### Et si un négatif apparaît quand même
+
+Il n'y a plus qu'une façon d'en fabriquer un : **corriger ou annuler une entrée
+après que des sorties l'ont consommée.** Aucun réseau, aucun second appareil —
+une correction de saisie, sur un seul comptoir.
+
+Ce n'est pas une fonctionnalité à concevoir, c'est un état de données à ne pas
+afficher comme s'il était normal. Le tableau écrit alors **« −3 · il manque une
+entrée »** plutôt qu'un nombre nu, au même titre qu'il écrirait une erreur de
+lecture. Le masquer reviendrait à ranger « ma saisie est incohérente » avec
+« il n'y en a plus » — la faute que D82 nomme.
 
 ---
 
