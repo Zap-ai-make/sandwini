@@ -85,7 +85,7 @@ export default function PageNouvelleVente() {
   const surTitre = useSurTitre("Motos");
   const session = useSession();
   const catalogue = useCatalogue();
-  const { clients, chargement: clientsEnCours } = useFichierClients();
+  const { clients, lus, chargement: clientsEnCours } = useFichierClients();
 
   const boutiqueId = perimetre.boutiqueId;
 
@@ -359,7 +359,7 @@ export default function PageNouvelleVente() {
             </p>
             <div className="mt-4">
               <FormulaireClient
-                clients={clients}
+                clients={lus}
                 surEnregistrement={(id, saisieClient) => {
                   changer({ clientId: id });
                   setCreationClient(false);

@@ -75,6 +75,53 @@ test.describe("entrée en stock", () => {
     await expect(contenu(page).getByRole("alert")).toContainText(terrain.modele);
   });
 
+  /**
+   * Le trajet qui créait le doublon (S40, corollaire de D95).
+   *
+   * Avant S40, `chassisDejaPris(saisie, stock ?? [])` répondait « aucun
+   * doublon » tant que l'écoute du stock n'avait pas rendu sa première réponse.
+   * Le test précédent ne le voyait jamais : `saisirMoto` attend la confirmation
+   * de la première moto, ce qui laisse à l'écoute tout le temps de répondre
+   * avant la seconde. Celui-ci soumet **dès l'ouverture de l'écran**.
+   *
+   * **Ce qu'il prouve de façon stable, c'est sa dernière assertion** : une seule
+   * moto porte ce châssis. Le reste reproduit la course telle qu'elle se
+   * produit au comptoir — et, comme toute course, elle ne se déclenche pas à
+   * tous les coups. C'est précisément ce qui l'avait fait passer pour du bruit
+   * de contention (D88). Le compte, lui, est vrai ou faux.
+   *
+   * **Le bouton est l'attente.** `getByRole("button", { name: "Faire entrer en
+   * stock" })` ne résout rien tant que le bouton s'appelle « Lecture du
+   * stock… ». C'est ce que le renommage apporte au test : un point d'attente
+   * réel, au lieu d'une temporisation qui aurait masqué le défaut.
+   */
+  test("un châssis existant est refusé même soumis dès l’ouverture de l’écran", async ({
+    page,
+  }) => {
+    await seConnecterEtEntrer(page);
+    const terrain = await preparerTerrain(page);
+    const chassis = `COURSE${Date.now().toString(36).toUpperCase()}`;
+
+    await saisirMoto(page, terrain, chassis);
+
+    await page.goto("/motos/nouvelle", { waitUntil: "commit" });
+    await page.getByLabel("Marque").selectOption({ label: terrain.marque });
+    await page.getByLabel("Modèle").selectOption({ label: terrain.modele });
+    await page.getByLabel("Numéro de châssis").fill(chassis);
+    await page.getByLabel("Provenance").selectOption({ label: terrain.provenance });
+    await page.getByRole("button", { name: "Faire entrer en stock" }).click();
+
+    await expect(contenu(page).getByRole("alert")).toContainText("déjà en stock", {
+      timeout: 20_000,
+    });
+
+    await page.goto("/motos", { waitUntil: "load" });
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
+    await expect(page.locator("tbody tr").filter({ hasText: chassis })).toHaveCount(1, {
+      timeout: 20_000,
+    });
+  });
+
   test("une moto ne peut pas entrer sans savoir dans quelle boutique", async ({ page }) => {
     await seConnecterEtEntrer(page);
     await preparerTerrain(page);
@@ -244,6 +291,18 @@ test.describe("hors ligne", () => {
 
     await page.goto("/motos", { waitUntil: "load" });
     await prendreLaMainEtMettreEnCache(page, "/motos");
+
+    /* **Couper le réseau avant que le décor soit parti, c'est mesurer autre
+       chose.** Ce test fabrique une marque, un modèle et une provenance, puis
+       débranche. Tant que ces écritures sont dans la file, rien ne garantit que
+       le cache Firestore les tienne durablement : au retour sur le formulaire,
+       la liste des modèles revenait vide, et le test échouait sur une option
+       manquante — jamais sur ce qu'il promet.
+       Le bandeau porte déjà la réponse : « À jour » veut dire file vide. On
+       l'attend une fois, à la frontière, plutôt que d'attendre le serveur à
+       chaque document du décor — ce qui fabriquerait la contention que S27
+       mesure (§3.3 du cahier). */
+    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 60_000 });
 
     await context.setOffline(true);
     await expect(bandeauEtat(page)).toContainText("Hors ligne", { timeout: 30_000 });

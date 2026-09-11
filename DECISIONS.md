@@ -2544,3 +2544,85 @@ Seule celle de S20 est corrigée ici — les cinq autres sont du code déjà liv
 et une correction trouvée en chemin devient une entrée de backlog plutôt que du
 code immédiat. Elle est inscrite comme **S40**, en tête de
 `specs/CAHIER-DU-RESTE.md`.
+
+---
+
+## D96 — Le contrôle d'unicité ne s'écrit pas dans l'écran, il s'écrit dans ce qui lui donne la liste
+
+*S40, corollaire de D95 : les six occurrences qu'il annonçait, plus une septième
+qu'il n'avait pas vue.*
+
+D95 avait nommé la règle — « pas encore lu » n'est pas « vide », et le contrôle
+d'unicité est l'endroit exact où s'en contenter produit ce qu'il devait
+empêcher — puis n'avait corrigé qu'une occurrence sur six, les cinq autres étant
+du code déjà livré. S40 les ferme toutes. **La plus grave n'était pas celle qui
+avait été prise en défaut** : `motos/nouvelle` vérifiait ainsi le numéro de
+châssis, et deux motos au même châssis se découvrent à la préfecture, des
+semaines plus tard.
+
+**La septième, et ce qu'elle apprend.** L'énumération de D92 — corriger
+l'occurrence trouvée ne corrige rien tant qu'on n'a pas énuméré les appelants —
+a été faite sur `grep "?? \[\]"`, et cette recherche est **incomplète par
+construction**. `FormulaireClient` demande « ce numéro de téléphone est-il déjà
+pris ? » à une liste qui lui arrive déjà aplatie : le `?? []` vit dans
+`useFichierClients`, pas dans l'écran. Un client créé pendant le chargement du
+fichier duplique un numéro, ce qui coupe en deux l'historique d'une personne —
+ses dettes sur une fiche, ses versements sur l'autre. **Le motif se cherche donc
+par les appels au contrôle (`…DejaPris`, `trouverParNom`), pas par l'écriture
+qui l'introduit.**
+
+**La règle, et c'est elle qui généralise.** Un composant ou un dépôt qui rend une
+liste servant à *décider d'écrire* doit rendre la nullité avec elle. Aplatir
+« pas encore lu » en « vide » est légitime pour **lire** — nommer une marque,
+alimenter un filtre, compter des entrées — et jamais pour **décider**.
+`ListeReferentiel` et `ChoixOuNouveau` acceptent donc `null` ; `useCatalogue` et
+`useFichierClients` exposent deux formes de la même liste, l'aplatie pour
+l'affichage et la lue (`lues`, `lus`) pour les contrôles. Ce n'est pas une
+redondance : c'est ce qui retire aux appelants — présents et à venir — la
+possibilité de refaire le trou. Tant que le composant ne pouvait pas distinguer
+les deux états, chaque nouvel écran rouvrait le défaut en une ligne de JSX.
+
+*Conséquence :* sept formulaires annoncent la lecture en cours sur leur bouton
+(« Lecture du stock… », « Lecture du fichier… »), ce qui est la seconde moitié du
+remède : le garde empêche le doublon, le bouton fait **disparaître** la course au
+lieu de la rattraper — et donne au test un point d'attente réel plutôt qu'une
+temporisation.
+
+---
+
+## D97 — Un décor qui coupe le réseau avant que ses écritures soient parties mesure autre chose
+
+*S40, trouvé en corrigeant D96 : un échec bout en bout déterministe, qui
+accusait le code qu'on venait d'écrire.*
+
+Le test « une moto se saisit et se consulte sans réseau » a commencé à échouer
+sur une option manquante — le modèle n'était plus proposé dans la liste — juste
+après le correctif de D96. L'accusation tombait sur le correctif : il touche
+précisément les listes de choix.
+
+**Ce n'était pas lui.** Le décor (`preparerTerrain`) fabrique une marque, un
+modèle et une provenance, puis le test **coupe le réseau aussitôt**. Tant que ces
+écritures sont dans la file, rien ne garantit que le cache Firestore les
+retienne durablement : au retour sur le formulaire, hors ligne, la liste des
+modèles revenait vide. Le correctif de D96 n'avait fait que **déplacer le
+moment** du clic de quelques centaines de millisecondes — le bouton attend
+désormais que la liste soit lue — ce qui a suffi à faire basculer une course qui
+existait déjà.
+
+**Ce qui a permis de le voir, et qui vaut d'être répété.** Le verdict « c'est ta
+faute » a été vérifié plutôt que cru : le test a été rejoué sur le code d'avant
+(il passait), puis sur chaque moitié du correctif jusqu'à isoler le fichier
+responsable, puis une sonde a montré que **le serveur avait bien le document** et
+que c'était le cache du navigateur qui ne l'avait pas. Sans cette dernière
+mesure, la conclusion naturelle — « le filtre des modèles est cassé » — aurait
+fait réécrire du code juste.
+
+**La règle.** Un test hors ligne doit attendre que **ce qu'il vient de fabriquer
+soit parti** avant de débrancher. Le produit porte déjà la réponse : le bandeau
+dit « À jour » quand la file est vide. On l'attend **une fois, à la frontière**,
+et non document par document — attendre le serveur à chaque écriture du décor
+fabriquerait exactement la contention que S27 mesure (`CAHIER-DU-RESTE` §3.3).
+
+*Conséquence :* le test est passé de 90 s d'expiration à **7,1 s**. Et une
+catégorie entière de faux échecs disparaît : tout test qui coupe le réseau après
+avoir écrit était exposé au même hasard.

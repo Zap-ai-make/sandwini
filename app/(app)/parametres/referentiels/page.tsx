@@ -77,8 +77,7 @@ function Referentiels() {
           singulier="provenance"
           determinant="cette"
           exemples="Import, Confrère, Reprise client"
-          entrees={provenances.valeur ?? []}
-          chargement={provenances.valeur === null && !provenances.erreur}
+          entrees={provenances.valeur}
           erreur={provenances.erreur}
           actions={ACTIONS_PROVENANCES}
         />
@@ -88,8 +87,7 @@ function Referentiels() {
           singulier="type de frais"
           determinant="ce"
           exemples="Transport, Remise en état, Commission"
-          entrees={typesFrais.valeur ?? []}
-          chargement={typesFrais.valeur === null && !typesFrais.erreur}
+          entrees={typesFrais.valeur}
           erreur={typesFrais.erreur}
           actions={ACTIONS_TYPES_FRAIS}
         />

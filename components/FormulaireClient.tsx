@@ -35,8 +35,11 @@ export function FormulaireClient({
   surEnregistrement,
   surAnnulation,
 }: {
-  /** Le fichier, pour reconnaître un numéro déjà connu. */
-  clients: Client[];
+  /**
+   * Le fichier, pour reconnaître un numéro déjà connu — ou `null` tant que
+   * l'écoute n'a pas répondu, ce qui n'autorise aucun verdict (S40).
+   */
+  clients: Client[] | null;
   /** Absent : on crée. Présent : on corrige. */
   existant?: Client;
   surEnregistrement?: (id: string, saisie: SaisieClient) => void;
@@ -66,6 +69,15 @@ export function FormulaireClient({
     const probleme = validerClient(saisie);
     if (probleme) {
       setErreur(probleme);
+      return;
+    }
+
+    /* Un fichier pas encore lu n'est pas un fichier vide. Sans ce garde, le
+       contrôle répond « numéro libre » sur une liste qu'il n'a pas lue, et la
+       même personne existe deux fois — avec ses dettes d'un côté et ses
+       versements de l'autre (D95). */
+    if (clients === null) {
+      setErreur("Le fichier clients n’a pas fini d’arriver. Réessayez dans un instant.");
       return;
     }
 
@@ -156,9 +168,14 @@ export function FormulaireClient({
       <div className="mt-3 flex flex-wrap gap-2">
         <button
           type="submit"
+          disabled={clients === null}
           className="bouton bouton-principal"
         >
-          {existant ? "Enregistrer" : "Créer le client"}
+          {clients === null
+            ? "Lecture du fichier…"
+            : existant
+              ? "Enregistrer"
+              : "Créer le client"}
         </button>
         {surAnnulation && (
           <button

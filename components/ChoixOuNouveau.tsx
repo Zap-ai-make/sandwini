@@ -59,8 +59,17 @@ export function ChoixOuNouveau({
   determinant: "cette" | "ce";
   valeur: string;
   changer: (valeur: string) => void;
-  /** Toutes les entrées connues, actives ou non. Le filtrage se fait ici. */
-  toutes: Referentiel[];
+  /**
+   * Toutes les entrées connues, actives ou non — ou `null` tant que l'écoute
+   * n'a pas répondu. Le filtrage se fait ici.
+   *
+   * **La nullité n'est pas décorative** (S40). Ce composant ne se contente pas
+   * d'afficher la liste : il décide, à l'ajout, si le nom saisi y figure déjà.
+   * Tant qu'il ne l'a pas lue, il ne peut pas répondre — et un `?? []` chez
+   * l'appelant lui ferait répondre « libre » sur du vide fabriqué (D95). Il
+   * retire donc « + Ajouter… » de la liste jusqu'à ce qu'il sache.
+   */
+  toutes: Referentiel[] | null;
   invite: string;
   desactive?: boolean;
   aide?: string;
@@ -88,7 +97,10 @@ export function ChoixOuNouveau({
     if (saisieOuverte) champ.current?.focus();
   }, [saisieOuverte]);
 
-  const options = optionsAvecChoix(toutes, valeur);
+  /* Pour l'affichage, « pas encore lu » et « vide » donnent le même menu : un
+     `?? []` est ici sans conséquence, et c'est la frontière exacte que D95
+     trace — aplatir pour lire, jamais pour décider. */
+  const options = optionsAvecChoix(toutes ?? [], valeur);
   const nouveau = determinant === "cette" ? "Nouvelle" : "Nouveau";
   const un = determinant === "cette" ? "une" : "un";
 
@@ -109,6 +121,14 @@ export function ChoixOuNouveau({
     const probleme = validerNom(nom, `${determinant} ${singulier}`);
     if (probleme) {
       setErreur(probleme);
+      return;
+    }
+
+    /* Ce garde ne devrait pas se déclencher — l'option « + Ajouter… » n'existe
+       pas tant que la liste manque — mais il reste : le chemin d'écriture ne
+       s'appuie pas sur ce que l'affichage a bien voulu montrer. */
+    if (toutes === null) {
+      setErreur("La liste n’a pas fini d’arriver. Réessayez dans un instant.");
       return;
     }
 
@@ -193,14 +213,17 @@ export function ChoixOuNouveau({
         }}
         className="saisie disabled:opacity-60"
       >
-        <option value="">{invite}</option>
+        {/* L'invite dit l'attente au lieu de proposer un choix qu'on ne peut
+            pas encore faire : un menu vide et un menu pas encore lu se
+            ressemblent trop pour qu'on laisse le lecteur trancher. */}
+        <option value="">{toutes === null ? "Lecture de la liste…" : invite}</option>
         {options.map((option) => (
           <option key={option.id} value={option.id}>
             {option.nom}
             {option.actif ? "" : " — hors liste"}
           </option>
         ))}
-        {!desactive && (
+        {!desactive && toutes !== null && (
           <option value={NOUVELLE}>
             + Ajouter {un} {singulier}…
           </option>

@@ -279,15 +279,20 @@ l'identique :
    disparaît au lieu d'être rattrapée. C'est aussi ce qui donne au test quelque
    chose à attendre, plutôt qu'une temporisation.
 
-**Ce qui prouve que c'est fait.**
-- [ ] Les six appels ne reçoivent plus jamais `?? []`. Une recherche
+**Ce qui prouve que c'est fait.** — *fait, cf. `specs/S40-controle-unicite.md`,
+D96 et D97.*
+- [x] Les six appels ne reçoivent plus jamais `?? []`. Une recherche
       `grep -rn "?? \[\]" app/ components/` ne rend plus aucun contrôle
-      d'unicité.
-- [ ] Pour le châssis, un test bout en bout qui **échoue sur l'ancien code** :
+      d'unicité. **Et une septième occurrence a été trouvée**, que cette
+      recherche ne pouvait pas voir : `FormulaireClient` reçoit sa liste déjà
+      aplatie par `useFichierClients`. Le motif se cherche par les appels au
+      contrôle, pas par l'écriture qui l'introduit.
+- [x] Pour le châssis, un test bout en bout qui **échoue sur l'ancien code** :
       ouvrir le formulaire, soumettre immédiatement un châssis existant, et
       vérifier le refus (D79, les deux sens).
-- [ ] Le bouton de chaque formulaire concerné annonce la lecture en cours, et se
-      regarde en capture.
+- [x] Le bouton de chaque formulaire concerné annonce la lecture en cours, et se
+      regarde en capture. La campagne a gagné une variante qui **fige** cet
+      état ; elle y a trouvé un second aplatissement, côté affichage cette fois.
 
 **Ce que l'étape ne fait pas.** Elle ne rend pas l'unicité *garantie* : deux
 appareils hors ligne peuvent toujours créer le même châssis, et aucune règle
