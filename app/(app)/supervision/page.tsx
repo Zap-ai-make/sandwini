@@ -4,6 +4,7 @@ import { Check, ChevronRight, TrendingUp, TriangleAlert, Wallet } from "lucide-r
 import Link from "next/link";
 import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
 import { DernieresVentes } from "@/components/DernieresVentes";
+import { PiecesEnAlerte } from "@/components/PiecesEnAlerte";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
 import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
@@ -173,6 +174,12 @@ export default function Supervision() {
       )}
 
       <CeQuiDemandeUneDecision className="mt-8" />
+
+      {/* Après ce qui demande une décision, avant ce qui vient de se passer :
+          une rupture de stock est une décision à prendre, pas une nouvelle.
+          La carte s'efface d'elle-même quand il n'y a rien à réapprovisionner
+          (S21). */}
+      <PiecesEnAlerte className="mt-8" />
 
       {/* Ce qui attend d'abord, ce qui vient de se passer ensuite (`a2:184`).
           L'ordre est celui de la maquette et il n'est pas indifférent : on

@@ -1121,6 +1121,87 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // --- La vente de pièces au comptoir (S21) ------------------------------
+    // Une vente de pièces est une **pièce comptable**, au même titre qu'une
+    // vente de moto : elle porte un numéro qu'on dicte au téléphone, et elle ne
+    // se retouche pas. Ce que la règle peut tenir, elle le tient ; ce qu'elle ne
+    // peut pas tenir est nommé plus bas.
+    function ligneVenteValide(ligne) {
+      return ligne.keys().hasOnly(['pieceId', 'reference', 'designation', 'quantite',
+                                   'prixUnitaire', 'total'])
+             && ligne.keys().hasAll(['pieceId', 'reference', 'designation', 'quantite',
+                                     'prixUnitaire', 'total'])
+             && ligne.pieceId is string
+             && texteBorne(ligne.reference, 40)
+             && texteBorne(ligne.designation, 120)
+             && ligne.quantite is int
+             && ligne.quantite > 0
+             && ligne.quantite <= 1000000
+             && ligne.prixUnitaire is int
+             && ligne.prixUnitaire > 0
+             && ligne.prixUnitaire <= 1000000000
+             // Le total de la ligne est **calculé**, pas déclaré : un document
+             // dont les nombres ne s'accordent pas entre eux est un document
+             // qu'on ne peut plus relire avec confiance six mois plus tard.
+             && ligne.total == ligne.quantite * ligne.prixUnitaire;
+    }
+
+    function ventePieceValide(donnees) {
+      return donnees.keys().hasOnly(['numero', 'numeroInitial', 'boutiqueId', 'date', 'clientId',
+                                     'lignes', 'total', 'moyenPaiement'].concat(champsAudit()))
+             && donnees.keys().hasAll(['numero', 'numeroInitial', 'boutiqueId', 'date', 'clientId',
+                                       'lignes', 'total', 'moyenPaiement'].concat(champsAudit()))
+             // Les deux numéros sont égaux à la création, et `numeroInitial` ne
+             // bougera plus : c'est la clé de rapprochement des doublons que la
+             // réconciliation serveur suffixe (D5). Même contrat qu'une vente de
+             // moto, parce que Q1 a tranché un compteur **partagé** entre les
+             // deux collections — un numéro dicté désigne une seule pièce.
+             && numeroDOrigine(donnees.numero)
+             && donnees.numeroInitial == donnees.numero
+             && donnees.boutiqueId is string
+             && dateAppareil(donnees.date)
+             // Le client est facultatif au comptoir (§9) : la chaîne vide dit
+             // « quelqu'un qui passe », et c'est le cas courant.
+             && donnees.clientId is string
+             && donnees.lignes is list
+             && donnees.lignes.size() > 0
+             && donnees.lignes.size() <= 20
+             && ligneVenteValide(donnees.lignes[0])
+             && montantValide(donnees.total)
+             && donnees.total > 0
+             && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave'];
+    }
+
+    match /ventesPieces/{venteId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+
+      allow create: if ventePieceValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+
+      // **Une vente enregistrée ne se retouche pas, elle se contre-passe.**
+      // Même principe qu'un versement et qu'une écriture de caisse : le stock
+      // est descendu, la recette est au journal, et un document modifiable
+      // rendrait les trois incohérents sans laisser de trace.
+      allow update, delete: if false;
+    }
+
+    // **Ce que ces règles ne peuvent pas tenir, et il faut le dire.**
+    //
+    // *Le total de la vente contre la somme de ses lignes.* Le langage des
+    // règles n'a pas de repli sur une liste ; seule la première ligne est
+    // vérifiée intégralement ci-dessus. Le reste est tenu par le domaine
+    // (`validerPanier`, `figerLignes`) et prouvé par un test bout en bout.
+    //
+    // *Le lien vers les mouvements de stock.* Une vente doit produire un
+    // `sortie_vente` par ligne et un encaissement ; c'est le **batch** qui le
+    // tient, parce qu'une règle ne voit qu'un document à la fois. Un test bout
+    // en bout le prouve, et c'est le seul endroit où il peut l'être.
+    //
+    // *Le stock disponible.* Une règle ne sait pas additionner une collection,
+    // et une transaction ne fonctionne pas hors ligne. « Pas de négatif » est
+    // donc une règle du **geste** (D94), tenue là où le geste se fait.
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.

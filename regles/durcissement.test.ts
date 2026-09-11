@@ -116,10 +116,10 @@ describe("refus par défaut", () => {
      sa règle ne s'ouvre pas toute seule. */
   it("ferme les collections qu’aucune spec n’a ouvertes, pour tout le monde", async () => {
     for (const chemin of [
-      /* `pieces` a quitte cette liste : S20 l'a ouverte, avec ses tests. Ce
-         qui la remplace est la suite immediate -- la vente au comptoir (S21)
-         et les categories que S20 a decide de ne jamais creer (D90). */
-      "ventesPieces/vente-1",
+      /* `pieces` a quitté cette liste avec S20, `ventesPieces` avec S21 :
+         chacune est ouverte par sa spec, avec ses tests. Ce qui reste ici est
+         ce qu'aucune spec n'a encore ouvert — plus les catégories, que S20 a
+         décidé de ne **jamais** créer (D90) et qui resteront donc fermées. */
       "categoriesPieces/cat-1",
       "inventaires/inv-1",
       "prestataires/prest-1/prive/token",

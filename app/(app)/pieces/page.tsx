@@ -1,6 +1,6 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, ShoppingCart } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { GardeEspace } from "@/components/GardeSession";
@@ -182,12 +182,28 @@ function Catalogue() {
             : "Le catalogue est commun à l’entreprise, et les quantités sont celles de toutes les boutiques réunies. Choisissez-en une pour voir son étagère et y faire bouger le stock."
         }
         actions={
-          tientLeCatalogue ? (
-            <Link href="/pieces/nouvelle" className="bouton bouton-principal">
-              <Plus aria-hidden="true" className="size-4" />
-              Nouvelle référence
-            </Link>
-          ) : undefined
+          <>
+            {/* **Vendre est le geste du comptoir**, et il passe donc devant : le
+                catalogue se tient de temps en temps, on vend toute la journée.
+                Il demande une boutique — un stock sort d'une étagère précise —
+                d'où l'absence de ce bouton en périmètre « toutes les
+                boutiques » plutôt qu'un bouton qui mènerait à un refus. */}
+            {surUneBoutique && (
+              <Link href="/pieces/vendre" className="bouton bouton-principal">
+                <ShoppingCart aria-hidden="true" className="size-4" />
+                Vendre
+              </Link>
+            )}
+            {tientLeCatalogue && (
+              <Link
+                href="/pieces/nouvelle"
+                className={surUneBoutique ? "bouton bouton-neutre" : "bouton bouton-principal"}
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Nouvelle référence
+              </Link>
+            )}
+          </>
         }
       />
 

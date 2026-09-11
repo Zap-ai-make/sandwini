@@ -48,7 +48,7 @@ avant toute spec post-MVP.
 | S17 | Transferts de motos entre boutiques           | S5          | Utile dès qu'il y a plusieurs boutiques actives. |
 | S18 | Échanges / reprises                           | S8          | Cas de vente fréquent mais contournable (vente + entrée en stock séparées). |
 | S19 | Envois de fichiers — photos et papiers        | S5          | Débloqué par D66 : un champ d'envoi peut exister s'il annonce qu'il demande du réseau. Reste une spec à part parce qu'une file d'attente locale, elle, est un vrai chantier (D14). |
-| S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. |
+| S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. **En cours** : le domaine, les règles, le dépôt, l'écran de vente et la carte d'alerte sont livrés ; le reçu et le bout en bout restent. Voir `specs/S21-vente-pieces.md`. |
 | S23 | Inventaires motos et pièces + comparaison     | S5, S20     | Exercice périodique, pas quotidien. |
 | S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
