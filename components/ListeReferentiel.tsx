@@ -42,7 +42,6 @@ export function ListeReferentiel({
   determinant,
   exemples,
   entrees,
-  chargement,
   erreur,
   actions,
 }: {
@@ -53,8 +52,19 @@ export function ListeReferentiel({
   determinant: "cette" | "ce";
   /** Deux ou trois vrais exemples du métier, pas des « Élément 1 ». */
   exemples: string;
-  entrees: Referentiel[];
-  chargement: boolean;
+  /**
+   * Les entrées, ou `null` tant que l'écoute n'a pas répondu.
+   *
+   * **La nullité entre ici plutôt que de s'arrêter chez l'appelant**, et c'est
+   * l'arbitrage 3 de S40. Les deux pages qui montent cette liste écrivaient
+   * `entrees={marques.valeur ?? []}` : l'aplatissement avait lieu dans le JSX,
+   * une ligne au-dessus du composant chargé de refuser les doublons. Le
+   * composant ne pouvait donc pas distinguer « pas encore lu » de « vide », et
+   * son contrôle d'unicité répondait « libre » à une question non posée (D95).
+   * En acceptant `null`, il retire à ses appelants — présents et à venir — la
+   * possibilité de refaire ce trou.
+   */
+  entrees: Referentiel[] | null;
   erreur: string | null;
   actions: ActionsReferentiel;
 }) {
@@ -72,8 +82,12 @@ export function ListeReferentiel({
 
       <EtatErreur message={erreur} className="mt-3" />
 
-      {chargement ? (
-        <EtatChargement className="mt-3">Chargement…</EtatChargement>
+      {/* Trois états, trois réponses, et jamais deux confondus : la liste
+          n'est pas là, la liste est vide, la liste est pleine. La lecture
+          échouée est déjà dite au-dessus — on n'ajoute pas « aucune entrée »
+          par-dessus un refus (`DESIGN.md` §10). */}
+      {entrees === null ? (
+        erreur ? null : <EtatChargement className="mt-3">Chargement…</EtatChargement>
       ) : entrees.length === 0 && !erreur ? (
         <EtatSansResultat className="mt-3">
           Aucune entrée pour l’instant. Ajoutez celles que vous utilisez vraiment&nbsp;: {exemples}.
@@ -105,7 +119,7 @@ function Ajout({
   singulier: string;
   determinant: "cette" | "ce";
   exemples: string;
-  entrees: Referentiel[];
+  entrees: Referentiel[] | null;
   actions: ActionsReferentiel;
 }) {
   const session = useSession();
@@ -121,6 +135,13 @@ function Ajout({
     const probleme = validerNom(nom, designation);
     if (probleme) {
       setErreur(probleme);
+      return;
+    }
+    /* Pas de liste, pas de verdict : sans elle ce contrôle répondrait « libre »
+       sur une liste qu'il n'a pas lue, et créerait le doublon qu'il existe
+       pour empêcher (D95). */
+    if (entrees === null) {
+      setErreur(`La liste n’a pas fini d’arriver. Réessayez dans un instant.`);
       return;
     }
     if (nomDejaPris(nom, entrees)) {
@@ -154,10 +175,17 @@ function Ajout({
         />
         <button
           type="submit"
+          disabled={entrees === null}
           className="bouton bouton-principal shrink-0"
         >
-          <Plus aria-hidden="true" className="size-4" />
-          Ajouter
+          {entrees === null ? (
+            "Lecture…"
+          ) : (
+            <>
+              <Plus aria-hidden="true" className="size-4" />
+              Ajouter
+            </>
+          )}
         </button>
       </div>
       <EtatErreurSaisie message={erreur} className="mt-1" />

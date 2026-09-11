@@ -291,6 +291,12 @@ const PRISES = [
      l'écran, et on prend la seconde moitié. */
   { nom: "motos-nouvelle-bas-bureau-clair", chemin: "/motos/nouvelle", theme: "light", mobile: false, boutique: true, bas: true },
   { nom: "motos-nouvelle-gerant-bas-bureau-clair", chemin: "/motos/nouvelle", theme: "light", mobile: false, gerant: true, bas: true },
+
+  /* L'état « pas encore lu » du contrôle d'unicité (S40, D96). Le bouton
+     annonce la lecture au lieu de laisser croire qu'il est prêt ; sans ces deux
+     prises, c'est le seul état du produit que personne ne regarderait jamais. */
+  { nom: "catalogue-lecture-en-cours-mobile-clair", chemin: "/parametres/catalogue", theme: "light", mobile: true, lectureEnCours: true },
+  { nom: "clients-lecture-en-cours-bureau-sombre", chemin: "/clients", theme: "dark", mobile: false, lectureEnCours: true, nouveauClient: true },
   { nom: "motos-nouvelle-gerant-bas-mobile-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: true, gerant: true, bas: true },
   /* Les prix d'achat, l'écran que S39 crée pour que le responsable pose ce que
      le gérant ne saisit plus. */
@@ -374,8 +380,10 @@ for (const {
   impression,
   gerant,
   ajoutMarque,
+  nouveauClient,
   bas,
   ouvrirPiece,
+  lectureEnCours,
   hauteur,
 } of aPrendre) {
   const contexte = await navigateur.newContext({
@@ -412,6 +420,40 @@ for (const {
     boutiqueChoisie = codes[0];
   }
 
+  /**
+   * L'état « je n'ai pas encore lu », figé pour qu'on puisse le regarder.
+   *
+   * **Pourquoi il a fallu l'outiller** (S40). Sept formulaires refusent de
+   * décider d'un doublon tant que leur liste n'est pas arrivée, et le disent
+   * sur leur bouton : « Lecture du stock… », « Lecture du fichier… ». Cet état
+   * dure quelques dizaines de millisecondes sur des émulateurs locaux — jamais
+   * une campagne ne l'attrape, et il serait donc le seul état du produit que
+   * personne n'aurait jamais vu. C'est exactement là que `DESIGN.md` §10 se
+   * perd : un bouton désactivé dont on n'a pas vérifié le contraste, un
+   * libellé qui déborde.
+   *
+   * On suspend le canal d'écoute de Firestore — la requête n'est ni servie ni
+   * refusée, elle attend — ce qui laisse l'écran dans l'état qu'il aurait au
+   * comptoir sur une connexion lente. L'authentification passe par un autre
+   * port et n'est pas touchée : la session s'ouvre, seules les listes manquent.
+   */
+  /**
+   * **Le gel ne vaut qu'avant la navigation**, et c'est une contrainte de
+   * transport, pas un choix : Firestore multiplexe toutes ses écoutes sur un
+   * seul canal ouvert une fois pour toutes. Une interception posée après le
+   * chargement ne voit plus rien passer — essayée, mesurée, sans effet.
+   *
+   * Conséquence : les écrans qui ont besoin de la liste des boutiques pour
+   * savoir où ils sont ne peuvent pas être photographiés dans cet état par ce
+   * moyen — ils répondraient « choisissez une boutique », c'est-à-dire autre
+   * chose. Le formulaire d'entrée en stock en fait partie ; son bouton suit le
+   * même patron que ceux photographiés ici, et c'est le test bout en bout qui
+   * l'atteste, en l'attendant par son nom.
+   */
+  if (lectureEnCours) {
+    await page.route("**/google.firestore.v1.Firestore/Listen/**", () => {});
+  }
+
   await page.goto(`${BASE}${chemin}`, { waitUntil: "load" });
   await page.locator("h1").first().waitFor({ timeout: 20000 });
 
@@ -435,12 +477,15 @@ for (const {
     }
   }
   /* Une capture prise pendant « Chargement… » ne dit rien du rendu réel : on
-     attend que les listes en direct soient arrivées (DESIGN.md §14). */
-  await page
-    .getByText(/Chargement/)
-    .first()
-    .waitFor({ state: "detached", timeout: 15000 })
-    .catch(() => {});
+     attend que les listes en direct soient arrivées (DESIGN.md §14).
+     Sauf quand c'est **cet état-là** qu'on vient photographier. */
+  if (!lectureEnCours) {
+    await page
+      .getByText(/Chargement/)
+      .first()
+      .waitFor({ state: "detached", timeout: 15000 })
+      .catch(() => {});
+  }
   /* Le patron `Tableau` ne dit pas "Chargement" : il occupe la place du
      contenu a venir avec des lignes fantomes (`.squelette`). La campagne les
      photographiait donc comme si c'etait le rendu -- un ecran gris, et une
@@ -484,6 +529,13 @@ for (const {
   if (ajoutMarque) {
     await page.getByLabel("Marque", { exact: true }).selectOption("__nouvelle__");
     await page.getByLabel(/^Nouvelle marque/).fill("Apsonic");
+    await page.waitForTimeout(300);
+  }
+  /* Le formulaire de création vit derrière un bouton : sans ce clic, la
+     capture montre la liste et pas le formulaire dont on vient regarder
+     l'état. */
+  if (nouveauClient) {
+    await page.getByRole("button", { name: "Nouveau client" }).click();
     await page.waitForTimeout(300);
   }
   if (coupe) {

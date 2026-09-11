@@ -72,8 +72,11 @@ function Catalogue() {
   const modeles = useAbonnement(souscrireModeles, "Les modèles n’ont pas pu être chargés.");
 
   const [marqueChoisie, setMarqueChoisie] = useState("");
-  const listeMarques = marques.valeur ?? [];
-  const ouvertes = listeMarques.filter((marque) => marque.actif);
+  /* Pour le **choix** d'une marque, une liste pas encore lue et une liste vide
+     mènent au même écran : aucun menu. C'est pour la **décision d'écrire** que
+     les deux diffèrent — et cette décision appartient à `ListeReferentiel`, qui
+     reçoit donc `marques.valeur` tel quel, nullité comprise (S40). */
+  const ouvertes = (marques.valeur ?? []).filter((marque) => marque.actif);
 
   /* Si aucune marque n'est encore choisie, on prend la première : l'écran des
      modèles a besoin d'une marque pour dire quoi que ce soit, et ouvrir sur un
@@ -94,14 +97,13 @@ function Catalogue() {
           singulier="marque"
           determinant="cette"
           exemples="Yamaha, TVS, Apsonic"
-          entrees={listeMarques}
-          chargement={marques.valeur === null && !marques.erreur}
+          entrees={marques.valeur}
           erreur={marques.erreur}
           actions={ACTIONS_MARQUES}
         />
 
         <Modeles
-          marques={ouvertes}
+          marques={marques.valeur === null ? null : ouvertes}
           marqueActive={marqueActive}
           choisir={setMarqueChoisie}
           modeles={modeles.valeur}
@@ -119,7 +121,8 @@ function Modeles({
   modeles,
   erreur,
 }: {
-  marques: Referentiel[];
+  /** Les marques actives, ou `null` tant que l'écoute n'a pas répondu. */
+  marques: Referentiel[] | null;
   marqueActive: Referentiel | undefined;
   choisir: (id: string) => void;
   modeles: Modele[] | null;
@@ -128,6 +131,29 @@ function Modeles({
   const session = useSession();
   const [nom, setNom] = useState("");
   const [erreurSaisie, setErreurSaisie] = useState<string | null>(null);
+
+  /* Les modèles de la marque affichée, ou `null` tant que l'écoute n'a pas
+     répondu. Le `?? []` d'avant S40 rendait le contrôle de doublon aveugle : il
+     concluait « ce modèle est libre » sur une liste vide fabriquée. */
+  const deLaMarque =
+    modeles === null
+      ? null
+      : modeles.filter((modele) => modele.marqueId === marqueActive?.id).sort(comparerReferentiels);
+
+  /* **« Aucune marque » et « marques pas encore lues » ne se disent pas
+     pareil**, et c'est la capture qui l'a montré : pendant le chargement, cette
+     section conseillait d'ajouter une marque à quelqu'un qui en a peut-être
+     vingt. C'est D95 côté affichage — le même aplatissement de trois états en
+     deux, avec une conséquence plus douce mais du même genre : on envoie
+     quelqu'un créer une donnée qu'il possède déjà (`DESIGN.md` §10). */
+  if (marques === null) {
+    return (
+      <section>
+        <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Modèles</h2>
+        <EtatChargement className="mt-3">Chargement…</EtatChargement>
+      </section>
+    );
+  }
 
   if (marques.length === 0) {
     return (
@@ -140,10 +166,6 @@ function Modeles({
     );
   }
 
-  const deLaMarque = (modeles ?? [])
-    .filter((modele) => modele.marqueId === marqueActive?.id)
-    .sort(comparerReferentiels);
-
   function ajouter(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (session.statut !== "connecte" || !marqueActive) return;
@@ -151,6 +173,10 @@ function Modeles({
     const probleme = validerNom(nom, "ce modèle");
     if (probleme) {
       setErreurSaisie(probleme);
+      return;
+    }
+    if (deLaMarque === null) {
+      setErreurSaisie("Les modèles n’ont pas fini d’arriver. Réessayez dans un instant.");
       return;
     }
     if (nomDejaPris(nom, deLaMarque)) {
@@ -200,9 +226,15 @@ function Modeles({
             onChange={(evenement) => setNom(evenement.target.value)}
             className="saisie min-w-0 flex-1 placeholder:text-encre-doux"
           />
-          <button type="submit" className="bouton bouton-principal">
-            <Plus aria-hidden="true" className="size-4" />
-            Ajouter
+          <button type="submit" disabled={deLaMarque === null} className="bouton bouton-principal">
+            {deLaMarque === null ? (
+              "Lecture des modèles…"
+            ) : (
+              <>
+                <Plus aria-hidden="true" className="size-4" />
+                Ajouter
+              </>
+            )}
           </button>
         </div>
         <EtatErreurSaisie message={erreurSaisie} className="mt-1" />
@@ -210,8 +242,8 @@ function Modeles({
 
       <EtatErreur message={erreur} className="mt-3" />
 
-      {modeles === null && !erreur ? (
-        <EtatChargement className="mt-3">Chargement…</EtatChargement>
+      {deLaMarque === null ? (
+        erreur ? null : <EtatChargement className="mt-3">Chargement…</EtatChargement>
       ) : deLaMarque.length === 0 && !erreur ? (
         <EtatSansResultat className="mt-3">
           Aucun modèle chez {marqueActive?.nom}. Ajoutez ceux que vous vendez réellement.

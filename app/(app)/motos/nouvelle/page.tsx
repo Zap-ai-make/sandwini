@@ -85,10 +85,12 @@ export default function PageNouvelleMoto() {
 
   /* Les modèles de la marque choisie, désactivés compris : c'est
      `ChoixOuNouveau` qui décide lesquels proposer, et il a besoin de tous pour
-     reconnaître un nom déjà employé. */
-  const modelesDeLaMarque = catalogue.modeles.filter(
-    (modele) => modele.marqueId === saisie.marqueId,
-  );
+     reconnaître un nom déjà employé — d'où `lues`, qui garde « pas encore
+     lu » distinct de « aucun modèle chez cette marque » (S40). */
+  const modelesDeLaMarque =
+    catalogue.lues.modeles === null
+      ? null
+      : catalogue.lues.modeles.filter((modele) => modele.marqueId === saisie.marqueId);
   const total = coutTotalSaisie(saisie);
 
   function soumettre(evenement: React.FormEvent) {
@@ -102,7 +104,19 @@ export default function PageNouvelleMoto() {
       return;
     }
 
-    const doublon = chassisDejaPris(saisie.numeroChassis, stock ?? []);
+    /* **Un stock pas encore lu n'est pas un stock vide.** `stock` vaut `null`
+       tant que la première réponse de l'écoute n'est pas arrivée ; le remplacer
+       ici par une liste vide ferait répondre « aucun doublon » à une question
+       qu'on n'a pas posée, et **deux motos porteraient le même numéro de
+       châssis**. Une référence de pièce en double se répare ; deux châssis
+       identiques se découvrent à la préfecture, sur un dossier de carte grise,
+       des semaines plus tard (D95). */
+    if (stock === null) {
+      setErreur("Le stock n’a pas fini d’arriver. Réessayez dans un instant.");
+      return;
+    }
+
+    const doublon = chassisDejaPris(saisie.numeroChassis, stock);
     if (doublon) {
       setErreur(
         `Ce châssis est déjà en stock : ${catalogue.nomMarque(doublon.marqueId)} ${catalogue.nomModele(doublon.modeleId)}.`,
@@ -202,7 +216,7 @@ export default function PageNouvelleMoto() {
               determinant="cette"
               valeur={saisie.marqueId}
               changer={(marqueId) => changer({ marqueId, modeleId: "" })}
-              toutes={catalogue.marques}
+              toutes={catalogue.lues.marques}
               invite="Choisir une marque"
               creer={(nom, auteur) => creerEntree("marques", nom, auteur)}
             />
@@ -296,7 +310,7 @@ export default function PageNouvelleMoto() {
               determinant="cette"
               valeur={saisie.provenanceId}
               changer={(provenanceId) => changer({ provenanceId })}
-              toutes={catalogue.provenances}
+              toutes={catalogue.lues.provenances}
               invite="Choisir une provenance"
               creer={(nom, auteur) => creerEntree("provenances", nom, auteur)}
             />
@@ -390,8 +404,12 @@ export default function PageNouvelleMoto() {
 
         <EtatErreurSaisie message={erreur} className="mt-3" />
 
-        <button type="submit" className="mt-3 bouton bouton-principal">
-          Faire entrer en stock
+        {/* La seconde moitié du remède, et elle n'est pas décorative : le garde
+            ci-dessus empêche le doublon, ce bouton fait **disparaître** la
+            course au lieu de la rattraper. Sans lui, le garde est un mur sans
+            panneau — on clique, on se fait refuser, on ne sait pas pourquoi. */}
+        <button type="submit" disabled={stock === null} className="mt-3 bouton bouton-principal">
+          {stock === null ? "Lecture du stock…" : "Faire entrer en stock"}
         </button>
       </form>
     </Cadre>

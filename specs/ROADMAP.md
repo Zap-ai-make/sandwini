@@ -228,6 +228,7 @@ c'est le voir revenir sous un autre nom.
 | S37 | Le reçu attend une phrase que D81 lui a retirée   | S10    | post-MVP  | terminée |
 
 | S38 | La console signale un écart d'hydratation à chaque chargement | S28 | post-MVP | terminée |
+| S40 | Le contrôle d'unicité répond avant de savoir | S5, S20, S39 | post-MVP | terminée |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
@@ -267,6 +268,37 @@ deux jours pour un mot, parce que rien ne cassait. Pendant ce temps, toute autre
 erreur arrivait dans une console qui en contenait déjà une. D88 en tire la
 règle, et note que c'est la troisième fois dans la même session qu'un canal de
 vérification avait cessé d'être lu.
+
+S40 est fermée — première étape du `CAHIER-DU-RESTE`. Les six écrans que D95
+annonçait posaient leur question de doublon à une liste encore vide pendant son
+chargement ; le `?? []` répondait « rien de pris » à une question jamais posée.
+Le plus grave d'entre eux laissait créer **deux motos au même numéro de
+châssis** — ce qui se découvre à la préfecture, des semaines plus tard.
+
+**Une septième occurrence a été trouvée en chemin**, et elle explique pourquoi
+D95 en avait annoncé six : la recherche `grep "?? []"` ne pouvait pas la voir.
+`FormulaireClient` demande « ce numéro est-il déjà pris ? » à une liste que
+`useFichierClients` lui livre **déjà aplatie**. Un client créé pendant le
+chargement du fichier duplique un numéro, et coupe en deux l'historique d'une
+personne. Le motif se cherche par les **appels au contrôle**, pas par l'écriture
+qui l'introduit (D96).
+
+**Le correctif ne vit pas dans les écrans mais dans ce qui leur donne la liste.**
+`ListeReferentiel` et `ChoixOuNouveau` acceptent désormais `null` ; `useCatalogue`
+et `useFichierClients` exposent la liste sous deux formes — aplatie pour lire,
+lue pour décider. Un nouvel écran ne peut plus rouvrir le défaut en une ligne de
+JSX.
+
+**Ce que la vérification a trouvé, et qui n'était pas le correctif.** Le test
+hors ligne des motos s'est mis à échouer aussitôt après, sur une option de liste
+manquante — toutes les apparences d'une régression du lot. Elle a été vérifiée
+plutôt que crue : rejeu sur le code d'avant, bissection fichier par fichier, puis
+une sonde qui a montré que **le serveur avait le document et que le cache du
+navigateur ne l'avait pas**. Le décor coupait le réseau avant que ses propres
+écritures soient parties ; le correctif n'avait fait que déplacer un clic de
+quelques centaines de millisecondes, ce qui suffisait à faire basculer une course
+déjà là. Le test attend maintenant « À jour » avant de débrancher, et passe en
+**7,1 s** contre 90 s d'expiration. D97 en tire la règle.
 
 ---
 

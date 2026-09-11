@@ -21,7 +21,7 @@ import { useFichierClients } from "@/lib/repositories/fichier-clients";
  * donc pas de sélecteur de périmètre ici, et c'est volontaire.
  */
 export default function PageClients() {
-  const { clients, chargement, erreur } = useFichierClients();
+  const { clients, lus, chargement, erreur } = useFichierClients();
   const [recherche, setRecherche] = useState("");
   const [creation, setCreation] = useState(false);
   const [ouvert, setOuvert] = useState<string | null>(null);
@@ -57,7 +57,7 @@ export default function PageClients() {
           <h2 className="font-semibold text-encre">Nouveau client</h2>
           <div className="mt-4">
             <FormulaireClient
-              clients={clients}
+              clients={lus}
               surEnregistrement={(_, saisie) => {
                 setConfirmation(`${saisie.nom.trim()} est enregistré.`);
                 setCreation(false);

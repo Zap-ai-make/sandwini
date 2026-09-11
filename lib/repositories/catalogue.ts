@@ -35,6 +35,26 @@ export type Catalogue = {
   modeles: Modele[];
   provenances: Referentiel[];
   typesFrais: Referentiel[];
+  /**
+   * Les mêmes listes, mais **telles que l'écoute les a rendues** — `null`
+   * compris, tant que la première réponse n'est pas arrivée.
+   *
+   * **Pourquoi deux formes de la même chose** (S40). Les quatre listes
+   * ci-dessus servent à *lire* : nommer une marque sur une fiche, alimenter un
+   * filtre, compter des entrées. Pour ces usages, « pas encore lu » et « vide »
+   * mènent au même écran, et aplatir les deux ne coûte rien.
+   *
+   * Elles servent aussi à **décider d'écrire** : ce nom est-il déjà pris ? Là,
+   * les deux états n'ont pas la même réponse, et les confondre fait répondre
+   * « libre » à une question non posée — le doublon se crée (D95). Les
+   * contrôles d'unicité lisent donc `lues`, jamais les listes aplaties.
+   */
+  lues: {
+    marques: Referentiel[] | null;
+    modeles: Modele[] | null;
+    provenances: Referentiel[] | null;
+    typesFrais: Referentiel[] | null;
+  };
   chargement: boolean;
   erreur: string | null;
   /** Le nom d'une entrée, ou un tiret : un identifiant brut ne dit rien à personne. */
@@ -63,6 +83,12 @@ export function useCatalogue(): Catalogue {
 
   return {
     ...listes,
+    lues: {
+      marques: marques.valeur,
+      modeles: modeles.valeur,
+      provenances: provenances.valeur,
+      typesFrais: typesFrais.valeur,
+    },
     chargement:
       marques.valeur === null ||
       modeles.valeur === null ||
