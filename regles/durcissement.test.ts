@@ -71,6 +71,10 @@ beforeEach(async () => {
       actif: true,
       ...auditFige,
     });
+    /* Une marque qui sert déjà : `motos/moto-ptg` la cite. Sans elle, le test
+       de renommage passerait sur un « document introuvable » et ne prouverait
+       rien de la règle. */
+    await setDoc(doc(base, "marques/m1"), { nom: "Yamaha", actif: true, ...auditFige });
     await setDoc(doc(base, "motos/moto-ptg"), {
       boutiqueId: "PTG",
       etat: "neuve",
@@ -142,11 +146,17 @@ describe("un visiteur sans compte", () => {
   });
 });
 
-describe("le coût d’une moto : écrit sans être lu (D4)", () => {
-  /* La formulation la plus délicate du dépôt. Elle se teste dans les deux
-     sens, sinon on croit avoir cloisonné alors qu'on a seulement compliqué. */
-  it("laisse le gérant écrire le coût à l’entrée en stock", async () => {
-    await assertSucceeds(
+describe("le coût d’une moto : ni lu ni écrit par le gérant (D2, S39)", () => {
+  /* La formulation la plus délicate du dépôt, et celle qui a le plus bougé.
+     Jusqu'à S39 elle disait « écrit sans être lu » (D4) : le gérant saisissait
+     le prix d'achat à l'entrée en stock et ne pouvait plus jamais le relire.
+     Le cloisonnement était donc tenu d'un côté et ouvert de l'autre.
+
+     Le commanditaire a tranché : le gérant fait entrer la moto, la supervision
+     pose ce qu'elle a coûté. Les deux sens se testent, sinon on croit avoir
+     cloisonné alors qu'on a seulement compliqué. */
+  it("refuse au gérant d’écrire un coût", async () => {
+    await assertFails(
       setDoc(doc(gerant(), "motos/moto-ptg/prive/cout"), {
         boutiqueId: "PTG",
         prixAchat: 900_000,
@@ -159,11 +169,22 @@ describe("le coût d’une moto : écrit sans être lu (D4)", () => {
     );
   });
 
-  it("mais lui refuse de le relire", async () => {
+  it("et de le relire", async () => {
     await assertFails(getDoc(doc(gerant(), "motos/moto-ptg/prive/cout")));
   });
 
-  it("et le laisse au responsable", async () => {
+  it("le laisse écrire et relire au responsable", async () => {
+    await assertSucceeds(
+      setDoc(doc(responsable(), "motos/moto-ptg/prive/cout"), {
+        boutiqueId: "PTG",
+        prixAchat: 900_000,
+        coutTotal: 915_000,
+        fraisEntree: [],
+        updatedAt: serverTimestamp(),
+        updatedBy: "resp-1",
+        updatedByName: "Responsable",
+      }),
+    );
     await assertSucceeds(getDoc(doc(responsable(), "motos/moto-ptg/prive/cout")));
   });
 });
@@ -243,37 +264,41 @@ describe("les cas croisés, entre deux specs", () => {
      casserait l'entrée en stock — qui écrit la moto et son coût ensemble, et
      doit marcher hors ligne.
 
-     Ce que le gérant y gagne se limite à des documents orphelins qu'il ne peut
-     pas relire. Ce test existe pour que la tolérance soit **écrite** quelque
-     part : personne ne la retrouverait en lisant la règle six mois plus tard,
-     et quelqu'un la refermerait en croyant boucher un trou. */
+     Ce que le responsable y gagne se limite à des documents orphelins, et il a
+     de toute façon le droit de les lire. Ce test existe pour que la tolérance
+     soit **écrite** quelque part : personne ne la retrouverait en lisant la
+     règle six mois plus tard, et quelqu'un la refermerait en croyant boucher
+     un trou. Depuis S39 seul le responsable écrit ici, ce qui la rend encore
+     moins coûteuse qu'elle ne l'était. */
   it("accepte un coût sans sa moto — le lot d’entrée en stock l’exige", async () => {
     await assertSucceeds(
-      setDoc(doc(gerant(), "motos/moto-a-venir/prive/cout"), {
+      setDoc(doc(responsable(), "motos/moto-a-venir/prive/cout"), {
         boutiqueId: "PTG",
         prixAchat: 100_000,
         coutTotal: 100_000,
         fraisEntree: [],
         updatedAt: serverTimestamp(),
-        updatedBy: "ger-1",
-        updatedByName: "Gérant",
+        updatedBy: "resp-1",
+        updatedByName: "Responsable",
       }),
     );
   });
 
   /* La garde qui protège vraiment : dès que la moto existe, sa boutique fait
-     foi. Un gérant ne peut pas coller un coût sur une moto d'ailleurs, ni
-     maquiller la boutique du coût pour se l'approprier. */
+     foi. Un coût ne se colle pas sur une moto d'ailleurs, et maquiller la
+     boutique du coût ne le déplace pas. Elle valait surtout contre un gérant ;
+     depuis S39 elle vaut contre une erreur de saisie du responsable, qui écrit
+     désormais tous les coûts du parc. */
   it("refuse un coût dont la boutique contredit celle de la moto", async () => {
     await assertFails(
-      setDoc(doc(gerant("ger-2", "KDG"), "motos/moto-ptg/prive/cout"), {
+      setDoc(doc(responsable(), "motos/moto-ptg/prive/cout"), {
         boutiqueId: "KDG",
         prixAchat: 100_000,
         coutTotal: 100_000,
         fraisEntree: [],
         updatedAt: serverTimestamp(),
-        updatedBy: "ger-2",
-        updatedByName: "Gérant KDG",
+        updatedBy: "resp-1",
+        updatedByName: "Responsable",
       }),
     );
   });
@@ -313,6 +338,62 @@ describe("ce qui doit rester possible (D69)", () => {
         photos: [],
         statut: "en_stock",
         dateEntree: serverTimestamp(),
+        ...audit("ger-1"),
+      }),
+    );
+  });
+
+  /* S39. Un gérant à qui il manque une marque un samedi matin la tape sur le
+     formulaire au lieu d'attendre un appel. C'est le pendant exact du bloc
+     précédent : le produit ne doit pas refuser ce dont le comptoir a besoin. */
+  it("laisse un gérant créer une marque, un modèle et une provenance", async () => {
+    const base = gerant();
+    await assertSucceeds(
+      setDoc(doc(base, "marques/apsonic"), { nom: "Apsonic", actif: true, ...audit("ger-1") }),
+    );
+    await assertSucceeds(
+      setDoc(doc(base, "modeles/ap-125"), {
+        nom: "AP 125",
+        marqueId: "apsonic",
+        actif: true,
+        ...audit("ger-1"),
+      }),
+    );
+    await assertSucceeds(
+      setDoc(doc(base, "provenances/lome"), { nom: "Lomé", actif: true, ...audit("ger-1") }),
+    );
+  });
+
+  /* Et l'autre moitié, sans laquelle la précédente n'aurait rien cloisonné :
+     créer un mot n'est pas en changer un. Le stock, les ventes et les reçus
+     citent ces libellés — un renommage se propage partout d'un coup. */
+  it("mais ne le laisse ni renommer ni désactiver ce qui sert déjà", async () => {
+    const base = gerant();
+    await assertFails(
+      updateDoc(doc(base, "marques/m1"), {
+        nom: "Autre nom",
+        updatedAt: serverTimestamp(),
+        updatedBy: "ger-1",
+        updatedByName: "Gérant",
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(base, "marques/m1"), {
+        actif: false,
+        updatedAt: serverTimestamp(),
+        updatedBy: "ger-1",
+        updatedByName: "Gérant",
+      }),
+    );
+  });
+
+  /* Les types de frais ne suivent pas les marques : ils n'alimentent que le
+     bloc des coûts, que le gérant ne voit plus depuis S39. */
+  it("ne lui ouvre pas les types de frais", async () => {
+    await assertFails(
+      setDoc(doc(gerant(), "typesFrais/transport"), {
+        nom: "Transport",
+        actif: true,
         ...audit("ger-1"),
       }),
     );

@@ -30,7 +30,7 @@ export default function PageReferentiels() {
 }
 
 const actionsPour = (nomCollection: "provenances" | "typesFrais"): ActionsReferentiel => ({
-  creer: (nom, auteur) => creerEntree(nomCollection, nom, auteur),
+  creer: (nom, auteur) => creerEntree(nomCollection, nom, auteur).enregistre,
   renommer: (id, nom, auteur) => renommerEntree(nomCollection, id, nom, auteur),
   basculer: (id, actif, auteur) => changerActivationEntree(nomCollection, id, actif, auteur),
   messageErreur: messageErreurReferentiel,

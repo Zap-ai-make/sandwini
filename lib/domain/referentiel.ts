@@ -39,10 +39,19 @@ export const LIBELLE_COLLECTION: Record<CollectionReferentiel, { singulier: stri
   typesFrais: { singulier: "type de frais", pluriel: "Types de frais" },
 };
 
-/** Valide un nom de référentiel. Renvoie le message à afficher, ou `null`. */
-export function validerNom(nom: string, singulier = "élément"): string | null {
+/**
+ * Valide un nom de référentiel. Renvoie le message à afficher, ou `null`.
+ *
+ * **`designation` est la phrase entière, déterminant compris** — « cette
+ * marque », « ce modèle ». Elle se fabriquait ici, en collant « cette » devant
+ * le singulier reçu, ce qui écrivait « cette modèle » et « cette type de
+ * frais » à l'écran d'un produit entièrement rédigé en français. Le genre ne
+ * se déduit pas d'une chaîne ; il vient de l'appelant, qui le connaît — c'est
+ * déjà ce que fait `ListeReferentiel` avec son `determinant`.
+ */
+export function validerNom(nom: string, designation = "cet élément"): string | null {
   const propre = nom.trim();
-  if (!propre) return `Donnez un nom à ${singulier === "élément" ? "cet élément" : `cette ${singulier}`}.`;
+  if (!propre) return `Donnez un nom à ${designation}.`;
   if (propre.length > LONGUEUR_NOM_MAX) {
     return `Le nom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
   }
@@ -64,9 +73,44 @@ export function reduire(nom: string): string {
     .toLowerCase();
 }
 
-export function nomDejaPris(nom: string, existants: Referentiel[], sauf?: string): boolean {
+/**
+ * L'entrée qui porte déjà ce nom, s'il y en a une — active ou non.
+ *
+ * C'est ce qui remplace le référentiel fermé depuis S39 : la marque se tape
+ * désormais sur le formulaire d'entrée en stock, donc plus rien n'empêche
+ * « apsonic » d'être saisi le jour où « Apsonic » existe. On ne l'empêche pas,
+ * on le reconnaît — et on rend l'entrée existante plutôt que d'en créer une
+ * seconde. Les désactivées comptent : une marque qu'on retape est une marque
+ * qu'on veut, et en créer un double couperait le stock en deux.
+ */
+export function trouverParNom<T extends Referentiel>(
+  nom: string,
+  existants: T[],
+  sauf?: string,
+): T | undefined {
   const cible = reduire(nom);
-  return existants.some((entree) => entree.id !== sauf && reduire(entree.nom) === cible);
+  if (!cible) return undefined;
+  return existants.find((entree) => entree.id !== sauf && reduire(entree.nom) === cible);
+}
+
+export function nomDejaPris(nom: string, existants: Referentiel[], sauf?: string): boolean {
+  return trouverParNom(nom, existants, sauf) !== undefined;
+}
+
+/**
+ * Les entrées à proposer dans une liste de choix.
+ *
+ * Les actives, plus **celle qui est déjà choisie** même si elle ne l'est plus.
+ * Sans cette seconde règle, désactiver une marque la faisait disparaître du
+ * `<select>` de toutes les motos qui la citent : le champ retombait sur son
+ * invite, et enregistrer la fiche effaçait silencieusement la marque. Le défaut
+ * existait avant S39 et n'avait jamais mordu parce que rien ne se désactivait.
+ */
+export function optionsAvecChoix<T extends Referentiel>(entrees: T[], choisi: string): T[] {
+  const actives = entrees.filter((entree) => entree.actif);
+  if (!choisi || actives.some((entree) => entree.id === choisi)) return actives;
+  const retenue = entrees.find((entree) => entree.id === choisi);
+  return retenue ? [retenue, ...actives] : actives;
 }
 
 /** Tri d'affichage : les entrées actives d'abord, puis par nom. */

@@ -4,7 +4,9 @@ import {
   LIBELLE_COLLECTION,
   comparerReferentiels,
   nomDejaPris,
+  optionsAvecChoix,
   reduire,
+  trouverParNom,
   validerNom,
   type Referentiel,
 } from "./referentiel";
@@ -67,6 +69,43 @@ describe("comparerReferentiels", () => {
       entree("3", "Haojue"),
     ].sort(comparerReferentiels);
     expect(liste.map((e) => e.nom)).toEqual(["Haojue", "Zongshen", "Apsonic"]);
+  });
+});
+
+describe("trouverParNom — ce qui remplace le référentiel fermé (S39)", () => {
+  const liste = [entree("1", "Yamaha"), entree("2", "Apsonic", false)];
+
+  it("rend l’entrée existante quelle que soit la casse ou les accents", () => {
+    expect(trouverParNom("  YAMAHA ", liste)?.id).toBe("1");
+  });
+
+  it("rend aussi une entrée désactivée — la retaper, c’est la vouloir", () => {
+    expect(trouverParNom("apsonic", liste)?.id).toBe("2");
+  });
+
+  it("ne rend rien pour un nom neuf ou vide", () => {
+    expect(trouverParNom("Sanili", liste)).toBeUndefined();
+    expect(trouverParNom("   ", liste)).toBeUndefined();
+  });
+});
+
+describe("optionsAvecChoix", () => {
+  const liste = [entree("1", "Yamaha"), entree("2", "Apsonic", false), entree("3", "Haojue")];
+
+  it("ne propose que les actives quand rien n’est choisi", () => {
+    expect(optionsAvecChoix(liste, "").map((e) => e.id)).toEqual(["1", "3"]);
+  });
+
+  it("garde la valeur choisie même désactivée, sinon le champ l’efface en silence", () => {
+    expect(optionsAvecChoix(liste, "2").map((e) => e.id)).toEqual(["2", "1", "3"]);
+  });
+
+  it("ne duplique pas une valeur choisie qui est déjà active", () => {
+    expect(optionsAvecChoix(liste, "1").map((e) => e.id)).toEqual(["1", "3"]);
+  });
+
+  it("ignore une valeur choisie qui n’existe plus du tout", () => {
+    expect(optionsAvecChoix(liste, "disparue").map((e) => e.id)).toEqual(["1", "3"]);
   });
 });
 

@@ -1,9 +1,9 @@
 import {
-  addDoc,
   collection,
   doc,
   onSnapshot,
   serverTimestamp,
+  setDoc,
   updateDoc,
   type DocumentData,
   type QueryDocumentSnapshot,
@@ -78,18 +78,29 @@ export function ecouterReferentiel(
   );
 }
 
+/**
+ * Crée une entrée et **rend son identifiant tout de suite**.
+ *
+ * L'identifiant est tiré avant l'écriture, comme pour une moto : depuis S39 la
+ * marque se crée en plein formulaire d'entrée en stock, et le `<select>` doit
+ * pouvoir la sélectionner dans la foulée — sans réseau, donc sans attendre le
+ * serveur. `addDoc` connaît lui aussi l'identifiant d'avance, mais il ne le
+ * rend qu'au bout d'une promesse qui, hors ligne, ne se résout jamais.
+ *
+ * La promesse reste offerte à part, pour qui veut signaler l'échec.
+ */
 export function creerEntree(
   nomCollection: CollectionReferentiel,
   nom: string,
   auteur: Auteur,
-): Promise<unknown> {
-  return suivreEcriture(
-    addDoc(collection(db(), nomCollection), {
-      nom: nom.trim(),
-      actif: true,
-      ...traceCreation(auteur),
-    }),
-  );
+): { id: string; enregistre: Promise<void> } {
+  const reference = doc(collection(db(), nomCollection));
+  return {
+    id: reference.id,
+    enregistre: suivreEcriture(
+      setDoc(reference, { nom: nom.trim(), actif: true, ...traceCreation(auteur) }),
+    ),
+  };
 }
 
 export function renommerEntree(
@@ -145,15 +156,26 @@ export function ecouterModeles(
   );
 }
 
-export function creerModele(marqueId: string, nom: string, auteur: Auteur): Promise<unknown> {
-  return suivreEcriture(
-    addDoc(collection(db(), "modeles"), {
-      marqueId,
-      nom: nom.trim(),
-      actif: true,
-      ...traceCreation(auteur),
-    }),
-  );
+/**
+ * Même montage que `creerEntree`, et la même raison (S39).
+ *
+ * L'ordre compte hors ligne : si la marque vient d'être créée sur le même
+ * formulaire, elle est déjà dans la file d'écritures, et Firestore la rejoue
+ * avant ce modèle-ci. La règle `exists(marques/{id})` sera donc vraie à
+ * l'arrivée, même si les deux documents sont partis du même geste sans réseau.
+ */
+export function creerModele(
+  marqueId: string,
+  nom: string,
+  auteur: Auteur,
+): { id: string; enregistre: Promise<void> } {
+  const reference = doc(collection(db(), "modeles"));
+  return {
+    id: reference.id,
+    enregistre: suivreEcriture(
+      setDoc(reference, { marqueId, nom: nom.trim(), actif: true, ...traceCreation(auteur) }),
+    ),
+  };
 }
 
 export function renommerModele(id: string, nom: string, auteur: Auteur): Promise<void> {

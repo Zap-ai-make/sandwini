@@ -204,9 +204,20 @@ service cloud.firestore {
     // que ses propres règles, et un refus nomme sa cause. La répétition est le
     // prix, et il est bon — trois blocs de sept lignes contre un joker qui
     // brouille la lecture des refus de tout le produit.
+    // **Créer, oui ; renommer et désactiver, non** (S39). Ajouter un mot au
+    // vocabulaire de la maison est un geste de comptoir : le gérant à qui il
+    // manque « Apsonic » un samedi matin le tape sur le formulaire d'entrée en
+    // stock, au lieu d'attendre un appel. Une entrée de trop se désactive.
+    //
+    // Changer un mot déjà employé est un autre geste : le stock, les ventes et
+    // les reçus le citent, et le renommage se propage partout d'un coup. Il
+    // reste au responsable.
+    //
+    // `typesFrais` ne suit pas : il n'alimente que le bloc des coûts, que le
+    // gérant ne voit plus depuis S39.
     match /marques/{id} {
       allow read: if connecte();
-      allow create: if estResponsable()
+      allow create: if connecte()
                     && referentielValide(request.resource.data)
                     && traceCreation(request.resource.data);
       allow update: if estResponsable()
@@ -217,7 +228,7 @@ service cloud.firestore {
 
     match /provenances/{id} {
       allow read: if connecte();
-      allow create: if estResponsable()
+      allow create: if connecte()
                     && referentielValide(request.resource.data)
                     && traceCreation(request.resource.data);
       allow update: if estResponsable()
@@ -251,7 +262,10 @@ service cloud.firestore {
 
     match /modeles/{id} {
       allow read: if connecte();
-      allow create: if estResponsable()
+      // Comme les marques (S39) : un modèle inconnu se tape au comptoir. La
+      // marque citée doit exister — hors ligne, la file d'écritures rejoue dans
+      // l'ordre, donc la marque créée juste avant sera là quand ceci arrive.
+      allow create: if connecte()
                     && modeleValide(request.resource.data)
                     && traceCreation(request.resource.data);
       allow update: if estResponsable()
@@ -439,13 +453,22 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/motos/$(motoId)).data.boutiqueId;
     }
 
+    // **Le responsable seul écrit ici, depuis S39.** Le gérant y avait accès en
+    // écriture — il saisissait le prix d'achat à l'entrée en stock sans jamais
+    // pouvoir le relire (D4). Le cloisonnement de D2 était donc tenu en lecture
+    // et ouvert en écriture, ce qui n'est un cloisonnement qu'à moitié.
+    //
+    // Le commanditaire a tranché : le gérant fait entrer la moto, la
+    // supervision pose ce qu'elle a coûté. Une moto peut donc exister sans ce
+    // document — et son absence est le signal que la supervision attend.
+    // L'écrire à zéro dirait « acquise gratuitement » au lieu de « on ne sait
+    // pas » (D82) ; rien ici ne l'exige, et le domaine ne le construit pas.
     match /motos/{motoId}/prive/{section} {
       allow read: if estResponsable();
 
       allow create, update: if section == 'cout'
+                            && estResponsable()
                             && coutValide(request.resource.data)
-                            && (estResponsable()
-                                || estGerantDe(request.resource.data.boutiqueId))
                             && (!exists(/databases/$(database)/documents/motos/$(motoId))
                                 || boutiqueDeLaMoto(motoId) == request.resource.data.boutiqueId);
 

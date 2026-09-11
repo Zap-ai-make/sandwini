@@ -148,16 +148,69 @@ describe("écriture des référentiels", () => {
     }
   });
 
-  it("le gérant n’en ajoute aucune", async () => {
-    for (const nomCollection of TROIS) {
-      await assertFails(
-        addDoc(collection(gerant(), nomCollection), {
-          nom: "Intruse",
-          actif: true,
-          ...creation("ger-1"),
-        }),
-      );
-    }
+  /* S39 : le gérant tape la marque manquante sur le formulaire d'entrée en
+     stock. C'est un geste de comptoir — il répare un manque, et une entrée de
+     trop se désactive. Les types de frais, eux, n'alimentent que le bloc des
+     coûts, que le gérant ne voit plus. */
+  it("le gérant ajoute une marque et une provenance, mais pas un type de frais", async () => {
+    await assertSucceeds(
+      addDoc(collection(gerant(), "marques"), {
+        nom: "Apsonic",
+        actif: true,
+        ...creation("ger-1"),
+      }),
+    );
+    await assertSucceeds(
+      addDoc(collection(gerant(), "provenances"), {
+        nom: "Lomé",
+        actif: true,
+        ...creation("ger-1"),
+      }),
+    );
+    await assertFails(
+      addDoc(collection(gerant(), "typesFrais"), {
+        nom: "Intrus",
+        actif: true,
+        ...creation("ger-1"),
+      }),
+    );
+  });
+
+  /* L'autre moitié, sans laquelle la précédente n'aurait rien cloisonné.
+     Créer un mot n'est pas en changer un : le stock, les ventes et les reçus
+     citent ces libellés, et un renommage se propage partout d'un coup. */
+  it("le gérant ne renomme ni ne désactive ce qui sert déjà", async () => {
+    await assertFails(
+      updateDoc(doc(gerant(), "marques/yamaha"), modification({ nom: "Autre" }, "ger-1")),
+    );
+    await assertFails(
+      updateDoc(doc(gerant(), "marques/yamaha"), modification({ actif: false }, "ger-1")),
+    );
+    await assertFails(
+      updateDoc(doc(gerant(), "provenances/import"), modification({ nom: "Autre" }, "ger-1")),
+    );
+  });
+
+  it("le contrat de forme tient aussi pour le gérant", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "marques"), { nom: "", actif: true, ...creation("ger-1") }),
+    );
+    await assertFails(
+      addDoc(collection(gerant(), "marques"), {
+        nom: "Apsonic",
+        actif: true,
+        remise: 10,
+        ...creation("ger-1"),
+      }),
+    );
+    /* Et il ne signe pas au nom d'un autre : la trace dit qui a ajouté le mot. */
+    await assertFails(
+      addDoc(collection(gerant(), "marques"), {
+        nom: "Apsonic",
+        actif: true,
+        ...creation("resp-1"),
+      }),
+    );
   });
 
   it("le responsable renomme et désactive", async () => {
@@ -248,9 +301,28 @@ describe("modèles", () => {
     );
   });
 
-  it("le gérant ne touche pas aux modèles", async () => {
+  it("le gérant ajoute un modèle mais ne renomme pas ceux qui servent (S39)", async () => {
+    await assertSucceeds(
+      addDoc(collection(gerant(), "modeles"), {
+        nom: "YBR",
+        marqueId: "yamaha",
+        actif: true,
+        ...creation("ger-1"),
+      }),
+    );
     await assertFails(
       updateDoc(doc(gerant(), "modeles/crux"), modification({ nom: "Crux 110" }, "ger-1")),
+    );
+  });
+
+  it("un modèle orphelin reste refusé, même au gérant", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "modeles"), {
+        nom: "Fantôme",
+        marqueId: "marque-inexistante",
+        actif: true,
+        ...creation("ger-1"),
+      }),
     );
   });
 });

@@ -99,14 +99,35 @@ export type FraisEntree = {
   note: string;
 };
 
-/** Le côté privé : jamais lu par un gérant, écrit par lui à la saisie (D4). */
+/**
+ * Le côté privé : lu et écrit par le seul responsable (D2, S39).
+ *
+ * Il l'était écrit par le gérant jusqu'à S39 — il saisissait un montant qu'il
+ * ne pouvait pas relire (D4). Le commanditaire a tranché autrement : le gérant
+ * fait entrer la moto, la supervision pose ce qu'elle a coûté.
+ */
 export type CoutMoto = {
   prixAchat: number;
   fraisEntree: FraisEntree[];
   coutTotal: number;
 };
 
-export type SaisieMoto = {
+/**
+ * La part « coût » d'une saisie, isolée parce qu'elle a deux points d'entrée.
+ *
+ * Le formulaire d'entrée en stock la porte — pour le responsable seulement — et
+ * l'écran de supervision qui pose un coût après coup la porte aussi, seule.
+ * Un seul type, une seule validation, donc une seule réponse à « ce coût
+ * est-il bien formé ».
+ */
+export type SaisieCout = {
+  prixAchat: string;
+  fraisEntree: { typeFraisId: string; montant: string; note: string }[];
+};
+
+export const COUT_VIDE: SaisieCout = { prixAchat: "", fraisEntree: [] };
+
+export type SaisieMoto = SaisieCout & {
   etat: EtatMoto;
   marqueId: string;
   modeleId: string;
@@ -117,8 +138,6 @@ export type SaisieMoto = {
   prixVenteConseille: string;
   provenanceId: string;
   papiersFournis: string;
-  prixAchat: string;
-  fraisEntree: { typeFraisId: string; montant: string; note: string }[];
 };
 
 export const SAISIE_VIDE: SaisieMoto = {
@@ -132,8 +151,7 @@ export const SAISIE_VIDE: SaisieMoto = {
   prixVenteConseille: "",
   provenanceId: "",
   papiersFournis: "",
-  prixAchat: "",
-  fraisEntree: [],
+  ...COUT_VIDE,
 };
 
 export const LONGUEUR_CHASSIS_MAX = 32;
@@ -205,14 +223,45 @@ export function validerMoto(saisie: SaisieMoto): string | null {
     }
   }
 
-  const prixAchat = lireEntier(saisie.prixAchat);
-  if (prixAchat === null) return "Le prix d’achat est obligatoire, en chiffres entiers.";
-  if (prixAchat > MONTANT_MAX) return "Le prix d’achat dépasse le maximum admis.";
-
   if (saisie.prixVenteConseille.trim()) {
     const conseille = lireEntier(saisie.prixVenteConseille);
     if (conseille === null) return "Le prix de vente conseillé doit être un nombre entier.";
     if (conseille > MONTANT_MAX) return "Le prix de vente conseillé dépasse le maximum admis.";
+  }
+
+  return validerCout(saisie);
+}
+
+/**
+ * Un coût a-t-il été saisi ?
+ *
+ * Le prix d'achat est ce qui fait exister le coût : sans lui il n'y a rien à
+ * écrire. Des frais seuls seraient un total sans son principal — c'est refusé
+ * par `validerCout`, pas ignoré.
+ */
+export function coutRenseigne(saisie: SaisieCout): boolean {
+  return saisie.prixAchat.trim() !== "";
+}
+
+/**
+ * Valide la part « coût », **sans exiger qu'elle soit remplie**.
+ *
+ * Depuis S39 une moto peut entrer en stock sans coût : le gérant ne le saisit
+ * plus, et la supervision le pose après coup. Un prix d'achat absent n'est donc
+ * pas une erreur de saisie, c'est un état du stock.
+ */
+export function validerCout(saisie: SaisieCout): string | null {
+  const renseigne = coutRenseigne(saisie);
+
+  if (renseigne) {
+    const prixAchat = lireEntier(saisie.prixAchat);
+    if (prixAchat === null) return "Le prix d’achat s’écrit en chiffres entiers.";
+    if (prixAchat > MONTANT_MAX) return "Le prix d’achat dépasse le maximum admis.";
+  } else if (saisie.fraisEntree.length > 0) {
+    /* Des frais sans prix d'achat donneraient un coût total égal aux seuls
+       frais, donc une marge fausse et non pas absente. On refuse plutôt que
+       d'écrire un chiffre qui a l'air d'un coût. */
+    return "Les frais d’entrée accompagnent un prix d’achat : saisissez-le, ou retirez les frais.";
   }
 
   for (const ligne of saisie.fraisEntree) {
@@ -230,8 +279,32 @@ export function validerMoto(saisie: SaisieMoto): string | null {
   return null;
 }
 
+/**
+ * La même validation, là où le prix d'achat **est** le sujet.
+ *
+ * L'écran de supervision sert à poser un coût manquant : y valider un
+ * formulaire vide l'écrirait à zéro, c'est-à-dire « acquise gratuitement »
+ * au lieu de « on ne sait pas » (D82).
+ */
+export function validerCoutPose(saisie: SaisieCout): string | null {
+  if (!coutRenseigne(saisie)) return "Saisissez le prix d’achat de cette moto.";
+  return validerCout(saisie);
+}
+
+/** Le coût prêt à écrire, ou `null` s'il n'y en a pas à écrire. */
+export function construireCout(saisie: SaisieCout): CoutMoto | null {
+  if (!coutRenseigne(saisie)) return null;
+  const prixAchat = lireEntier(saisie.prixAchat) ?? 0;
+  const fraisEntree = saisie.fraisEntree.map((ligne) => ({
+    typeFraisId: ligne.typeFraisId,
+    montant: lireEntier(ligne.montant) ?? 0,
+    note: ligne.note.trim(),
+  }));
+  return { prixAchat, fraisEntree, coutTotal: coutTotal(prixAchat, fraisEntree) };
+}
+
 /** Le coût total d'une saisie encore en cours, pour l'afficher pendant la frappe. */
-export function coutTotalSaisie(saisie: SaisieMoto): number {
+export function coutTotalSaisie(saisie: SaisieCout): number {
   const prixAchat = lireEntier(saisie.prixAchat) ?? 0;
   const frais = saisie.fraisEntree.map((ligne) => ({ montant: lireEntier(ligne.montant) ?? 0 }));
   return coutTotal(prixAchat, frais);

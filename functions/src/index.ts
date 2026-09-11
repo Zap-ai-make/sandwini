@@ -360,11 +360,12 @@ function versPiece(document: QueryDocumentSnapshot): PieceNumerotee {
  * gérant : elle est infalsifiable, y compris par un responsable qui voudrait la
  * retoucher depuis l'application.
  *
- * *Limite, à rouvrir le jour où le coût d'une moto deviendra modifiable :* le
- * coût est lu à la synchronisation, pas à la seconde de la vente. Aujourd'hui
- * il est écrit une fois pour toutes à l'entrée en stock, donc les deux valeurs
- * sont la même. Un écran de correction du coût devra soit refuser de toucher
- * une moto vendue, soit laisser cet instantané tranquille.
+ * *La limite annoncée ici s'est réalisée avec S39*, et elle est traitée juste
+ * en dessous par `rattraperMargeDuCout`. Le coût n'est plus écrit à l'entrée en
+ * stock — le gérant ne le saisit plus — donc une vente peut très bien précéder
+ * son coût. Le choix retenu est celui que ce commentaire nommait en second :
+ * **laisser l'instantané tranquille**. Une marge déjà figée ne se réécrit
+ * jamais ; seule une marge absente se remplit.
  */
 export const figerMargeVente = onDocumentCreated(
   { region: REGION, document: "ventesMotos/{venteId}" },
@@ -407,6 +408,70 @@ export const figerMargeVente = onDocumentCreated(
       updatedBy: "systeme",
       updatedByName: "Calcul automatique",
     });
+  },
+);
+
+/**
+ * Rattrape la marge d'une vente dont le coût est arrivé après elle (S39).
+ *
+ * **Pourquoi il a fallu l'écrire.** `figerMargeVente` se déclenche à la
+ * création de la vente et lit le coût de la moto. Tant que le coût était écrit
+ * dans le même lot que l'entrée en stock, il était toujours là. Depuis S39 le
+ * gérant ne le saisit plus : une moto peut entrer, se vendre, et ne recevoir
+ * son prix d'achat que le soir, quand le responsable descend sa liste. Sans ce
+ * déclencheur, cette vente-là n'aurait **jamais** de marge — le seul acteur qui
+ * savait la calculer était déjà passé.
+ *
+ * **Ce qu'il ne fait pas, et c'est le point délicat.** Il ne réécrit aucune
+ * marge existante. Le cahier des charges veut un coût *figé au moment de la
+ * vente* (§5.4) : corriger un prix d'achat trois mois plus tard ne doit pas
+ * réviser en silence la marge d'une vente déjà analysée. Une marge s'écrit une
+ * fois et ne se réécrit jamais (D51) — ce déclencheur comble un trou, il ne
+ * révise rien.
+ *
+ * **Il ne tourne que quand il peut servir.** Une moto encore en stock n'a
+ * aucune vente : la requête ne rend rien et la fonction s'arrête. Le cas
+ * courant — le responsable renseigne le coût d'une moto invendue — coûte une
+ * requête et aucune écriture.
+ */
+export const rattraperMargeDuCout = onDocumentWritten(
+  { region: REGION, document: "motos/{motoId}/prive/{section}" },
+  async (evenement) => {
+    if (evenement.params.section !== "cout") return;
+
+    const apres = evenement.data?.after;
+    if (!apres?.exists) return;
+
+    const coutMotoSnapshot = apres.get("coutTotal");
+    if (typeof coutMotoSnapshot !== "number") return;
+
+    const { base, horodatage } = await admin();
+    const ventes = await base
+      .collection("ventesMotos")
+      .where("motoId", "==", evenement.params.motoId)
+      .get();
+    if (ventes.empty) return;
+
+    for (const vente of ventes.docs) {
+      const marge = base.doc(`ventesMotos/${vente.id}/prive/marge`);
+      if ((await marge.get()).exists) continue;
+
+      const prixConvenu = vente.get("prixConvenu");
+      if (typeof prixConvenu !== "number") continue;
+
+      await marge.set({
+        boutiqueId: vente.get("boutiqueId"),
+        coutMotoSnapshot,
+        marge: prixConvenu - coutMotoSnapshot,
+        updatedAt: horodatage,
+        updatedBy: "systeme",
+        updatedByName: "Calcul automatique",
+      });
+      logger.info("Marge rattrapée : le coût est arrivé après la vente", {
+        vente: vente.id,
+        moto: evenement.params.motoId,
+      });
+    }
   },
 );
 

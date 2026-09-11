@@ -50,7 +50,7 @@ export default function PageCatalogue() {
 }
 
 const ACTIONS_MARQUES: ActionsReferentiel = {
-  creer: (nom, auteur) => creerEntree("marques", nom, auteur),
+  creer: (nom, auteur) => creerEntree("marques", nom, auteur).enregistre,
   renommer: (id, nom, auteur) => renommerEntree("marques", id, nom, auteur),
   basculer: (id, actif, auteur) => changerActivationEntree("marques", id, actif, auteur),
   messageErreur: messageErreurReferentiel,
@@ -148,7 +148,7 @@ function Modeles({
     evenement.preventDefault();
     if (session.statut !== "connecte" || !marqueActive) return;
 
-    const probleme = validerNom(nom, "modèle");
+    const probleme = validerNom(nom, "ce modèle");
     if (probleme) {
       setErreurSaisie(probleme);
       return;
@@ -162,7 +162,7 @@ function Modeles({
     creerModele(marqueActive.id, nom, {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
-    }).catch((cause) => setErreurSaisie(messageErreurReferentiel(cause)));
+    }).enregistre.catch((cause) => setErreurSaisie(messageErreurReferentiel(cause)));
     setNom("");
   }
 
@@ -242,7 +242,7 @@ function LigneModele({ modele, freres }: { modele: Modele; freres: Modele[] }) {
     evenement.preventDefault();
     if (!auteur) return;
 
-    const probleme = validerNom(nom, "modèle");
+    const probleme = validerNom(nom, "ce modèle");
     if (probleme) {
       setErreur(probleme);
       return;

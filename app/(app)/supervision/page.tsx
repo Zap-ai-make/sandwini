@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, TrendingUp, TriangleAlert } from "lucide-react";
+import { Check, ChevronRight, TrendingUp, TriangleAlert, Wallet } from "lucide-react";
 import Link from "next/link";
 import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
 import { DernieresVentes } from "@/components/DernieresVentes";
@@ -67,10 +67,19 @@ export default function Supervision() {
            mois en cours, pas un écran où l'on travaille — on y va, on regarde,
            on revient. */
         actions={
-          <Link href="/supervision/chiffres" className="bouton bouton-neutre">
-            <TrendingUp aria-hidden="true" className="size-4" />
-            Voir les chiffres
-          </Link>
+          <>
+            <Link href="/supervision/chiffres" className="bouton bouton-neutre">
+              <TrendingUp aria-hidden="true" className="size-4" />
+              Voir les chiffres
+            </Link>
+            {/* S39. Les gérants ne saisissent plus les prix d'achat : c'est ici
+                qu'ils se posent, et cet écran est le seul endroit d'où l'on
+                sait quelles motos en attendent un. */}
+            <Link href="/supervision/couts" className="bouton bouton-neutre">
+              <Wallet aria-hidden="true" className="size-4" />
+              Prix d’achat
+            </Link>
+          </>
         }
         /* Une phrase, celle de la maquette (`a2:81`). La seconde — « ce que
            vous ouvrez s'inscrit dans le bandeau… » — expliquait un mécanisme
