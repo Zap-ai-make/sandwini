@@ -32,7 +32,30 @@ const serwist = new Serwist({
   precacheOptions: {
     ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^moto$/, /^vente$/, /^recu$/],
   },
-  skipWaiting: true,
+  /* Une mise à jour n'emporte jamais une saisie en cours (S34, réponse 5).
+
+     Avec `skipWaiting: true`, un service worker fraîchement installé prenait la
+     main sur les onglets déjà ouverts. La page continuait d'exécuter le code
+     déjà chargé, mais le morceau suivant qu'elle demandait — une navigation, un
+     panneau qui s'ouvre — était cherché dans le nouveau cache, où l'ancien
+     fichier n'existe plus. Le geste échouait alors au pire moment : celui où le
+     gérant vient de changer d'écran, donc en pleine saisie. C'est l'esprit de
+     D76 pris à l'envers — le comptoir subissait le serveur.
+
+     À `false`, la nouvelle version s'installe et attend. L'onglet ouvert finit
+     sa journée sur la version avec laquelle il l'a commencée, cohérente d'un
+     bout à l'autre, et passe à la suivante au rechargement.
+
+     Ce n'est pas renoncer à `skipWaiting` : Serwist, quand l'option est fausse,
+     installe lui-même l'écouteur du message `SKIP_WAITING` (`serwist/dist/
+     index.mjs:1328`). Le bouton « Mettre à jour » des réglages l'envoie. Le
+     saut de version cesse d'être une option de compilation posée une fois pour
+     toutes et devient un geste du comptoir, au moment choisi par celui qui
+     tient la caisse. */
+  skipWaiting: false,
+  /* Reste vrai, et ne se contredit pas : `clientsClaim` n'agit qu'à
+     l'activation — c'est-à-dire, désormais, après le geste ci-dessus. Il évite
+     qu'un onglet rechargé reparte non contrôlé, donc sans repli hors ligne. */
   clientsClaim: true,
   navigationPreload: true,
   runtimeCaching: defaultCache,

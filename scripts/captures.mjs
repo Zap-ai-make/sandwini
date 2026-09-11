@@ -26,7 +26,15 @@ async function seConnecter(page) {
 const PRISES = [
   { nom: "connexion-mobile-clair", chemin: "/login", theme: "light", mobile: true, publique: true },
   { nom: "connexion-mobile-sombre", chemin: "/login", theme: "dark", mobile: true, publique: true },
+  /* Le panneau de marque, et le numéro de version qu'il porte (`a1:25`),
+     n'existent qu'au-delà du seuil `md` : sur mobile, la page de connexion est
+     le seul formulaire. Sans ces deux prises, la moitié de l'écran validé par
+     le commanditaire n'était jamais regardée (S34). */
+  { nom: "connexion-bureau-clair", chemin: "/login", theme: "light", mobile: false, publique: true },
+  { nom: "connexion-bureau-sombre", chemin: "/login", theme: "dark", mobile: false, publique: true },
   { nom: "reglages-mobile-clair", chemin: "/parametres", theme: "light", mobile: true },
+  { nom: "reglages-bureau-clair", chemin: "/parametres", theme: "light", mobile: false },
+  { nom: "reglages-bureau-sombre", chemin: "/parametres", theme: "dark", mobile: false },
   { nom: "boutiques-mobile-clair", chemin: "/parametres/boutiques", theme: "light", mobile: true },
   { nom: "boutiques-bureau-sombre", chemin: "/parametres/boutiques", theme: "dark", mobile: false },
   { nom: "entreprise-mobile-clair", chemin: "/parametres/entreprise", theme: "light", mobile: true },
@@ -89,6 +97,12 @@ const PRISES = [
   { nom: "supervision-mobile-sombre-coupe", chemin: "/supervision", theme: "dark", mobile: true, coupe: true },
 ];
 
+/* Un filtre facultatif : `node scripts/captures.mjs connexion` ne reprend que
+   les prises dont le nom correspond. La série entière ouvre une cinquantaine de
+   sessions ; en revoir deux après un changement ne doit pas coûter la série. */
+const filtre = process.argv[2] ? new RegExp(process.argv[2]) : null;
+const aPrendre = filtre ? PRISES.filter(({ nom }) => filtre.test(nom)) : PRISES;
+
 await mkdir(DOSSIER, { recursive: true });
 const navigateur = await chromium.launch();
 
@@ -103,7 +117,7 @@ for (const {
   premiereVente,
   premierRecu,
   impression,
-} of PRISES) {
+} of aPrendre) {
   const contexte = await navigateur.newContext({
     ...(mobile ? devices["Pixel 7"] : { viewport: { width: 1280, height: 820 } }),
     colorScheme: theme,

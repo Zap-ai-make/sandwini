@@ -55,8 +55,8 @@ avant toute spec post-MVP.
 | S26 | Motos de confrère                             | S8          | Cas de vente marginal (`prompt.md` §8). |
 | S27 | Reconnexion immédiate au retour du réseau     | aucune      | La file d'écritures repart quand le SDK a fini son attente croissante — jusqu'à une minute après le retour du signal. D66 fait baisser son rang côté produit ; il reste haut côté vérification, où ce défaut rend la suite bout en bout bruitée (D50, D55). **Mesuré en S31** : 9 échecs sur émulateurs vieillis, 6 sur émulateurs neufs, 2 en rejouant ces six, 0 en rejouant ces deux. L'ensemble qui échoue change à chaque passe ; aucun test n'échoue deux fois de suite. **Remesuré en S24** : 83 passés, 4 échoués sur une suite complète de 29 min — les quatre en expiration *dans le décor*, aucun sur une assertion. Trois passent au rejeu sur émulateurs neufs ; le quatrième, qui avait échoué deux fois, passe en **7,1 s lancé seul** contre un budget de 180 s épuisé en suite chargée. Le rapport n'est pas marginal : ce n'est pas une assertion lente, c'est la file d'écritures qui étouffe sous la contention. Qui prendra S27 doit chercher là. |
 | S32 | Recherche globale — motos, ventes, clients     | aucune      | La palette du bandeau ne cherche que des écrans ; les maquettes lui font chercher des choses. Demande un index consultable hors ligne, ce qui en fait une spec et non une ligne : relevé pendant S31, sans être codé. |
+| S36 | Appliquer une version en attente sans fermer l'application | S34 | Le produit annonce la version prête, et dit d'aller la chercher en fermant puis rouvrant. Le bouton qui la prendrait sur place a été écrit et retiré : mesuré en S34, `skipWaiting` ne se résout jamais tant qu'un écran est ouvert — les écoutes Firestore gardent la version active occupée, et un rechargement complet n'y change rien. La piste non vérifiée est de fermer les écoutes (`disableNetwork`) avant d'envoyer le message. Petit confort : sans lui, la version arrive quand même à la réouverture. D85 porte les quatre mesures. |
 | S33 | Renommer le nom affiché sur les reçus          | aucune      | `a9:180-191` fait de « Votre compte » une carte « Mon nom affiché » : le nom qui s'imprime au bas des reçus remis. Le produit ne sait pas renommer un compte (D72) — c'est une écriture et une règle, pas un habillage. |
-| S34 | Le numéro de version, visible au comptoir      | aucune      | Le produit n'expose aucune version (A1.3). Quand un gérant décrit un comportement au téléphone, rien ne dit ce qui tourne sur son appareil — et une PWA garde son ancienne version jusqu'à ce que le service worker passe la main. Petit, mais c'est ce qui rend un rapport de défaut exploitable. |
 | S35 | Le nom du client dans le journal de caisse | S22 | La maquette `c2` montre une colonne « Qui » avec le nom du client ; un encaissement ne le contient pas. Deux voies : joindre ventes et clients à la lecture (deux écoutes de plus pour une colonne), ou l'écrire dans le libellé à l'encaissement, ce qui touche S8 et S9 et ne vaudra que pour les mouvements à venir. Rien d'urgent : le libellé porte déjà le numéro, qui est ce qu'on rapproche d'un papier. Trouvé par la suite bout en bout de S22 (D84). |
 
 ---
@@ -99,6 +99,7 @@ neuf. Ce qui restait « manque de données » attendait S24, sans se déguiser e
 |-----|-----------------------------------------------|-----------|-----------|----------|
 | S24 | Supervision — les chiffres toutes boutiques   | S9, S11   | post-MVP  | terminée |
 | S22 | Caisse — le journal du jour                   | S8, S9, S11 | post-MVP  | terminée |
+| S34 | Le numéro de version, visible au comptoir     | aucune    | post-MVP  | terminée |
 
 S24 est fermée. Elle remplit ce que D63 réservait : la supervision avait sa
 section depuis S3bis et sa forme depuis S31, il lui manquait ses nombres. Quatre
@@ -172,6 +173,45 @@ n'est pas un échec de la méthode, c'est sa limite — et c'est la méthode qui
 rendu la mauvaise réponse bon marché.
 
 ---
+S34 est fermée. Le produit sait dire ce qui tourne : « SDI · version 1 » en pied
+de connexion comme le demande `a1:25`, et la version, la date de compilation et
+l'empreinte courte dans « Cet appareil ». Les trois voyagent dans le paquet et
+se lisent **réseau coupé** — c'est l'écran qu'on ouvre quand plus rien ne
+marche, il ne peut rien aller chercher.
+
+**Cinq questions ont précédé la première ligne de code, cinq réponses rendues**,
+toutes conformes aux recommandations. Le premier numéro est 1 et non 20 : le
+produit a connu une vingtaine de lots, mais aucun ne s'annonçait, et « aucun
+numéro affiché » devient l'information exacte *plus ancien que la version 1*.
+
+**La cinquième question touchait un comportement déjà en production**, et c'est
+elle qui a produit la décision. Le service worker déclarait `skipWaiting: true` :
+une version fraîchement déployée reprenait la main sur les onglets ouverts, et
+le morceau de code suivant — une navigation, un panneau — était cherché dans un
+cache où l'ancien fichier n'existait plus. L'échec tombait exactement sur le
+geste, donc en pleine saisie. D85 en tire la règle : D76 dit qu'un geste au
+comptoir n'attend jamais le serveur ; il n'est jamais rattrapé par lui non plus.
+
+**Ce que la vérification a trouvé, et qu'aucune relecture n'aurait vu.** Le
+bouton « Recharger maintenant » ne pouvait pas tenir sa promesse. Quatre mesures
+l'établissent : le message arrive bien au worker en attente, mais `skipWaiting`
+ne se résout jamais tant qu'un écran de l'application est ouvert — ses écoutes
+Firestore gardent la version active occupée — et un rechargement complet n'y
+change rien. Le même message depuis `/login`, sans session, active la nouvelle
+version immédiatement. L'écran dit donc ce qui marche vraiment (fermer
+l'application, la rouvrir) et il n'y a pas de bouton : un bouton qui ne fait
+rien n'échoue pas bruyamment, il apprend à ne plus croire l'écran.
+
+**Et le premier test de non-régression ne testait rien** : il cherchait la chaîne
+`SKIP_WAITING` dans le worker servi, où elle est présente dans les deux
+réglages. Il passait à l'endroit comme à l'envers. C'est en le vérifiant en sens
+inverse (D79) qu'on s'en est aperçu — et c'est cette vérification qui a mis au
+jour tout ce qui précède.
+
+**Reste au backlog** le bouton de rechargement, avec sa mesure et sa piste
+(fermer les écoutes Firestore avant d'envoyer le message, non vérifié).
+
+
 
 ---
 
@@ -184,10 +224,33 @@ c'est le voir revenir sous un autre nom.
 | ID  | Spec                                              | Touche | Périmètre | Statut  |
 |-----|---------------------------------------------------|--------|-----------|---------|
 | S30 | Le dépôt chez un prestataire ne se termine jamais | S11    | MVP       | terminée |
+| S37 | Le reçu attend une phrase que D81 lui a retirée   | S10    | post-MVP  | terminée |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
 accusait, et il était faux. La leçon est en D76.
+
+S37 est ouverte, et c'est S34 qui l'a trouvée en refusant de classer un échec
+bout en bout comme du bruit. `e2e/recus.spec.ts:101` attend « La moto est remise
+au client » sur le reçu. L'assertion y a été posée le 9 septembre (`7916082`) ;
+le lendemain, `8fb2a7d` retirait `MENTION_RECU` du reçu sur demande du
+commanditaire (D81). Le test échoue depuis, **sur `main`**, à chaque passe —
+mesuré quatre fois, sur les deux branches, sur émulateurs neufs comme vieillis.
+
+Ce n'est donc ni de la contention ni un défaut de produit : **le produit a
+raison et le test est resté en arrière.** D81 affirmait que retirer la mention
+« n'en casse aucun » ; cette phrase n'avait pas été vérifiée, et elle est
+corrigée dans `DECISIONS.md`.
+
+S37 est fermée sur arbitrage du commanditaire. L'assertion est retirée : la
+conséquence du mode reste vérifiée là où le gérant la lit, sur la fiche de vente
+(`paiements.spec.ts:106`) — ce que D81 affirmait sans l'avoir mesuré, et qui l'est
+maintenant. `recus.spec.ts:70` passe en 6,8 s, contre un budget de 15 s qu'il
+épuisait à chaque passe.
+
+**Ce que le défaut coûtait tant qu'il vivait** : la suite bout en bout était
+rouge en permanence, ce qui rend le prochain vrai défaut plus facile à ranger
+avec le bruit — précisément le mécanisme qui l'avait caché deux jours.
 
 ---
 

@@ -1,7 +1,61 @@
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
 import withSerwistInit from "@serwist/next";
 import type { NextConfig } from "next";
 
 const enDev = process.env.NODE_ENV === "development";
+
+/* ── La version du produit, telle qu'on la lira au comptoir (S34) ───────────
+   Ces trois valeurs sont posées ici parce qu'elles n'existent qu'à la
+   compilation : l'écran qui les affiche est celui qu'on ouvre quand plus rien
+   ne marche, et il ne peut donc rien aller chercher. Elles partent dans le
+   paquet et se lisent hors ligne.
+   Corollaire connu du projet : un `npm run dev` déjà lancé les a figées à son
+   démarrage — les changer demande de redémarrer le serveur. */
+
+/**
+ * L'entier de la maquette `a1:25`, posé à la main dans le commit qui ferme un
+ * lot — au même moment que la décision et la ligne de roadmap.
+ *
+ * Il vit dans un fichier d'une ligne et non dans le champ `version` de
+ * `package.json` : ce champ vaut `0.1.0`, ne veut rien dire pour un paquet
+ * privé, et n'accepte pas un entier nu. Deux nombres qui se disent tous deux
+ * « la version » seraient exactement la confusion que ce lot vient supprimer.
+ */
+const lireNumeroDeVersion = (): string => {
+  try {
+    return readFileSync(new URL("VERSION", import.meta.url), "utf8").trim();
+  } catch {
+    /* Un paquet déployé sans son fichier VERSION vaut mieux sans numéro
+       qu'avec un numéro inventé : le domaine sait afficher « SDI » tout court,
+       et l'absence de numéro reste une information exacte. */
+    return "";
+  }
+};
+
+/**
+ * L'empreinte du commit compilé. Vercel la pose ; en local on la demande à git.
+ *
+ * `execFileSync` et non `execSync` : aucun shell, donc rien à échapper.
+ */
+const lireEmpreinte = (): string => {
+  const posteeParVercel = process.env.VERCEL_GIT_COMMIT_SHA;
+  if (posteeParVercel) return posteeParVercel;
+  try {
+    return execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  } catch {
+    /* Ni Vercel ni dépôt git — une archive décompressée, par exemple. Le
+       domaine affichera « — » plutôt qu'une valeur qui ferait chercher un
+       commit inexistant. */
+    return "";
+  }
+};
+
+/* Un seul instant pour les deux usages : la date que lit le gérant et la
+   révision qui invalide le cache du service worker désignent alors la même
+   compilation. Deux horloges auraient pu diverger d'une seconde et faire
+   mentir l'une des deux. */
+const COMPILEE_LE = new Date().toISOString();
 
 /* Les émulateurs s'autorisent sur le drapeau qui dit qu'on leur parle, pas sur
    `NODE_ENV`. La distinction n'est pas cosmétique : les tests bout en bout
@@ -73,6 +127,15 @@ const nextConfig: NextConfig = {
      vivent dans `node_modules/next/dist/docs/` — est repris dans AGENTS.md,
      dans nos mots et sous notre contrôle. */
   agentRules: false,
+  /* Ces trois clés entrent telles quelles dans le paquet JavaScript. Elles se
+     lisent une par une, jamais par déstructuration de `process.env` : Next les
+     remplace littéralement à la compilation, et un `const { X } = process.env`
+     ne trouverait rien (doc Next, `05-config/01-next-config-js/env.md`). */
+  env: {
+    NEXT_PUBLIC_VERSION: lireNumeroDeVersion(),
+    NEXT_PUBLIC_COMPILEE_LE: COMPILEE_LE,
+    NEXT_PUBLIC_EMPREINTE: lireEmpreinte(),
+  },
   async headers() {
     return [
       {
@@ -134,8 +197,9 @@ const ECRANS_HORS_LIGNE = [
 
 /* Une révision par build : elle change à chaque compilation pour qu'une
    nouvelle version remplace l'ancienne dans le cache, et reste identique
-   pour toutes les entrées d'un même build. */
-const REVISION = `${Date.now()}`;
+   pour toutes les entrées d'un même build. C'est l'instant que lit aussi le
+   gérant dans « Cet appareil ». */
+const REVISION = `${Date.parse(COMPILEE_LE)}`;
 
 const construireAvecServiceWorker = () =>
   withSerwistInit({

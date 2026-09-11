@@ -1925,6 +1925,16 @@ occurrences de leur information, pas les seules :
   vérifient — sur la fiche, pas sur le reçu : les retirer du reçu n'en casse
   aucun, ce qui est le signe que ce n'était pas là qu'ils la lisaient.
 
+> **Correction du 10 septembre 2026, apportée par S34.** La dernière phrase
+> était fausse, et elle n'avait pas été mesurée. `e2e/recus.spec.ts:101`
+> attendait bien « La moto est remise au client » **sur le reçu** — l'assertion
+> y avait été posée la veille (`7916082`, 9 septembre). Le retrait de
+> `MENTION_RECU` l'a donc cassée le jour même, et elle échoue depuis, sur
+> `main`, à chaque passe. Elle n'a pas été vue parce qu'elle tombait dans le
+> panier « la suite est bruitée » de D50 — or D50 dit exactement l'inverse :
+> un échec s'explique avant d'être écarté. Le raisonnement de D81 reste juste ;
+> c'est sa vérification qui n'avait pas eu lieu. Le défaut est ouvert en S37.
+
 **Ce qui reste vrai, et qu'il faut dire.** Le client, lui, n'a plus la phrase
 sur son papier. Elle passe du document à la parole : c'est le gérant qui la dit
 en remettant le reçu. C'est un recul pour un client qui rouvre son papier trois
@@ -1991,6 +2001,7 @@ Les deux corrections étaient nécessaires, et l'ordre importe — **c'est en
 expliquant l'échec au lieu de rallonger le délai qu'on a trouvé le défaut de
 produit**. Un test qu'on rend patient sans l'avoir compris efface exactement ce
 qu'il venait de trouver.
+
 
 ---
 
@@ -2076,6 +2087,113 @@ Ce sont deux vérifications, et la seconde était absente ici.
 branche, et cette décision-ci prend le numéro suivant plutôt que de leur entrer
 dedans à la fusion. Les deux lots ont avancé en parallèle, chacun sur sa
 branche, et c'est le prix ordinaire de ce parallélisme.*
+
+---
+
+## D85 — Une mise à jour ne prend jamais la main sur un geste en cours
+
+*S34, le numéro de version. La décision ne vient pas d'une panne observée mais
+d'une lecture : en écrivant la spec, il fallait ouvrir `app/sw.ts` pour savoir
+comment le produit passait d'une version à l'autre.*
+
+**Ce qui y était, et pourquoi ça se défendait.** Le service worker déclarait
+`skipWaiting: true` avec `clientsClaim: true`. L'intention est bonne et
+courante : une correction déployée arrive tout de suite, sans attendre que le
+gérant pense à fermer son onglet. Sur un produit qu'on ouvre et qu'on ferme,
+c'est le bon réglage.
+
+**Ce que ça fait sur un poste de comptoir, qui reste ouvert la journée.** Dès
+qu'un nouveau paquet est installé, il prend la main sur les onglets déjà
+ouverts. La page continue d'exécuter le code qu'elle a déjà chargé — elle ne se
+recharge pas — mais le morceau suivant qu'elle demande est cherché dans le
+**nouveau** cache, où l'ancien fichier n'existe plus. Or une page ne demande un
+morceau de code qu'au moment où l'utilisateur fait quelque chose : il change
+d'écran, il ouvre un panneau. **L'échec est donc exactement synchronisé avec le
+geste**, et le geste, ici, c'est une vente en train d'être saisie.
+
+**Pourquoi c'est D76 pris à l'envers.** D76 dit qu'un geste au comptoir n'attend
+jamais l'accusé de réception du serveur. Le même principe a une seconde face,
+qu'on n'avait pas écrite : **un geste au comptoir n'est jamais rattrapé par le
+serveur non plus.** Ne pas attendre et ne pas être bousculé sont la même
+exigence — que la session appartienne à celui qui la tient.
+
+**La règle.** Une nouvelle version s'installe, puis attend. L'onglet ouvert finit
+sur la version avec laquelle il a commencé, cohérente d'un bout à l'autre. Le
+saut de version est un **geste**, proposé et jamais imposé : le produit dit
+qu'une version est prête, et celui qui tient la caisse choisit le moment.
+
+**Ce que ça a coûté.** `skipWaiting: false`, une ligne.
+
+**Et ce que la vérification a trouvé ensuite, qui change la seconde moitié de la
+décision.** Le geste devait être un bouton « Recharger maintenant » : Serwist,
+quand l'option est fausse, installe lui-même l'écouteur du message
+`SKIP_WAITING` (`serwist/dist/index.mjs:1328`) — il n'y avait donc rien à écrire
+pour le recevoir, seulement un bouton pour l'envoyer. **Le bouton ne marche
+pas**, et il a fallu quatre mesures pour comprendre pourquoi plutôt que pour le
+contourner.
+
+| Ce qu'on a mesuré | Résultat |
+|---|---|
+| Message envoyé au worker en attente, depuis `/parametres` (session ouverte) | **reçu** — le worker répond, `state=installed` |
+| `self.skipWaiting()` appelé dans la foulée | **ne se résout jamais** ; le worker reste `installed` pendant 20 s |
+| Le même message depuis `/login`, sans session | **`skipWaiting` résolu**, `controllerchange` émis, version activée |
+| Message puis rechargement complet de la page, avec session | le worker reste `installed` — la bascule ne se termine pas |
+
+**La cause.** Un onglet de l'application tient des écoutes Firestore ouvertes —
+des requêtes de longue durée qui ne se terminent jamais tant que l'écran vit. Le
+navigateur n'active pas une nouvelle version tant que la version active a des
+requêtes en vol. Un rechargement ne suffit pas : la page qui repart rouvre ses
+écoutes avant que l'ancienne version ait eu son instant d'inactivité. **Sur ce
+produit, une version en attente ne peut pas prendre la main pendant qu'on s'en
+sert** — elle prend la main à la réouverture, quand l'application a été fermée
+pour de bon.
+
+**Ce qu'on en fait.** L'écran annonce la version en attente et dit la seule
+chose qui marche : fermer l'application, la rouvrir. Pas de bouton. **Un bouton
+qui ne fait rien est pire que pas de bouton** — il n'échoue pas bruyamment, il
+apprend à ne plus croire l'écran, et c'est le genre de dette qu'on ne rembourse
+jamais parce qu'elle ne casse rien de mesurable.
+
+**Le corollaire.** Un défaut peut n'avoir jamais été observé et être certain
+quand même. Celui-ci ne s'était signalé par aucun rapport — il se manifeste par
+un geste qui échoue une fois, chez une personne, au moment où elle est occupée,
+et qui marche au coup d'après. C'est précisément le profil d'un défaut que
+personne ne rapporte jamais.
+
+**Le second corollaire, sur les tests.** Le premier test censé protéger ce
+réglage lisait le service worker servi et y cherchait la chaîne `SKIP_WAITING`.
+Il passait — et il passait **aussi** avec `skipWaiting: true`, parce que Serwist
+embarque ses deux branches et choisit à l'exécution. Il ne vérifiait rien. Seule
+la vérification en sens inverse l'a montré (D79), et c'est en la faisant qu'on a
+découvert tout ce qui précède. Un test qu'on n'a pas vu échouer n'est pas encore
+un test.
+
+---
+
+## D86 — Un numéro posé à la main voyage avec une valeur qui ne s'oublie pas
+
+*S34. Le numéro de version s'incrémente à la main, dans le commit qui ferme un
+lot.*
+
+**Le risque du geste manuel n'est pas l'absence, c'est la répétition.** Un
+numéro oublié ne laisse pas un vide qu'on remarque : il laisse **deux logiciels
+différents qui disent le même nombre**. Le dépannage repart alors sur une fausse
+piste, avec plus d'assurance que s'il n'avait rien eu — un identifiant faux est
+pire qu'un identifiant absent.
+
+**Ce qui rend le geste manuel tenable.** À côté du numéro voyage la date de
+compilation, que le build pose seul et que personne ne peut oublier. Deux
+paquets qui diraient tous deux « version 12 » porteraient deux dates
+différentes, et la date tranche. **L'oubli dégrade alors la précision au lieu de
+fabriquer un mensonge** — c'est la seule propriété qui autorise à confier un
+identifiant à la mémoire de quelqu'un.
+
+**La règle, au-delà des versions.** Toute valeur significative posée à la main
+s'accompagne d'une valeur automatique qui la recoupe. On ne choisit pas entre
+« lisible mais oubliable » et « exact mais illisible » : on donne le lisible au
+lecteur, et l'exact à qui doit trancher (D78 pour la nuance des deux lecteurs).
+
+---
 
 ## D87 — La clôture se retire au panneau, parce qu'elle n'avait pas été bâtie au panneau
 

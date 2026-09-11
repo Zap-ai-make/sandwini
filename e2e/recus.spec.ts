@@ -97,9 +97,16 @@ test.describe("le reçu de vente", () => {
     /* Le pied nomme le gérant en regard du trait du client (`c4:76-86`) : la
        légende d'une signature, et non plus la phrase « Établi par ». */
     await expect(recu).toContainText("Le gérant");
-    /* La conséquence du mode s'imprime : sans elle, le client ne lit nulle
-       part pourquoi il repart avec la moto, ou sans elle (`c4:70-73`). */
-    await expect(recu).toContainText("La moto est remise au client");
+    /* La conséquence du mode ne s'imprime plus, et son assertion est partie
+       avec elle (S37). Elle était ici depuis le 9 septembre ; le lendemain, le
+       commanditaire faisait retirer `MENTION_RECU` du reçu et D81 l'actait.
+       Ce test échouait depuis, sur `main`, à chaque passe — rangé avec le bruit
+       de la file d'écritures (D50) alors qu'il ne variait jamais.
+
+       Ce qu'on ne perd pas en la retirant : la phrase reste vérifiée là où le
+       gérant la lit, sur la fiche de vente (`paiements.spec.ts:106`). C'est ce
+       que D81 affirmait sans l'avoir mesuré — la vérification a lieu
+       maintenant. */
     /* Les mentions légales s'impriment toujours : elles ne dépendent plus de ce
        que quelqu'un a pensé à saisir (D71). */
     await expect(recu).toContainText(IDENTITE.ifu);
