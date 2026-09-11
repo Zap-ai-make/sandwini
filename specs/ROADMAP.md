@@ -49,6 +49,7 @@ avant toute spec post-MVP.
 | S18 | Échanges / reprises                           | S8          | Cas de vente fréquent mais contournable (vente + entrée en stock séparées). |
 | S19 | Envois de fichiers — photos et papiers        | S5          | Débloqué par D66 : un champ d'envoi peut exister s'il annonce qu'il demande du réseau. Reste une spec à part parce qu'une file d'attente locale, elle, est un vrai chantier (D14). |
 | S20 | Pièces — catalogue, stock et mouvements       | S4          | Second métier entier ; n'empêche pas de vendre des motos. |
+| S39 | Déclarer moins pour saisir mieux              | S4, S5      | Deux corrections demandées en répondant à S20, et qui portent ailleurs : le gérant ne saisit plus le prix d'achat d'une moto (il se pose depuis la supervision), et la marque ne se déclare plus d'avance — les listes restent, mais elles se remplissent depuis le formulaire. Même forme dans les deux cas : une condition préalable retirée à un geste de comptoir. Bloque S20, qui applique le même principe à ses catégories. |
 | S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. |
 | S23 | Inventaires motos et pièces + comparaison     | S5, S20     | Exercice périodique, pas quotidien. |
 | S25 | Annulation et correction de vente, et d'un versement | S9    | Opération sensible, cf. `DECISIONS.md` D10 et D58. S9 y a renvoyé la correction d'un versement : même appareillage d'historique. |

@@ -1,8 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import {
   bandeauEtat,
+  codeUnique,
   contenu,
+  creerBoutique,
   emailUnique,
+  nomUnique,
   prendreLaMainEtMettreEnCache,
   preparerTerrain,
   saisirMoto,
@@ -16,8 +19,14 @@ import {
  *
  * Deux choses à protéger, et elles ne se ressemblent pas. La première est une
  * promesse : la saisie et la recherche marchent sans réseau — c'est la raison
- * d'être du produit. La seconde est une frontière : le gérant écrit le coût
- * d'une moto et ne peut jamais le relire.
+ * d'être du produit. La seconde est une frontière : le coût d'une moto est
+ * hors de portée du gérant.
+ *
+ * **Cette frontière a changé de forme avec S39.** Le gérant écrivait le coût
+ * sans pouvoir le relire (D4) — un cloisonnement tenu d'un côté et ouvert de
+ * l'autre. Il ne le saisit plus du tout : la moto entre sans coût, et la
+ * supervision le pose après coup. Le test qui suit vérifie les deux moitiés,
+ * parce qu'une seule ne prouverait rien.
  */
 
 test.describe("entrée en stock", () => {
@@ -100,7 +109,7 @@ test.describe("recherche dans le stock", () => {
 });
 
 test.describe("le coût est réservé au responsable", () => {
-  test("le gérant saisit un coût qu’il ne peut pas relire ; le responsable le voit", async ({
+  test("le gérant n’a pas de champ de prix ; le responsable le pose depuis la supervision", async ({
     page,
     browser,
   }) => {
@@ -135,28 +144,98 @@ test.describe("le coût est réservé au responsable", () => {
     await seConnecter(pageGerant, email, motDePasse);
     await pageGerant.waitForURL("**/dashboard");
 
+    /* La première moitié : le formulaire du gérant ne demande aucun montant
+       d'achat. On le vérifie sur le formulaire ouvert, pas en relisant le
+       code — c'est tout l'objet de D79. */
+    await pageGerant.goto("/motos/nouvelle", { waitUntil: "load" });
+    await expect(pageGerant.getByLabel("Prix d’achat")).toHaveCount(0);
+    await expect(contenu(pageGerant)).not.toContainText("Ce qu’elle a coûté");
+    await expect(contenu(pageGerant)).not.toContainText("Frais d’entrée");
+    // Le prix de vente, lui, reste le sien : le commanditaire l'a dit.
+    await expect(pageGerant.getByLabel(/Prix de vente conseillé/)).toHaveCount(1);
+
     const chassis = `COUT${Date.now().toString(36).toUpperCase()}`;
-    await saisirMoto(pageGerant, terrain, chassis, { prixAchat: "775000" });
+    await saisirMoto(pageGerant, terrain, chassis);
     await expect(contenu(pageGerant).getByRole("status")).toContainText(chassis);
 
-    // Il ouvre la fiche : le coût lui est refusé, et on le lui dit.
+    // La fiche ne lui apprend rien de plus, et le dit.
     await pageGerant.goto("/motos", { waitUntil: "load" });
     /* La fiche s'ouvre par le châssis, pas par la ligne entière : une ligne de
        tableau ne peut pas être un lien, et l'envelopper dans un gestionnaire de
        clic la rendrait inatteignable au clavier. */
     await pageGerant.getByRole("link", { name: chassis }).click();
     await expect(contenu(pageGerant)).toContainText("réservés au responsable");
-    await expect(contenu(pageGerant)).not.toContainText("775 000");
 
     await contexteGerant.close();
 
-    // Le responsable, lui, voit le montant.
+    /* La seconde moitié : le responsable trouve la moto dans la liste de ce
+       qui attend un prix d'achat, l'y saisit, et elle en sort. */
+    await page.goto("/supervision/couts", { waitUntil: "load" });
+    const ligne = page.locator("tbody tr").filter({ hasText: chassis });
+    await expect(ligne).toHaveCount(1, { timeout: 60_000 });
+    await expect(ligne).toContainText("À renseigner");
+
+    await ligne.getByRole("button").first().click();
+    const pose = page.getByRole("region", { name: new RegExp(chassis) });
+    await pose.getByLabel("Prix d’achat").fill("775000");
+    await pose.getByRole("button", { name: "Enregistrer le prix d’achat" }).click();
+
+    /* Elle quitte « À renseigner » — c'est le filtre d'ouverture, donc aucune
+       manipulation n'est nécessaire pour le constater. */
+    await expect(page.locator("tbody tr").filter({ hasText: chassis })).toHaveCount(0, {
+      timeout: 30_000,
+    });
+
+    // Et le montant se relit sur la fiche, côté responsable.
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher dans le stock").fill(chassis);
     await page.getByRole("link", { name: chassis }).click();
-    await expect(contenu(page)).toContainText("775 000 FCFA");
+    await expect(contenu(page)).toContainText("775 000 FCFA", { timeout: 30_000 });
+  });
+
+  /* Le panneau « Il manque une marque ou une provenance » barrait cet écran
+     tant que le référentiel était vide, et les règles refusaient au gérant de
+     le remplir. Ce test part d'une boutique neuve dont aucun référentiel n'a
+     été rempli, et fait tout depuis le formulaire. */
+  test("une moto entre alors qu’aucune marque n’est déclarée : tout se crée au formulaire", async ({
+    page,
+  }) => {
+    await seConnecterEtEntrer(page);
+    const code = codeUnique();
+    await creerBoutique(page, code, ["Motos"]);
+    await selecteurPerimetre(page).selectOption(code);
+
+    await page.goto("/motos/nouvelle", { waitUntil: "load" });
+    await expect(contenu(page)).not.toContainText("Il manque une marque");
+
+    const marque = nomUnique("Apsonic");
+    await ajouterDepuisLaListe(page, "Marque", marque);
+    await ajouterDepuisLaListe(page, "Modèle", nomUnique("AP 125"));
+    await ajouterDepuisLaListe(page, "Provenance", nomUnique("Lomé"));
+
+    const chassis = `NEUF${Date.now().toString(36).toUpperCase()}`;
+    await page.getByLabel("Numéro de châssis").fill(chassis);
+    await page.getByRole("button", { name: "Faire entrer en stock" }).click();
+    await expect(contenu(page).getByRole("status")).toContainText(chassis, { timeout: 20_000 });
+
+    /* La même marque retapée dans une autre casse ne dédouble pas la liste :
+       c'est ce qui remplace le référentiel fermé. */
+    await ajouterDepuisLaListe(page, "Marque", marque.toUpperCase());
+    await expect(contenu(page)).toContainText("existait déjà");
+    await expect(
+      page.getByLabel("Marque", { exact: true }).locator("option", { hasText: marque }),
+    ).toHaveCount(1);
   });
 });
+
+/** Ouvre « + Ajouter… » sur une liste de choix, saisit un nom, valide. */
+async function ajouterDepuisLaListe(page: Page, libelle: string, nom: string) {
+  await page.getByLabel(libelle, { exact: true }).selectOption("__nouvelle__");
+  const champ = page.getByLabel(/^Nouve(lle|au) /);
+  await champ.fill(nom);
+  await champ.press("Enter");
+  await expect(page.getByLabel(libelle, { exact: true })).toBeVisible();
+}
 
 test.describe("hors ligne", () => {
   test("une moto se saisit et se consulte sans réseau", async ({ page, context }) => {

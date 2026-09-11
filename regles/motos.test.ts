@@ -196,30 +196,50 @@ describe("lecture du stock", () => {
 });
 
 describe("entrée en stock", () => {
-  it("le gérant fait entrer une moto et son coût dans le même lot", async () => {
+  /* Depuis S39, le gérant fait entrer la moto et **rien d'autre**. Le coût
+     n'est plus de son ressort : la supervision le pose après coup, et
+     l'absence du document est le signal qu'elle attend. */
+  it("le gérant fait entrer une moto seule, sans coût", async () => {
+    await assertSucceeds(addDoc(collection(gerant(), "motos"), moto()));
+  });
+
+  it("le gérant n’écrit plus aucun coût, même sur sa propre moto (S39)", async () => {
+    /* L'autre moitié du test précédent, et la seule qui prouve quelque chose :
+       ce lot passait avant S39. Le cloisonnement de D2 était tenu en lecture et
+       ouvert en écriture — la moitié d'un cloisonnement (D79). */
     const base = gerant();
     const reference = doc(collection(base, "motos"));
     const lot = writeBatch(base);
     lot.set(reference, moto());
     lot.set(doc(reference, "prive", "cout"), cout());
+    await assertFails(lot.commit());
+
+    await assertFails(setDoc(doc(base, "motos/moto-ptg/prive/cout"), cout()));
+  });
+
+  it("le responsable fait entrer une moto et son coût dans le même lot", async () => {
+    const base = responsable();
+    const reference = doc(collection(base, "motos"));
+    const lot = writeBatch(base);
+    lot.set(reference, moto({}, "resp-1"));
+    lot.set(doc(reference, "prive", "cout"), cout({}, "resp-1"));
     await assertSucceeds(lot.commit());
+  });
+
+  it("le responsable pose un coût sur une moto déjà en stock — le geste de S39", async () => {
+    await assertSucceeds(
+      setDoc(doc(responsable(), "motos/moto-ptg/prive/cout"), cout({}, "resp-1")),
+    );
   });
 
   it("le gérant n’entre pas une moto dans une autre boutique", async () => {
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ boutiqueId: "KDG" })));
   });
 
-  it("le gérant n’écrit pas un coût rattaché à une autre boutique", async () => {
-    const base = gerant();
-    const reference = doc(collection(base, "motos"));
-    const lot = writeBatch(base);
-    lot.set(reference, moto());
-    lot.set(doc(reference, "prive", "cout"), cout({ boutiqueId: "KDG" }));
-    await assertFails(lot.commit());
-  });
-
-  it("le gérant n’attache pas un coût à la moto d’une autre boutique", async () => {
-    await assertFails(setDoc(doc(gerant(), "motos/moto-kdg/prive/cout"), cout({ boutiqueId: "PTG" })));
+  it("le coût ne se rattache pas à une autre boutique que sa moto", async () => {
+    await assertFails(
+      setDoc(doc(responsable(), "motos/moto-kdg/prive/cout"), cout({ boutiqueId: "PTG" }, "resp-1")),
+    );
   });
 
   it("le responsable fait entrer une moto dans n’importe quelle boutique", async () => {
@@ -263,11 +283,11 @@ describe("entrée en stock", () => {
   });
 
   it("refuse un montant décimal — le FCFA ne se divise pas", async () => {
-    const base = gerant();
+    const base = responsable();
     const reference = doc(collection(base, "motos"));
     const lot = writeBatch(base);
-    lot.set(reference, moto());
-    lot.set(doc(reference, "prive", "cout"), cout({ prixAchat: 850_000.5 }));
+    lot.set(reference, moto({}, "resp-1"));
+    lot.set(doc(reference, "prive", "cout"), cout({ prixAchat: 850_000.5 }, "resp-1"));
     await assertFails(lot.commit());
   });
 });

@@ -84,7 +84,7 @@ export function ListeReferentiel({
             <Ligne
               key={entree.id}
               entree={entree}
-              singulier={singulier}
+              designation={`${determinant} ${singulier}`}
               entrees={entrees}
               actions={actions}
             />
@@ -112,12 +112,13 @@ function Ajout({
   const [nom, setNom] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
   const identifiant = `ajout-${singulier.replace(/\s+/g, "-")}`;
+  const designation = `${determinant} ${singulier}`;
 
   function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (session.statut !== "connecte") return;
 
-    const probleme = validerNom(nom, singulier);
+    const probleme = validerNom(nom, designation);
     if (probleme) {
       setErreur(probleme);
       return;
@@ -166,12 +167,13 @@ function Ajout({
 
 function Ligne({
   entree,
-  singulier,
+  designation,
   entrees,
   actions,
 }: {
   entree: Referentiel;
-  singulier: string;
+  /** « cette marque », « ce type de frais » — déterminant compris. */
+  designation: string;
   entrees: Referentiel[];
   actions: ActionsReferentiel;
 }) {
@@ -189,7 +191,7 @@ function Ligne({
     evenement.preventDefault();
     if (!auteur) return;
 
-    const probleme = validerNom(nom, singulier);
+    const probleme = validerNom(nom, designation);
     if (probleme) {
       setErreur(probleme);
       return;

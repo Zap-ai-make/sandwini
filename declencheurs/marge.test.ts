@@ -13,6 +13,12 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
  * sur la bonne collection, qu'il va chercher le coût au bon endroit, qu'il pose
  * la marge là où le responsable la lira — et qu'il **n'écrit rien** quand il ne
  * sait pas, plutôt que de poser un zéro qui mentirait.
+ *
+ * **S39 ajoute le cas inverse du dernier.** Le coût n'est plus écrit avec la
+ * moto : le gérant ne le saisit plus, le responsable le pose quand il descend
+ * sa liste. Une vente peut donc précéder son coût, et `figerMargeVente` est
+ * déjà passé quand celui-ci arrive. `rattraperMargeDuCout` comble ce trou — et
+ * lui seul : une marge déjà figée ne se réécrit jamais (§5.4, D51).
  */
 
 const PROJET = "sdi-dev";
@@ -161,6 +167,16 @@ async function vendre(options: {
   return { venteId: vente.id, motoId: moto.id };
 }
 
+/** Le geste de `/supervision/couts` : poser un coût sur une moto déjà là. */
+async function poserLeCout(motoId: string, coutTotal: number): Promise<void> {
+  await base.doc(`motos/${motoId}/prive/cout`).set({
+    boutiqueId: BOUTIQUE,
+    prixAchat: coutTotal,
+    fraisEntree: [],
+    coutTotal,
+  });
+}
+
 const pause = (ms: number) => new Promise((suite) => setTimeout(suite, ms));
 
 async function lireMarge(venteId: string) {
@@ -212,5 +228,51 @@ describe("le coût est figé sur la vente par le serveur", () => {
 
     const marge = await attendreMarge(venteId);
     expect(marge?.updatedBy).toBe("systeme");
+  });
+});
+
+describe("le coût arrivé après la vente (S39)", () => {
+  it("rattrape la marge d’une vente enregistrée avant que le coût soit posé", async () => {
+    /* Le trajet exact d'après S39 : un gérant fait entrer la moto sans coût,
+       la vend, et le responsable ne pose le prix d'achat que le soir. Sans le
+       rattrapage, cette vente n'aurait jamais de marge — le seul acteur qui
+       savait la calculer était déjà passé. */
+    const { venteId, motoId } = await vendre({ coutTotal: null, prixConvenu: 1_200_000 });
+    await pause(3_000);
+    expect(await lireMarge(venteId)).toBeNull();
+
+    await poserLeCout(motoId, 865_000);
+
+    const marge = await attendreMarge(venteId, 60_000);
+    expect(marge?.coutMotoSnapshot).toBe(865_000);
+    expect(marge?.marge).toBe(335_000);
+    expect(marge?.boutiqueId).toBe(BOUTIQUE);
+  });
+
+  it("ne réécrit jamais une marge déjà figée — le coût est celui du jour de la vente", async () => {
+    /* §5.4 veut un coût figé au moment de la vente. Corriger un prix d'achat
+       trois mois plus tard ne doit pas réviser en silence la marge d'une vente
+       déjà analysée : le rattrapage comble un trou, il ne révise rien. */
+    const { venteId, motoId } = await vendre({ coutTotal: 800_000, prixConvenu: 1_000_000 });
+    const avant = await attendreMarge(venteId);
+    expect(avant?.marge).toBe(200_000);
+
+    await poserLeCout(motoId, 100_000);
+    await pause(5_000);
+
+    const apres = await lireMarge(venteId);
+    expect(apres?.coutMotoSnapshot).toBe(800_000);
+    expect(apres?.marge).toBe(200_000);
+  });
+
+  it("ne touche à rien quand la moto n’a pas été vendue", async () => {
+    const moto = base.collection("motos").doc();
+    await moto.set({ boutiqueId: BOUTIQUE, numeroChassis: "LC6STOCK", statut: "en_stock" });
+
+    await poserLeCout(moto.id, 500_000);
+    await pause(5_000);
+
+    const ventes = await base.collection("ventesMotos").where("motoId", "==", moto.id).get();
+    expect(ventes.empty).toBe(true);
   });
 });

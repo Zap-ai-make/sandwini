@@ -1,9 +1,11 @@
 import {
   collection,
   doc,
+  getDoc,
   onSnapshot,
   query,
   serverTimestamp,
+  setDoc,
   Timestamp,
   updateDoc,
   where,
@@ -13,7 +15,7 @@ import {
 } from "firebase/firestore";
 import { db, stockage } from "@/lib/firebase/client";
 import {
-  coutTotal,
+  construireCout,
   lireEntier,
   lirePapiers,
   normaliserChassis,
@@ -33,11 +35,17 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
 /**
  * Le stock de motos.
  *
- * Deux documents par moto, écrits dans le même lot : la moto elle-même, que le
- * gérant lit, et son coût, que seul le responsable lit (`DECISIONS.md` D2). Le
- * gérant écrit donc quelque chose qu'il ne pourra jamais relire — c'est assumé
- * (D4), et c'est le seul montage compatible avec le hors-ligne : une moto qui
- * arrive au comptoir se saisit sans attendre personne.
+ * Jusqu'à deux documents par moto : la moto elle-même, que le gérant lit, et
+ * son coût, que seul le responsable lit **et écrit** (`DECISIONS.md` D2, S39).
+ *
+ * Le gérant écrivait ce coût jusqu'à S39, sans jamais pouvoir le relire (D4).
+ * Le commanditaire a tranché autrement : le gérant fait entrer la moto, la
+ * supervision pose ce qu'elle a coûté. Une moto peut donc exister sans son
+ * coût, et cette absence n'est pas un trou à boucher — c'est le signal que
+ * l'écran `/supervision/couts` cherche.
+ *
+ * Ce qui n'a pas bougé : une moto qui arrive au comptoir se saisit sans
+ * attendre personne, réseau compris.
  */
 
 function lireMoto(instantane: DocumentSnapshot<DocumentData>): Moto {
@@ -145,10 +153,12 @@ export function ecouterCoutMoto(
 /**
  * Fait entrer une moto en stock.
  *
- * Les deux documents partent dans le même lot : une moto sans son coût serait
- * une moto dont on ne saura jamais la marge, et un coût sans sa moto un
- * orphelin invisible. Hors ligne, Firestore garde le lot entier et le rejoue
- * tel quel.
+ * Le lot reste un lot **quand il y a un coût à écrire** — c'est-à-dire quand
+ * c'est le responsable qui saisit : un coût sans sa moto serait un orphelin
+ * invisible, et les deux doivent arriver ensemble. Hors ligne, Firestore garde
+ * le lot entier et le rejoue tel quel.
+ *
+ * Quand c'est un gérant, il n'y a qu'un document, et la moto entre sans coût.
  *
  * La **date d'entrée vient de l'appareil**, pas du serveur (D38) : une moto
  * saisie lundi sans réseau et synchronisée mercredi est entrée lundi. Seuls les
@@ -161,12 +171,7 @@ export function entrerEnStock(
   auteur: Auteur,
 ): { id: string; enregistre: Promise<void> } {
   const reference = doc(collection(db(), "motos"));
-  const prixAchat = lireEntier(saisie.prixAchat) ?? 0;
-  const frais = saisie.fraisEntree.map((ligne) => ({
-    typeFraisId: ligne.typeFraisId,
-    montant: lireEntier(ligne.montant) ?? 0,
-    note: ligne.note.trim(),
-  }));
+  const cout = construireCout(saisie);
   const annee = saisie.annee.trim() ? lireEntier(saisie.annee) : null;
   const conseille = saisie.prixVenteConseille.trim()
     ? lireEntier(saisie.prixVenteConseille)
@@ -194,21 +199,79 @@ export function entrerEnStock(
     ...traceCreation(auteur),
   });
 
-  lot.set(doc(reference, "prive", "cout"), {
-    boutiqueId,
-    prixAchat,
-    fraisEntree: frais,
-    coutTotal: coutTotal(prixAchat, frais),
-    updatedAt: serverTimestamp(),
-    updatedBy: auteur.uid,
-    updatedByName: auteur.nom,
-  });
+  /* **Le coût n'est écrit que s'il y en a un** (S39). Un gérant n'en saisit
+     plus : sa moto part seule, et l'absence du document est ce que l'écran de
+     supervision cherche pour savoir quoi lui réclamer. L'écrire à zéro dirait
+     « acquise gratuitement » là où on ne sait pas encore (D82), et ferait
+     disparaître la moto de la liste qui devait la signaler. */
+  if (cout) lot.set(doc(reference, "prive", "cout"), { boutiqueId, ...cout, ...traceCout(auteur) });
 
   /* L'identifiant existe tout de suite, l'écriture se termine plus tard : hors
      ligne, la promesse ne se résout qu'au retour du réseau. L'appelant peut
      donc afficher la moto immédiatement — elle est déjà dans le cache — sans
      attendre un serveur qui n'est peut-être pas joignable. */
   return { id: reference.id, enregistre: suivreEcriture(lot.commit()) };
+}
+
+/**
+ * La trace d'un coût : ce document ne porte pas de création, seulement une
+ * dernière main. Il se pose une fois et se corrige ensuite, et les règles
+ * n'acceptent que ces trois champs d'audit.
+ */
+function traceCout(auteur: Auteur) {
+  return {
+    updatedAt: serverTimestamp(),
+    updatedBy: auteur.uid,
+    updatedByName: auteur.nom,
+  };
+}
+
+/**
+ * Pose — ou corrige — le coût d'une moto déjà en stock (S39).
+ *
+ * Le geste du responsable, depuis la supervision. Il n'existait pas : le coût
+ * s'écrivait une fois, dans le lot d'entrée en stock, par le gérant. Depuis que
+ * le gérant ne le saisit plus, une moto peut rester sans coût indéfiniment — et
+ * sans ce geste, sa marge serait muette pour toujours.
+ *
+ * `setDoc` sans fusion : le document entier est réécrit, donc corriger un prix
+ * d'achat ne laisse pas derrière lui les frais de la version d'avant.
+ */
+export function poserCoutMoto(
+  motoId: string,
+  boutiqueId: string,
+  cout: CoutMoto,
+  auteur: Auteur,
+): Promise<void> {
+  return suivreEcriture(
+    setDoc(doc(db(), "motos", motoId, "prive", "cout"), {
+      boutiqueId,
+      ...cout,
+      ...traceCout(auteur),
+    }),
+  );
+}
+
+/**
+ * Le coût d'une moto, lu une fois.
+ *
+ * **Une lecture, pas une écoute**, et **trois réponses, pas deux** : le coût
+ * existe, il n'existe pas, ou on n'a pas pu savoir. `getDoc` lève `unavailable`
+ * quand le document n'est pas en cache et que la connexion est encombrée — S24
+ * l'a constaté au banc, juste après une vente, pendant que la file d'écritures
+ * se vidait. Ranger cet échec avec « pas de coût » ferait apparaître dans la
+ * liste « à renseigner » des motos qui ont peut-être déjà le leur, et le
+ * responsable le saisirait deux fois. C'est D82, au mot près.
+ */
+export async function lireCoutMoto(motoId: string): Promise<CoutMoto | null> {
+  const instantane = await getDoc(doc(db(), "motos", motoId, "prive", "cout"));
+  if (!instantane.exists()) return null;
+  const donnees = instantane.data();
+  return {
+    prixAchat: donnees.prixAchat ?? 0,
+    fraisEntree: Array.isArray(donnees.fraisEntree) ? donnees.fraisEntree : [],
+    coutTotal: donnees.coutTotal ?? 0,
+  };
 }
 
 /** Traduit les refus de Firestore en phrases qui disent quoi faire. */

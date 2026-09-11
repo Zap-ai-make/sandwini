@@ -2271,3 +2271,116 @@ forme : **un canal de vérification qu'on a appris à ne plus lire.**
 tolère. Si l'écart est volontaire, on le dit à l'outil — c'est à ça que servent
 les échappatoires comme `suppressHydrationWarning` — et on écrit pourquoi à côté.
 Un canal de vérification ne vaut que s'il est vide quand tout va bien.
+
+---
+
+## D89 — Un cloisonnement tenu d'un seul côté n'est pas un cloisonnement
+
+*S39. Le commanditaire signale que le formulaire d'entrée en stock demande le
+prix d'achat au gérant. Vérification faite, il avait raison — et le défaut était
+plus large que le formulaire.*
+
+D2 dit que les coûts et les marges sont hors de portée des gérants, et le prouve
+par des tests de règles. Ces tests portaient tous sur la **lecture**.
+`firestore.rules` autorisait l'écriture de `motos/{id}/prive/cout` à
+`estResponsable() || estGerantDe(...)`, et D4 assumait explicitement ce montage :
+« le gérant écrit quelque chose qu'il ne pourra jamais relire ».
+
+Ce n'était pas un oubli, c'était un arbitrage — et il avait sa logique : la moto
+arrive au comptoir, celui qui la reçoit sait ce qu'elle a coûté, et le hors-ligne
+interdit d'attendre quiconque. Mais il produisait deux choses qu'on ne voulait
+pas.
+
+**Une donnée dont personne ne répond.** Un chiffre saisi par quelqu'un qui ne
+peut jamais le vérifier est un chiffre qu'on tape vite et qu'on ne relit pas.
+L'écran s'en excusait d'ailleurs en toutes lettres — « ces montants sont
+réservés au responsable : ils ne se relisent pas ici » —, ce qui aurait dû
+alerter : **un formulaire qui s'excuse d'un champ décrit un champ qui n'y est
+pas à sa place.**
+
+**Et une protection à moitié.** Un gérant pouvait écrire un coût sur n'importe
+quelle moto de sa boutique, donc fabriquer la marge que la supervision lirait.
+Il ne pouvait pas la lire ; il pouvait la décider.
+
+**La règle.** Un cloisonnement se teste dans les deux sens, lecture **et**
+écriture, sans quoi on croit avoir cloisonné alors qu'on a seulement compliqué.
+Le nouveau test de règles échoue sur l'ancienne version — vérifié, pas supposé
+(D79).
+
+**Ce que ça a coûté de le réparer, et ce que ça dit.** Trois lignes de règles,
+un bloc d'écran rendu conditionnel, un document rendu facultatif — et **un écran
+entièrement neuf**, parce qu'une moto peut désormais exister sans coût et que
+sans un endroit pour le poser, sa marge serait muette pour toujours. Le coût de
+la correction n'était pas dans l'interdit qu'on pose, il était dans le geste
+qu'il faut inventer à côté.
+
+---
+
+## D90 — Un référentiel vide ne bloque jamais une saisie de comptoir
+
+*S39. « Devoir déclarer une marque avant de faire rentrer une moto n'est pas
+anodin. »*
+
+Le formulaire d'entrée en stock se remplaçait par un panneau tant qu'aucune
+marque n'était déclarée, avec un bouton vers les réglages. Le raisonnement était
+écrit à l'écran et il est juste : « sinon la même marque finit écrite de trois
+façons », et le stock se coupe en autant de morceaux.
+
+**Il est juste, et il coûtait trop cher.** Il mettait un écran de paramétrage
+entre un gérant et la moto qu'il avait devant lui. Pire, le panneau au moins se
+voyait : les règles réservaient la **création** d'une marque au responsable, si
+bien que le gérant à qui il manquait « Apsonic » un samedi matin ne pouvait pas
+s'en sortir même en trouvant l'écran. Il attendait un appel.
+
+**La correction n'est pas de renoncer à la liste.** Un champ libre à suggestions
+laisse « Apsonic » et « Apsonik » coexister dès que deux personnes tapent : la
+suggestion propose, elle n'empêche rien. La liste, elle, ne se trompe pas sur ce
+qu'on a déjà. C'est **l'endroit où on la remplit** qui change, pas la liste.
+
+Chaque liste de choix porte donc un « + Ajouter… » qui ouvre un champ sur place,
+sans quitter la saisie ni perdre ce qui est déjà tapé. Le nom est d'abord
+cherché sous forme réduite — sans casse ni accents ; s'il existe, on sélectionne
+l'existant et on le dit, au lieu d'en créer un second.
+
+**La coupure qui rend la chose tenable : créer, oui ; renommer et désactiver,
+non.** Ajouter un mot au vocabulaire de la maison répare un manque, et une
+entrée de trop se désactive. Changer un mot déjà employé est autre chose : le
+stock, les ventes et les reçus le citent, et le renommage se propage partout
+d'un coup. Le premier passe au gérant, le second reste au responsable.
+
+**Le corollaire trouvé en chemin.** Une entrée désactivée disparaissait du
+`<select>`, y compris quand c'était celle de la fiche ouverte : le champ
+retombait sur son invite, et enregistrer effaçait la marque en silence. Le
+défaut existait avant S39 et n'avait jamais mordu parce que rien ne se
+désactivait. La valeur sélectionnée est désormais toujours présente dans la
+liste, active ou non.
+
+---
+
+## D91 — Un calcul figé se comble, il ne se révise pas
+
+*S39. Rendre le coût facultatif a ouvert un trou dans la marge, et le bouchon
+évident aurait été pire que le trou.*
+
+`figerMargeVente` se déclenche à la création d'une vente et lit le coût de la
+moto. Tant que le coût partait dans le même lot que l'entrée en stock, il était
+toujours là. Depuis que le gérant ne le saisit plus, une moto peut entrer, se
+vendre, et ne recevoir son prix d'achat que le soir : le seul acteur qui savait
+calculer la marge était déjà passé, et cette vente n'en aurait **jamais**.
+
+Le commentaire de `figerMargeVente` avait nommé ce jour d'avance — « limite, à
+rouvrir le jour où le coût d'une moto deviendra modifiable » — et proposait deux
+issues : refuser de toucher une moto vendue, ou laisser l'instantané tranquille.
+
+**C'est la seconde, et la nuance est tout.** Un second déclencheur réagit à
+l'écriture du coût et écrit la marge **si elle manque**. Il ne réécrit jamais
+celle qui existe. Le cahier des charges veut un coût figé au moment de la vente
+(§5.4) : corriger un prix d'achat trois mois plus tard ne doit pas réviser en
+silence la marge d'une vente déjà analysée — un chiffre qui change tout seul
+sous les yeux de qui l'a lu est pire qu'un chiffre absent, parce qu'il ne se
+remarque pas.
+
+**La forme générale.** Quand une valeur est figée par décision, le rattrapage
+d'un manque et la révision d'une valeur sont deux opérations différentes, même
+si elles s'écrivent au même endroit avec le même calcul. Confondre les deux,
+c'est transformer un filet de sécurité en réécriture de l'histoire.

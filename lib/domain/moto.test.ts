@@ -1,16 +1,22 @@
 import { describe, expect, it } from "vitest";
 import {
+  COUT_VIDE,
   FILTRES_VIDES,
   SAISIE_VIDE,
   chassisDejaPris,
+  construireCout,
+  coutRenseigne,
   coutTotal,
   coutTotalSaisie,
   filtrerMotos,
   lireEntier,
   lirePapiers,
   normaliserChassis,
+  validerCout,
+  validerCoutPose,
   validerMoto,
   type Moto,
+  type SaisieCout,
   type SaisieMoto,
   validerFichierPapier,
 } from "./moto";
@@ -122,8 +128,15 @@ describe("validerMoto", () => {
     expect(validerMoto(saisie({ numeroChassis: "lc6p cj1a 9k00" }))).toBeNull();
   });
 
-  it("exige un prix d’achat entier", () => {
-    expect(validerMoto(saisie({ prixAchat: "" }))).toMatch(/prix d’achat/i);
+  /* Depuis S39 le gérant ne saisit plus le prix d'achat : la moto entre sans,
+     et la supervision le pose après coup. Ce test disait l'inverse jusqu'ici —
+     il exigeait le prix — et c'est exactement le comportement que le
+     commanditaire a fait retirer. */
+  it("accepte une moto sans prix d’achat : la supervision le posera (S39)", () => {
+    expect(validerMoto(saisie({ prixAchat: "" }))).toBeNull();
+  });
+
+  it("refuse un prix d’achat qui n’est pas un entier, quand il est saisi", () => {
     expect(validerMoto(saisie({ prixAchat: "850 000,50" }))).toMatch(/prix d’achat/i);
   });
 
@@ -157,6 +170,52 @@ describe("validerMoto", () => {
         }),
       ),
     ).toBeNull();
+  });
+});
+
+describe("le coût, séparé de la moto (S39)", () => {
+  const cout = (partie: Partial<SaisieCout> = {}): SaisieCout => ({ ...COUT_VIDE, ...partie });
+
+  it("dit qu’un coût est renseigné dès que le prix d’achat l’est", () => {
+    expect(coutRenseigne(COUT_VIDE)).toBe(false);
+    expect(coutRenseigne(cout({ prixAchat: "   " }))).toBe(false);
+    expect(coutRenseigne(cout({ prixAchat: "850000" }))).toBe(true);
+  });
+
+  it("accepte un coût vide : une moto peut entrer sans", () => {
+    expect(validerCout(COUT_VIDE)).toBeNull();
+  });
+
+  it("refuse des frais sans prix d’achat — le total serait faux, pas absent", () => {
+    expect(
+      validerCout(cout({ fraisEntree: [{ typeFraisId: "t1", montant: "5000", note: "" }] })),
+    ).toMatch(/frais/i);
+  });
+
+  it("exige le prix là où le prix est le sujet", () => {
+    expect(validerCoutPose(COUT_VIDE)).toMatch(/prix d’achat/i);
+    expect(validerCoutPose(cout({ prixAchat: "850000" }))).toBeNull();
+  });
+
+  it("ne construit rien quand il n’y a rien à écrire", () => {
+    /* Le document absent est le signal. Un `prixAchat: 0` dirait « acquise
+       gratuitement » là où on ne sait pas encore (D82). */
+    expect(construireCout(COUT_VIDE)).toBeNull();
+  });
+
+  it("construit un coût propre : entiers, notes taillées, total additionné", () => {
+    expect(
+      construireCout(
+        cout({
+          prixAchat: "850 000",
+          fraisEntree: [{ typeFraisId: "t1", montant: "15000", note: "  Transport  " }],
+        }),
+      ),
+    ).toEqual({
+      prixAchat: 850_000,
+      fraisEntree: [{ typeFraisId: "t1", montant: 15_000, note: "Transport" }],
+      coutTotal: 865_000,
+    });
   });
 });
 

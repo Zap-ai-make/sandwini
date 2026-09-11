@@ -218,7 +218,15 @@ export async function saisirMoto(
   await page.getByLabel("Modèle").selectOption({ label: terrain.modele });
   await page.getByLabel("Numéro de châssis").fill(chassis);
   await page.getByLabel("Provenance").selectOption({ label: terrain.provenance });
-  await page.getByLabel("Prix d’achat").fill(options.prixAchat ?? "850000");
+
+  /* **Le champ n'existe que pour le responsable depuis S39.** Le gérant fait
+     entrer la moto ; la supervision pose ce qu'elle a coûté. L'aide ne force
+     donc rien : elle renseigne le prix là où on le lui demande, et laisse la
+     moto entrer sans coût partout ailleurs — ce qui est le trajet réel du
+     comptoir. Le test qui vérifie que ce champ est absent chez le gérant vit
+     dans `motos.spec.ts`, pas ici : une aide ne prouve rien. */
+  const prixAchat = page.getByLabel("Prix d’achat");
+  if (await prixAchat.count()) await prixAchat.fill(options.prixAchat ?? "850000");
   if (options.conseille) {
     await page.getByLabel(/Prix de vente conseillé/).fill(options.conseille);
   }
