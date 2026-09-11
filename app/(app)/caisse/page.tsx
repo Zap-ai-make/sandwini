@@ -173,20 +173,37 @@ function SortieEspeces({
   const [montant, setMontant] = useState("");
   const [libelle, setLibelle] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
-  const [enCours, setEnCours] = useState(false);
 
-  async function soumettre(evenement: FormEvent) {
+  /**
+   * **On n'attend pas l'accusé de réception du serveur** (D76).
+   *
+   * Ce formulaire le faisait — `await enregistrer(…)`, bouton désactivé le
+   * temps du trajet — et c'était le seul geste du comptoir qui s'y risquait
+   * encore. Hors ligne, la promesse de Firestore ne se résout **jamais** : le
+   * bouton serait resté désactivé et les champs pleins, indéfiniment, pour une
+   * écriture pourtant déjà acquise dans le cache local. Sur une connexion
+   * seulement lente, le même mécanisme rendait la main au bout d'une minute.
+   *
+   * La validation, elle, reste immédiate : `enregistrerSortieEspeces` lève de
+   * façon synchrone sur un montant absurde ou un libellé vide, avant même de
+   * toucher à Firestore. Ce qui part en différé, c'est le seul refus qu'on ne
+   * peut pas connaître d'avance — celui du serveur.
+   */
+  function soumettre(evenement: FormEvent) {
     evenement.preventDefault();
-    setEnCours(true);
     setErreur(null);
     try {
-      await enregistrer({ montant, libelle });
+      const partie = enregistrer({ montant, libelle });
       setMontant("");
       setLibelle("");
+      partie.catch((cause) =>
+        setErreur(
+          cause instanceof Error ? cause.message : "La sortie n’a pas pu être enregistrée.",
+        ),
+      );
     } catch (cause) {
       setErreur(cause instanceof Error ? cause.message : "La sortie n’a pas pu être enregistrée.");
     }
-    setEnCours(false);
   }
 
   return (
@@ -222,7 +239,7 @@ function SortieEspeces({
             onChange={(evenement) => setLibelle(evenement.target.value)}
           />
         </div>
-        <button type="submit" className="bouton bouton-neutre h-11" disabled={enCours}>
+        <button type="submit" className="bouton bouton-neutre h-11">
           Enregistrer la sortie
         </button>
       </div>

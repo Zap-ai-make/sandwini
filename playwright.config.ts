@@ -61,6 +61,20 @@ export default defineConfig({
      donc être plus large que la somme de ses attentes, sinon il tombe non pas
      sur un défaut du produit mais sur sa propre arithmétique. */
   timeout: 90_000,
+  /**
+   * Le plafond de la passe entière, et il a une raison mesurée (S27).
+   *
+   * Le budget par test ne couvre pas tout : quand l'émulateur Functions perd sa
+   * socket — « Request to function failed: Error: socket hang up » —, un test
+   * peut rester suspendu **bien au-delà** de son propre budget. Deux cas
+   * mesurés, à 45 minutes et à 1 h 30 pour un test qui en demandait trois. Une
+   * passe lancée le soir se retrouvait encore là le matin, et le verdict qu'on
+   * venait chercher n'existait pas.
+   *
+   * Deux heures laissent la place à la suite complète sur une machine chargée,
+   * et coupent net ce qui ne finira pas.
+   */
+  globalTimeout: 2 * 60 * 60_000,
   /* Le budget par assertion, porté de cinq à quinze secondes.
      Presque toutes les attentes de cette suite portent sur de la propagation
      asynchrone : une écriture part dans la file Firestore, revient par un

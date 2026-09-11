@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  attendreLaFileVide,
   bandeauEtat,
   contenu,
   creerClientDepuisLeFichier,
@@ -85,7 +86,7 @@ async function preparerVente(
  * fragile — l'attente elle-même finissait par expirer.
  */
 async function attendreSynchronisation(page: Page) {
-  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 120_000 });
+  await attendreLaFileVide(page);
 }
 
 async function choisirMotoEtClient(page: Page, chassis: string, client: string) {
@@ -314,6 +315,11 @@ test.describe("la marge est réservée au responsable", () => {
     });
 
     // Le gérant vend.
+    /* Le second navigateur lit le **serveur**, pas le cache du premier : tant
+       que la file d'écritures n'est pas vide, il ne verra rien de ce que le
+       décor vient de fabriquer, et l'échec accusera les droits (D97). */
+    await attendreLaFileVide(page);
+
     const contexteGerant = await browser.newContext();
     const pageGerant = await contexteGerant.newPage();
     await seConnecter(pageGerant, email, motDePasse);

@@ -344,13 +344,18 @@ redescend pas sous **quinze minutes avec zéro échec inexpliqué**, appliquer l
 parade, consigner la mesure dans une décision, et passer à l'étape 2. Cette étape
 ne doit pas manger le cahier.
 
-**Ce qui prouve que c'est fait.**
-- [ ] Deux passes complètes mesurées, émulateurs neufs et vieillis, chiffres
-      consignés dans la décision.
-- [ ] Soit la cause est corrigée et la suite passe **deux fois de suite** sans
-      échec inexpliqué, soit la parade est outillée et documentée.
-- [ ] Le protocole de tri (rejouer isolément avant de conclure) est écrit là où
-      on le lira, pas dans un message de commit.
+**Ce qui prouve que c'est fait.** — *fait, cf. `specs/S27-reconnexion-apres-coupure.md`,
+D97 à D99.*
+- [x] Deux passes mesurées, chiffres consignés. **L'axe « neufs / vieillis » a
+      été remplacé par « avant / après correction »**, à émulateurs neufs dans
+      les deux cas : D98 montre que le vieillissement n'est pas temporel mais
+      dû aux données accumulées, et `test:e2e:propre` retire la variable au lieu
+      de la mesurer.
+- [x] La cause est corrigée pour sept échecs sur huit, **et** la parade est
+      outillée et documentée. Le huitième n'est pas du bruit : c'est S41, avec
+      sa preuve.
+- [x] Le protocole de tri est dans `e2e/README.md` — en cinq étapes, dont celle
+      qui tranche : aller voir si la donnée est au serveur.
 
 ---
 

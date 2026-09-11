@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  attendreLaFileVide,
   bandeauEtat,
   codeUnique,
   contenu,
@@ -188,6 +189,11 @@ test.describe("la frontière entre les deux rôles", () => {
   test("le gérant tient le stock mais pas le catalogue", async ({ page, browser }) => {
     await seConnecterEtEntrer(page);
     const { reference, email } = await preparerComptoir(page, { avecGerant: true });
+
+    /* Le second navigateur lit le **serveur**, pas le cache du premier : tant
+       que la file d'écritures n'est pas vide, il ne verra rien de ce que le
+       décor vient de fabriquer, et l'échec accusera les droits (D97). */
+    await attendreLaFileVide(page);
 
     const contexte = await browser.newContext();
     const pageGerant = await contexte.newPage();

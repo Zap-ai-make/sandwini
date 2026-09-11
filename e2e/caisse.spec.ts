@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 import {
+  attendreLaFileVide,
   bandeauEtat,
   contenu,
   emailUnique,
@@ -113,6 +114,11 @@ test.describe("la sortie d’espèces", () => {
       timeout: 30_000,
     });
 
+    /* Le second navigateur lit le **serveur**, pas le cache du premier : tant
+       que la file d'écritures n'est pas vide, il ne verra rien de ce que le
+       décor vient de fabriquer, et l'échec accusera les droits (D97). */
+    await attendreLaFileVide(page);
+
     const contexteGerant = await browser.newContext();
     const pageGerant = await contexteGerant.newPage();
     await seConnecter(pageGerant, email, motDePasse);
@@ -151,6 +157,28 @@ test.describe("la sortie d’espèces", () => {
     ).toBeVisible({ timeout: 30_000 });
     await expect(page.getByRole("button", { name: "Enregistrer la sortie" })).toHaveCount(0);
 
+    /* **Réseau coupé, le formulaire rend la main** (D76, et le défaut que S27 a
+       trouvé). Il attendait l'accusé de réception du serveur : hors ligne, la
+       promesse de Firestore ne se résout jamais, le bouton restait désactivé et
+       les champs pleins — pour une écriture pourtant déjà acquise au cache. Le
+       gérant ne pouvait plus saisir la sortie suivante.
+
+       Les deux sens de D79 : la ligne apparaît **et** le formulaire redevient
+       disponible. Vérifier l'un sans l'autre laissait passer le défaut. */
+    await contexteGerant.setOffline(true);
+    await expect(bandeauEtat(pageGerant)).toContainText("Hors ligne", { timeout: 30_000 });
+
+    await pageGerant.getByLabel("Montant", { exact: true }).fill("2500");
+    await pageGerant.getByLabel("À quoi").fill("Course au marché");
+    await pageGerant.getByRole("button", { name: "Enregistrer la sortie" }).click();
+
+    await expect(
+      contenu(pageGerant).locator("tbody tr").filter({ hasText: "Course au marché" }),
+    ).toBeVisible({ timeout: 20_000 });
+    await expect(pageGerant.getByLabel("Montant", { exact: true })).toHaveValue("");
+    await expect(pageGerant.getByRole("button", { name: "Enregistrer la sortie" })).toBeEnabled();
+
+    await contexteGerant.setOffline(false);
     await contexteGerant.close();
   });
 });
