@@ -383,7 +383,7 @@ portent la forme, à étendre aux lignes.
    le négatif qu'on vient d'interdire, et il serait emprunté — parce qu'il est
    plus court que d'aller saisir le carton. **L'écart au cahier des charges est
    assumé et doit être écrit dans la spec.**
-5. **La numérotation** — voir **Q1** au §5. Par défaut : un compteur partagé avec
+5. **La numérotation** — voir **Q1** au §5. *Tranché :* un compteur partagé avec
    les ventes de motos, de sorte qu'un numéro dicté au téléphone désigne une seule
    pièce comptable. Cela demande que `prochainCompteur` reçoive l'union des
    numéros des deux collections, et que `reconcilierNumeroVente` regarde les deux.
@@ -449,8 +449,9 @@ batch qui le tient, et un test bout en bout qui le prouve.
 
 **Ce que l'étape ne fait pas.** Le transfert de pièces (étape 7), l'inventaire
 (étape 10), la contre-passation d'une vente de pièces (étape 6), le prix d'achat
-d'une référence — qui attend de savoir si une référence a un prix ou si chaque lot
-a le sien (`prompt.md` §5.7 et §9 emploient le même mot pour les deux).
+d'une pièce. **Q9 a tranché où il ira** — sur le mouvement d'entrée, parce que
+c'est le lot qui porte le tarif du fournisseur, pas la référence — mais cette
+étape ne le construit pas. Elle doit seulement ne pas fermer la porte.
 
 ---
 
@@ -600,7 +601,7 @@ autres, mais rien ne dit combien il en reste ni laquelle a été donnée à qui.
    numéro seul ou une plage, et refuse une plage qui chevauche un numéro déjà
    enregistré.
 3. **L'ordre attribution / dépôt de la carte grise reste libre** — voir **Q3**.
-   Par défaut : les deux ordres restent permis, comme aujourd'hui.
+   *Tranché :* les deux ordres restent permis, comme aujourd'hui.
 4. **L'attribution d'un CMC à une vente** passe `cmc.statut` à `attribue`, écrit
    `cmcId` sur le document `cmc` de la vente et passe ce document à
    `revenu_magasin`. La remise au client passe `cmc.statut` à `remis`.
@@ -670,17 +671,17 @@ première ligne. Trois principes, non négociables :
    cas dans les règles, et ça ne change pas.
 3. **Tout passe par l'historique.** Qui, quand, pourquoi. Le motif est obligatoire.
 
-**Les arbitrages** — voir **Q4**, **Q5** et **Q6** au §5. Réponses par défaut, si
-elles restent sans réponse :
+**Les arbitrages** — voir **Q4**, **Q5** et **Q6** au §5. Tranchés par le
+commanditaire le 11 septembre 2026 :
 
-- **Q4 — qui a le droit ?** Par défaut : le **responsable seul**, conformément à
+- **Q4 — qui a le droit ?** Le **responsable seul**, conformément à
   la proposition de `prompt.md` §17.4. Un gérant qui peut défaire une vente peut
   défaire une recette.
-- **Q5 — la moto revient-elle en stock ?** Par défaut : **oui**, `statut` repasse
+- **Q5 — la moto revient-elle en stock ?** **Oui**, `statut` repasse
   à `en_stock`, `venteId` est effacé. La moto est physiquement revenue ou n'est
   jamais partie ; la laisser « vendue » ferait mentir le stock, qui est ce qu'on
   regarde tous les jours.
-- **Q6 — que deviennent les versements encaissés ?** Par défaut : chaque versement
+- **Q6 — que deviennent les versements encaissés ?** Chaque versement
   reçoit un **encaissement de sens inverse**, origine `autre`, libellé
   « Remboursement vente {numéro} ». La caisse du jour montre donc la sortie — ce
   qui est la vérité : l'argent est rendu.
@@ -714,7 +715,7 @@ sans sortir du système.
 
 **Les arbitrages.**
 
-1. **Le transfert d'une moto se fait en deux temps.** *Par défaut, et c'est un
+1. **Le transfert d'une moto se fait en deux temps** (**Q7**, tranché). *C'est un
    écart au premier abord.* `prompt.md` §8 décrit un transfert immédiat — « la
    moto disparaît d'une boutique et apparaît dans l'autre ». Mais §5.2 prévoit un
    statut `transferee` qu'un transfert immédiat n'utiliserait jamais. Les deux se
@@ -732,8 +733,8 @@ sans sortir du système.
 
 **Les règles.** Le gérant d'origine crée l'envoi, le gérant de destination crée la
 réception. Cela demande qu'un gérant **lise** les motos d'une autre boutique quand
-elles lui sont destinées — `prompt.md` §16 le note comme un point à trancher.
-*Par défaut :* lecture ouverte au gérant sur les motos dont le transfert en cours
+elles lui sont destinées — `prompt.md` §16 le note comme un point à trancher (**Q10**).
+*Tranché :* lecture ouverte au gérant sur les motos dont le transfert en cours
 le désigne comme destination, pas sur le stock entier de l'autre boutique.
 
 ---
@@ -851,11 +852,11 @@ fichiers est un vrai chantier (D14) et n'est pas dans ce cahier.
 **Les arbitrages.**
 
 1. **La photo se redimensionne sur l'appareil avant l'envoi** — 1600 px sur le
-   grand côté, JPEG qualité 80. *Par défaut.* Une photo de téléphone pèse cinq
+   grand côté, JPEG qualité 80. *Tranché (Q8).* Une photo de téléphone pèse cinq
    mégaoctets ; sur la connexion de Pouytenga, l'envoyer brute prend des minutes
    et échouera une fois sur deux. Le `canvas` du navigateur suffit, aucune
    dépendance.
-2. **Au plus six photos par moto.** *Par défaut.* Au-delà, personne ne regarde et
+2. **Au plus six photos par moto.** *Tranché (Q8).* Au-delà, personne ne regarde et
    le stockage se paie.
 3. **Le bouton dit qu'il demande du réseau**, avant le clic et pas après l'échec.
    Hors ligne, il est désactivé avec sa raison écrite.
@@ -969,13 +970,18 @@ suivant.
 
 ## 5. Les questions au commanditaire
 
-**À poser en une seule fois, au tout début de la session d'implémentation.** Le
-travail ne s'arrête pas en les attendant : chacune a une réponse par défaut, déjà
-appliquée dans les étapes ci-dessus, et chacune se change en un commit. Seules
-Q4, Q5 et Q6 méritent d'attendre — c'est pourquoi l'étape 6 est placée assez loin
-dans l'ordre pour qu'une réponse ait le temps d'arriver.
+**Posées en une seule fois au début de la session d'implémentation, et
+répondues.** Le commanditaire a validé les dix recommandations en bloc le
+**11 septembre 2026**. Il n'y a donc plus de réponse « par défaut » dans ce
+cahier : les dix arbitrages ci-dessous sont **tranchés**, et les specs des lots
+doivent le porter tel quel — « tranché par le commanditaire », pas « pris par
+défaut ». La différence n'est pas cosmétique : un arbitrage par défaut se
+rediscute au premier signe de friction, un arbitrage tranché se respecte.
 
-| # | Question | Recommandation | Si sans réponse |
+Deux questions ont été ajoutées par la lecture du cahier (Q9, Q10) ; elles ont
+reçu la même validation.
+
+| # | Question | Réponse tranchée (11 sept. 2026) | Ce qu'elle coûte |
 |---|---|---|---|
 | **Q1** | Un reçu de vente de pièces et un reçu de vente de moto peuvent-ils porter le **même numéro** ? Aujourd'hui le format `{CODE}-{AAMM}-{NNNN}` ne distingue pas les deux natures. | **Non.** Un numéro dicté au téléphone doit désigner une seule pièce. Un compteur partagé entre les deux collections. | Compteur partagé. Coût : deux collections à lire pour numéroter, et la fonction de réconciliation à étendre. |
 | **Q2** | La **facture** (troisième type du §10) répond-elle à un besoin réel ? Un client professionnel la demande-t-il ? | La construire **seulement si le besoin existe**. Les deux reçus couvrent le comptoir. | Non construite. Reste au backlog, comme depuis S10. |
@@ -985,6 +991,8 @@ dans l'ordre pour qu'une réponse ait le temps d'arriver.
 | **Q6** | Que deviennent les **versements déjà encaissés** d'une vente annulée ? | Une **contre-passation** par versement : la caisse du jour montre la sortie, rien n'est effacé. | Contre-passation. |
 | **Q7** | Le transfert d'une moto se fait-il **en deux temps** (envoi puis réception) ou immédiatement ? | **Deux temps** : sinon l'inventaire de la boutique d'arrivée compte une moto encore sur la route. | Deux temps. |
 | **Q8** | Combien de **photos** au maximum par moto, et faut-il pouvoir scanner les papiers fournis ? | Six photos, redimensionnées sur l'appareil. Les papiers : un champ de texte suffit aujourd'hui, il existe. | Six photos, pas de scan de papiers. |
+| **Q9** | Le **prix d'achat d'une pièce** : une référence porte-t-elle un prix d'achat, ou chaque lot d'entrée le sien ? (`prompt.md` §5.7 et §9 emploient le même mot pour les deux) | **Le lot.** C'est ce qui donne une marge juste quand le fournisseur change de tarif entre deux cartons. | Rien aujourd'hui : l'étape 3 ne construit aucun prix d'achat de pièce. La réponse dit seulement **où il ira** — sur le mouvement d'entrée, pas sur la référence — pour que le modèle de S20 ne se referme pas dessus. |
+| **Q10** | Un **gérant** lit-il les motos d'une **autre boutique** quand un transfert les lui destine ? | **Oui, mais celles-là seulement** — pas le stock entier de l'autre boutique. | Une règle de lecture conditionnée au transfert en cours, avec son test (étape 8). |
 
 ---
 
