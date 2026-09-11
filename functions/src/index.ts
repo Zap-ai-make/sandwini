@@ -423,7 +423,8 @@ export const figerMargeVente = onDocumentCreated(
  * savait la calculer était déjà passé.
  *
  * **Ce qu'il ne fait pas, et c'est le point délicat.** Il ne réécrit aucune
- * marge existante. Le cahier des charges veut un coût *figé au moment de la
+ * marge existante — garanti par `create`, qui échoue si le document est là,
+ * et non par une lecture préalable qui se court-circuite sous concurrence. Le cahier des charges veut un coût *figé au moment de la
  * vente* (§5.4) : corriger un prix d'achat trois mois plus tard ne doit pas
  * réviser en silence la marge d'une vente déjà analysée. Une marge s'écrit une
  * fois et ne se réécrit jamais (D51) — ce déclencheur comble un trou, il ne
@@ -453,20 +454,35 @@ export const rattraperMargeDuCout = onDocumentWritten(
     if (ventes.empty) return;
 
     for (const vente of ventes.docs) {
-      const marge = base.doc(`ventesMotos/${vente.id}/prive/marge`);
-      if ((await marge.get()).exists) continue;
-
       const prixConvenu = vente.get("prixConvenu");
       if (typeof prixConvenu !== "number") continue;
 
-      await marge.set({
-        boutiqueId: vente.get("boutiqueId"),
-        coutMotoSnapshot,
-        marge: prixConvenu - coutMotoSnapshot,
-        updatedAt: horodatage,
-        updatedBy: "systeme",
-        updatedByName: "Calcul automatique",
-      });
+      /* **`create` et non `set`, et c'est toute la différence.** La première
+         version lisait le document puis décidait d'écrire — deux opérations,
+         donc une fenêtre entre les deux. Le banc l'a trouvée : une marge déjà
+         figée à 800 000 s'est fait réécrire à 100 000 par un rattrapage dont
+         la lecture était passée avant qu'elle existe.
+
+         `create` échoue si le document est là. L'invariant de D91 — une marge
+         se comble mais ne se révise jamais — cesse d'être une intention portée
+         par un `if` et devient une propriété de l'écriture elle-même. Un `if`
+         se court-circuite sous concurrence ; un `create` non. */
+      try {
+        await base.doc(`ventesMotos/${vente.id}/prive/marge`).create({
+          boutiqueId: vente.get("boutiqueId"),
+          coutMotoSnapshot,
+          marge: prixConvenu - coutMotoSnapshot,
+          updatedAt: horodatage,
+          updatedBy: "systeme",
+          updatedByName: "Calcul automatique",
+        });
+      } catch (cause) {
+        /* 6 = ALREADY_EXISTS : la marge était déjà figée, on la laisse. Tout
+           autre code est une vraie panne et doit remonter. */
+        if ((cause as { code?: number }).code !== 6) throw cause;
+        continue;
+      }
+
       logger.info("Marge rattrapée : le coût est arrivé après la vente", {
         vente: vente.id,
         moto: evenement.params.motoId,
