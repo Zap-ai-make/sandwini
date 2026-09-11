@@ -998,6 +998,129 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // --- Pièces détachées (S20) ---------------------------------------------
+    //
+    // **Il n'y a pas de collection `stockPieces` dans ce produit**, et c'est
+    // l'arbitrage structurant du lot. `prompt.md` §5.7 en décrit une, avec sa
+    // `quantite` entretenue par déclencheur ; D61 l'écarte et le hors-ligne
+    // tranche presque seul — un agrégat entretenu ne bouge pas quand le
+    // déclencheur ne tourne pas, donc l'écran afficherait l'ancienne quantité
+    // au comptoir précisément quand le réseau manque. La quantité se compte
+    // depuis les mouvements, à la lecture.
+    //
+    // Conséquence directe sur ces règles : **« pas de stock négatif » ne peut
+    // pas se tenir ici.** Une règle ne sait pas additionner une collection, et
+    // une transaction ne fonctionne pas hors ligne. La garde vit donc à
+    // l'écran, où le geste se fait (`lib/domain/piece.ts`), et ces règles ne
+    // prétendent pas la tenir.
+
+    function pieceValide(donnees) {
+      return donnees.keys().hasOnly(['reference', 'designation', 'categorie', 'prixVente',
+                                     'seuilAlerte', 'actif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['reference', 'designation', 'categorie', 'prixVente',
+                                       'seuilAlerte', 'actif'].concat(champsAudit()))
+             && donnees.reference is string
+             && donnees.reference.size() > 0
+             && donnees.reference.size() <= 40
+             && donnees.designation is string
+             && donnees.designation.size() > 0
+             && donnees.designation.size() <= 120
+             // Un mot, pas une clé : le commanditaire veut déclarer comme il
+             // veut, et aucun écran de paramétrage ne tient cette liste (D90).
+             && texteBorne(donnees.categorie, 60)
+             // Nul tant que le responsable ne l'a pas posé : une référence
+             // arrive parfois avant qu'on ait décidé de son prix. Elle existe
+             // alors au catalogue et ne se vend pas (S21).
+             && (donnees.prixVente == null || montantValide(donnees.prixVente))
+             && donnees.seuilAlerte is int
+             && donnees.seuilAlerte >= 0
+             && donnees.seuilAlerte <= 1000000
+             && donnees.actif is bool
+             // **Aucun prix d'achat sur le document public.** Firestore ne sait
+             // pas masquer un champ : un `prixAchat` posé ici serait lisible
+             // par quiconque lit la pièce, c'est-à-dire par tout gérant (D2).
+             && !donnees.keys().hasAny(['prixAchat']);
+    }
+
+    // Le catalogue appartient au responsable : une référence porte un prix, et
+    // les prix appartiennent à la supervision. C'est la réponse 4 de S20, et
+    // elle se sépare volontairement de celle des marques — une marque est un
+    // mot du vocabulaire, une référence est un article avec un prix.
+    match /pieces/{pieceId} {
+      allow read: if connecte();
+      allow create: if estResponsable()
+                    && pieceValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && pieceValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      // Rien ne se supprime : des mouvements citent leur pièce. On la
+      // désactive, et elle reste lisible partout où elle a déjà servi.
+      allow delete: if false;
+    }
+
+    // Le prix d'achat d'une référence, cloisonné comme celui d'une moto (D2),
+    // et fermé au gérant dans les deux sens dès le premier jour — S39 a montré
+    // ce que coûte un cloisonnement tenu d'un seul côté (D89).
+    function coutPieceValide(donnees) {
+      return donnees.keys().hasOnly(['prixAchat', 'updatedAt', 'updatedBy', 'updatedByName'])
+             && donnees.keys().hasAll(['prixAchat', 'updatedAt', 'updatedBy', 'updatedByName'])
+             && montantValide(donnees.prixAchat)
+             && donnees.updatedAt == request.time
+             && donnees.updatedBy == request.auth.uid
+             && texteBorne(donnees.updatedByName, 200);
+    }
+
+    match /pieces/{pieceId}/prive/{section} {
+      allow read: if estResponsable();
+      allow create, update: if section == 'cout'
+                            && estResponsable()
+                            && coutPieceValide(request.resource.data);
+      allow delete: if false;
+    }
+
+    // Les mouvements. La quantité est **toujours positive** : le sens vient du
+    // type. Une quantité négative écrite à la main est une faute de frappe qui
+    // ne se voit pas ; un type inconnu, lui, se refuse ici.
+    //
+    // `sortie_vente` reste admis alors que S21 n'existe pas encore : l'ajouter
+    // après coup demanderait de rouvrir ce fichier pour une vente, et le
+    // domaine refuse déjà de le saisir à la main.
+    function mouvementPieceValide(donnees) {
+      return donnees.keys().hasOnly(['boutiqueId', 'pieceId', 'type', 'quantite', 'note',
+                                     'date'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'pieceId', 'type', 'quantite', 'note',
+                                       'date'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.pieceId is string
+             && donnees.type in ['entree', 'sortie_vente', 'sortie_autre',
+                                 'transfert_entree', 'transfert_sortie', 'ajustement_inventaire']
+             && donnees.quantite is int
+             && donnees.quantite > 0
+             && donnees.quantite <= 1000000
+             && texteBorne(donnees.note, 120)
+             // La date vient de l'appareil (D38) : un mouvement saisi lundi
+             // sans réseau et synchronisé mercredi a eu lieu lundi. On la borne
+             // seulement contre une horloge déréglée.
+             && donnees.date is timestamp
+             && donnees.date <= request.time + duration.value(1, 'd')
+             && exists(/databases/$(database)/documents/pieces/$(donnees.pieceId));
+    }
+
+    match /mouvementsPieces/{mouvementId} {
+      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+
+      allow create: if mouvementPieceValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
+
+      // **Un mouvement est un fait, pas un état.** Le corriger reviendrait à
+      // réécrire l'histoire du stock, et la quantité étant la somme des
+      // mouvements, une retouche silencieuse déplacerait un total sans laisser
+      // de trace. On corrige par un mouvement inverse, qui se voit.
+      allow update, delete: if false;
+    }
+
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par
     // l'application, et réservées à une session ouverte.

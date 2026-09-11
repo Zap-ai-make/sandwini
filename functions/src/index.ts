@@ -398,16 +398,30 @@ export const figerMargeVente = onDocumentCreated(
       return;
     }
 
-    await base.doc(`ventesMotos/${vente.id}/prive/marge`).set({
-      boutiqueId,
-      coutMotoSnapshot,
-      marge: prixConvenu - coutMotoSnapshot,
-      updatedAt: horodatage,
-      /* L'auteur est le serveur, et le dire explicitement vaut mieux que
-         recopier l'identifiant du gérant : personne n'a saisi ce chiffre. */
-      updatedBy: "systeme",
-      updatedByName: "Calcul automatique",
-    });
+    /* **`create` et non `set`, comme dans `rattraperMargeDuCout`.** Les deux
+       declencheurs ecrivent au meme endroit, et rien ne garantit leur ordre :
+       celui-ci lit le cout de la moto puis ecrit, et si le responsable corrige
+       ce cout entre les deux, il ecrirait le cout corrige par-dessus la marge
+       deja figee. Vu au banc, valeur a l'appui.
+
+       Une marge s'ecrit une fois et ne se reecrit jamais (D51, D91). Faire
+       porter l'invariant par l'ecriture plutot que par l'ordre d'arrivee est
+       la seule facon de le tenir sous concurrence. */
+    try {
+      await base.doc(`ventesMotos/${vente.id}/prive/marge`).create({
+        boutiqueId,
+        coutMotoSnapshot,
+        marge: prixConvenu - coutMotoSnapshot,
+        updatedAt: horodatage,
+        /* L'auteur est le serveur, et le dire explicitement vaut mieux que
+           recopier l'identifiant du gérant : personne n'a saisi ce chiffre. */
+        updatedBy: "systeme",
+        updatedByName: "Calcul automatique",
+      });
+    } catch (cause) {
+      // 6 = ALREADY_EXISTS : le rattrapage est passe avant, la marge est figee.
+      if ((cause as { code?: number }).code !== 6) throw cause;
+    }
   },
 );
 

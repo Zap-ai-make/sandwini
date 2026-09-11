@@ -228,7 +228,23 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       ecrans: [{ href: "/clients", libelle: "Clients" }],
     },
   ],
-  pieces: [{ titre: "Vendre", ecrans: [{ href: "/pieces", libelle: "Pièces détachées" }] }],
+  pieces: [
+    {
+      titre: "Suivre",
+      ecrans: [
+        { href: "/pieces", libelle: "Catalogue" },
+        /* Créer une référence appartient au responsable : une référence porte
+           un prix (S20, réponse 4). Le gérant voit le catalogue et fait bouger
+           le stock depuis la ligne qu'il touche. */
+        {
+          href: "/pieces/nouvelle",
+          libelle: "Nouvelle référence",
+          capacite: "gerer_referentiels",
+          quoi: "Ajouter une pièce au catalogue commun à l’entreprise",
+        },
+      ],
+    },
+  ],
   caisse: [{ titre: "Suivre", ecrans: [{ href: "/caisse", libelle: "Journal de caisse" }] }],
   reglages: [
     {

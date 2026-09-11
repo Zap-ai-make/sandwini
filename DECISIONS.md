@@ -2384,3 +2384,163 @@ remarque pas.
 d'un manque et la révision d'une valeur sont deux opérations différentes, même
 si elles s'écrivent au même endroit avec le même calcul. Confondre les deux,
 c'est transformer un filet de sécurité en réécriture de l'histoire.
+
+---
+
+## D92 — Une valeur figée se protège par l'écriture, pas par une lecture
+
+*S39 puis S20. Le même défaut, trouvé deux fois au banc, à deux endroits.*
+
+`rattraperMargeDuCout` lisait le document de marge, puis décidait d'écrire s'il
+n'existait pas. Deux opérations, donc un intervalle entre les deux. Le test l'a
+pris en flagrant délit : une marge figée à 800 000 réécrite à 100 000 par un
+rattrapage dont la lecture était passée avant que la marge existe.
+
+`create` a corrigé ce cas — et le défaut a reparu ailleurs. **`figerMargeVente`
+écrivait avec `set`.** Il lit le coût de la moto puis écrit ; si le responsable
+corrige ce coût entre les deux, il écrit le coût corrigé par-dessus la marge
+déjà figée. Le premier correctif avait déplacé la course, pas supprimée.
+
+**La règle.** Quand une valeur est figée par décision — une marge, un numéro,
+un instantané de coût —, l'invariant « écrite une fois, jamais réécrite »
+(D51) doit être porté par l'opération d'écriture elle-même, et par **tous** ses
+écrivains. Un `if` se court-circuite sous concurrence ; un `create` non.
+
+**Le corollaire, et c'est lui qui coûte.** Il ne suffit pas de corriger celui
+qu'on a pris en défaut : il faut chercher qui d'autre écrit au même endroit. Ici
+ils étaient deux, et le second ne s'est déclaré qu'à la troisième exécution du
+même test. Un défaut de concurrence qui passe deux fois sur trois n'est pas
+corrigé tant qu'on n'a pas énuméré les écrivains.
+
+C'est le pendant exact de D56, vu par l'autre bout : là où les versements
+demandaient qu'aucune écriture ne gagne, la marge demande que **la première**
+gagne — et dans les deux cas, c'est la forme de l'écriture qui décide, jamais
+l'ordre d'arrivée.
+
+---
+
+## D93 — Un outil de revue qui ne montre pas tout ne montre rien
+
+*S39 et S20. Trois aveuglements du script de captures, trouvés en essayant de
+regarder ce qu'il fallait regarder.*
+
+`scripts/captures.mjs` existe pour tenir la promesse de `DESIGN.md` §14 :
+prendre une capture et regarder le rendu réel. Il l'a tenue à moitié pendant
+longtemps, et chaque moitié manquante a laissé passer un défaut.
+
+**Il ne savait ouvrir qu'une session de responsable**, et le disait en
+commentaire sans y remédier. Depuis que le formulaire d'entrée en stock
+n'affiche plus les mêmes blocs selon le rôle (D89), la revue ne voyait qu'une de
+ses deux formes — celle que personne n'utilise au comptoir. Et l'espace pièces
+est un espace de gérant de bout en bout.
+
+**`fullPage` ne montrait pas la page.** La coquille fixe la barre latérale et le
+bandeau et fait défiler une zone intérieure : la hauteur du document vaut celle
+de la fenêtre, donc `fullPage` rend la même image qu'une prise ordinaire. Un
+formulaire de dix champs se laissait photographier jusqu'au quatrième.
+
+**Il photographiait le chargement.** Il attendait la disparition du mot
+« Chargement… », mais le patron `Tableau` ne dit pas ce mot : il occupe la place
+du contenu à venir avec des lignes fantômes. La campagne prenait le gris pour le
+rendu.
+
+**Ce que la réparation a rapporté, et qui justifie le détour.** Une fois ces
+trois points corrigés, la première campagne a trouvé cinq défauts en une passe,
+dont un que quatre cent cinquante tests n'avaient pas vu : `/supervision/couts`
+affichait « Aucune moto en stock » **pendant** que le stock chargeait, sur une
+base qui en contenait deux. Une réponse rendue avant de l'avoir.
+
+**La règle.** Un outil de vérification se vérifie lui-même, et le moment de le
+faire est celui où il ne montre pas ce qu'on lui demande. Le réflexe inverse —
+conclure que l'écran va bien parce que la capture n'a rien montré — est
+exactement ce contre quoi D69 met en garde : une restriction trop stricte ne
+produit aucune alerte, seulement un produit qui ne marche pas.
+
+---
+
+## D94 — Le stock des pièces se compte, il ne se stocke pas
+
+*S20. L'arbitrage structurant du lot, contre le cahier des charges.*
+
+`prompt.md` §5.7 décrit `stockPieces/{boutiqueId}_{pieceId}` avec une `quantite`
+« maintenue par mouvements », et prévoit une Cloud Function de recalcul. Ce
+produit n'a pas cette collection, et n'en aura pas.
+
+**Le hors-ligne tranche presque seul.** Un agrégat entretenu par déclencheur ne
+bouge pas quand le déclencheur ne tourne pas : une vente au comptoir sans réseau
+laisserait l'écran afficher l'ancienne quantité — précisément dans la situation
+que ce produit promet de servir. Comptée depuis les mouvements, la quantité
+bouge dès l'écriture locale. Le test bout en bout le vérifie réseau coupé plutôt
+que de le supposer.
+
+**Ce que ça coûte est écrit d'avance**, comme S24 l'a fait avec ses 20 000
+ventes : au-delà de `SEUIL_MOUVEMENTS`, la réponse n'est pas d'entretenir un
+agrégat — ce serait reprendre le défaut — mais de poser un **arrêté périodique**
+qui fige la quantité à une date, seuls les mouvements postérieurs se rejouant.
+Cet arrêté est le produit naturel de l'inventaire, donc il n'existera pas avant
+S23. Le dire maintenant évite de le découvrir en catastrophe.
+
+**La conséquence qu'on assume, et qu'il a fallu regarder en face.** « Pas de
+stock négatif », que le commanditaire demande, **ne peut pas se tenir dans les
+règles Firestore** : une règle ne sait pas additionner une collection, et une
+transaction ne fonctionne pas hors ligne. La garde vit donc au geste, à l'écran
+qui refuse de sortir plus que le stock.
+
+**Et un refus sans suite se contourne.** Le cas qui se produira au comptoir n'est
+pas un stock négatif : c'est une vente refusée sur une pièce présente sur
+l'étagère, parce que le carton n'a pas encore été saisi. Là où l'écran refuse,
+il propose donc l'entrée manquante au même endroit — « faites d'abord entrer un
+lot ». C'est D90 appliqué au stock : une condition préalable ne bloque pas, elle
+se répare sur place.
+
+---
+
+## D95 — « Pas encore lu » n'est pas « vide », et le contrôle d'unicité est l'endroit où ça se paie
+
+*S20, trouvé par son propre test bout en bout, à la dernière vérification avant
+le commit.*
+
+L'écran de création d'une référence de pièce vérifiait le doublon ainsi :
+
+```ts
+const doublon = referenceDejaPrise(saisie.reference, catalogue ?? []);
+```
+
+`catalogue` vaut `null` tant que la première réponse de l'écoute Firestore n'est
+pas arrivée. **Le `?? []` transforme « je ne sais pas encore » en « il n'y a
+rien »**, et le contrôle répond « aucun doublon » à une question qu'il n'a pas
+posée. La référence se crée en double.
+
+**Ce qui rend ce défaut particulier, c'est qu'il se déguise en bruit.** Il est
+intermittent — il ne se produit que si l'on soumet avant que l'écoute réponde —,
+il disparaît au rejeu isolé, et il est sensible à la charge. Toutes les
+apparences de la contention mesurée par S27. La tentation était de le classer
+comme tel. C'est précisément le mécanisme de D88 : une chaîne de vérification
+bruyante finit par avaler ce qu'elle devait montrer.
+
+**La règle.** `?? []` sur une valeur qui distingue *vide* de *pas encore chargé*
+est un aplatissement de trois états en deux. Partout où l'on décide **d'écrire**
+d'après cette liste, l'état « pas encore chargé » doit rester distinct et
+interdire la décision. C'est D82 vu de l'autre côté : là où D82 disait qu'un
+échec de lecture n'est pas une réponse, D95 dit qu'une **absence** de lecture
+n'en est pas une non plus — et que le contrôle d'unicité est l'endroit exact où
+s'en contenter produit ce qu'il devait empêcher.
+
+**Le remède a deux moitiés, et une seule ne suffit pas.** Le garde dans la
+soumission empêche le doublon ; le bouton qui annonce la lecture en cours fait
+disparaître la course au lieu de la rattraper, et donne au test quelque chose à
+attendre plutôt qu'une temporisation. Un garde seul produit un mur sans panneau :
+l'utilisateur clique, on lui dit non, il ne sait pas pourquoi.
+
+**Le corollaire, et il coûte plus que le défaut.** Ce même aplatissement vit dans
+**six écrans**, écrit six fois de la même main. La plus grave des six n'est pas
+celle qu'on a prise en défaut : `motos/nouvelle` vérifie ainsi le **numéro de
+châssis**. Une référence de pièce en double se répare ; deux motos au même
+châssis se découvrent à la préfecture, sur un dossier de carte grise, des
+semaines plus tard. C'est D92 à nouveau, dans une autre matière : **corriger
+l'occurrence trouvée ne corrige rien tant qu'on n'a pas énuméré les autres.**
+
+Seule celle de S20 est corrigée ici — les cinq autres sont du code déjà livré,
+et une correction trouvée en chemin devient une entrée de backlog plutôt que du
+code immédiat. Elle est inscrite comme **S40**, en tête de
+`specs/CAHIER-DU-RESTE.md`.

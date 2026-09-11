@@ -116,7 +116,11 @@ describe("refus par défaut", () => {
      sa règle ne s'ouvre pas toute seule. */
   it("ferme les collections qu’aucune spec n’a ouvertes, pour tout le monde", async () => {
     for (const chemin of [
-      "pieces/piece-1",
+      /* `pieces` a quitte cette liste : S20 l'a ouverte, avec ses tests. Ce
+         qui la remplace est la suite immediate -- la vente au comptoir (S21)
+         et les categories que S20 a decide de ne jamais creer (D90). */
+      "ventesPieces/vente-1",
+      "categoriesPieces/cat-1",
       "inventaires/inv-1",
       "prestataires/prest-1/prive/token",
       "ventesMotos/vente-1/inconnu/x",

@@ -1,7 +1,7 @@
 # S20 — Pièces : catalogue, stock et mouvements
 
 ```
-Statut     : en cours — questions tranchées, prêt à construire
+Statut     : livré
 Périmètre  : post-MVP
 Dépend de  : S4 (référentiels), S3 (boutiques et périmètre)
 ```
@@ -321,23 +321,69 @@ lecture. Le masquer reviendrait à ranger « ma saisie est incohérente » avec
 
 ---
 
-## Ce qui prouvera que c'est fait
+## Ce qui prouve que c'est fait
 
-*À compléter une fois les réponses connues ; les critères dépendent des
-arbitrages ci-dessus.*
+- [x] **Le domaine pur calcule un stock depuis une liste de mouvements**, sans
+      Firestore ni horloge — 34 tests, un par arbitrage, négatif compris.
+- [x] **Les règles cloisonnent le prix d'achat dans les deux sens** : le gérant
+      ne le lit pas et ne l'écrit pas. 25 tests de règles, dont deux qui figent
+      l'absence de `stockPieces` et de `categoriesPieces` — sans eux, quelqu'un
+      rouvrirait ces portes en croyant boucher un trou.
+- [x] **Un mouvement écrit réseau coupé met la quantité à jour immédiatement.**
+      C'est la question 2, vérifiée et non supposée : le test coupe le réseau,
+      écrit une sortie, lit 20 − 6 = 14 dans le tableau, et vérifie que la garde
+      du geste tient aussi sur le cache local.
+- [x] **Le catalogue s'affiche avec sa recherche et ses trois filtres**, la
+      maquette `c1` ouverte à côté du rendu — moins sa colonne « Compatible »,
+      que la réponse 3 a écartée.
+- [x] **Le rendu est regardé en clair et en sombre, et dans les deux rôles.**
+      Sept captures, dont le repli en cartes et le panneau ouvert.
+- [x] **Le semis de vérification écrit ce que le produit écrit** : des
+      mouvements, jamais une quantité. Semer une quantité serait semer ce que le
+      produit n'écrit pas (D84).
 
-- [ ] Le domaine pur (`lib/domain/piece.ts`) calcule un stock à partir d'une
-      liste de mouvements, sans Firestore ni horloge, avec un test par
-      arbitrage — négatif compris.
-- [ ] Les règles Firestore cloisonnent ce que la question 1 décide, et un test
-      de règles le prouve — sans quoi le cloisonnement n'existe pas.
-- [ ] Un mouvement écrit **réseau coupé** met la quantité à jour immédiatement
-      à l'écran (c'est la question 2, vérifiée et non supposée).
-- [ ] Le catalogue s'affiche avec sa recherche et ses trois filtres, maquette
-      `c1` ouverte à côté du rendu.
-- [ ] Le rendu est regardé en clair et en sombre, capture à l'appui.
-- [ ] Le semis de vérification écrit ce que le produit écrit, et non ce que la
-      maquette montre (D84).
+---
+
+## Ce qui a été livré
+
+**Le domaine** (`lib/domain/piece.ts`). `quantiteDe` et `stockParPiece`
+comptent ; `etatStock` nomme les quatre états, dont l'anomalie qui n'est pas une
+quantité mais un aveu. Le signe vit dans `MOUVEMENTS`, une seule fois : la
+quantité se stocke positive, parce qu'un nombre négatif écrit à la main est une
+faute de frappe qui ne se voit pas, là où un type inconnu se refuse.
+`SEUIL_MOUVEMENTS` écrit d'avance où ce choix cesse d'être tenable.
+
+**Les règles.** `pieces` au responsable, `mouvementsPieces` au comptoir de sa
+boutique, `pieces/{id}/prive/cout` au seul responsable en lecture **et** en
+écriture. Un mouvement ne se corrige ni ne s'efface : la quantité étant leur
+somme, retoucher l'un d'eux déplacerait un total sans laisser de trace. On
+corrige par un mouvement inverse, qui se voit.
+
+**Les écrans.** `/pieces` porte le catalogue, ses filtres et les quantités de la
+boutique du bandeau ; la ligne qu'on touche ouvre un panneau qui montre la
+quantité, l'histoire récente et les deux gestes qui la changent. Le geste vit à
+côté du chiffre : un arrivage de douze références aurait sinon coûté douze
+allers-retours. `/pieces/nouvelle` crée une référence, et n'est offert qu'au
+responsable.
+
+**La catégorie est un champ libre à suggestions**, sans écran de paramétrage ni
+collection pour la tenir — ce que `prompt.md` §14 prévoyait. C'est la réponse 5
+appliquée, et c'est D90.
+
+### Ce que le lot ne fait pas
+
+- **La vente au comptoir** reste S21, qui s'appuie entièrement sur ce socle.
+- **Les transferts** restent S17. Leurs deux types existent dans le modèle et
+  dans les règles, mais aucun écran ne les écrit : les ajouter après coup aurait
+  demandé de rouvrir le fichier de règles pour une spec voisine.
+- **L'inventaire** reste S23, qui apportera l'arrêté périodique dont
+  `SEUIL_MOUVEMENTS` dit qu'il manquera un jour.
+- **Le prix d'achat d'une référence** a sa place en base et sa règle, et aucun
+  écran ne le pose encore. C'est volontaire : `/supervision/couts` fait ce
+  travail pour les motos, et l'étendre aux pièces demande de décider si une
+  référence a un prix d'achat ou si chaque lot a le sien — le cahier des charges
+  emploie le même mot pour les deux (§5.7 et §9). La question est posée, pas
+  devinée.
 
 ---
 

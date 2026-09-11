@@ -94,6 +94,7 @@ async function semerLeGerant() {
     { merge: true },
   );
   await semerLeStock(base, FieldValue, code);
+  await semerLesPieces(base, FieldValue, code);
   return code;
 }
 
@@ -170,6 +171,59 @@ async function semerLeStock(base, FieldValue, code) {
   }
 }
 
+/**
+ * Un catalogue de trois références, et trois états de stock (S20).
+ *
+ * Un pour chaque colonne « Statut » : en stock, stock bas, épuisé. Une liste
+ * qui ne montre qu'un seul état ne dit rien des trois, et c'est justement la
+ * colonne que la maquette `c1` met en avant.
+ *
+ * La quantité n'est écrite nulle part : on sème des **mouvements**, et l'écran
+ * en fait la somme. Semer une quantité serait semer ce que le produit n'écrit
+ * pas — ce que D84 appelle un semis qui ne vérifie rien.
+ */
+async function semerLesPieces(base, FieldValue, code) {
+  const trace = () => ({
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: "captures",
+    createdByName: "Captures",
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: "captures",
+    updatedByName: "Captures",
+  });
+
+  const catalogue = [
+    { id: "piece-captures-1", reference: "PLQ-0142", designation: "Plaquette de frein avant", categorie: "Freinage", prixVente: 3500, seuilAlerte: 5, entree: 42 },
+    { id: "piece-captures-2", reference: "CHN-0088", designation: "Chaîne 428H · 118 maillons", categorie: "Transmission", prixVente: 9000, seuilAlerte: 4, entree: 3 },
+    { id: "piece-captures-3", reference: "FLT-0003", designation: "Filtre à air", categorie: "Moteur", prixVente: null, seuilAlerte: 2, entree: 0 },
+  ];
+
+  for (const piece of catalogue) {
+    const { id, entree, ...champs } = piece;
+    await base.doc(`pieces/${id}`).set({ ...champs, actif: true, ...trace() });
+    if (entree === 0) continue;
+    await base.doc(`mouvementsPieces/mvt-${id}`).set({
+      boutiqueId: code,
+      pieceId: id,
+      type: "entree",
+      quantite: entree,
+      note: "Arrivage",
+      date: new Date("2026-09-02T08:00:00Z"),
+      ...trace(),
+    });
+  }
+  /* Une sortie, pour que l'historique du panneau ne montre pas qu'une ligne. */
+  await base.doc("mouvementsPieces/mvt-sortie-captures").set({
+    boutiqueId: code,
+    pieceId: "piece-captures-1",
+    type: "sortie_autre",
+    quantite: 2,
+    note: "Casse atelier",
+    date: new Date("2026-09-05T15:00:00Z"),
+    ...trace(),
+  });
+}
+
 /** Ouvre une session : la plupart des écrans en exigent une depuis S2. */
 async function seConnecter(page, identifiants = RESPONSABLE, arrivee = "**/supervision") {
   await page.goto(`${BASE}/login`, { waitUntil: "load" });
@@ -243,6 +297,22 @@ const PRISES = [
   { nom: "couts-mobile-clair", chemin: "/supervision/couts", theme: "light", mobile: true },
   { nom: "couts-bureau-clair", chemin: "/supervision/couts", theme: "light", mobile: false },
   { nom: "couts-bureau-sombre", chemin: "/supervision/couts", theme: "dark", mobile: false },
+  /* L'espace pieces (S20). Le gerant est le vrai destinataire : le catalogue
+     lui sert a vendre, et c'est lui qui fait bouger le stock. Le responsable
+     le voit aussi, avec en plus le bouton de creation d'une reference. */
+  { nom: "pieces-gerant-mobile-clair", chemin: "/pieces", theme: "light", mobile: true, gerant: true },
+  { nom: "pieces-gerant-bureau-clair", chemin: "/pieces", theme: "light", mobile: false, gerant: true },
+  { nom: "pieces-gerant-bureau-sombre", chemin: "/pieces", theme: "dark", mobile: false, gerant: true },
+  { nom: "pieces-piece-ouverte-bureau-clair", chemin: "/pieces", theme: "light", mobile: false, gerant: true, ouvrirPiece: true },
+  { nom: "pieces-piece-ouverte-mobile-sombre", chemin: "/pieces", theme: "dark", mobile: true, gerant: true, ouvrirPiece: true },
+  /* Fenêtre haute plutôt que défilement : la coquille fixe ses bords et fait
+     défiler une zone intérieure, et trois approches du défilement n'ont pas
+     rendu le bas du panneau photographiable. Un écran de 1400 px de haut est
+     un rendu réel, pas un artifice — et c'est le seul moyen de regarder ce
+     panneau en entier plutôt que de dire qu'on l'a regardé. */
+  { nom: "pieces-piece-geste-bureau-clair", chemin: "/pieces", theme: "light", mobile: false, gerant: true, ouvrirPiece: true, hauteur: 1400 },
+  { nom: "pieces-nouvelle-bureau-clair", chemin: "/pieces/nouvelle", theme: "light", mobile: false },
+  { nom: "pieces-nouvelle-mobile-sombre", chemin: "/pieces/nouvelle", theme: "dark", mobile: true },
   { nom: "ventes-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, boutique: true },
   { nom: "ventes-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, boutique: true },
   { nom: "vente-nouvelle-mobile-clair", chemin: "/motos/ventes/nouvelle", theme: "light", mobile: true, boutique: true },
@@ -285,7 +355,7 @@ const filtre = process.argv[2] ? new RegExp(process.argv[2]) : null;
 const aPrendre = filtre ? PRISES.filter(({ nom }) => filtre.test(nom)) : PRISES;
 
 await mkdir(DOSSIER, { recursive: true });
-if (aPrendre.some((prise) => prise.gerant || prise.chemin.startsWith("/supervision/couts"))) {
+if (aPrendre.some((prise) => prise.gerant || /\/supervision\/couts|\/pieces/.test(prise.chemin))) {
   const code = await semerLeGerant();
   console.log(`compte gérant prêt : ${GERANT.email} (boutique ${code})`);
 }
@@ -305,9 +375,13 @@ for (const {
   gerant,
   ajoutMarque,
   bas,
+  ouvrirPiece,
+  hauteur,
 } of aPrendre) {
   const contexte = await navigateur.newContext({
-    ...(mobile ? devices["Pixel 7"] : { viewport: { width: 1280, height: 820 } }),
+    ...(mobile
+      ? devices["Pixel 7"]
+      : { viewport: { width: 1280, height: hauteur ?? 820 } }),
     colorScheme: theme,
   });
   const page = await contexte.newPage();
@@ -421,9 +495,33 @@ for (const {
      ajoute les traits de signature (DESIGN.md §14 — regarder le rendu réel). */
   if (impression) await page.emulateMedia({ media: "print" });
 
+  /* Le panneau d'une piece : la quantite, son histoire et les deux gestes qui
+     la changent. Il n'existe sur aucune prise au repos, et c'est pourtant la
+     que S20 se joue. */
+  if (ouvrirPiece) {
+    const ligne = page.locator("tbody tr").first().getByRole("button").first();
+    await ligne.waitFor({ timeout: 20000 });
+    await ligne.click();
+    await page.getByRole("region", { name: /^Pièce / }).waitFor({ timeout: 20000 });
+    await page.waitForTimeout(600);
+  }
+  /* `bas` fait defiler jusqu'au dernier bouton du contenu : la coquille fixe
+     la barre laterale et fait defiler une zone interieure, donc `fullPage` ne
+     montre jamais le bas d'un long formulaire. On regarde ce que la personne
+     voit apres avoir fait defiler. */
   if (bas) {
-    await page.getByRole("button", { name: /Faire entrer en stock/ }).scrollIntoViewIfNeeded();
-    await page.waitForTimeout(400);
+    /* La molette, pas `scrollIntoViewIfNeeded` : la zone qui defile est un
+       conteneur interieur de la coquille, et faire « entrer dans la vue » un
+       element qui y est deja ne bouge rien. On fait ce que fait la main. */
+    /* `scrollIntoView` execute DANS la page : le navigateur y trouve seul le
+       bon ancetre defilant, la ou la molette scrolle ce qui est sous le
+       curseur -- c'est-a-dire le tableau, qui a sa propre zone. */
+    await page.evaluate(() => {
+      const contenu = document.querySelector("main");
+      const dernier = contenu?.lastElementChild?.lastElementChild ?? contenu?.lastElementChild;
+      dernier?.scrollIntoView({ block: "end" });
+    });
+    await page.waitForTimeout(600);
   }
   await page.screenshot({ path: `${DOSSIER}/${nom}.png`, fullPage: !mobile });
   console.log(`capturé  ${DOSSIER}/${nom}.png`);
