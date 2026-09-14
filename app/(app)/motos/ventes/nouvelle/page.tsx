@@ -36,6 +36,8 @@ import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterVentes, enregistrerVente, messageErreurVente } from "@/lib/repositories/ventes";
+import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
+import type { VentePiece } from "@/lib/domain/vente-piece";
 
 /**
  * Enregistrer une vente.
@@ -106,6 +108,34 @@ export default function PageNouvelleVente() {
   );
   const { valeur: ventes } = useAbonnement(souscrireVentes, "Les ventes n’ont pas pu être lues.");
 
+  /* **Le compteur est partagé avec le comptoir** (Q1) : un numéro dicté au
+     téléphone ne doit désigner qu'une seule pièce comptable. Cet écran doit
+     donc connaître les numéros que les ventes de pièces ont brûlés, exactement
+     comme l'écran de vente de pièces connaît ceux des motos. Sans cette
+     seconde écoute, un appareil qui n'a encore vendu aucune moto repartirait du
+     numéro suivant *des motos* et redonnerait à une moto le numéro d'un ticket
+     de pièces déjà remis. */
+  const souscrireVentesPieces = useCallback(
+    (auChangement: (ventes: VentePiece[]) => void, enErreur: (cause: unknown) => void) =>
+      perimetre.type === "boutique"
+        ? ecouterVentesPieces(boutiqueId, auChangement, enErreur)
+        : () => {},
+    [boutiqueId, perimetre.type],
+  );
+  const { valeur: ventesPieces } = useAbonnement(
+    souscrireVentesPieces,
+    "Les ventes n’ont pas pu être lues.",
+  );
+
+  /* L'union des deux collections, telle que la numérotation l'attend. */
+  const numerosConnus = useMemo(
+    () => [
+      ...(ventes ?? []).flatMap((vente) => [vente.numero, vente.numeroInitial]),
+      ...(ventesPieces ?? []).map((vente) => vente.numero),
+    ],
+    [ventes, ventesPieces],
+  );
+
   const [saisie, setSaisie] = useState<SaisieVente>(SAISIE_VENTE_VIDE);
   const [rechercheMoto, setRechercheMoto] = useState("");
   const [rechercheClient, setRechercheClient] = useState("");
@@ -154,10 +184,7 @@ export default function PageNouvelleVente() {
 
   const numeroAVenir =
     boutiqueId && perimetre.type === "boutique"
-      ? prochainNumero(
-          { boutiqueId, code: perimetre.code },
-          (ventes ?? []).flatMap((vente) => [vente.numero, vente.numeroInitial]),
-        )
+      ? prochainNumero({ boutiqueId, code: perimetre.code }, numerosConnus)
       : null;
 
   function choisirMoto(moto: Moto) {
@@ -190,7 +217,7 @@ export default function PageNouvelleVente() {
       saisie,
       {
         boutique: { boutiqueId, code: perimetre.code },
-        numerosConnus: (ventes ?? []).flatMap((vente) => [vente.numero, vente.numeroInitial]),
+        numerosConnus,
       },
       { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
     );

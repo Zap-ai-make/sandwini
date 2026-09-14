@@ -75,6 +75,10 @@ describe("arbitrage 1 — le panier est multi-lignes, le client est facultatif",
       panier = ajouterAuPanier(panier, p, 10);
     }
     expect(panier.lignes).toHaveLength(LIGNES_MAX);
+    /* **Et le refus porte un nom.** Un ajout qui ne passe pas sans raison
+       nommée laisse l'écran muet : le gérant clique, la pièce ne vient pas, et
+       rien ne dit pourquoi. C'est le seul refus qui manquait à l'union. */
+    expect(refusAjout(piece({ id: "de-trop" }), 10, panier.lignes)).toBe("panier_plein");
   });
 });
 
@@ -133,6 +137,19 @@ describe("arbitrage 4 — le stock insuffisant refuse la vente, sans forçage", 
     const bougie = piece({ id: "b" });
 
     expect(refusAjout(bougie, 0, [])).toBe("epuise");
+  });
+
+  it("ne confond pas le stock négatif avec l’épuisé : ce n’est pas le même aveu (D82)", () => {
+    /* « Il n'y en a plus » envoie commander ; « mon compte est faux » envoie
+       corriger une saisie. Les ranger sous le même mot fait commander un carton
+       peut-être déjà sur l'étagère. */
+    const bougie = piece({ id: "b" });
+
+    expect(refusAjout(bougie, -3, [])).toBe("stock_incoherent");
+
+    let panier = ajouterAuPanier(PANIER_VIDE, bougie, 5);
+    panier = changerLigne(panier, "b", { quantite: "1" });
+    expect(validerPanier(panier, carte(bougie), stocks(["b", -3]))).toMatch(/négatif/);
   });
 
   it("accepte exactement le stock disponible : la borne est inclusive", () => {
@@ -243,7 +260,30 @@ describe("la carte « pièces en alerte » de la supervision", () => {
     const alertes = piecesEnAlerte(pieces, stocks(["bas", 2], ["vide", 0]));
 
     expect(alertes.map((a) => a.piece.id)).toEqual(["vide", "bas"]);
-    expect(alertes[0].epuisee).toBe(true);
+    expect(alertes[0].etat).toBe("epuise");
+  });
+
+  it("range l’incohérence avant l’épuisé : un chiffre faux empêche de décider", () => {
+    const pieces = [
+      piece({ id: "vide", reference: "A", seuilAlerte: 5 }),
+      piece({ id: "negatif", reference: "Z", seuilAlerte: 5 }),
+    ];
+    const alertes = piecesEnAlerte(pieces, stocks(["vide", 0], ["negatif", -2]));
+
+    expect(alertes.map((a) => a.etat)).toEqual(["anomalie", "epuise"]);
+  });
+
+  it("ignore ce que la boutique n’a jamais tenu : sans mouvement, il n’y a pas de rupture", () => {
+    /* Le catalogue est commun à l'entreprise, le stock ne l'est pas. Compter
+       comme épuisée une référence que cette boutique n'a jamais reçue noierait
+       les trois vraies ruptures sous deux cent cinquante fausses, et une carte
+       de décision qui crie tous les jours cesse d'être lue. */
+    const pieces = [
+      piece({ id: "tenue", reference: "A", seuilAlerte: 5 }),
+      piece({ id: "jamais-vue", reference: "B", seuilAlerte: 5 }),
+    ];
+
+    expect(piecesEnAlerte(pieces, stocks(["tenue", 0])).map((a) => a.piece.id)).toEqual(["tenue"]);
   });
 
   it("ignore les références retirées du catalogue : on ne les réapprovisionne pas", () => {

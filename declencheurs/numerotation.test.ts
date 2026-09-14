@@ -2,17 +2,26 @@ import type { Firestore } from "firebase-admin/firestore";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
- * Le câblage de la réconciliation des numéros (S7).
+ * Le câblage de la réconciliation des numéros (S7, étendu par S21).
  *
  * La *règle* qui décide qui garde son numéro est vérifiée ailleurs, sans
  * émulateur et en millisecondes (`functions/src/numerotation.test.ts`). Ici on
- * vérifie ce que cette règle ne peut pas prouver toute seule : que le
- * déclencheur est branché sur la bonne collection, qu’il retrouve les pièces
- * concurrentes, et qu’il écrit le nouveau numéro là où le reçu ira le lire.
+ * vérifie ce que cette règle ne peut pas prouver toute seule : que les
+ * déclencheurs sont branchés sur les bonnes collections, qu’ils retrouvent les
+ * pièces concurrentes, et qu’ils écrivent le nouveau numéro là où le reçu ira
+ * le lire.
+ *
+ * **Deux collections, un seul compteur** (Q1). Depuis S21 le comptoir vend des
+ * pièces, et un numéro dicté au téléphone doit continuer à désigner une seule
+ * pièce comptable. La collision se cherche donc aussi *entre* `ventesMotos` et
+ * `ventesPieces` — c’est le cas que personne ne voit passer si on ne le teste
+ * pas, puisqu’aucun des deux écrans ne regarde la collection de l’autre au
+ * moment d’écrire.
  *
  * Les documents écrits ne portent que ce que le déclencheur lit — `boutiqueId`,
  * `numero`, `numeroInitial`, `createdAt`. La forme complète d’une vente est
- * l’affaire de S8 ; l’anticiper ici figerait un modèle qui n’est pas décidé.
+ * l’affaire de S8 et de S21 ; l’anticiper ici figerait un modèle qui n’est pas
+ * décidé.
  */
 
 const PROJET = "sdi-dev";
@@ -24,6 +33,14 @@ process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE;
 process.env.GCLOUD_PROJECT = PROJET;
 
 const BOUTIQUE = "PTG";
+
+/** Les deux collections qui puisent dans le même compteur. */
+const COLLECTIONS = ["ventesMotos", "ventesPieces"] as const;
+
+type Collection = (typeof COLLECTIONS)[number];
+
+/** Une pièce écrite, désignée par sa collection autant que par son identifiant. */
+type Reference = { collection: Collection; id: string };
 
 let base: Firestore;
 let Horodatage: typeof import("firebase-admin/firestore").Timestamp;
@@ -119,60 +136,86 @@ async function reveillerLeDeclencheur(): Promise<void> {
   const temoin = "ZZZ-0000-0001";
   await ecrirePiece(temoin, new Date("2020-01-01T00:00:00Z"), "ZZZ");
   const second = await ecrirePiece(temoin, new Date("2020-01-01T00:01:00Z"), "ZZZ");
+  /* Un runtime par fonction : réveiller celui des motos ne réveille pas celui
+     des pièces, et le premier test de pièces paierait seul le démarrage. */
+  const temoinPiece = "ZZZ-0000-0002";
+  await ecrirePiece(temoinPiece, new Date("2020-01-01T00:00:00Z"), "ZZZ", "ventesPieces");
+  const secondPiece = await ecrirePiece(
+    temoinPiece,
+    new Date("2020-01-01T00:01:00Z"),
+    "ZZZ",
+    "ventesPieces",
+  );
   try {
     await attendreNumero(second, `${temoin}-B`, 90_000);
+    await attendreNumero(secondPiece, `${temoinPiece}-B`, 90_000);
   } catch (cause) {
     throw new Error(
       [
-        "Le déclencheur de réconciliation n'a pas réagi.",
+        "Un déclencheur de réconciliation n'a pas réagi.",
         "",
-        "Vérifiez la ligne « functions[europe-west1-reconcilierNumeroVente]:",
-        "firestore function initialized » au démarrage des émulateurs, puis le",
-        "journal de l'émulateur : une erreur dans la fonction y est visible.",
+        "Vérifiez les lignes « functions[europe-west1-reconcilierNumeroVente] »",
+        "et « functions[europe-west1-reconcilierNumeroVentePiece]: firestore",
+        "function initialized » au démarrage des émulateurs, puis le journal de",
+        "l'émulateur : une erreur dans la fonction y est visible.",
         "",
         String(cause),
       ].join("\n"),
     );
   }
   await viderLesVentes();
-  console.log(`Déclencheur de numérotation réveillé en ${Date.now() - debut} ms.`);
+  console.log(`Déclencheurs de numérotation réveillés en ${Date.now() - debut} ms.`);
 }
 
 async function viderLesVentes(): Promise<void> {
-  const tout = await base.collection("ventesMotos").get();
-  await Promise.all(tout.docs.map((document) => document.ref.delete()));
+  await Promise.all(
+    COLLECTIONS.map(async (nom) => {
+      const tout = await base.collection(nom).get();
+      await Promise.all(tout.docs.map((document) => document.ref.delete()));
+    }),
+  );
 }
 
 /** Écrit une pièce comme le ferait un appareil : `numero` et `numeroInitial` identiques. */
-async function ecrirePiece(numero: string, recueA: Date, boutiqueId = BOUTIQUE): Promise<string> {
-  const reference = base.collection("ventesMotos").doc();
+async function ecrirePiece(
+  numero: string,
+  recueA: Date,
+  boutiqueId = BOUTIQUE,
+  collection: Collection = "ventesMotos",
+): Promise<Reference> {
+  const reference = base.collection(collection).doc();
   await reference.set({
     boutiqueId,
     numero,
     numeroInitial: numero,
     createdAt: Horodatage.fromDate(recueA),
   });
-  return reference.id;
+  return { collection, id: reference.id };
 }
 
-async function lireNumero(id: string): Promise<string> {
-  const instantane = await base.doc(`ventesMotos/${id}`).get();
+async function lireNumero(cible: Reference): Promise<string> {
+  const instantane = await base.doc(`${cible.collection}/${cible.id}`).get();
   return instantane.get("numero") ?? "";
 }
 
 const pause = (ms: number) => new Promise((suite) => setTimeout(suite, ms));
 
 /** Attend que le déclencheur ait tranché, ou dit clairement ce qu’il a fait à la place. */
-async function attendreNumero(id: string, attendu: string, plafondMs = 25_000): Promise<void> {
+async function attendreNumero(
+  cible: Reference,
+  attendu: string,
+  plafondMs = 25_000,
+): Promise<void> {
   const debut = Date.now();
   let vu = "";
   while (Date.now() - debut < plafondMs) {
-    vu = await lireNumero(id);
+    vu = await lireNumero(cible);
     if (vu === attendu) return;
     await pause(200);
   }
   throw new Error(
-    `La pièce ${id} porte « ${vu} » après ${plafondMs} ms ; on attendait « ${attendu} ».`,
+    `La pièce ${cible.collection}/${cible.id} porte « ${vu} » après ${plafondMs} ms ;` +
+      ` on attendait « ${attendu} ».`,
   );
 }
 
@@ -238,8 +281,8 @@ describe("réconciliation des numéros en double", () => {
       return reference.id;
     };
 
-    const une = await ecrire();
-    const autre = await ecrire();
+    const une: Reference = { collection: "ventesMotos", id: await ecrire() };
+    const autre: Reference = { collection: "ventesMotos", id: await ecrire() };
 
     /* L’ordre est ici celui du serveur, que le test ne choisit pas. On vérifie
        donc la propriété qui compte : exactement une des deux est renumérotée. */
@@ -252,5 +295,55 @@ describe("réconciliation des numéros en double", () => {
     }
 
     expect([...numeros].sort()).toEqual(["PTG-2608-0500", "PTG-2608-0500-B"]);
+  });
+});
+
+describe("le compteur est partagé entre les deux collections (Q1, S21)", () => {
+  it("suffixe une vente de pièces qui reprend le numéro d’une autre vente de pièces", async () => {
+    const premiere = await ecrirePiece(
+      "PTG-2609-0007",
+      new Date("2026-09-10T09:00:00Z"),
+      BOUTIQUE,
+      "ventesPieces",
+    );
+    const seconde = await ecrirePiece(
+      "PTG-2609-0007",
+      new Date("2026-09-10T09:05:00Z"),
+      BOUTIQUE,
+      "ventesPieces",
+    );
+
+    await attendreNumero(seconde, "PTG-2609-0007-B");
+    expect(await lireNumero(premiere)).toBe("PTG-2609-0007");
+  });
+
+  it("tranche à travers les collections : un numéro ne désigne qu’une pièce comptable", async () => {
+    /* Le cas que personne ne voit passer. Les deux écrans réservent leur numéro
+       sur l'union des deux listes, mais deux appareils hors ligne ne partagent
+       aucune liste — et sans cette réconciliation croisée, un reçu de moto et
+       un ticket de pièces porteraient le même numéro pour toujours. */
+    const moto = await ecrirePiece("PTG-2609-0008", new Date("2026-09-10T09:00:00Z"));
+    const piecesDetachees = await ecrirePiece(
+      "PTG-2609-0008",
+      new Date("2026-09-10T09:05:00Z"),
+      BOUTIQUE,
+      "ventesPieces",
+    );
+
+    await attendreNumero(piecesDetachees, "PTG-2609-0008-B");
+    expect(await lireNumero(moto)).toBe("PTG-2609-0008");
+  });
+
+  it("suffixe la moto quand c’est elle qui arrive en second", async () => {
+    const piecesDetachees = await ecrirePiece(
+      "PTG-2609-0009",
+      new Date("2026-09-10T09:00:00Z"),
+      BOUTIQUE,
+      "ventesPieces",
+    );
+    const moto = await ecrirePiece("PTG-2609-0009", new Date("2026-09-10T09:05:00Z"));
+
+    await attendreNumero(moto, "PTG-2609-0009-B");
+    expect(await lireNumero(piecesDetachees)).toBe("PTG-2609-0009");
   });
 });

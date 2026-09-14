@@ -35,7 +35,14 @@
  * a été renommée depuis. Même raisonnement que `coutMotoSnapshot` (D2).
  */
 
-import { lireEntier, MONTANT_MAX, QUANTITE_MAX, type Piece } from "./piece";
+import {
+  etatStock,
+  lireEntier,
+  MONTANT_MAX,
+  QUANTITE_MAX,
+  type EtatStock,
+  type Piece,
+} from "./piece";
 import type { MoyenPaiement } from "./vente";
 
 /**
@@ -97,14 +104,28 @@ export const PANIER_VIDE: SaisiePanier = {
  * Rendu comme une **raison nommée** plutôt qu'un booléen : l'écran doit proposer
  * la réparation qui correspond, et « fixez son prix » n'est pas « faites entrer
  * un lot » (D90).
+ *
+ * **Tout refus porte un nom, sans exception.** Un chemin qui refuserait sans
+ * rien rendre laisserait l'écran sans rien à dire : le gérant cliquerait,
+ * la pièce ne viendrait pas, et aucun message n'expliquerait pourquoi. C'est
+ * précisément ce que cette union existe pour empêcher — le panier plein en
+ * fait donc partie, au même titre que le prix manquant.
  */
-export type RefusAjout = "sans_prix" | "inactive" | "epuise" | "deja_au_panier";
+export type RefusAjout =
+  | "sans_prix"
+  | "inactive"
+  | "stock_incoherent"
+  | "epuise"
+  | "deja_au_panier"
+  | "panier_plein";
 
 export const MESSAGE_REFUS: Record<RefusAjout, string> = {
   sans_prix: "Cette pièce n’a pas encore de prix de vente.",
   inactive: "Cette référence a été retirée du catalogue.",
+  stock_incoherent: "Le stock de cette pièce est négatif : il manque une entrée.",
   epuise: "Cette pièce n’est pas en stock ici.",
   deja_au_panier: "Cette pièce est déjà au panier : changez sa quantité.",
+  panier_plein: `Le panier est complet : ${LIGNES_MAX} lignes au plus.`,
 };
 
 export function refusAjout(
@@ -114,8 +135,17 @@ export function refusAjout(
 ): RefusAjout | null {
   if (!piece.actif) return "inactive";
   if (piece.prixVente === null) return "sans_prix";
-  if (stock <= 0) return "epuise";
+  /* Un stock négatif ne se vend pas davantage qu'un stock vide, mais il ne se
+     dit pas « épuisé » : ce n'est pas « il n'y en a plus », c'est « ma saisie
+     est incohérente » — la confusion que D82 nomme. La réparation est la même
+     (faire entrer ce qui manque), le diagnostic ne l'est pas, et c'est le
+     diagnostic qui évite qu'on recommande un réapprovisionnement inutile. */
+  if (stock < 0) return "stock_incoherent";
+  if (stock === 0) return "epuise";
   if (panier.some((ligne) => ligne.pieceId === piece.id)) return "deja_au_panier";
+  /* En dernier, et l'ordre compte : quand la pièce est déjà au panier **et**
+     que le panier est plein, « changez sa quantité » est la phrase utile. */
+  if (panier.length >= LIGNES_MAX) return "panier_plein";
   return null;
 }
 
@@ -124,11 +154,12 @@ export function refusAjout(
  *
  * Rend le panier inchangé si l'ajout est refusé : l'appelant a déjà demandé
  * `refusAjout` pour dire pourquoi, et un second endroit qui déciderait serait un
- * second endroit à corriger.
+ * second endroit à corriger. **Un seul garde-fou, donc** — `refusAjout` porte
+ * aussi la borne des vingt lignes, là où un second `if` muet ici rendait le
+ * panier inchangé sans que personne puisse dire pourquoi.
  */
 export function ajouterAuPanier(panier: SaisiePanier, piece: Piece, stock: number): SaisiePanier {
   if (refusAjout(piece, stock, panier.lignes) !== null) return panier;
-  if (panier.lignes.length >= LIGNES_MAX) return panier;
   return {
     ...panier,
     lignes: [
@@ -220,7 +251,13 @@ export function validerPanier(
 
     const disponible = stocks.get(ligne.pieceId) ?? 0;
     if (quantite > disponible) {
-      return disponible <= 0
+      /* Trois phrases et non deux : un stock négatif n'est pas une rupture,
+         c'est une écriture manquante, et le dire évite d'envoyer commander ce
+         qui est peut-être déjà sur l'étagère (D82). */
+      if (disponible < 0) {
+        return `${piece.reference} : le stock est négatif ici. Une entrée manque — saisissez-la avant de vendre.`;
+      }
+      return disponible === 0
         ? `${piece.reference} n’est plus en stock ici. Faites d’abord entrer un lot.`
         : `${piece.reference} : il n’y en a que ${disponible} en stock ici.`;
     }
@@ -271,9 +308,18 @@ export function libelleEncaissement(numero: string, nomClient: string): string {
 export type PieceEnAlerte = {
   piece: Piece;
   quantite: number;
-  /** `true` quand il n'y en a plus du tout : l'urgence n'est pas la même. */
-  epuisee: boolean;
+  /**
+   * `anomalie`, `epuise` ou `bas` — jamais `en_stock`.
+   *
+   * L'état plutôt qu'un booléen « épuisée » : un stock négatif et un stock à
+   * zéro appellent deux phrases différentes, et les aplatir enverrait commander
+   * un carton là où c'est une écriture qui manque (D82).
+   */
+  etat: EtatStock;
 };
+
+/** L'ordre d'urgence de la carte. `en_stock` n'y figure jamais, mais le type l'exige. */
+const RANG_ALERTE: Record<EtatStock, number> = { anomalie: 0, epuise: 1, bas: 2, en_stock: 3 };
 
 /**
  * Les pièces qui demandent un réapprovisionnement, pour la carte de supervision
@@ -284,21 +330,32 @@ export type PieceEnAlerte = {
  * même lecteur (D73). Ce qui manquait, c'est le **responsable**, qui ne regarde
  * pas le catalogue — d'où cette carte, et rien de plus.
  *
- * Les épuisées d'abord : c'est la vente qu'on rate aujourd'hui.
+ * **Seules les références que ce périmètre a réellement tenues.** Le catalogue
+ * est commun à l'entreprise, le stock ne l'est pas : une pièce que Koudougou
+ * n'a jamais vendue ni reçue n'est pas « épuisée » là-bas, elle n'y a jamais
+ * été. Les compter comme des ruptures noierait les vraies sous des centaines de
+ * fausses, et une carte de décision qui crie tous les jours ne se lit plus. Le
+ * test est l'existence d'un mouvement, c'est-à-dire la présence dans `stocks` —
+ * pas la valeur, qui vaut zéro dans les deux cas.
+ *
+ * Les incohérences d'abord — un chiffre auquel on ne peut pas se fier empêche
+ * de décider quoi que ce soit —, puis les épuisées, qui sont la vente qu'on
+ * rate aujourd'hui.
  */
 export function piecesEnAlerte(
   pieces: readonly Piece[],
   stocks: ReadonlyMap<string, number>,
 ): PieceEnAlerte[] {
   return pieces
-    .filter((piece) => piece.actif)
+    .filter((piece) => piece.actif && stocks.has(piece.id))
     .map((piece) => {
       const quantite = stocks.get(piece.id) ?? 0;
-      return { piece, quantite, epuisee: quantite <= 0 };
+      return { piece, quantite, etat: etatStock(quantite, piece.seuilAlerte) };
     })
-    .filter((ligne) => ligne.epuisee || ligne.quantite <= ligne.piece.seuilAlerte)
+    .filter((ligne) => ligne.etat !== "en_stock")
     .sort((a, b) => {
-      if (a.epuisee !== b.epuisee) return a.epuisee ? -1 : 1;
+      const rang = RANG_ALERTE[a.etat] - RANG_ALERTE[b.etat];
+      if (rang !== 0) return rang;
       if (a.quantite !== b.quantite) return a.quantite - b.quantite;
       return a.piece.reference.localeCompare(b.piece.reference, "fr", { numeric: true });
     });

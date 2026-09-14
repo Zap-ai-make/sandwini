@@ -85,11 +85,16 @@ ce sont eux qui lui diront qu'il se trompe.
 
 - [x] Le domaine calcule un panier, son total et son refus sur stock
       insuffisant, sans Firestore ni horloge — **un test par arbitrage, qui le
-      nomme** (25 tests).
-- [x] Les règles refusent une ligne à quantité nulle, un total qui ne somme pas,
-      et toute retouche d'une vente enregistrée (26 tests de règles).
+      nomme** (28 tests). Chaque refus porte un nom, y compris le panier plein,
+      et le stock négatif ne se dit pas « épuisé » (D82).
+- [x] Les règles refusent une ligne à quantité nulle, un total de ligne qui ne
+      somme pas, un total de document qui contredit la somme de son détail, et
+      toute retouche d'une vente enregistrée (32 tests de règles). Vérifier
+      *entièrement* les vingt lignes a été mesuré comme impossible : le plafond
+      de 1000 expressions par requête tombe dès la sixième.
 - [x] Le refus sur stock insuffisant propose l'entrée manquante, et le refus sur
-      prix absent propose de le fixer — chacun avec son lien.
+      prix absent propose de le fixer — chacun avec son lien, et `/pieces` ouvre
+      la référence désignée ou applique le filtre demandé.
 - [x] La carte « pièces en alerte » en supervision, qui s'efface quand il n'y a
       rien à réapprovisionner.
 - [ ] **Une vente se passe réseau coupé** : le stock descend à l'écran
@@ -102,12 +107,16 @@ ce sont eux qui lui diront qu'il se trompe.
 
 ## Ce qui reste, et pourquoi c'est séparé
 
-**Le reçu et le bout en bout.** Le geste est complet et vérifié à deux niveaux —
-le domaine et les règles — mais le lot ne sera fermé que quand un test bout en
-bout aura prouvé les deux choses qu'aucun des deux niveaux ne peut prouver : que
-le **batch** lie réellement la vente, ses sorties de stock et sa recette, et que
-tout cela marche **réseau coupé**. L'écran de vente n'annonce donc aucun reçu :
-un bouton qui mène nulle part apprend à ne plus croire l'écran.
+**Le reçu et le bout en bout.** Le geste est complet et vérifié à trois niveaux
+— le domaine, les règles, et les déclencheurs pour la numérotation partagée entre
+les deux collections (Q1) — mais le lot ne sera fermé que quand un test bout en
+bout aura prouvé les deux choses qu'aucun de ces niveaux ne peut prouver : que le
+**batch** lie réellement la vente, ses sorties de stock et sa recette, et que tout
+cela marche **réseau coupé**. Tant qu'il n'existe pas, ce lien ne repose sur rien
+d'autre que la relecture de `enregistrerVentePiece` — et les commentaires de
+`firestore.rules` et du dépôt le disent ainsi, plutôt que d'annoncer une
+protection absente. L'écran de vente n'annonce donc aucun reçu : un bouton qui
+mène nulle part apprend à ne plus croire l'écran.
 
 ---
 

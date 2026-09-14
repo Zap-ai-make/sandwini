@@ -12,6 +12,7 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
+import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
 import type { Piece } from "@/lib/domain/piece";
 import {
   figerLignes,
@@ -24,6 +25,7 @@ import {
 import { reserverNumero, type Numeroteur } from "@/lib/numerotation/compteur";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { traceCreation, type Auteur } from "./referentiels";
+import { versDate } from "./ventes";
 
 /**
  * La vente de pièces, côté base (S21).
@@ -33,11 +35,11 @@ import { traceCreation, type Auteur } from "./referentiels";
  * descend sans recette enregistrée — ou l'inverse — est un mensonge, et hors
  * ligne le lot voyage dans la file comme une écriture unique. Aucune règle
  * Firestore ne peut exiger ce lien : une règle ne voit qu'un document à la
- * fois. C'est donc le lot qui le tient, et un test bout en bout qui le prouve.
+ * fois. C'est donc le lot qui le tient — **seul**, tant que le test bout en
+ * bout qui le prouverait n'est pas écrit : c'est le critère resté ouvert de
+ * `specs/S21-vente-pieces.md`. Qui touche à cette fonction n'a donc aucun filet
+ * sous lui, et doit le savoir.
  */
-
-const versDate = (valeur: unknown): Date | null =>
-  valeur instanceof Timestamp ? valeur.toDate() : null;
 
 function lireLigne(brut: DocumentData): LigneVentePiece {
   return {
@@ -81,8 +83,15 @@ export function ecouterVentesPieces(
 
   return onSnapshot(
     requete,
+    /* `includeMetadataChanges` sert l'indicateur « données du cache » : sans
+       `signalerSourceDonnees`, on paierait les réveils supplémentaires sans
+       que personne n'en lise le résultat — comme les neuf autres écoutes du
+       dossier, celle-ci répond donc à l'indicateur. */
     { includeMetadataChanges: true },
-    (instantane) => auChangement(instantane.docs.map(lireVentePiece)),
+    (instantane) => {
+      signalerSourceDonnees(instantane.metadata.fromCache);
+      auChangement(instantane.docs.map(lireVentePiece));
+    },
     enErreur,
   );
 }

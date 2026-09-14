@@ -14,10 +14,10 @@ import { resoudreCollision, type PieceNumerotee } from "./numerotation";
  * §3.4). Ces fonctions-ci sont administratives : le responsable les utilise au
  * calme, connecté, jamais au comptoir en pleine vente.
  *
- * Une exception à la fin du fichier : `reconcilierNumeroVente` n'est appelée
- * par personne, elle réagit à une écriture. C'est la contrepartie serveur de
- * la numérotation hors-ligne — la seule chose qu'un appareil isolé ne peut pas
- * faire lui-même.
+ * Une exception à la fin du fichier : les deux réconciliations de numéro ne
+ * sont appelées par personne, elles réagissent à une écriture. C'est la
+ * contrepartie serveur de la numérotation hors-ligne — la seule chose qu'un
+ * appareil isolé ne peut pas faire lui-même.
  */
 
 type Role = "responsable" | "gerant";
@@ -284,11 +284,28 @@ export const attribuerBoutique = onCall({ region: REGION }, async (requete) => {
  * pouvoir est de corriger le numéro de la pièce arrivée en second, et
  * l'application le signale ensuite au gérant.
  */
-export const reconcilierNumeroVente = onDocumentCreated(
-  /* La région doit rester celle de la base Firestore : un déclencheur déployé
-     ailleurs ne se déclenche pas du tout. */
-  { region: REGION, document: "ventesMotos/{venteId}" },
-  async (evenement) => {
+/**
+ * Les deux collections qui puisent dans le **même** compteur (Q1).
+ *
+ * Un numéro dicté au téléphone désigne une seule pièce comptable, qu'elle porte
+ * une moto ou un jeu de plaquettes. La collision se cherche donc à travers les
+ * deux, sinon une vente de moto et une vente de pièces pourraient porter
+ * éternellement le même numéro sans que rien ne s'en aperçoive — le pire des
+ * doublons, puisqu'il est invisible des deux côtés.
+ */
+const COLLECTIONS_NUMEROTEES = ["ventesMotos", "ventesPieces"] as const;
+
+type CollectionNumerotee = (typeof COLLECTIONS_NUMEROTEES)[number];
+
+/**
+ * Le corps commun des deux déclencheurs, paramétré par la collection écrite.
+ *
+ * Un seul corps et deux déclencheurs, parce qu'un déclencheur Firestore ne
+ * surveille qu'un chemin. Les dupliquer laisserait les deux moitiés diverger,
+ * et c'est exactement la divergence qui vient d'être corrigée ici.
+ */
+function reconciliationDe(collectionCreee: CollectionNumerotee) {
+  return async (evenement: { data: QueryDocumentSnapshot | undefined }) => {
     const creee = evenement.data;
     if (!creee) return;
 
@@ -297,38 +314,64 @@ export const reconcilierNumeroVente = onDocumentCreated(
     if (typeof boutiqueId !== "string" || typeof numeroInitial !== "string") return;
 
     const { base } = await admin();
-    const memeNumero = await base
-      .collection("ventesMotos")
-      .where("boutiqueId", "==", boutiqueId)
-      .where("numeroInitial", "==", numeroInitial)
-      .get();
+    const parCollection = await Promise.all(
+      COLLECTIONS_NUMEROTEES.map(async (nom) => {
+        const lot = await base
+          .collection(nom)
+          .where("boutiqueId", "==", boutiqueId)
+          .where("numeroInitial", "==", numeroInitial)
+          .get();
+        return lot.docs.map((document) => versPiece(nom, document));
+      }),
+    );
+    const concurrentes = parCollection.flat();
 
     /* Le cas normal, et de très loin le plus fréquent : la pièce est seule à
        porter ce numéro. On sort sans écrire. */
-    if (memeNumero.size < 2) return;
+    if (concurrentes.length < 2) return;
 
-    const concurrentes = memeNumero.docs.map(versPiece);
-    const moi = concurrentes.find((piece) => piece.id === creee.id);
+    const moi = concurrentes.find((piece) => piece.id === `${collectionCreee}/${creee.id}`);
     if (!moi) return;
 
     const numero = resoudreCollision(moi, concurrentes);
     if (!numero) return;
 
-    await base.doc(`ventesMotos/${creee.id}`).update({ numero });
+    await base.doc(`${collectionCreee}/${creee.id}`).update({ numero });
     logger.info("Numéro en double réconcilié", {
+      collection: collectionCreee,
       boutiqueId,
       numeroInitial,
       numero,
       vente: creee.id,
     });
-  },
+  };
+}
+
+/* La région doit rester celle de la base Firestore : un déclencheur déployé
+   ailleurs ne se déclenche pas du tout. */
+export const reconcilierNumeroVente = onDocumentCreated(
+  { region: REGION, document: "ventesMotos/{venteId}" },
+  reconciliationDe("ventesMotos"),
 );
 
-/** Convertit un document de vente en ce que la règle de réconciliation attend, et rien de plus. */
-function versPiece(document: QueryDocumentSnapshot): PieceNumerotee {
+export const reconcilierNumeroVentePiece = onDocumentCreated(
+  { region: REGION, document: "ventesPieces/{venteId}" },
+  reconciliationDe("ventesPieces"),
+);
+
+/**
+ * Convertit un document de vente en ce que la règle de réconciliation attend,
+ * et rien de plus.
+ *
+ * L'identifiant est **préfixé de sa collection** : les concurrentes viennent
+ * maintenant de deux collections, et deux documents homonymes s'y
+ * confondraient — au mieux en départageant mal une égalité, au pire en faisant
+ * croire à un document qu'il est l'autre.
+ */
+function versPiece(collection: CollectionNumerotee, document: QueryDocumentSnapshot): PieceNumerotee {
   const cree = document.get("createdAt");
   return {
-    id: document.id,
+    id: `${collection}/${document.id}`,
     numeroInitial: document.get("numeroInitial"),
     /* `createdAt` est un horodatage serveur : au moment où ce déclencheur
        s'exécute, il est déjà résolu. S'il manquait malgré tout, l'identifiant

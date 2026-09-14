@@ -17,11 +17,21 @@ import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
  * incohérents sans laisser de trace. C'est ce que ces tests figent.
  *
  * **Ce qu'ils figent aussi, c'est une absence.** Trois choses ne peuvent pas
- * être tenues par une règle — la somme des lignes, le lien vers les mouvements
- * de stock, et le stock disponible — et les tests le disent explicitement
- * plutôt que de laisser croire à une protection qui n'existe pas. Une règle qui
- * ne peut pas protéger doit nommer qui protège à sa place, sinon quelqu'un
- * retirera un jour le garde-fou du geste en croyant la base derrière lui.
+ * être tenues par une règle — le détail des lignes au-delà de la première, le
+ * lien vers les mouvements de stock, et le stock disponible — et les tests le
+ * disent explicitement plutôt que de laisser croire à une protection qui
+ * n'existe pas. Une règle qui ne peut pas protéger doit nommer qui protège à sa
+ * place, sinon quelqu'un retirera un jour le garde-fou du geste en croyant la
+ * base derrière lui.
+ *
+ * **Ce qui a changé, c'est l'argent.** Le total du document est désormais
+ * confronté à la somme de son détail, et le total de chacune des vingt lignes
+ * est exigé entier et positif. C'était le trou le plus large de cette
+ * collection : une vente pouvait annoncer un franc en face de lignes en
+ * annonçant douze mille, pour toujours, puisque rien ne se retouche ici.
+ * Vérifier *entièrement* les vingt lignes a été essayé et mesuré : le plafond
+ * de 1000 expressions par requête tombe dès la sixième (voir le dernier test du
+ * groupe « la forme des lignes »).
  */
 
 let env: RulesTestEnvironment;
@@ -206,6 +216,86 @@ describe("la forme des lignes", () => {
       ),
     );
   });
+
+  it("refuse une ligne au total négatif : une ligne n’en compense pas une autre", async () => {
+    /* La somme seule ne suffirait pas : deux lignes opposées tombent juste. Le
+       total de chacune des vingt est donc exigé strictement positif — c'est ce
+       que le plafond d'expressions laisse tenir sur les dix-neuf autres. Ici le
+       total du document est correct, c'est bien la ligne qui est refusée. */
+    await assertFails(
+      setDoc(
+        doc(gerant(), "ventesPieces/v1"),
+        vente({
+          lignes: [
+            ligne(),
+            ligne({ pieceId: "b", quantite: -2, total: -7_000 }),
+            ligne({ pieceId: "c" }),
+          ],
+          total: 7_000,
+        }),
+      ),
+    );
+  });
+
+  it("refuse une ligne au total nul", async () => {
+    await assertFails(
+      setDoc(
+        doc(gerant(), "ventesPieces/v1"),
+        vente({
+          lignes: [ligne(), ligne({ pieceId: "autre", quantite: 0, total: 0 })],
+          total: 7_000,
+        }),
+      ),
+    );
+  });
+
+  it("va jusqu’à la vingtième ligne : la borne n’est pas un angle mort", async () => {
+    const dixNeuf = Array.from({ length: 19 }, (_, n) => ligne({ pieceId: `p${n}` }));
+    await assertFails(
+      setDoc(
+        doc(gerant(), "ventesPieces/v1"),
+        vente({
+          lignes: [...dixNeuf, ligne({ pieceId: "p19", total: -1 })],
+          total: 19 * 7_000 - 1,
+        }),
+      ),
+    );
+  });
+
+  it("accepte vingt lignes justes : le dépliage ne doit pas étouffer la borne", async () => {
+    /* Vingt lignes, c'est le pire cas d'évaluation de ces règles, et le plafond
+       de 1000 expressions par requête n'est pas loin : c'est lui qui a imposé
+       de ne déplier que les totaux plutôt que la validation entière des lignes.
+       Mesuré : six lignes intégralement vérifiées le franchissaient déjà, et
+       dix en n'en gardant que les nombres. Ce test est la sentinelle de cette
+       mesure — s'il rougit, c'est qu'une règle a grossi ailleurs et que le
+       budget est épuisé. Le symptôme en production serait un refus d'écriture
+       sur les grosses ventes, et lui seul. */
+    const vingt = Array.from({ length: 20 }, (_, n) => ligne({ pieceId: `p${n}` }));
+    await assertSucceeds(
+      setDoc(doc(gerant(), "ventesPieces/v1"), vente({ lignes: vingt, total: 20 * 7_000 })),
+    );
+  });
+});
+
+describe("le total du document s’accorde avec son détail", () => {
+  it("refuse un total qui contredit la somme des lignes", async () => {
+    await assertFails(
+      setDoc(
+        doc(gerant(), "ventesPieces/v1"),
+        vente({ lignes: [ligne(), ligne({ pieceId: "autre" })], total: 7_000 }),
+      ),
+    );
+  });
+
+  it("accepte le total juste sur plusieurs lignes", async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(gerant(), "ventesPieces/v1"),
+        vente({ lignes: [ligne(), ligne({ pieceId: "autre" })], total: 14_000 }),
+      ),
+    );
+  });
 });
 
 describe("la forme de la vente", () => {
@@ -302,22 +392,28 @@ describe("ce que ces règles ne peuvent pas tenir", () => {
    * du geste « puisque les règles le tiennent », ce sont ces tests qui lui
    * diront qu'il se trompe.
    */
-  it("le total de la vente n’est pas confronté à la somme de ses lignes", async () => {
-    /* Le langage des règles n'a pas de repli sur une liste : seule la première
-       ligne est vérifiée intégralement. C'est `validerPanier` et `figerLignes`
-       qui tiennent l'accord, et un test bout en bout qui le prouve. */
+  it("le détail d’une ligne au-delà de la première n’est pas confronté à son total", async () => {
+    /* Le plafond d'expressions tombe avant : seule la première ligne est
+       vérifiée entièrement. Ce qui est tenu sur les dix-neuf autres, c'est leur
+       total — entier, positif, et sommé juste. Une quantité absurde en face
+       d'un total exact passe donc encore ; elle ne fait plus mentir la recette,
+       et `figerLignes` reste seul à l'empêcher. */
     await assertSucceeds(
       setDoc(
         doc(gerant(), "ventesPieces/v1"),
-        vente({ lignes: [ligne(), ligne({ pieceId: "autre" })], total: 7_000 }),
+        vente({
+          lignes: [ligne(), ligne({ pieceId: "autre", quantite: 999, prixUnitaire: 1 })],
+          total: 14_000,
+        }),
       ),
     );
   });
 
   it("rien n’oblige la vente à produire ses mouvements de stock", async () => {
-    /* Une règle ne voit qu'un document à la fois. C'est le **batch** qui lie la
-       vente, ses sorties de stock et son encaissement — et le test bout en bout
-       est le seul endroit où cela peut se vérifier. */
+    /* Une règle ne voit qu'un document à la fois. C'est le **batch** de
+       `enregistrerVentePiece` qui lie la vente, ses sorties de stock et son
+       encaissement — et rien ne le vérifie aujourd'hui : le test bout en bout
+       qui le pourrait est le critère resté ouvert de la spec S21. */
     await assertSucceeds(setDoc(doc(gerant(), "ventesPieces/v1"), vente()));
 
     let ecrite = false;

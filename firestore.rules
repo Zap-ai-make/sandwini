@@ -1146,6 +1146,63 @@ service cloud.firestore {
              && ligne.total == ligne.quantite * ligne.prixUnitaire;
     }
 
+    // **Ce qu'on peut tenir sur les vingt lignes — et ce qui a été mesuré.**
+    //
+    // Le langage des règles n'a pas de repli sur une liste : vérifier vingt
+    // lignes demande de les écrire vingt fois. Et `||` n'y court-circuite pas
+    // comme on l'espère — CEL évalue ses deux membres —, si bien qu'un
+    // `size() <= index || ligneVenteValide(lignes[index])` déplié coûte ses
+    // vingt validations complètes même pour une vente d'une seule ligne.
+    //
+    // Mesuré sur l'émulateur (`regles/vente-pieces.test.ts`, dernier test du
+    // groupe) : le plafond de **1000 expressions par requête** tombe dès la
+    // sixième ligne ainsi dépliée, et dès la dixième même en ne gardant que les
+    // nombres. Vingt lignes intégralement vérifiées n'est donc pas une question
+    // de patience : la plateforme ne le permet pas.
+    //
+    // Ce qui tient, en revanche : le **total de chaque ligne** — entier,
+    // strictement positif — et le **total du document égal à leur somme**.
+    // C'est ce qui porte l'argent. Une ligne ne peut plus gonfler la recette
+    // sans que l'en-tête le dise, ni se compenser avec une ligne négative, et
+    // la caisse ne peut plus recevoir un montant que le détail contredit. Ce
+    // qui reste hors de portée est nommé plus bas.
+    //
+    // **Les deux contrôles n'en font qu'un, et c'est une contrainte de budget.**
+    // Un second passage de vingt termes pour la positivité franchissait le
+    // plafond ; un appel de fonction par terme aussi. Restent vingt termes en
+    // ligne, où une ligne malsaine — total absent, non entier, nul ou négatif —
+    // n'est pas rejetée sur place mais **empoisonne la somme** avec deux
+    // milliards.
+    //
+    // Ce que cela vaut, précisément : `montantValide` borne `donnees.total` à un
+    // milliard, chaque terme sain est nul ou strictement positif, donc une
+    // seule ligne empoisonnée porte la somme au-delà de deux milliards et
+    // l'égalité devient impossible à satisfaire. Un dépassement d'entier n'est
+    // pas une échappatoire non plus : CEL en fait une erreur, et une erreur
+    // refuse l'écriture.
+    function sommeDesLignes(lignes) {
+      return (lignes.size() <= 0 ? 0 : (lignes[0].total is int && lignes[0].total > 0 ? lignes[0].total : 2000000000))
+             + (lignes.size() <= 1 ? 0 : (lignes[1].total is int && lignes[1].total > 0 ? lignes[1].total : 2000000000))
+             + (lignes.size() <= 2 ? 0 : (lignes[2].total is int && lignes[2].total > 0 ? lignes[2].total : 2000000000))
+             + (lignes.size() <= 3 ? 0 : (lignes[3].total is int && lignes[3].total > 0 ? lignes[3].total : 2000000000))
+             + (lignes.size() <= 4 ? 0 : (lignes[4].total is int && lignes[4].total > 0 ? lignes[4].total : 2000000000))
+             + (lignes.size() <= 5 ? 0 : (lignes[5].total is int && lignes[5].total > 0 ? lignes[5].total : 2000000000))
+             + (lignes.size() <= 6 ? 0 : (lignes[6].total is int && lignes[6].total > 0 ? lignes[6].total : 2000000000))
+             + (lignes.size() <= 7 ? 0 : (lignes[7].total is int && lignes[7].total > 0 ? lignes[7].total : 2000000000))
+             + (lignes.size() <= 8 ? 0 : (lignes[8].total is int && lignes[8].total > 0 ? lignes[8].total : 2000000000))
+             + (lignes.size() <= 9 ? 0 : (lignes[9].total is int && lignes[9].total > 0 ? lignes[9].total : 2000000000))
+             + (lignes.size() <= 10 ? 0 : (lignes[10].total is int && lignes[10].total > 0 ? lignes[10].total : 2000000000))
+             + (lignes.size() <= 11 ? 0 : (lignes[11].total is int && lignes[11].total > 0 ? lignes[11].total : 2000000000))
+             + (lignes.size() <= 12 ? 0 : (lignes[12].total is int && lignes[12].total > 0 ? lignes[12].total : 2000000000))
+             + (lignes.size() <= 13 ? 0 : (lignes[13].total is int && lignes[13].total > 0 ? lignes[13].total : 2000000000))
+             + (lignes.size() <= 14 ? 0 : (lignes[14].total is int && lignes[14].total > 0 ? lignes[14].total : 2000000000))
+             + (lignes.size() <= 15 ? 0 : (lignes[15].total is int && lignes[15].total > 0 ? lignes[15].total : 2000000000))
+             + (lignes.size() <= 16 ? 0 : (lignes[16].total is int && lignes[16].total > 0 ? lignes[16].total : 2000000000))
+             + (lignes.size() <= 17 ? 0 : (lignes[17].total is int && lignes[17].total > 0 ? lignes[17].total : 2000000000))
+             + (lignes.size() <= 18 ? 0 : (lignes[18].total is int && lignes[18].total > 0 ? lignes[18].total : 2000000000))
+             + (lignes.size() <= 19 ? 0 : (lignes[19].total is int && lignes[19].total > 0 ? lignes[19].total : 2000000000));
+    }
+
     function ventePieceValide(donnees) {
       return donnees.keys().hasOnly(['numero', 'numeroInitial', 'boutiqueId', 'date', 'clientId',
                                      'lignes', 'total', 'moyenPaiement'].concat(champsAudit()))
@@ -1166,9 +1223,14 @@ service cloud.firestore {
              && donnees.lignes is list
              && donnees.lignes.size() > 0
              && donnees.lignes.size() <= 20
+             // La première ligne intégralement — c'est tout ce que le plafond
+             // d'expressions autorise. Les vingt totaux, eux, sont tenus par
+             // l'égalité qui suit : `montantValide` la borne, et la somme
+             // refuse toute ligne dont le total n'est pas un entier positif.
              && ligneVenteValide(donnees.lignes[0])
              && montantValide(donnees.total)
              && donnees.total > 0
+             && donnees.total == sommeDesLignes(donnees.lignes)
              && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave'];
     }
 
@@ -1188,15 +1250,24 @@ service cloud.firestore {
 
     // **Ce que ces règles ne peuvent pas tenir, et il faut le dire.**
     //
-    // *Le total de la vente contre la somme de ses lignes.* Le langage des
-    // règles n'a pas de repli sur une liste ; seule la première ligne est
-    // vérifiée intégralement ci-dessus. Le reste est tenu par le domaine
-    // (`validerPanier`, `figerLignes`) et prouvé par un test bout en bout.
+    // *Le détail des lignes au-delà de la première.* Leur quantité, leur prix
+    // unitaire, leur référence et leur jeu de clés ne sont pas vérifiés : le
+    // plafond d'expressions tombe avant. Ce qui l'est, et qui borne les dégâts,
+    // c'est leur total — positif — et la somme qui doit tomber juste. Une
+    // deuxième ligne peut donc annoncer une quantité absurde en face d'un total
+    // exact ; elle ne peut plus faire mentir la recette. Le reste est tenu par
+    // `validerPanier` et `figerLignes`, c'est-à-dire par le geste, et par rien
+    // d'autre côté base.
     //
     // *Le lien vers les mouvements de stock.* Une vente doit produire un
     // `sortie_vente` par ligne et un encaissement ; c'est le **batch** qui le
-    // tient, parce qu'une règle ne voit qu'un document à la fois. Un test bout
-    // en bout le prouve, et c'est le seul endroit où il peut l'être.
+    // tient, parce qu'une règle ne voit qu'un document à la fois. Rien ici ne
+    // le vérifie — et, à ce jour, **aucun test non plus** : le test bout en
+    // bout qui le prouverait est le critère resté ouvert de
+    // `specs/S21-vente-pieces.md`. Tant qu'il n'existe pas, l'invariant tient
+    // sur la relecture de `enregistrerVentePiece`, et sur rien d'autre. Le dire
+    // ici est le minimum : une protection annoncée mais absente est pire que
+    // pas de protection, parce qu'on cesse de la chercher.
     //
     // *Le stock disponible.* Une règle ne sait pas additionner une collection,
     // et une transaction ne fonctionne pas hors ligne. « Pas de négatif » est

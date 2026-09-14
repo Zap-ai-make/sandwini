@@ -28,6 +28,7 @@ import {
   totalLigne,
   totalPanier,
   validerPanier,
+  type RefusAjout,
 } from "@/lib/domain/vente-piece";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -43,6 +44,19 @@ import type { Vente } from "@/lib/domain/vente";
 import type { VentePiece } from "@/lib/domain/vente-piece";
 
 /**
+ * Le libellé du lien de réparation, quand le refus s'en répare un (D90).
+ *
+ * Absent pour les refus qui se lèvent sur place — changer une quantité,
+ * encaisser le panier en cours : y mettre un lien enverrait ailleurs quelqu'un
+ * qui n'a rien à y faire.
+ */
+const REPARATION: Partial<Record<RefusAjout, string>> = {
+  sans_prix: "Fixer le prix",
+  epuise: "Faire entrer un lot",
+  stock_incoherent: "Corriger le stock",
+};
+
+/**
  * Vendre des pièces au comptoir (S21).
  *
  * **L'écran d'un geste debout.** On cherche une pièce, on l'ajoute, on ajuste la
@@ -55,6 +69,15 @@ import type { VentePiece } from "@/lib/domain/vente-piece";
  * vend pas non plus : l'écran le dit et renvoie à l'entrée de stock. Un refus
  * qui ne dit pas la suite se contourne, et ici il n'y a pas de contournement —
  * c'est l'arbitrage 4, « pas de stock négatif », et il n'a pas de porte dérobée.
+ *
+ * **Ce n'est délibérément pas un `<form>`**, pour la raison exacte que l'écran
+ * de vente de moto énonce déjà (`motos/ventes/nouvelle`). Le premier champ est
+ * une recherche, et un formulaire dont le bouton d'envoi est actif valide à la
+ * touche Entrée : taper une référence puis Entrée aurait encaissé le panier en
+ * cours au lieu d'y ajouter la pièce — stock descendu, recette au journal,
+ * numéro brûlé, et une vente qu'on ne peut plus reprendre puisqu'elle est
+ * immuable. Perdre la validation au clavier est ici un gain. Les `fieldset`
+ * restent : ils groupent et ils nomment, ce qui ne demande aucun formulaire.
  */
 export default function PageVendrePieces() {
   return (
@@ -146,10 +169,13 @@ function VendrePieces() {
     setRecherche("");
   }
 
-  function enregistrer(evenement: React.FormEvent) {
-    evenement.preventDefault();
+  function enregistrer() {
     if (session.statut !== "connecte" || !surUneBoutique || !boutiqueId) return;
     setEnregistree(null);
+    /* Le refus concernait un ajout ; on encaisse. Quoi qu'il advienne ensuite,
+       le laisser à l'écran le collerait soit à une erreur de validation qu'il
+       n'explique pas, soit à la confirmation « Vente enregistrée ». */
+    setRefus(null);
 
     const probleme = validerPanier(panier, parId, stocks);
     if (probleme) {
@@ -221,7 +247,7 @@ function VendrePieces() {
         </div>
       )}
 
-      <form onSubmit={enregistrer} className="mt-6 max-w-[46rem]" noValidate>
+      <div className="mt-6 max-w-[46rem]">
         <fieldset className="cadre p-4">
           <legend className="px-1 font-semibold text-encre">Les pièces</legend>
 
@@ -236,7 +262,14 @@ function VendrePieces() {
                 type="search"
                 autoComplete="off"
                 value={recherche}
-                onChange={(evenement) => setRecherche(evenement.target.value)}
+                aria-describedby="chercher-piece-aide"
+                onChange={(evenement) => {
+                  setRecherche(evenement.target.value);
+                  /* Le refus portait sur la pièce qu'on vient de quitter. Le
+                     garder sous une autre recherche le ferait lire comme le
+                     verdict de celle-ci. */
+                  setRefus(null);
+                }}
                 className="saisie"
               />
             </Champ>
@@ -298,12 +331,23 @@ function VendrePieces() {
                     Faites entrer le carton depuis le catalogue, et revenez : la vente passera.
                   </p>
                 )}
-                {(refus.raison === "sans_prix" || refus.raison === "epuise") && (
+                {refus.raison === "stock_incoherent" && (
+                  <p className="mt-1 text-corps text-encre-doux">
+                    Le compte des mouvements est descendu sous zéro : une entrée a été oubliée, ou
+                    annulée après des sorties. Saisissez-la, et la vente passera.
+                  </p>
+                )}
+                {refus.raison === "panier_plein" && (
+                  <p className="mt-1 text-corps text-encre-doux">
+                    Encaissez ce panier, puis ouvrez-en un second pour la suite.
+                  </p>
+                )}
+                {REPARATION[refus.raison] && (
                   <Link
                     href={`/pieces?piece=${refus.piece.id}`}
                     className="bouton bouton-neutre mt-3"
                   >
-                    {refus.raison === "sans_prix" ? "Fixer le prix" : "Faire entrer un lot"}
+                    {REPARATION[refus.raison]}
                   </Link>
                 )}
               </div>
@@ -323,6 +367,14 @@ function VendrePieces() {
                 {panier.lignes.map((ligne) => {
                   const piece = parId.get(ligne.pieceId);
                   const sousTotal = totalLigne(ligne);
+                  /* Calculé une fois : l'aide et son `aria-describedby` doivent
+                     apparaître et disparaître ensemble, sinon l'input désigne
+                     un paragraphe qui n'existe pas. */
+                  const ecartCatalogue =
+                    piece && piece.prixVente !== null &&
+                    String(piece.prixVente) !== ligne.prixUnitaire
+                      ? `Catalogue : ${formaterMontant(piece.prixVente)}`
+                      : undefined;
                   return (
                     <li key={ligne.pieceId} className="cadre p-3">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -332,7 +384,13 @@ function VendrePieces() {
                         </span>
                         <button
                           type="button"
-                          onClick={() => setPanier((actuel) => retirerDuPanier(actuel, ligne.pieceId))}
+                          onClick={() => {
+                            setPanier((actuel) => retirerDuPanier(actuel, ligne.pieceId));
+                            /* Retirer une ligne lève « déjà au panier » comme
+                               « panier complet » : le refus affiché peut ne plus
+                               être vrai. */
+                            setRefus(null);
+                          }}
                           className="inline-flex h-11 items-center gap-2 rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
                         >
                           <Trash2 aria-hidden="true" className="size-4" />
@@ -359,16 +417,14 @@ function VendrePieces() {
                         <Champ
                           id={`p-${ligne.pieceId}`}
                           libelle="Prix unitaire"
-                          aide={
-                            piece && piece.prixVente !== null &&
-                            String(piece.prixVente) !== ligne.prixUnitaire
-                              ? `Catalogue : ${formaterMontant(piece.prixVente)}`
-                              : undefined
-                          }
+                          aide={ecartCatalogue}
                         >
                           <input
                             id={`p-${ligne.pieceId}`}
                             inputMode="numeric"
+                            aria-describedby={
+                              ecartCatalogue ? `p-${ligne.pieceId}-aide` : undefined
+                            }
                             value={ligne.prixUnitaire}
                             onChange={(evenement) =>
                               setPanier((actuel) =>
@@ -434,6 +490,7 @@ function VendrePieces() {
               <select
                 id="client"
                 value={panier.clientId}
+                aria-describedby="client-aide"
                 disabled={clientsLus === null}
                 onChange={(evenement) =>
                   setPanier((actuel) => ({ ...actuel, clientId: evenement.target.value }))
@@ -466,13 +523,14 @@ function VendrePieces() {
             vide : sans le stock, cet écran ne sait pas si la vente est
             possible, et l'annoncer coûte une seconde (D96). */}
         <button
-          type="submit"
+          type="button"
+          onClick={enregistrer}
           disabled={!pret || panier.lignes.length === 0}
           className="mt-3 bouton bouton-principal"
         >
           {!pret ? "Lecture du stock…" : "Encaisser et enregistrer"}
         </button>
-      </form>
+      </div>
     </div>
   );
 }

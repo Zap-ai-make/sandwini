@@ -178,8 +178,13 @@ export default function Supervision() {
       {/* Après ce qui demande une décision, avant ce qui vient de se passer :
           une rupture de stock est une décision à prendre, pas une nouvelle.
           La carte s'efface d'elle-même quand il n'y a rien à réapprovisionner
-          (S21). */}
-      <PiecesEnAlerte className="mt-8" />
+          (S21).
+
+          **Montée seulement si une boutique tient des pièces.** Elle ouvre deux
+          écoutes, dont le journal entier des mouvements ; les payer sur une
+          entreprise qui ne vend que des motos, pour n'afficher jamais rien,
+          serait une lecture sans lecteur. */}
+      {toutesLesMetiers.includes("pieces") && <PiecesEnAlerte className="mt-8" />}
 
       {/* Ce qui attend d'abord, ce qui vient de se passer ensuite (`a2:184`).
           L'ordre est celui de la maquette et il n'est pas indifférent : on

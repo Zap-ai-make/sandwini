@@ -62,7 +62,14 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * seulement cachée, elle est infalsifiable.
  */
 
-function versDate(valeur: unknown): Date | null {
+/**
+ * Un `Timestamp` Firestore en `Date`, ou `null`.
+ *
+ * Exporté parce que chaque dépôt en avait recopié le sien : la cinquième copie
+ * est celle qui diverge, le jour où quelqu'un décide qu'une date absente vaut
+ * `new Date(0)` dans un fichier et pas dans les autres (`AGENTS.md` règle 1).
+ */
+export function versDate(valeur: unknown): Date | null {
   return valeur instanceof Timestamp ? valeur.toDate() : null;
 }
 
