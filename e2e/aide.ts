@@ -191,6 +191,25 @@ export async function creerBoutique(
   await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
 }
 
+/** Ajoute une marque et l'un de ses modèles au catalogue, par l'écran de S39. */
+export async function ajouterMarqueEtModele(page: Page, marque: string, modele: string) {
+  await page.goto("/parametres/catalogue", { waitUntil: "load" });
+  const marques = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Marques" }) });
+  await marques.getByLabel("Ajouter une marque").fill(marque);
+  await marques.getByRole("button", { name: "Ajouter" }).click();
+  await expect(marques.getByRole("listitem").filter({ hasText: marque })).toBeVisible();
+
+  const modeles = page
+    .locator("section")
+    .filter({ has: page.getByRole("heading", { name: "Modèles" }) });
+  await modeles.getByLabel("Marque").selectOption({ label: marque });
+  await modeles.getByLabel(/^Ajouter un modèle/).fill(modele);
+  await modeles.getByRole("button", { name: "Ajouter" }).click();
+  await expect(modeles.getByRole("listitem").filter({ hasText: modele })).toBeVisible();
+}
+
 export type Terrain = { code: string; marque: string; modele: string; provenance: string };
 
 /**
@@ -209,21 +228,7 @@ export async function preparerTerrain(page: Page): Promise<Terrain> {
 
   await creerBoutique(page, code, ["Motos"]);
 
-  await page.goto("/parametres/catalogue", { waitUntil: "load" });
-  const marques = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Marques" }) });
-  await marques.getByLabel("Ajouter une marque").fill(marque);
-  await marques.getByRole("button", { name: "Ajouter" }).click();
-  await expect(marques.getByRole("listitem").filter({ hasText: marque })).toBeVisible();
-
-  const modeles = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Modèles" }) });
-  await modeles.getByLabel("Marque").selectOption({ label: marque });
-  await modeles.getByLabel(/^Ajouter un modèle/).fill(modele);
-  await modeles.getByRole("button", { name: "Ajouter" }).click();
-  await expect(modeles.getByRole("listitem").filter({ hasText: modele })).toBeVisible();
+  await ajouterMarqueEtModele(page, marque, modele);
 
   await page.goto("/parametres/referentiels", { waitUntil: "load" });
   const provenances = page

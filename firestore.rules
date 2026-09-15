@@ -302,6 +302,35 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Fournisseurs (S42) -------------------------------------------------
+    // De qui les motos arrivent, par lots. Comme les provenances : tout le
+    // monde lit, et un fournisseur s'ajoute au comptoir en plein formulaire
+    // d'arrivage (même geste que la marque créée en pleine entrée en stock,
+    // S39). Le corriger ensuite reste au responsable. Rien ne se supprime.
+    function fournisseurValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'telephone', 'localite', 'actif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'telephone', 'localite', 'actif'].concat(champsAudit()))
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && donnees.telephone is string
+             && donnees.telephone.size() <= 40
+             && donnees.localite is string
+             && donnees.localite.size() <= 80
+             && donnees.actif is bool;
+    }
+
+    match /fournisseurs/{id} {
+      allow read: if connecte();
+      allow create: if connecte()
+                    && fournisseurValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && fournisseurValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
     // Le document `entreprise/profil` ne porte plus l'identité de l'entreprise :
     // raison sociale, siège, téléphone, IFU, RCCM et logo sont une constante du
     // code depuis D71. Une donnée qui ne change jamais n'a rien à faire dans une
@@ -366,9 +395,9 @@ service cloud.firestore {
     function motoValide(donnees) {
       return donnees.keys().hasOnly(['boutiqueId', 'etat', 'marqueId', 'modeleId', 'couleur',
                                      'annee', 'numeroChassis', 'numeroMoteur',
-                                     'prixVenteConseille', 'provenanceId', 'papiersFournis',
+                                     'prixVenteConseille', 'provenanceId', 'arrivageId', 'papiersFournis',
                                      'photos', 'statut', 'dateEntree',
-                                     'quittanceChemin', 'cmcChemin'].concat(champsAudit()))
+                                     'quittanceChemin', 'cmcChemin', 'cmcRecu'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'etat', 'marqueId', 'modeleId',
                                        'numeroChassis', 'provenanceId', 'photos', 'statut',
                                        'dateEntree'].concat(champsAudit()))
@@ -380,7 +409,15 @@ service cloud.firestore {
              && donnees.modeleId is string
              && donnees.modeleId.size() > 0
              && donnees.provenanceId is string
-             && donnees.provenanceId.size() > 0
+             // Une moto tient son origine d'une provenance (saisie unitaire, S5)
+             // ou d'un arrivage (lot, S42) : l'un des deux, jamais aucun.
+             && (donnees.provenanceId.size() > 0
+                 || (donnees.keys().hasAny(['arrivageId'])
+                     && donnees.arrivageId is string
+                     && donnees.arrivageId.size() > 0))
+             && (!donnees.keys().hasAny(['arrivageId'])
+                 || donnees.arrivageId == null
+                 || (donnees.arrivageId is string && donnees.arrivageId.size() > 0))
              && donnees.numeroChassis is string
              && donnees.numeroChassis.size() > 0
              && donnees.numeroChassis.size() <= 32
@@ -401,6 +438,10 @@ service cloud.firestore {
              // pas des URL : l'URL se redemande a chaque lecture et expire.
              && cheminFichier(donnees, 'quittanceChemin')
              && cheminFichier(donnees, 'cmcChemin')
+             // Le CMC reçu (S43) : absent des motos d'avant cette spec, donc
+             // facultatif — mais booléen dès qu'il est là. Le rendre obligatoire
+             // casserait la mise à jour des motos déjà en base.
+             && (!donnees.keys().hasAny(['cmcRecu']) || donnees.cmcRecu is bool)
              // La date d'entrée vient de l'appareil (D38), on la borne seulement
              // contre une horloge déréglée.
              && donnees.dateEntree is timestamp
@@ -473,6 +514,48 @@ service cloud.firestore {
                                 || boutiqueDeLaMoto(motoId) == request.resource.data.boutiqueId);
 
       allow delete: if false;
+    }
+
+    // --- Arrivages (S42) ----------------------------------------------------
+    // Un lot de motos entrées ensemble, rattaché à une boutique. Même portée
+    // que les motos : le responsable voit tout, le gérant les lots de sa
+    // boutique. Le gérant peut en créer (c'est un geste de réception), mais le
+    // coût des motos du lot vit ailleurs, dans `motos/{id}/prive/cout`, où il
+    // n'a pas accès (D2). Rien ne se supprime : des motos y renvoient.
+    function arrivageValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'fournisseurId', 'boutiqueId', 'date',
+                                     'description', 'annule'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'fournisseurId', 'boutiqueId',
+                                       'description'].concat(champsAudit()))
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && donnees.fournisseurId is string
+             && donnees.fournisseurId.size() > 0
+             && donnees.boutiqueId is string
+             && (!donnees.keys().hasAny(['date'])
+                 || donnees.date == null
+                 || donnees.date is timestamp)
+             && donnees.description is string
+             && donnees.description.size() <= 200
+             // L'annulation douce (S43), facultative et booléenne.
+             && (!donnees.keys().hasAny(['annule']) || donnees.annule is bool);
+    }
+
+    match /arrivages/{id} {
+      allow read: if estResponsable()
+                  || (connecte() && boutiqueDuCompte() == resource.data.boutiqueId);
+      allow create: if arrivageValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
+      allow update: if arrivageValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data)
+                    && request.resource.data.boutiqueId == resource.data.boutiqueId
+                    && (estResponsable() || estGerantDe(resource.data.boutiqueId));
+      // Supprimer, adapté au journal (S43) : l'entête seule s'efface, jamais en
+      // cascade — les motos ne se suppriment pas (elles sont citées ailleurs).
+      // L'écran ne l'offre que pour un lot vide ; ici, on borne à sa boutique.
+      allow delete: if estResponsable() || estGerantDe(resource.data.boutiqueId);
     }
 
     // --- Clients (S6) -------------------------------------------------------

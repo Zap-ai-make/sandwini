@@ -9,9 +9,11 @@ import {
   coutTotal,
   coutTotalSaisie,
   filtrerMotos,
+  LONGUEUR_CHASSIS_MAX,
   lireEntier,
   lirePapiers,
   normaliserChassis,
+  validerChassis,
   validerCout,
   validerCoutPose,
   validerMoto,
@@ -45,10 +47,12 @@ const moto = (partie: Partial<Moto> = {}): Moto => ({
   numeroMoteur: "",
   prixVenteConseille: null,
   provenanceId: "p1",
+  arrivageId: null,
   papiersFournis: [],
   photos: [],
   statut: "en_stock",
   dateEntree: null,
+  cmcRecu: false,
   ...partie,
 });
 
@@ -310,5 +314,23 @@ describe("validerFichierPapier", () => {
 
   it("refuse un fichier vide", () => {
     expect(validerFichierPapier(fichier("image/jpeg", 0))).toMatch(/vide/i);
+  });
+});
+
+describe("validerChassis", () => {
+  it("refuse un châssis vide : c'est l'identité de la moto", () => {
+    expect(validerChassis("  ")).toMatch(/obligatoire/i);
+  });
+
+  it("refuse un châssis trop long", () => {
+    expect(validerChassis("A".repeat(LONGUEUR_CHASSIS_MAX + 1))).toMatch(/dépasse/i);
+  });
+
+  it("refuse un châssis avec des caractères autres que lettres et chiffres", () => {
+    expect(validerChassis("LC6/PCJ")).toMatch(/lettres et.*chiffres/i);
+  });
+
+  it("accepte un châssis normalisé", () => {
+    expect(validerChassis("lc6pcj1a9k0000123")).toBeNull();
   });
 });

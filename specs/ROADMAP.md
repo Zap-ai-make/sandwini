@@ -231,6 +231,8 @@ c'est le voir revenir sous un autre nom.
 | S40 | Le contrôle d'unicité répond avant de savoir | S5, S20, S39 | post-MVP | terminée |
 | S27 | La suite bout en bout rend un verdict qu'on peut croire | aucune | post-MVP | terminée |
 | S41 | Le second lecteur ne voit pas une sortie de caisse déjà publiée | S22, S27 | post-MVP | **ouverte** |
+| S42 | L'arrivage : faire entrer un lot de motos d'un même fournisseur | S4, S5, S39, S40 | post-MVP | **en cours** |
+| S43 | L'arrivage : l'espace de suivi d'un lot (bilan, CMC, inspection, actions) | S42, S11, S39 | post-MVP | **en cours** |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les

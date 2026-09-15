@@ -215,6 +215,7 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       titre: "Suivre",
       ecrans: [
         { href: "/motos", libelle: "Stock motos" },
+        { href: "/motos/arrivages", libelle: "Arrivages" },
         { href: "/motos/ventes", libelle: "Ventes" },
         { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
         { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },

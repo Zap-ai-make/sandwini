@@ -101,13 +101,14 @@ describe("accueilDuRole", () => {
 });
 
 describe("le second niveau de navigation", () => {
-  it("met les huit écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
+  it("met les neuf écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
     const ecrans = ecransVisibles("motos", "gerant");
-    expect(ecrans).toHaveLength(8);
+    expect(ecrans).toHaveLength(9);
     expect(ecrans.map((e) => e.href)).toEqual(
       expect.arrayContaining([
         "/motos",
         "/motos/nouvelle",
+        "/motos/arrivages",
         "/motos/ventes",
         "/motos/ventes/nouvelle",
         "/motos/paiements",

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  depuisQuand,
   formaterAnciennete,
   formaterDate,
   formaterDateCourte,
@@ -89,6 +90,26 @@ describe("formaterAnciennete", () => {
   it("dit « date inconnue » plutôt que d’inventer un chiffre", () => {
     expect(formaterAnciennete(null)).toBe("date inconnue");
     expect(formaterAnciennete(Number.NaN)).toBe("date inconnue");
+  });
+});
+
+describe("depuisQuand", () => {
+  const maintenant = new Date(2026, 8, 15, 10, 0); // 15 septembre 2026
+
+  it("reprend les mots d'ancienneté pour les jours proches", () => {
+    expect(depuisQuand(new Date(2026, 8, 15, 8, 0), maintenant)).toBe("aujourd’hui");
+    expect(depuisQuand(new Date(2026, 8, 14, 23, 0), maintenant)).toBe("hier");
+    expect(depuisQuand(new Date(2026, 8, 6, 0, 0), maintenant)).toBe("il y a 9 jours");
+  });
+
+  it("bascule en mois au-delà d'une trentaine de jours, comme on le dit", () => {
+    expect(depuisQuand(new Date(2026, 7, 15), maintenant)).toBe("il y a 1 mois"); // ~31 jours
+    expect(depuisQuand(new Date(2026, 5, 15), maintenant)).toBe("il y a 3 mois"); // ~92 jours
+  });
+
+  it("dit « date inconnue » sur une date absente ou cassée", () => {
+    expect(depuisQuand(null, maintenant)).toBe("date inconnue");
+    expect(depuisQuand(new Date("pas une date"), maintenant)).toBe("date inconnue");
   });
 });
 

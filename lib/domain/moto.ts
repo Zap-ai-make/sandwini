@@ -44,6 +44,9 @@ export type Moto = {
   numeroMoteur: string;
   prixVenteConseille: number | null;
   provenanceId: string;
+  /* Le lot d'arrivage dont la moto vient (S42). Nul pour une saisie unitaire :
+     une moto tient son origine soit d'une provenance, soit d'un arrivage. */
+  arrivageId: string | null;
   papiersFournis: string[];
   photos: string[];
   statut: StatutMoto;
@@ -54,6 +57,11 @@ export type Moto = {
      tard, l'envoi étant la seule opération de S11 qui exige du réseau. */
   quittanceChemin: string | null;
   cmcChemin: string | null;
+  /* Le CMC de cette moto est-il en main ? Témoin coché à la main (S43), distinct
+     du scan `cmcChemin` : on peut avoir reçu la carte sans l'avoir encore
+     photographiée, et inversement. C'est lui qui nourrit le décompte des « CMC
+     manquants » d'un arrivage. Rien à voir avec le stock de cartes de S16. */
+  cmcRecu: boolean;
 };
 
 /** Les deux papiers qu'une moto peut porter en pièce jointe (D66). */
@@ -194,12 +202,14 @@ export function ecrirePapiers(papiers: string[]): string {
   return ecrireLignes(papiers);
 }
 
-export function validerMoto(saisie: SaisieMoto): string | null {
-  if (!saisie.marqueId) return "Choisissez une marque.";
-  if (!saisie.modeleId) return "Choisissez un modèle.";
-  if (!saisie.provenanceId) return "Choisissez une provenance.";
-
-  const chassis = normaliserChassis(saisie.numeroChassis);
+/**
+ * Le numéro de châssis est-il recevable ? Message à afficher, ou `null`.
+ *
+ * Isolé de `validerMoto` pour que la saisie d'un lot (S42) applique la même
+ * règle à chaque ligne sans dupliquer la normalisation ni le motif.
+ */
+export function validerChassis(numero: string): string | null {
+  const chassis = normaliserChassis(numero);
   if (!chassis) return "Le numéro de châssis est obligatoire : c’est l’identité de la moto.";
   if (chassis.length > LONGUEUR_CHASSIS_MAX) {
     return `Le numéro de châssis dépasse ${LONGUEUR_CHASSIS_MAX} caractères.`;
@@ -207,6 +217,16 @@ export function validerMoto(saisie: SaisieMoto): string | null {
   if (!/^[A-Z0-9]+$/.test(chassis)) {
     return "Le numéro de châssis ne contient que des lettres et des chiffres.";
   }
+  return null;
+}
+
+export function validerMoto(saisie: SaisieMoto): string | null {
+  if (!saisie.marqueId) return "Choisissez une marque.";
+  if (!saisie.modeleId) return "Choisissez un modèle.";
+  if (!saisie.provenanceId) return "Choisissez une provenance.";
+
+  const messageChassis = validerChassis(saisie.numeroChassis);
+  if (messageChassis) return messageChassis;
 
   if (normaliserChassis(saisie.numeroMoteur).length > LONGUEUR_CHASSIS_MAX) {
     return `Le numéro de moteur dépasse ${LONGUEUR_CHASSIS_MAX} caractères.`;
