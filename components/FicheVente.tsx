@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, Info, KeyRound, Lock, Printer, ReceiptText } from "lucide-react";
+import { Check, CircleAlert, Info, KeyRound, Lock, Minus, Printer, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { DossierDocuments } from "@/components/DossierDocuments";
@@ -14,7 +14,7 @@ import {
   TitrePanneau,
 } from "@/components/patrons/PanneauLateral";
 import { useSession } from "@/lib/auth/session";
-import { formaterTelephone, type Client } from "@/lib/domain/client";
+import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { identifiantRecu, rangInscrit } from "@/lib/domain/recu";
@@ -25,6 +25,7 @@ import {
   MOYENS_PAIEMENT,
   SAISIE_VERSEMENT_VIDE,
   estRenumerotee,
+  inclusionsDeVente,
   lignePaiement,
   peutRemettreMoto,
   resumerDossier,
@@ -222,13 +223,7 @@ export function FicheVente({ id }: { id: string }) {
             <DossierDocuments documents={documents} />
           </section>
 
-          {(vente.inclus.length > 0 || vente.nonInclus.length > 0) && (
-            <section>
-              <TitrePanneau>Ce qui était convenu</TitrePanneau>
-              <ListeConvenue titre="Inclus dans la vente" valeurs={vente.inclus} />
-              <ListeConvenue titre="Non inclus" valeurs={vente.nonInclus} />
-            </section>
-          )}
+          <CeQuiEtaitConvenu vente={vente} />
 
           <section>
             <TitrePanneau>Marge</TitrePanneau>
@@ -266,7 +261,7 @@ function Identite({
 
   return (
     <Faits>
-      <Fait titre="Client">{client?.nom ?? "Client inconnu"}</Fait>
+      <Fait titre="Client">{nomDuClient(client)}</Fait>
       {client && (
         <Fait titre="Téléphone" code>
           {formaterTelephone(client.telephone)}
@@ -435,6 +430,51 @@ function ListeVersements({ versements }: { versements: Versement[] | null }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Ce qui était convenu, dans les deux formes que le produit a connues.
+ *
+ * Depuis S44 ce sont deux cases ; avant, deux listes de texte libre. On ne
+ * traduit pas les unes dans les autres : une vente ancienne dit ce qu'elle
+ * disait, et la fiche doit rester d'accord avec le reçu qu'on réimprime.
+ */
+function CeQuiEtaitConvenu({ vente }: { vente: Vente }) {
+  const inclusions = inclusionsDeVente(vente);
+
+  if (inclusions) {
+    return (
+      <section>
+        <TitrePanneau>Ce qui part avec la moto</TitrePanneau>
+        <ul className="mt-2 space-y-1">
+          {inclusions.map(({ libelle, inclus }) => (
+            <li key={libelle} className="flex items-center gap-2 text-corps">
+              {inclus ? (
+                <Check aria-hidden="true" className="size-4 shrink-0 text-solde" />
+              ) : (
+                <Minus aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              )}
+              {/* Le mot dit l'état : la couleur et l'icône ne font que le
+                  doubler (`DESIGN.md` §5). */}
+              <span className={inclus ? "text-encre" : "text-encre-doux"}>
+                {libelle}
+                {inclus ? "" : " — non inclus"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
+  if (vente.inclus.length === 0 && vente.nonInclus.length === 0) return null;
+  return (
+    <section>
+      <TitrePanneau>Ce qui était convenu</TitrePanneau>
+      <ListeConvenue titre="Inclus dans la vente" valeurs={vente.inclus} />
+      <ListeConvenue titre="Non inclus" valeurs={vente.nonInclus} />
+    </section>
   );
 }
 

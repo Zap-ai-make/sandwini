@@ -2,9 +2,11 @@
 
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
+import { CartesVentes } from "@/components/CartesVentes";
 import { FicheVente } from "@/components/FicheVente";
+import { ModaleVente } from "@/components/ModaleVente";
 import {
   ErreurDeLecture,
   EtatSansResultat,
@@ -15,13 +17,14 @@ import {
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { normaliserNom, type Client } from "@/lib/domain/client";
+import { nomDuClient, normaliserNom, type Client } from "@/lib/domain/client";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
   LIBELLE_MODE,
   LIBELLE_STATUT_PAIEMENT,
   STATUTS_PAIEMENT,
+  bilanVentes,
   chercherVentes,
   comparerVentes,
   type StatutPaiement,
@@ -63,7 +66,15 @@ export default function PageVentes() {
 }
 
 function Ventes() {
-  const venteOuverte = useSearchParams().get("vente");
+  const parametres = useSearchParams();
+  const venteOuverte = parametres.get("vente");
+  /* La modale s'ouvre par un paramètre d'écran, comme les fiches : une route
+     `/motos/ventes/nouvelle` obligeait le navigateur à demander au serveur un
+     document que le service worker sert déjà sous `/motos/ventes` (D39). Le
+     paramètre `nouvelle` est donc ignoré par le cache de précharge — la ligne
+     est dans `app/sw.ts`, et l'oubli ne se verrait qu'en coupure. */
+  const modaleOuverte = parametres.get("nouvelle") === "1";
+  const router = useRouter();
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   /* Avant tout retour anticipé : un hook appelé sous condition change l'ordre
      des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
@@ -144,7 +155,7 @@ function Ventes() {
         cle: "client",
         titre: "Client",
         principal: true,
-        rendu: (ligne) => ligne.client?.nom ?? "Client inconnu",
+        rendu: (ligne) => nomDuClient(ligne.client),
       },
       {
         /* Le modèle seul. Le châssis y a figuré une capture durant — la
@@ -197,6 +208,20 @@ function Ventes() {
   const total = cherchables.length;
   const enCours = resultats.filter((ligne) => ligne.vente.resteDu > 0).length;
   const chargement = ventes === null && !erreur;
+  const bilan = bilanVentes(ventes ?? []);
+
+  /* Ouvrir et fermer la modale ne perd pas la fiche ouverte derrière : les
+     deux paramètres d'écran cohabitent, et fermer l'une ne referme pas
+     l'autre. */
+  const adresse = (avecModale: boolean) => {
+    const parts = [
+      venteOuverte ? `vente=${venteOuverte}` : null,
+      avecModale ? "nouvelle=1" : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? `/motos/ventes?${parts.join("&")}` : "/motos/ventes";
+  };
+  const ouvrirLaModale = () => router.push(adresse(true), { scroll: false });
+  const fermerLaModale = () => router.replace(adresse(false), { scroll: false });
 
   return (
     <div>
@@ -204,12 +229,20 @@ function Ventes() {
         surTitre={surTitre}
         titre="Ventes"
         actions={
-          <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
+          <button type="button" onClick={ouvrirLaModale} className="bouton bouton-principal">
             <Plus aria-hidden="true" className="size-4" />
             Nouvelle vente
-          </Link>
+          </button>
         }
       />
+
+      {/* Lus des ventes déjà affichées, jamais stockés (D61), et sans marge
+          (D2). Ils portent le périmètre courant : « toutes boutiques » les
+          somme, une boutique les borne — c'est l'écoute qui en décide, pas
+          cette carte. */}
+      <CartesVentes bilan={bilan} />
+
+      <ModaleVente ouverte={modaleOuverte} onFermer={fermerLaModale} />
 
       <AvecPanneau
         panneau={venteOuverte ? <FicheVente id={venteOuverte} /> : null}
@@ -228,7 +261,7 @@ function Ventes() {
             lecture.
           </ErreurDeLecture>
         ) : !chargement && total === 0 ? (
-          <AucuneVente perimetreEnCours={perimetreEnCours} />
+          <AucuneVente perimetreEnCours={perimetreEnCours} surCreation={ouvrirLaModale} />
         ) : (
           <div className="cadre cadre-tableau">
             <div className="cadre-tete">
@@ -348,16 +381,22 @@ function Recherche({
   );
 }
 
-function AucuneVente({ perimetreEnCours }: { perimetreEnCours: boolean }) {
+function AucuneVente({
+  perimetreEnCours,
+  surCreation,
+}: {
+  perimetreEnCours: boolean;
+  surCreation: () => void;
+}) {
   if (perimetreEnCours) return null;
   return (
     <EtatVide
       titre="Aucune vente enregistrée pour l’instant."
       action={
-        <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
+        <button type="button" onClick={surCreation} className="bouton bouton-principal">
           <Plus aria-hidden="true" className="size-4" />
           Enregistrer la première
-        </Link>
+        </button>
       }
     >
       Une vente demande une moto en stock et un client. Le client peut se créer au moment de la

@@ -1,12 +1,13 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import { ChoixOuNouveau } from "@/components/ChoixOuNouveau";
 import { SaisieLotMotos } from "@/components/SaisieLotMotos";
 import { SelectFournisseur } from "@/components/SelectFournisseur";
 import { Champ } from "@/components/patrons/Champ";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
+import { Modale } from "@/components/patrons/Modale";
 import {
   ARRIVAGE_VIDE,
   LIGNE_VIDE,
@@ -35,7 +36,16 @@ import { creerEntree, creerModele, type Auteur } from "@/lib/repositories/refere
  * en choisir un reprend son fournisseur et amorce la première marque — un
  * nouveau lot du même fournisseur ressemble au précédent. Le prix reste
  * cloisonné : il n'apparaît qu'au responsable (D2/S39).
- */
+ *
+ * **Il a quitté `<dialog>` en S44.** C'était le dernier modal natif de saisie du
+ * produit, et le seul à l'être : les trois autres étaient déjà des calques,
+ * parce que deux `<dialog>` imbriqués se referment l'un l'autre — celui-ci
+ * contient le modal fournisseur, et le lot repartait **sans fournisseur** (S42).
+ * Le produit tenait donc deux mécaniques pour un même objet, dont l'une n'était
+ * là que pour survivre à l'autre. `Modale` les remplace toutes les deux, et
+ * rend au calque ce que le natif donnait : focus pris, piégé, rendu ; Échap ;
+ * fond inerte ; empilement décidé par une pile plutôt que par un `z-index`
+ * recopié.
 
 /** Un groupe en cours de saisie : le sous-lot, plus le compteur qui le dimensionne. */
 type GroupeSaisie = SousLot & { nombre: string };
@@ -48,19 +58,7 @@ const groupeVide = (): GroupeSaisie => ({
   nombre: "1",
 });
 
-export function ArrivageModal({
-  ouvert,
-  onFermer,
-  onEnregistre,
-  fournisseurs,
-  marques,
-  modeles,
-  stock,
-  arrivages,
-  auteur,
-  boutiqueId,
-  voitLesCouts,
-}: {
+type ProprietesArrivageModal = {
   ouvert: boolean;
   onFermer: () => void;
   onEnregistre: (info: { nombre: number }) => void;
@@ -72,24 +70,39 @@ export function ArrivageModal({
   auteur: Auteur | null;
   boutiqueId: string;
   voitLesCouts: boolean;
-}) {
-  const reference = useRef<HTMLDialogElement>(null);
+};
+
+/**
+ * La saisie n'existe que pendant que le modal est ouvert.
+ *
+ * Le `<dialog>` remettait les champs à zéro dans l'effet qui appelait
+ * `showModal()`. Sans lui, cette remise à zéro serait devenue un effet qui ne
+ * fait que poser de l'état — ce que React déconseille, et ce que le lint
+ * refuse. Ne monter le corps qu'à l'ouverture répond mieux : les valeurs
+ * initiales des `useState` repartent d'elles-mêmes, et c'est déjà ainsi que
+ * vivent les trois autres modals du produit.
+ */
+export function ArrivageModal(proprietes: ProprietesArrivageModal) {
+  if (!proprietes.ouvert) return null;
+  return <CorpsArrivageModal {...proprietes} />;
+}
+
+function CorpsArrivageModal({
+  ouvert,
+  onFermer,
+  onEnregistre,
+  fournisseurs,
+  marques,
+  modeles,
+  stock,
+  arrivages,
+  auteur,
+  boutiqueId,
+  voitLesCouts,
+}: ProprietesArrivageModal) {
   const [saisie, setSaisie] = useState<SaisieArrivage>(ARRIVAGE_VIDE);
   const [groupes, setGroupes] = useState<GroupeSaisie[]>([groupeVide()]);
   const [erreur, setErreur] = useState<string | null>(null);
-
-  useEffect(() => {
-    const dialogue = reference.current;
-    if (!dialogue) return;
-    if (ouvert && !dialogue.open) {
-      setSaisie(ARRIVAGE_VIDE);
-      setGroupes([groupeVide()]);
-      setErreur(null);
-      dialogue.showModal();
-    } else if (!ouvert && dialogue.open) {
-      dialogue.close();
-    }
-  }, [ouvert]);
 
   const changer = (partie: Partial<SaisieArrivage>) =>
     setSaisie((actuel) => ({ ...actuel, ...partie }));
@@ -179,25 +192,29 @@ export function ArrivageModal({
   const plusieurs = groupes.length > 1;
 
   return (
-    <dialog
-      ref={reference}
-      onClose={onFermer}
-      onClick={(evenement) => {
-        if (evenement.target === reference.current) onFermer();
-      }}
-      aria-labelledby="titre-arrivage"
-      className="fixed inset-0 m-auto h-fit max-h-[calc(100dvh-2rem)] w-[min(56rem,calc(100vw-2rem))] overflow-y-auto rounded-carte border border-bord bg-papier p-0 text-encre shadow-panneau backdrop:bg-nuit/45"
-    >
-      <div className="colonne-formulaire p-5 sm:p-6">
-        <div>
-          <h2 id="titre-arrivage" className="text-lg font-semibold text-encre">
-            Enregistrer un arrivage
-          </h2>
-          <p className="text-corps text-encre-doux">
-            Un lot d’un même fournisseur. Une marque par groupe : ajoutez-en un pour une autre marque.
-          </p>
+    <Modale
+      ouvert={ouvert}
+      onFermer={onFermer}
+      titre="Enregistrer un arrivage"
+      description="Un lot d’un même fournisseur. Une marque par groupe : ajoutez-en un pour une autre marque."
+      taille="large"
+      pied={
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button type="button" onClick={onFermer} className="bouton bouton-discret">
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={soumettre}
+            disabled={stock === null}
+            className="bouton bouton-principal"
+          >
+            {stock === null ? "Lecture du stock…" : "Enregistrer le lot"}
+          </button>
         </div>
-
+      }
+    >
+      <div className="space-y-6">
         <fieldset className="cadre p-4">
           <legend className="px-1 font-semibold text-encre">L’arrivage</legend>
           <div className="mt-2 colonne-formulaire">
@@ -292,7 +309,7 @@ export function ArrivageModal({
                 changer={(modeleId) => changerGroupe(index, { modeleId })}
                 toutes={modelesDeLaMarque(groupe.marqueId)}
                 invite={groupe.marqueId ? "Choisir un modèle" : "Choisissez d’abord une marque"}
-                desactive={!groupe.marqueId}
+                enAttente={!groupe.marqueId}
                 creer={(nom, auteur) => creerModele(groupe.marqueId, nom, auteur)}
               />
 
@@ -341,21 +358,7 @@ export function ArrivageModal({
         </div>
 
         <EtatErreurSaisie message={erreur} />
-
-        <div className="flex flex-wrap justify-end gap-2">
-          <button type="button" onClick={onFermer} className="bouton bouton-discret">
-            Annuler
-          </button>
-          <button
-            type="button"
-            onClick={soumettre}
-            disabled={stock === null}
-            className="bouton bouton-principal"
-          >
-            {stock === null ? "Lecture du stock…" : "Enregistrer le lot"}
-          </button>
-        </div>
       </div>
-    </dialog>
+    </Modale>
   );
 }

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useMemo } from "react";
 import { ErreurDeLecture, EtatChargement, PastillePaiement } from "@/components/patrons/Etats";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
+import { nomComplet } from "@/lib/domain/client";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { comparerVentes, LIBELLE_MODE, type Vente } from "@/lib/domain/vente";
@@ -74,7 +75,7 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
   const { valeur: stock } = useAbonnement(souscrireStock, "Le stock n’a pas pu être lu.");
 
   const lignes = useMemo<Ligne[]>(() => {
-    const nomDuClient = new Map(clients.map((client) => [client.id, client.nom]));
+    const nomDuClient = new Map(clients.map((client) => [client.id, nomComplet(client)]));
     const parMoto = new Map((stock ?? []).map((moto) => [moto.id, moto]));
 
     return [...(ventes ?? [])]

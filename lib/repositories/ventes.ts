@@ -13,7 +13,6 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { lireLignes } from "@/lib/domain/saisie";
 import { engendrerToken } from "@/lib/domain/token";
 import {
   TYPES_DOCUMENT,
@@ -85,6 +84,12 @@ function lireVente(instantane: DocumentSnapshot<DocumentData>): Vente {
     date: versDate(donnees.date),
     prixConvenu: typeof donnees.prixConvenu === "number" ? donnees.prixConvenu : 0,
     modePaiement: (donnees.modePaiement as ModePaiement) ?? "comptant",
+    /* `null` et non `false` quand le champ manque : une vente d'avant S44 ne
+       disait pas « la carte grise n'est pas incluse », elle ne le disait pas
+       du tout. L'écran retombe alors sur les deux listes ci-dessous, qui sont
+       ce que le gérant avait réellement écrit. */
+    carteGrise: typeof donnees.carteGrise === "boolean" ? donnees.carteGrise : null,
+    casque: typeof donnees.casque === "boolean" ? donnees.casque : null,
     inclus: Array.isArray(donnees.inclus) ? donnees.inclus : [],
     nonInclus: Array.isArray(donnees.nonInclus) ? donnees.nonInclus : [],
     totalPaye: typeof donnees.totalPaye === "number" ? donnees.totalPaye : 0,
@@ -383,8 +388,8 @@ export function enregistrerVente(
     date: maintenant,
     prixConvenu,
     modePaiement: saisie.modePaiement,
-    inclus: lireLignes(saisie.inclus),
-    nonInclus: lireLignes(saisie.nonInclus),
+    carteGrise: saisie.carteGrise,
+    casque: saisie.casque,
     totalPaye,
     resteDu,
     statutPaiement,

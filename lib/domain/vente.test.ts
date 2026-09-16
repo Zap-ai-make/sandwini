@@ -7,9 +7,11 @@ import {
   SAISIE_VENTE_VIDE,
   SAISIE_VERSEMENT_VIDE,
   agregatsPaiement,
+  bilanVentes,
   chercherVentes,
   comparerVentes,
   dettes,
+  inclusionsDeVente,
   estEngagement,
   estInactive,
   estRenumerotee,
@@ -188,14 +190,84 @@ describe("validation d’une saisie de vente", () => {
     expect(validerVente(saisie({ modePaiement: "tranches", montantEncaisse: "" }))).toBeNull();
   });
 
-  it("borne les listes inclus / non inclus, en nommant celle qui déborde", () => {
-    const vingtEtUne = Array.from({ length: 21 }, (_, index) => `objet ${index}`).join("\n");
-    expect(validerVente(saisie({ inclus: vingtEtUne }))).toMatch(/inclus/);
-    expect(validerVente(saisie({ nonInclus: "x".repeat(200) }))).toMatch(/non inclus/);
+  /* Deux booléens ne se valident pas : ce qui était une liste bornée à vingt
+     lignes est maintenant coché ou non, et l'une comme l'autre est valable. */
+  it("accepte les quatre combinaisons d’inclusions", () => {
+    for (const carteGrise of [true, false]) {
+      for (const casque of [true, false]) {
+        expect(validerVente(saisie({ carteGrise, casque })), `${carteGrise}/${casque}`).toBeNull();
+      }
+    }
   });
 
   it("borne la référence du moyen de paiement", () => {
     expect(validerVente(saisie({ reference: "R".repeat(61) }))).toMatch(/référence/i);
+  });
+});
+
+describe("inclusionsDeVente", () => {
+  const venteAvecBooleens = (carteGrise: boolean, casque: boolean) =>
+    ({ carteGrise, casque, inclus: [], nonInclus: [] }) as Pick<
+      Vente,
+      "carteGrise" | "casque" | "inclus" | "nonInclus"
+    >;
+
+  it("rend les deux inclusions nommées, cochées ou non", () => {
+    expect(inclusionsDeVente(venteAvecBooleens(true, false))).toEqual([
+      { libelle: "Carte grise", inclus: true },
+      { libelle: "Casque", inclus: false },
+    ]);
+  });
+
+  /* La rétro-compatibilité, et c'est le test qui la tient : une vente d'avant
+     S44 n'a pas les booléens. On ne devine pas ce qu'elle contenait — on rend
+     `null`, et l'appelant retombe sur les listes de texte qu'elle porte. */
+  it("rend null pour une vente d’avant S44", () => {
+    const ancienne = {
+      carteGrise: null,
+      casque: null,
+      inclus: ["Casque", "Bidon d’huile"],
+      nonInclus: ["Rétroviseur gauche"],
+    } as Pick<Vente, "carteGrise" | "casque" | "inclus" | "nonInclus">;
+    expect(inclusionsDeVente(ancienne)).toBeNull();
+  });
+
+  it("ne rend null que si les deux manquent, pas si l’une vaut false", () => {
+    expect(inclusionsDeVente(venteAvecBooleens(false, false))).not.toBeNull();
+  });
+});
+
+describe("bilanVentes", () => {
+  const ligne = (prixConvenu: number, totalPaye: number) =>
+    ({ prixConvenu, totalPaye, resteDu: prixConvenu - totalPaye }) as Pick<
+      Vente,
+      "prixConvenu" | "totalPaye" | "resteDu"
+    >;
+
+  it("somme ce que l’écran a déjà chargé, sans rien stocker", () => {
+    expect(bilanVentes([ligne(1_200_000, 1_200_000), ligne(800_000, 300_000)])).toEqual({
+      ventes: 2,
+      chiffreAffaires: 2_000_000,
+      encaisse: 1_500_000,
+      resteAPercevoir: 500_000,
+    });
+  });
+
+  it("rend quatre zéros sur un périmètre sans vente — c’est l’écran qui choisit de ne pas les afficher", () => {
+    expect(bilanVentes([])).toEqual({
+      ventes: 0,
+      chiffreAffaires: 0,
+      encaisse: 0,
+      resteAPercevoir: 0,
+    });
+  });
+
+  /* Le total encaissé et le reste à percevoir se recomposent toujours en le
+     chiffre d'affaires : si un jour ils divergent, c'est l'agrégat de la vente
+     qui a menti, et le test le dira ici plutôt qu'à l'écran. */
+  it("garde l’identité encaissé + reste = chiffre d’affaires", () => {
+    const bilan = bilanVentes([ligne(500_000, 0), ligne(750_000, 750_000), ligne(900_000, 10_000)]);
+    expect(bilan.encaisse + bilan.resteAPercevoir).toBe(bilan.chiffreAffaires);
   });
 });
 
@@ -223,6 +295,8 @@ describe("recherche d’une vente", () => {
     date: new Date("2026-08-20T10:00:00Z"),
     prixConvenu: 1_200_000,
     modePaiement: "comptant",
+    carteGrise: true,
+    casque: true,
     inclus: [],
     nonInclus: [],
     totalPaye: 1_200_000,
@@ -347,6 +421,8 @@ const venteS9 = (partie: Partial<Vente> = {}): Vente => ({
   date: new Date("2026-08-01T10:00:00Z"),
   prixConvenu: 1_200_000,
   modePaiement: "credit",
+  carteGrise: true,
+  casque: true,
   inclus: [],
   nonInclus: [],
   totalPaye: 0,

@@ -153,6 +153,72 @@ describe("création", () => {
   });
 });
 
+/* S44 sépare le prénom du nom et ajoute le numéro de la pièce d'identité.
+   Les deux champs sont **facultatifs au sens des règles**, et ce n'est pas un
+   relâchement : `clientValide` tourne aussi à la modification, et tout le
+   fichier d'avant S44 deviendrait incorrigible s'ils étaient exigés. */
+describe("le prénom et la pièce d’identité (S44)", () => {
+  const NIP = "12345678901234567";
+
+  it("accepte une fiche neuve, prénom et NIP compris", async () => {
+    await assertSucceeds(
+      addDoc(
+        collection(gerant(), "clients"),
+        client({ nom: "Ouédraogo", prenom: "Salif", nip: NIP, nomNormalise: "ouedraogo salif" }),
+      ),
+    );
+  });
+
+  /* La rétro-compatibilité, prouvée plutôt qu'affirmée : la fixture `client()`
+     est exactement une fiche d'avant S44 — ni `prenom`, ni `nip`. */
+  it("accepte une fiche d’avant S44, qui n’a ni l’un ni l’autre", async () => {
+    await assertSucceeds(addDoc(collection(gerant(), "clients"), client()));
+  });
+
+  it("accepte un NIP vide — le client a pu oublier sa carte", async () => {
+    await assertSucceeds(addDoc(collection(gerant(), "clients"), client({ nip: "" })));
+  });
+
+  it("refuse un NIP qui n’a pas dix-sept chiffres", async () => {
+    await assertFails(addDoc(collection(gerant(), "clients"), client({ nip: "1234567890123456" })));
+    await assertFails(
+      addDoc(collection(gerant(), "clients"), client({ nip: "123456789012345678" })),
+    );
+  });
+
+  it("refuse un NIP qui n’est pas fait que de chiffres", async () => {
+    await assertFails(addDoc(collection(gerant(), "clients"), client({ nip: "B234567890123456" })));
+  });
+
+  /* La forme cherchée porte maintenant le nom **et** le prénom : sa borne a
+     grandi en conséquence, et elle doit tenir les deux champs pleins. */
+  it("accepte une forme cherchée qui réunit un nom et un prénom longs", async () => {
+    await assertSucceeds(
+      addDoc(
+        collection(gerant(), "clients"),
+        client({
+          nom: "n".repeat(80),
+          prenom: "p".repeat(80),
+          nomNormalise: `${"n".repeat(80)} ${"p".repeat(80)}`,
+        }),
+      ),
+    );
+  });
+
+  it("refuse un prénom trop long", async () => {
+    await assertFails(addDoc(collection(gerant(), "clients"), client({ prenom: "p".repeat(81) })));
+  });
+
+  it("corrige une fiche d’avant S44 en lui ajoutant son prénom", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(gerant(), "clients/salif"),
+        modification({ nom: "Ouédraogo", prenom: "Salif", nomNormalise: "ouedraogo salif" }),
+      ),
+    );
+  });
+});
+
 describe("correction", () => {
   it("un gérant corrige un numéro mal noté", async () => {
     await assertSucceeds(

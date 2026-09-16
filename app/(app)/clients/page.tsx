@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 import { FormulaireClient } from "@/components/FormulaireClient";
 import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
-import { chercherClients, formaterTelephone, type Client } from "@/lib/domain/client";
+import { chercherClients, formaterTelephone, nomComplet, type Client } from "@/lib/domain/client";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 
 /**
@@ -59,7 +59,7 @@ export default function PageClients() {
             <FormulaireClient
               clients={lus}
               surEnregistrement={(_, saisie) => {
-                setConfirmation(`${saisie.nom.trim()} est enregistré.`);
+                setConfirmation(`${nomComplet(saisie)} est enregistré.`);
                 setCreation(false);
               }}
               surAnnulation={() => setCreation(false)}
@@ -158,7 +158,7 @@ function LigneClient({
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="min-w-0 flex-1">
-          <span className="block font-medium text-encre">{client.nom}</span>
+          <span className="block font-medium text-encre">{nomComplet(client)}</span>
           <span className="flex items-center gap-1.5 text-sm text-encre-doux">
             <Phone aria-hidden="true" className="size-3.5 shrink-0" />
             <span className="plaque-code">{formaterTelephone(client.telephone)}</span>
@@ -182,7 +182,7 @@ function LigneClient({
 
       {ouvert && (
         <div className="mt-3 rounded-plaque border border-bord bg-fond p-4">
-          <h3 className="text-sm font-semibold text-encre">Corriger {client.nom}</h3>
+          <h3 className="text-sm font-semibold text-encre">Corriger {nomComplet(client)}</h3>
           <div className="mt-4">
             <FormulaireClient
               clients={clients}

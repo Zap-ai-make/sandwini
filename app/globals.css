@@ -802,6 +802,34 @@
   }
 
   /* --------------------------------------------------------------------------
+     L'arrivée d'une modale (`components/patrons/Modale.tsx`).
+
+     Sur téléphone la feuille monte du bas ; au-dessus de 640 px la boîte se
+     pose au centre, et une translation verticale y serait un tic. Le même nom
+     sert les deux : c'est la requête média qui change ce qu'il veut dire.
+
+     La classe l'appelle sous `motion-safe:`, et `prefers-reduced-motion` est de
+     toute façon neutralisé globalement (`@layer base`) — ceinture et bretelles,
+     parce qu'une modale qui glisse est exactement ce qui gêne quand on a
+     demandé que ça ne bouge pas.
+     -------------------------------------------------------------------------- */
+  @keyframes monte {
+    from {
+      transform: translateY(1.5rem);
+      opacity: 0;
+    }
+  }
+
+  @media (min-width: 640px) {
+    @keyframes monte {
+      from {
+        transform: scale(0.98);
+        opacity: 0;
+      }
+    }
+  }
+
+  /* --------------------------------------------------------------------------
      La pastille de statut.
 
      Jamais la couleur seule : le mot est toujours écrit, la pastille ne fait

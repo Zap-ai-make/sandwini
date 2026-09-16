@@ -7,7 +7,7 @@ import { Suspense, useCallback, useMemo, useState } from "react";
 import { PanneauRecu } from "@/components/PanneauRecu";
 import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
-import { normaliserNom } from "@/lib/domain/client";
+import { nomDuClient, normaliserNom } from "@/lib/domain/client";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import {
   LIBELLE_TYPE_RECU,
@@ -101,7 +101,7 @@ function Recus() {
         const client = parClient.get(recu.vente.clientId);
         return {
           recu,
-          nomClient: client?.nom ?? "Client inconnu",
+          nomClient: nomDuClient(client),
           nomNormalise: client?.nomNormalise ?? "",
         };
       });

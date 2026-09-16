@@ -4,10 +4,15 @@ import { useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import {
   LONGUEUR_ADRESSE_MAX,
+  LONGUEUR_NIP,
   LONGUEUR_NOM_MAX,
   LONGUEUR_NOTE_MAX,
   LONGUEUR_TELEPHONE_MAX,
   SAISIE_CLIENT_VIDE,
+  formaterTelephone,
+  lireNip,
+  nipDejaPris,
+  nomComplet,
   telephoneDejaPris,
   validerClient,
   type Client,
@@ -15,6 +20,7 @@ import {
 } from "@/lib/domain/client";
 import { creerClient, messageErreurClient, modifierClient } from "@/lib/repositories/clients";
 import { Champ } from "@/components/patrons/Champ";
+import { ChampCases } from "@/components/patrons/ChampCases";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 
 /**
@@ -34,6 +40,7 @@ export function FormulaireClient({
   existant,
   surEnregistrement,
   surAnnulation,
+  surFicheExistante,
 }: {
   /**
    * Le fichier, pour reconnaître un numéro déjà connu — ou `null` tant que
@@ -44,12 +51,20 @@ export function FormulaireClient({
   existant?: Client;
   surEnregistrement?: (id: string, saisie: SaisieClient) => void;
   surAnnulation?: () => void;
+  /**
+   * Ce qu'on fait de la fiche reconnue quand le numéro ou la pièce est déjà
+   * pris. L'écran de vente s'en sert pour adopter le client au lieu d'en créer
+   * un second ; là où ce n'est pas proposé, le rapprochement reste un avis.
+   */
+  surFicheExistante?: (client: Client) => void;
 }) {
   const session = useSession();
   const [saisie, setSaisie] = useState<SaisieClient>(
     existant
       ? {
           nom: existant.nom,
+          prenom: existant.prenom,
+          nip: existant.nip,
           telephone: existant.telephone,
           telephone2: existant.telephone2,
           adresse: existant.adresse,
@@ -58,6 +73,12 @@ export function FormulaireClient({
       : SAISIE_CLIENT_VIDE,
   );
   const [erreur, setErreur] = useState<string | null>(null);
+  /* La fiche qu'on a reconnue, gardée à part de l'erreur : on ne se contente
+     plus de refuser, on la propose. */
+  const [rapproche, setRapproche] = useState<Client | null>(null);
+  /* Replié par défaut : trois champs sur cinq ne servent qu'une fois sur dix,
+     et le geste du comptoir est « nom, prénom, téléphone, pièce ». */
+  const [details, setDetails] = useState(false);
 
   const changer = (partie: Partial<SaisieClient>) =>
     setSaisie((actuel) => ({ ...actuel, ...partie }));
@@ -69,6 +90,7 @@ export function FormulaireClient({
     const probleme = validerClient(saisie);
     if (probleme) {
       setErreur(probleme);
+      setRapproche(null);
       return;
     }
 
@@ -78,16 +100,25 @@ export function FormulaireClient({
        versements de l'autre (D95). */
     if (clients === null) {
       setErreur("Le fichier clients n’a pas fini d’arriver. Réessayez dans un instant.");
+      setRapproche(null);
       return;
     }
 
-    const doublon = telephoneDejaPris(saisie.telephone, clients, existant?.id);
+    /* Deux clés de rapprochement, et la pièce d'identité passe devant : un
+       numéro de téléphone change de main, un numéro de pièce non. Les deux
+       proposent la fiche trouvée au lieu de refuser sèchement — un mur sans
+       panneau apprend surtout à ne plus lire l'écran (D95). */
+    const doublon =
+      nipDejaPris(saisie.nip, clients, existant?.id) ??
+      telephoneDejaPris(saisie.telephone, clients, existant?.id);
     if (doublon) {
-      setErreur(`Ce numéro est déjà celui de ${doublon.nom}.`);
+      setRapproche(doublon);
+      setErreur(null);
       return;
     }
 
     setErreur(null);
+    setRapproche(null);
     const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
 
     if (existant) {
@@ -115,13 +146,27 @@ export function FormulaireClient({
   return (
     <form onSubmit={soumettre} className="colonne-formulaire max-w-[40rem]" noValidate>
       <div className="space-y-4">
-        <ChampClient
-          id={`${prefixe}-nom`}
-          libelle="Nom"
-          valeur={saisie.nom}
-          maximum={LONGUEUR_NOM_MAX}
-          changer={(nom) => changer({ nom })}
-        />
+        {/* Le nom et le prénom côte à côte : ce sont deux moitiés d'une même
+            information, et les empiler ferait lire deux questions là où il n'y
+            en a qu'une. C'est la seule paire de l'écran — partout ailleurs,
+            un champ par ligne (`CAHIER-UI.md` §8.3). */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ChampClient
+            id={`${prefixe}-nom`}
+            libelle="Nom"
+            valeur={saisie.nom}
+            maximum={LONGUEUR_NOM_MAX}
+            changer={(nom) => changer({ nom })}
+          />
+          <ChampClient
+            id={`${prefixe}-prenom`}
+            libelle="Prénom"
+            facultatif
+            valeur={saisie.prenom}
+            maximum={LONGUEUR_NOM_MAX}
+            changer={(prenom) => changer({ prenom })}
+          />
+        </div>
         <ChampClient
           id={`${prefixe}-telephone`}
           libelle="Téléphone"
@@ -131,37 +176,74 @@ export function FormulaireClient({
           changer={(telephone) => changer({ telephone })}
           aide="Huit chiffres suffisent. L’indicatif est ajouté tout seul."
         />
-        <ChampClient
-          id={`${prefixe}-telephone2`}
-          libelle="Second téléphone"
-          type="tel"
+        <ChampCases
+          id={`${prefixe}-nip`}
+          libelle="Numéro de la pièce d’identité"
           facultatif
-          valeur={saisie.telephone2}
-          maximum={LONGUEUR_TELEPHONE_MAX}
-          changer={(telephone2) => changer({ telephone2 })}
+          valeur={saisie.nip}
+          longueur={LONGUEUR_NIP}
+          changer={(nip) => changer({ nip: lireNip(nip) })}
         />
-        <ChampClient
-          id={`${prefixe}-adresse`}
-          libelle="Adresse"
-          facultatif
-          valeur={saisie.adresse}
-          maximum={LONGUEUR_ADRESSE_MAX}
-          changer={(adresse) => changer({ adresse })}
-        />
+
+        {/* Trois champs qui ne servent qu'une fois sur dix. Repliés, ils ne
+            pèsent plus sur le geste ordinaire ; dépliés, ils sont là. Un vrai
+            bouton, pas un `<details>` : le formulaire est déjà dans une modale,
+            et deux mécaniques de repli se contredisent à l'usage. */}
         <div>
-          <label htmlFor={`${prefixe}-note`} className="block text-sm font-medium text-encre">
-            Note <span className="font-normal text-encre-doux">(facultatif)</span>
-          </label>
-          <textarea
-            id={`${prefixe}-note`}
-            rows={2}
-            value={saisie.note}
-            maxLength={LONGUEUR_NOTE_MAX}
-            onChange={(evenement) => changer({ note: evenement.target.value })}
-            className="saisie mt-1.5"
-          />
+          <button
+            type="button"
+            onClick={() => setDetails((ouvert) => !ouvert)}
+            aria-expanded={details}
+            aria-controls={`${prefixe}-details`}
+            className="bouton bouton-discret"
+          >
+            {details ? "Masquer les précisions" : "Préciser (second numéro, adresse, note)"}
+          </button>
         </div>
+
+        {details && (
+          <div id={`${prefixe}-details`} className="space-y-4">
+            <ChampClient
+              id={`${prefixe}-telephone2`}
+              libelle="Second téléphone"
+              type="tel"
+              facultatif
+              valeur={saisie.telephone2}
+              maximum={LONGUEUR_TELEPHONE_MAX}
+              changer={(telephone2) => changer({ telephone2 })}
+            />
+            <ChampClient
+              id={`${prefixe}-adresse`}
+              libelle="Adresse"
+              facultatif
+              valeur={saisie.adresse}
+              maximum={LONGUEUR_ADRESSE_MAX}
+              changer={(adresse) => changer({ adresse })}
+            />
+            <div>
+              <label htmlFor={`${prefixe}-note`} className="block text-sm font-medium text-encre">
+                Note <span className="font-normal text-encre-doux">(facultatif)</span>
+              </label>
+              <textarea
+                id={`${prefixe}-note`}
+                rows={2}
+                value={saisie.note}
+                maxLength={LONGUEUR_NOTE_MAX}
+                onChange={(evenement) => changer({ note: evenement.target.value })}
+                className="saisie mt-1.5"
+              />
+            </div>
+          </div>
+        )}
       </div>
+
+      {rapproche && (
+        <FicheReconnue
+          client={rapproche}
+          surUtilisation={surFicheExistante}
+          surAbandon={() => setRapproche(null)}
+        />
+      )}
 
       <EtatErreurSaisie message={erreur} className="mt-3" />
 
@@ -188,6 +270,51 @@ export function FormulaireClient({
         )}
       </div>
     </form>
+  );
+}
+
+/**
+ * La fiche qu'on a reconnue avant de créer un doublon.
+ *
+ * **Proposer vaut mieux que refuser.** Le contrôle disait « ce numéro est déjà
+ * celui de X » et s'arrêtait là : la personne se retrouvait devant un mur, sans
+ * geste pour en sortir, et le réflexe était de changer un chiffre pour passer —
+ * ce qui fabrique exactement le doublon qu'on voulait empêcher. Ici la fiche
+ * est nommée, et le geste qui l'adopte est à côté d'elle.
+ */
+function FicheReconnue({
+  client,
+  surUtilisation,
+  surAbandon,
+}: {
+  client: Client;
+  surUtilisation?: (client: Client) => void;
+  surAbandon: () => void;
+}) {
+  return (
+    <div
+      role="status"
+      className="mt-3 rounded-champ border-l-[3px] border-l-goutte bg-goutte-surface p-3"
+    >
+      <p className="text-encre">
+        <strong className="font-semibold">Cette personne est déjà dans le fichier.</strong>{" "}
+        {nomComplet(client)} — {formaterTelephone(client.telephone)}
+      </p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {surUtilisation && (
+          <button
+            type="button"
+            onClick={() => surUtilisation(client)}
+            className="bouton bouton-principal"
+          >
+            Utiliser cette fiche
+          </button>
+        )}
+        <button type="button" onClick={surAbandon} className="bouton bouton-neutre">
+          Corriger ma saisie
+        </button>
+      </div>
+    </div>
   );
 }
 

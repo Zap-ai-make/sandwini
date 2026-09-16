@@ -208,21 +208,36 @@ export default function PageNouvelleMoto() {
             </div>
           </div>
 
-          <div className="mt-4">
+          {/* Marque et modèle sont une seule étape, et se lisent comme telle.
+              Le modèle paraissait verrouillé : il était `disabled` tant
+              qu'aucune marque n'était choisie, et le gris s'interprétait comme
+              un refus plutôt que comme une attente. Il a désormais l'aspect et
+              le comportement de la marque ; ce qui reste vrai — un modèle
+              appartient à une marque (S40) — est dit par l'invite, avant le
+              geste, et non par un champ éteint. */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <ChoixOuNouveau
               id="marque"
               libelle="Marque"
               singulier="marque"
               determinant="cette"
               valeur={saisie.marqueId}
-              changer={(marqueId) => changer({ marqueId, modeleId: "" })}
+              changer={(marqueId) => {
+                changer({ marqueId, modeleId: "" });
+                /* Le focus enchaîne sur le modèle : c'est la question
+                   suivante, et l'attente que l'invite annonçait vient de se
+                   lever. Après la peinture, sinon le champ visé n'a pas
+                   encore repris sa forme de `<select>` quand la marque
+                   vient d'être créée à la volée. */
+                if (marqueId) {
+                  requestAnimationFrame(() => document.getElementById("modele")?.focus());
+                }
+              }}
               toutes={catalogue.lues.marques}
               invite="Choisir une marque"
               creer={(nom, auteur) => creerEntree("marques", nom, auteur)}
             />
-          </div>
 
-          <div className="mt-4">
             <ChoixOuNouveau
               id="modele"
               libelle="Modèle"
@@ -232,7 +247,7 @@ export default function PageNouvelleMoto() {
               changer={(modeleId) => changer({ modeleId })}
               toutes={modelesDeLaMarque}
               invite={saisie.marqueId ? "Choisir un modèle" : "Choisissez d’abord une marque"}
-              desactive={!saisie.marqueId}
+              enAttente={!saisie.marqueId}
               creer={(nom, auteur) => creerModele(saisie.marqueId, nom, auteur)}
             />
           </div>

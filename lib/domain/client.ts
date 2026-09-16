@@ -9,7 +9,23 @@
 
 export type Client = {
   id: string;
+  /**
+   * Le nom de famille.
+   *
+   * **Une fiche d'avant S44 porte ici le nom entier**, prénom compris, et
+   * `prenom` y vaut `""`. Les deux formes cohabitent sans migration parce que
+   * `nomComplet` rend exactement la même chaîne dans les deux cas — et une
+   * migration, c'est une fenêtre pendant laquelle deux formes coexistent mal.
+   */
   nom: string;
+  prenom: string;
+  /**
+   * Le numéro de la pièce d'identité, en chiffres seuls (S44).
+   *
+   * Vide est une valeur ordinaire, pas un manque à corriger : une vente au
+   * comptoir ne s'arrête pas parce que le client a oublié sa carte (D76).
+   */
+  nip: string;
   /** Tel que la personne l'a saisi — c'est ce qui s'affiche et s'imprime. */
   telephone: string;
   /** Forme internationale, celle sur laquelle on cherche. */
@@ -17,12 +33,14 @@ export type Client = {
   telephone2: string;
   adresse: string;
   note: string;
-  /** Le nom sans casse ni accents, pour chercher sur son début. */
+  /** Le nom et le prénom sans casse ni accents, pour chercher dedans. */
   nomNormalise: string;
 };
 
 export type SaisieClient = {
   nom: string;
+  prenom: string;
+  nip: string;
   telephone: string;
   telephone2: string;
   adresse: string;
@@ -31,6 +49,8 @@ export type SaisieClient = {
 
 export const SAISIE_CLIENT_VIDE: SaisieClient = {
   nom: "",
+  prenom: "",
+  nip: "",
   telephone: "",
   telephone2: "",
   adresse: "",
@@ -41,6 +61,15 @@ export const LONGUEUR_NOM_MAX = 80;
 export const LONGUEUR_ADRESSE_MAX = 200;
 export const LONGUEUR_NOTE_MAX = 300;
 export const LONGUEUR_TELEPHONE_MAX = 32;
+
+/**
+ * La longueur du numéro de pièce d'identité.
+ *
+ * Une constante, et une seule, parce que c'est la seule hypothèse du code sur
+ * la forme du document : si la pièce devait porter une lettre en tête, c'est
+ * ici et dans `firestore.rules` que ça se change — les deux ensemble.
+ */
+export const LONGUEUR_NIP = 17;
 
 /**
  * L'indicatif ajouté aux numéros locaux.
@@ -89,10 +118,75 @@ export function normaliserNom(brut: string): string {
     .replace(/\s+/g, " ");
 }
 
+/**
+ * Le nom tel qu'on le lit et qu'on l'imprime : le nom, puis le prénom.
+ *
+ * L'ordre n'est pas neutre — c'est celui sous lequel la maison connaît ses
+ * clients, et celui dans lequel les fiches d'avant S44 ont été saisies. Le
+ * choisir autrement ferait diverger l'affichage d'une fiche ancienne et d'une
+ * fiche neuve pour la même personne.
+ */
+export function nomComplet(client: Pick<Client, "nom" | "prenom">): string {
+  return [client.nom, client.prenom]
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
+/**
+ * Le nom d'un client qu'on n'a peut-être pas retrouvé.
+ *
+ * Écrit une fois plutôt que onze : chaque écran qui affiche un client avait sa
+ * propre façon de dire « absent », et la onzième copie est celle qui aurait
+ * oublié le prénom.
+ */
+export function nomDuClient(
+  client: Pick<Client, "nom" | "prenom"> | null | undefined,
+  absent = "Client inconnu",
+): string {
+  return client ? nomComplet(client) : absent;
+}
+
+/**
+ * La forme sur laquelle on cherche une personne : nom et prénom réunis.
+ *
+ * Séparer les deux champs sans réunir la forme cherchée ferait disparaître le
+ * prénom de la recherche — au comptoir, on tape aussi bien l'un que l'autre.
+ * Une fiche d'avant S44, qui a tout dans `nom`, rend la même chaîne qu'avant.
+ */
+export function nomPourRecherche(client: Pick<Client, "nom" | "prenom">): string {
+  return normaliserNom(nomComplet(client));
+}
+
+/**
+ * Le numéro de pièce tel qu'on le range : chiffres seuls, borné.
+ *
+ * Un numéro se recopie d'une carte, souvent avec des espaces ou des tirets, et
+ * parfois collé depuis ailleurs. Les refuser produirait une erreur pour une
+ * saisie juste ; on les absorbe.
+ */
+export function lireNip(brut: string): string {
+  return brut.replace(/\D/g, "").slice(0, LONGUEUR_NIP);
+}
+
 export function validerClient(saisie: SaisieClient): string | null {
   const nom = saisie.nom.trim();
   if (!nom) return "Le nom du client est obligatoire.";
   if (nom.length > LONGUEUR_NOM_MAX) return `Le nom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
+
+  if (saisie.prenom.trim().length > LONGUEUR_NOM_MAX) {
+    return `Le prénom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
+  }
+
+  /* Le NIP est facultatif — mais renseigné, il l'est en entier : un numéro à
+     seize chiffres est une saisie interrompue, pas un autre format.
+
+     On compte les chiffres **bruts**, pas ceux que `lireNip` a gardés. Un
+     numéro collé trop long serait sinon tronqué en silence, et c'est le genre
+     d'erreur qu'on découvre à la préfecture (D95, dans une autre matière). */
+  if (saisie.nip.trim() !== "" && saisie.nip.replace(/\D/g, "").length !== LONGUEUR_NIP) {
+    return `Le numéro de la pièce d’identité compte ${LONGUEUR_NIP} chiffres.`;
+  }
 
   const telephone = saisie.telephone.trim();
   if (!telephone) return "Le téléphone est obligatoire : c’est par lui qu’on retrouve un client.";
@@ -123,6 +217,14 @@ export function validerClient(saisie: SaisieClient): string | null {
  * qu'il a — des chiffres relevés sur un carnet ou les premières lettres d'un
  * nom — et la liste se réduit. Sur un numéro, on accepte un **fragment**,
  * parce qu'on se souvient souvent de la fin plutôt que du début.
+ *
+ * **Sur un nom, on cherche le début d'un mot, pas un fragment.** La recherche
+ * acceptait n'importe quelle sous-chaîne, ce qui faisait répondre « Sawadogo »
+ * à « Awa » — au milieu du mot. Le défaut était invisible tant que le nom
+ * n'était qu'un champ ; il devient franc quand on tape un prénom, qui est
+ * court et donc d'autant plus souvent contenu ailleurs. Chercher par début de
+ * mot fait les deux à la fois : le prénom se trouve, et le hasard ne répond
+ * plus.
  */
 export function chercherClients(clients: Client[], recherche: string): Client[] {
   const texte = recherche.trim();
@@ -138,8 +240,27 @@ export function chercherClients(clients: Client[], recherche: string): Client[] 
         .filter(Boolean);
       if (numeros.some((numero) => numero.includes(chiffres))) return true;
     }
-    return nom.length > 0 && client.nomNormalise.includes(nom);
+    return nom.length > 0 && commenceUnMot(client.nomNormalise, nom);
   });
+}
+
+/** Vrai si `cherche` ouvre le nom entier, ou l'un de ses mots. */
+function commenceUnMot(nomNormalise: string, cherche: string): boolean {
+  if (nomNormalise.startsWith(cherche)) return true;
+  return nomNormalise.split(" ").some((mot) => mot.startsWith(cherche));
+}
+
+/**
+ * Le client qui porte déjà ce numéro de pièce, s'il y en a un.
+ *
+ * **Un NIP vide ne rapproche personne.** Sans cette garde, toutes les fiches
+ * sans pièce d'identité se reconnaîtraient les unes dans les autres, et le
+ * contrôle produirait exactement le doublon qu'il devait empêcher (D96).
+ */
+export function nipDejaPris(nip: string, clients: Client[], sauf?: string): Client | undefined {
+  const cible = lireNip(nip);
+  if (cible.length !== LONGUEUR_NIP) return undefined;
+  return clients.find((client) => client.id !== sauf && lireNip(client.nip) === cible);
 }
 
 /** Le client qui porte déjà ce numéro, s'il y en a un. */

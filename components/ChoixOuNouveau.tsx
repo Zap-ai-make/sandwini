@@ -47,7 +47,7 @@ export function ChoixOuNouveau({
   changer,
   toutes,
   invite,
-  desactive = false,
+  enAttente = false,
   aide,
   creer,
 }: {
@@ -71,7 +71,20 @@ export function ChoixOuNouveau({
    */
   toutes: Referentiel[] | null;
   invite: string;
-  desactive?: boolean;
+  /**
+   * Ce champ dépend d'un autre, pas encore renseigné (la marque, pour un
+   * modèle). Il n'y a donc rien à proposer — mais **le champ n'est pas
+   * désactivé pour autant** (S44).
+   *
+   * Il l'était, et le `disabled:opacity-60` le faisait lire comme verrouillé :
+   * on croyait le modèle interdit alors qu'il était simplement en attente. Un
+   * champ grisé ne dit pas *pourquoi*, et `DESIGN.md` §10 demande que l'état
+   * désactivé se justifie **avant** le geste, pas après l'échec. L'invite
+   * porte donc la raison, le champ garde l'aspect et le focus de son voisin,
+   * et seule « + Ajouter… » se retire — on ne peut pas créer un modèle sans
+   * savoir chez quelle marque le ranger.
+   */
+  enAttente?: boolean;
   aide?: string;
   /**
    * Écrit la nouvelle entrée et rend son identifiant **tout de suite**, sans
@@ -201,7 +214,6 @@ export function ChoixOuNouveau({
       <select
         id={id}
         value={valeur}
-        disabled={desactive}
         aria-describedby={note || aide ? `${id}-aide` : undefined}
         onChange={(evenement) => {
           if (evenement.target.value === NOUVELLE) {
@@ -211,7 +223,7 @@ export function ChoixOuNouveau({
           setNote(null);
           changer(evenement.target.value);
         }}
-        className="saisie disabled:opacity-60"
+        className="saisie"
       >
         {/* L'invite dit l'attente au lieu de proposer un choix qu'on ne peut
             pas encore faire : un menu vide et un menu pas encore lu se
@@ -223,7 +235,7 @@ export function ChoixOuNouveau({
             {option.actif ? "" : " — hors liste"}
           </option>
         ))}
-        {!desactive && toutes !== null && (
+        {!enAttente && toutes !== null && (
           <option value={NOUVELLE}>
             + Ajouter {un} {singulier}…
           </option>

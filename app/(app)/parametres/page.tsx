@@ -9,6 +9,7 @@ import { Hub, type Destination } from "@/components/patrons/Hub";
 import { TetePage, TitreSection } from "@/components/patrons/Page";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
+import { formaterTelephone } from "@/lib/domain/client";
 import { IDENTITE } from "@/lib/domain/entreprise";
 import { ecransVisibles } from "@/lib/domain/espaces";
 import type { Prestataire } from "@/lib/domain/prestataire";
@@ -33,10 +34,22 @@ import { useMiseAJour } from "@/lib/version/mise-a-jour";
  * l’application (D71). Posée sur le hub, la carte le dit sans qu’on ait à la
  * chercher.
  *
- * **Chaque destination annonce ce qu’on y trouvera.** « 3 prestataires » et
- * « aucun prestataire » ne demandent pas la même visite ; sur une installation
- * neuve, ce compte est ce qui dit quel écran reste à remplir. C’est le sens de
- * « atteints sans les chercher » : on ne va pas voir pour savoir.
+ * **La boutique du périmètre se lit ici aussi** (S44). Son nom, son code, son
+ * adresse et son téléphone forment le second en-tête du reçu ; ils vivaient
+ * dans une ligne de la liste des boutiques, qu’il fallait ouvrir et parcourir.
+ *
+ * **Le sommaire des destinations n’existe plus que sur petit écran** (S44).
+ * Au-dessus de 1024 px, la colonne de gauche liste exactement les mêmes écrans,
+ * dans le même ordre et avec les mêmes droits — les deux dérivent de
+ * `GROUPES_DE.reglages`, et un test unitaire les empêche de diverger. Ouvrir
+ * « Réglages » pour tomber sur une seconde table des matières ne menait nulle
+ * part qu’on n’ait déjà sous les yeux. En dessous, la colonne est masquée et
+ * rien ne la remplace : le hub y redevient le seul chemin, et il reste.
+ *
+ * **Chaque destination annonce ce qu’on y trouvera**, là où elle s’affiche.
+ * « 3 prestataires » et « aucun prestataire » ne demandent pas la même visite ;
+ * sur une installation neuve, ce compte est ce qui dit quel écran reste à
+ * remplir.
  *
  * **Ce qui appartient à cet ordinateur est rangé à part.** La file d’envoi
  * n’est pas un réglage de l’entreprise : ce qui attend ici n’attend pas
@@ -173,8 +186,22 @@ export default function Reglages() {
         )}
       </section>
 
+      {/* La boutique du périmètre, en clair et tout de suite (S44). Ce qui
+          s'imprime sous l'en-tête de l'entreprise sur chaque reçu — le code,
+          le nom, l'adresse et le téléphone du comptoir — se lisait jusqu'ici
+          en ouvrant « Boutiques » et en cherchant la bonne ligne. */}
+      <IdentiteBoutique boutiques={boutiques} boutiqueId={perimetre.boutiqueId} />
+
+      {/* « Ce qui change » ne survit que là où la colonne de gauche n'est pas.
+          Au-dessus de 1024 px elle liste exactement ces écrans, dans le même
+          ordre et avec les mêmes droits : le hub y était un second sommaire, et
+          l'écran des réglages n'ouvrait que sur une table des matières.
+          En dessous, la colonne est masquée (`.colonne` est en `max-lg:hidden`)
+          et rien ne la remplace : ce hub est alors le **seul** chemin vers les
+          six écrans d'administration, et le retirer partout les rendrait
+          inatteignables au comptoir. */}
       {administration.length > 0 && (
-        <section aria-labelledby="titre-administration" className="mb-8">
+        <section aria-labelledby="titre-administration" className="mb-8 lg:hidden">
           <TitreSection id="titre-administration">Ce qui change</TitreSection>
           <Hub destinations={administration} />
         </section>
@@ -289,6 +316,49 @@ function MiseAJour() {
         l’application, puis rouverte</strong> — à la réouverture du magasin, par exemple.
       </p>
     </Avis>
+  );
+}
+
+/**
+ * L'identité de la boutique du périmètre (S44).
+ *
+ * C'est le second en-tête du reçu : sous la raison sociale, le client lit le
+ * comptoir où il est passé — et c'est là qu'il revient. Cette carte le montre
+ * à l'endroit où l'on vient vérifier « qu'est-ce qui est imprimé ».
+ *
+ * Elle ne s'affiche pas sur « toutes les boutiques » : il n'y a alors pas une
+ * identité à montrer mais plusieurs, et la liste a son écran. Rien non plus
+ * tant que la collection n'est pas revenue — une carte vide se lirait comme
+ * une boutique sans adresse (D63).
+ */
+function IdentiteBoutique({
+  boutiques,
+  boutiqueId,
+}: {
+  boutiques: Boutique[] | null;
+  boutiqueId: string | null;
+}) {
+  if (!boutiqueId || boutiques === null) return null;
+  const boutique = boutiques.find((fiche) => fiche.id === boutiqueId);
+  if (!boutique) return null;
+
+  return (
+    <section aria-labelledby="titre-boutique" className="mb-8">
+      <TitreSection id="titre-boutique">La boutique</TitreSection>
+      <dl className="cadre cadre-liste">
+        <Fait titre="Nom">{boutique.nom}</Fait>
+        <Fait titre="Code">
+          <span className="plaque-code">{boutique.code}</span>
+        </Fait>
+        <Fait titre="Adresse">{boutique.adresse || "Non renseignée"}</Fait>
+        <Fait titre="Téléphone">
+          {boutique.telephone ? formaterTelephone(boutique.telephone) : "Non renseigné"}
+        </Fait>
+      </dl>
+      <p className="mt-3 max-w-prose text-corps text-encre-doux">
+        C’est ce qui s’imprime sous l’en-tête de l’entreprise, sur les reçus remis à ce comptoir.
+      </p>
+    </section>
   );
 }
 

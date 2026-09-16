@@ -11,6 +11,7 @@ import {
   type Arrivage,
   type SaisieArrivage,
 } from "@/lib/domain/arrivage";
+import { Modale } from "@/components/patrons/Modale";
 import type { Fournisseur } from "@/lib/domain/fournisseur";
 import { jourLocal } from "@/lib/domain/format";
 import { messageErreurArrivage, modifierArrivage } from "@/lib/repositories/arrivages";
@@ -19,10 +20,11 @@ import type { Auteur } from "@/lib/repositories/referentiels";
 /**
  * Corriger l'entête d'un arrivage (S43) — nom, fournisseur, date, description.
  *
- * On ne touche pas aux motos du lot : leur fiche s'en charge. Un calque simple,
- * pas un `<dialog>` natif, pour la même raison qu'en S42 — deux modals natifs
- * imbriqués se referment l'un l'autre. Monté seulement à l'ouverture : l'état
- * part de l'arrivage à corriger, sans effet de remise à zéro.
+ * On ne touche pas aux motos du lot : leur fiche s'en charge. Monté seulement à
+ * l'ouverture : l'état part de l'arrivage à corriger, sans effet de remise à
+ * zéro. Le calque, le focus, Échap et le verrou de défilement viennent de
+ * `Modale` depuis S44 — ils étaient recopiés ici, et **Échap ne marchait pas** :
+ * la touche était écoutée sur une boîte que rien ne focalisait à l'ouverture.
  */
 export function ModifierArrivageModal({
   arrivage,
@@ -62,83 +64,65 @@ export function ModifierArrivageModal({
   }
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-nuit/45 p-4"
-      onMouseDown={(evenement) => {
-        if (evenement.target === evenement.currentTarget) onFermer();
-      }}
+    <Modale
+      ouvert
+      onFermer={onFermer}
+      titre="Modifier l’arrivage"
+      description="L’entête seule. Les motos du lot ne changent pas ici."
+      taille="moyenne"
+      pied={
+        <div className="ml-auto flex flex-wrap gap-2">
+          <button type="button" onClick={onFermer} className="bouton bouton-discret">
+            Annuler
+          </button>
+          <button type="button" onClick={soumettre} className="bouton bouton-principal">
+            Enregistrer les modifications
+          </button>
+        </div>
+      }
     >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="titre-modifier-arrivage"
-        onKeyDown={(evenement) => {
-          if (evenement.key === "Escape") {
-            evenement.preventDefault();
-            onFermer();
-          }
-        }}
-        className="w-[min(36rem,calc(100vw-2rem))] rounded-carte border border-bord bg-papier text-encre shadow-panneau"
-      >
-        <div className="colonne-formulaire p-5">
-          <h2 id="titre-modifier-arrivage" className="text-lg font-semibold text-encre">
-            Modifier l’arrivage
-          </h2>
-          <p className="text-corps text-encre-doux">
-            L’entête seule. Les motos du lot ne changent pas ici.
-          </p>
+      <div className="space-y-4">
+        <Champ id="mod-nom" libelle="Nom de l’arrivage">
+          <input
+            id="mod-nom"
+            value={saisie.nom}
+            maxLength={LONGUEUR_NOM_MAX}
+            autoComplete="off"
+            onChange={(evenement) => changer({ nom: evenement.target.value })}
+            className="saisie"
+          />
+        </Champ>
 
-          <Champ id="mod-nom" libelle="Nom de l’arrivage">
+        <SelectFournisseur
+          valeur={saisie.fournisseurId}
+          changer={(fournisseurId) => changer({ fournisseurId })}
+          fournisseurs={fournisseurs}
+          auteur={auteur}
+        />
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Champ id="mod-date" libelle="Date d’arrivée" facultatif>
             <input
-              id="mod-nom"
-              value={saisie.nom}
-              maxLength={LONGUEUR_NOM_MAX}
-              autoComplete="off"
-              onChange={(evenement) => changer({ nom: evenement.target.value })}
+              id="mod-date"
+              type="date"
+              value={saisie.date}
+              onChange={(evenement) => changer({ date: evenement.target.value })}
               className="saisie"
             />
           </Champ>
-
-          <SelectFournisseur
-            valeur={saisie.fournisseurId}
-            changer={(fournisseurId) => changer({ fournisseurId })}
-            fournisseurs={fournisseurs}
-            auteur={auteur}
-          />
-
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Champ id="mod-date" libelle="Date d’arrivée" facultatif>
-              <input
-                id="mod-date"
-                type="date"
-                value={saisie.date}
-                onChange={(evenement) => changer({ date: evenement.target.value })}
-                className="saisie"
-              />
-            </Champ>
-            <Champ id="mod-desc" libelle="Description" facultatif>
-              <input
-                id="mod-desc"
-                value={saisie.description}
-                maxLength={LONGUEUR_DESCRIPTION_MAX}
-                onChange={(evenement) => changer({ description: evenement.target.value })}
-                className="saisie"
-              />
-            </Champ>
-          </div>
-
-          <EtatErreurSaisie message={erreur} />
-
-          <div className="flex flex-wrap justify-end gap-2">
-            <button type="button" onClick={onFermer} className="bouton bouton-discret">
-              Annuler
-            </button>
-            <button type="button" onClick={soumettre} className="bouton bouton-principal">
-              Enregistrer les modifications
-            </button>
-          </div>
+          <Champ id="mod-desc" libelle="Description" facultatif>
+            <input
+              id="mod-desc"
+              value={saisie.description}
+              maxLength={LONGUEUR_DESCRIPTION_MAX}
+              onChange={(evenement) => changer({ description: evenement.target.value })}
+              className="saisie"
+            />
+          </Champ>
         </div>
+
+        <EtatErreurSaisie message={erreur} />
       </div>
-    </div>
+    </Modale>
   );
 }

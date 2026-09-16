@@ -5,6 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { GardeEspace } from "@/components/GardeSession";
 import { Champ } from "@/components/patrons/Champ";
+import { nomComplet, nomDuClient } from "@/lib/domain/client";
 import { EtatErreurSaisie, EtatSansResultat, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
@@ -200,7 +201,7 @@ function VendrePieces() {
           ...ventesMotos.valeur.flatMap((vente) => [vente.numero, vente.numeroInitial]),
           ...ventesPieces.valeur.map((vente) => vente.numero),
         ],
-        nomClient: clients.find((client) => client.id === panier.clientId)?.nom ?? "",
+        nomClient: nomDuClient(clients.find((client) => client.id === panier.clientId), ""),
       },
       { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
     );
@@ -502,7 +503,7 @@ function VendrePieces() {
                 </option>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
-                    {client.nom}
+                    {nomComplet(client)}
                   </option>
                 ))}
               </select>

@@ -8,7 +8,7 @@ import { Avis } from "@/components/patrons/Avis";
 import { ErreurDeLecture, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { normaliserNom } from "@/lib/domain/client";
+import { nomDuClient, normaliserNom } from "@/lib/domain/client";
 import {
   chercherDossiers,
   dossiersEnAttente,
@@ -149,7 +149,7 @@ export default function PageDossiers() {
         cle: "client",
         titre: "Client",
         principal: true,
-        rendu: (dossier) => parClient.get(dossier.clientId)?.nom ?? "Client inconnu",
+        rendu: (dossier) => nomDuClient(parClient.get(dossier.clientId)),
       },
     ];
 
@@ -234,7 +234,7 @@ export default function PageDossiers() {
             <p key={dossier.venteId}>
               <span className="plaque-code">{dossier.numero}</span>
               {" · "}
-              {parClient.get(dossier.clientId)?.nom ?? "Client inconnu"}
+              {nomDuClient(parClient.get(dossier.clientId))}
               {" · "}
               {retardDe(dossier)}
             </p>

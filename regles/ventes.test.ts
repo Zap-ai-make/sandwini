@@ -81,8 +81,8 @@ const vente = (partie: Record<string, unknown> = {}, auteur = "ger-1") => ({
   date: hier,
   prixConvenu: 1_200_000,
   modePaiement: "comptant",
-  inclus: ["Casque"],
-  nonInclus: [],
+  carteGrise: true,
+  casque: true,
   totalPaye: 1_200_000,
   resteDu: 0,
   statutPaiement: "solde",
@@ -435,6 +435,45 @@ describe("l’arithmétique de la vente, vérifiée côté serveur", () => {
 
   it("accepte une vente datée d’hier : celle qui a été saisie hors ligne", async () => {
     await assertSucceeds(addDoc(collection(gerant(), "ventesMotos"), vente()));
+  });
+});
+
+/* Ce qui part avec la moto se coche depuis S44. Le validateur l'exige, et
+   refuse les deux listes de texte qu'il remplace — sans quoi un ancien
+   navigateur en cache continuerait d'écrire l'ancienne forme, et la base
+   porterait deux modèles à la fois. */
+describe("ce qui part avec la moto (S44)", () => {
+  it("accepte les quatre combinaisons de cases", async () => {
+    for (const carteGrise of [true, false]) {
+      for (const casque of [true, false]) {
+        await assertSucceeds(
+          addDoc(collection(gerant(), "ventesMotos"), vente({ carteGrise, casque })),
+        );
+      }
+    }
+  });
+
+  it("refuse une vente qui ne dit pas ce qui est inclus", async () => {
+    const { carteGrise, ...sansCarteGrise } = vente();
+    void carteGrise;
+    await assertFails(addDoc(collection(gerant(), "ventesMotos"), sansCarteGrise));
+
+    const { casque, ...sansCasque } = vente();
+    void casque;
+    await assertFails(addDoc(collection(gerant(), "ventesMotos"), sansCasque));
+  });
+
+  it("refuse autre chose qu’un booléen", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "ventesMotos"), vente({ carteGrise: "oui" })),
+    );
+  });
+
+  it("refuse les deux listes d’avant S44 — elles ne s’écrivent plus", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "ventesMotos"), vente({ inclus: ["Casque"] })),
+    );
+    await assertFails(addDoc(collection(gerant(), "ventesMotos"), vente({ nonInclus: [] })));
   });
 });
 

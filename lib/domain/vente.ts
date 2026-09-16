@@ -1,5 +1,4 @@
 import { formaterMontant } from "./format";
-import { lireLignes, ligneTropLongue, LIGNES_MAX, LONGUEUR_LIGNE_MAX } from "./saisie";
 
 /**
  * Une vente de moto (`prompt.md` §5.4, §6.1, §6.2).
@@ -103,6 +102,19 @@ export type Vente = {
   date: Date | null;
   prixConvenu: number;
   modePaiement: ModePaiement;
+  /**
+   * Ce qui part avec la moto (S44). `null` pour une vente d'avant S44, qui
+   * portait deux listes de texte libre au lieu de deux cases.
+   */
+  carteGrise: boolean | null;
+  casque: boolean | null;
+  /**
+   * Les deux listes d'avant S44 — **lues, jamais écrites**.
+   *
+   * On ne les traduit pas en booléens : deviner ce qu'un gérant avait tapé
+   * fabriquerait une donnée que personne n'a saisie. Elles restent telles
+   * quelles, et l'écran les affiche quand les booléens manquent.
+   */
   inclus: string[];
   nonInclus: string[];
   totalPaye: number;
@@ -175,8 +187,9 @@ export type SaisieVente = {
   clientId: string;
   prixConvenu: string;
   modePaiement: ModePaiement;
-  inclus: string;
-  nonInclus: string;
+  /** Ce qui part avec la moto. Coché par défaut : c'est le cas ordinaire. */
+  carteGrise: boolean;
+  casque: boolean;
   /** Ce que le client dépose au moment de la vente. Vide vaut zéro. */
   montantEncaisse: string;
   moyenPaiement: MoyenPaiement;
@@ -188,8 +201,8 @@ export const SAISIE_VENTE_VIDE: SaisieVente = {
   clientId: "",
   prixConvenu: "",
   modePaiement: "comptant",
-  inclus: "",
-  nonInclus: "",
+  carteGrise: true,
+  casque: true,
   montantEncaisse: "",
   moyenPaiement: "especes",
   reference: "",
@@ -307,19 +320,66 @@ export function validerVente(saisie: SaisieVente): string | null {
     return `La référence dépasse ${LONGUEUR_REFERENCE_MAX} caractères.`;
   }
 
-  for (const [champ, brut] of [
-    ["inclus", saisie.inclus],
-    ["non inclus", saisie.nonInclus],
-  ] as const) {
-    const lignes = lireLignes(brut);
-    const trop = ligneTropLongue(lignes);
-    if (trop) return `Une ligne « ${champ} » dépasse ${LONGUEUR_LIGNE_MAX} caractères.`;
-    if (brut.split("\n").filter((ligne) => ligne.trim()).length > LIGNES_MAX) {
-      return `La liste « ${champ} » ne peut pas dépasser ${LIGNES_MAX} lignes.`;
-    }
-  }
-
+  /* Les inclusions ne se valident plus : deux cases à cocher n'ont pas de
+     forme fautive. C'est tout ce que S44 a retiré d'ici. */
   return null;
+}
+
+/** Les deux inclusions, dans l'ordre où elles se lisent sur un reçu. */
+export const LIBELLE_INCLUSION = { carteGrise: "Carte grise", casque: "Casque" } as const;
+
+/**
+ * Ce qui part avec la moto, prêt à afficher — ou `null` pour une vente d'avant S44.
+ *
+ * `null` n'est pas « rien n'est inclus » : c'est « cette vente-là ne le disait
+ * pas ainsi ». L'appelant retombe alors sur ses deux listes de texte, qui sont
+ * ce que le gérant avait réellement écrit. Traduire les unes dans les autres
+ * fabriquerait une donnée que personne n'a saisie — et un reçu réimprimé ne
+ * dirait plus ce que le client a lu le jour de la vente (D61).
+ */
+export function inclusionsDeVente(
+  vente: Pick<Vente, "carteGrise" | "casque">,
+): { libelle: string; inclus: boolean }[] | null {
+  if (vente.carteGrise === null || vente.casque === null) return null;
+  return [
+    { libelle: LIBELLE_INCLUSION.carteGrise, inclus: vente.carteGrise },
+    { libelle: LIBELLE_INCLUSION.casque, inclus: vente.casque },
+  ];
+}
+
+export type BilanVentes = {
+  ventes: number;
+  chiffreAffaires: number;
+  encaisse: number;
+  resteAPercevoir: number;
+};
+
+/**
+ * Les quatre chiffres de tête du registre des ventes (S44).
+ *
+ * **Lus, jamais stockés** (D61) : ils se somment des documents que l'écran
+ * écoute déjà, donc ils ne peuvent pas diverger de ce dont ils sont tirés, et
+ * l'écran continue de les afficher réseau coupé. Un agrégat entretenu par
+ * déclencheur coûterait moins à lire et mentirait en silence le jour où le
+ * déclencheur échoue.
+ *
+ * **Aucune marge ici, et c'est une frontière, pas un oubli.** Les trois
+ * montants se lisent sur le document de vente, que le gérant a le droit de
+ * lire. Le coût et la marge vivent dans `prive/marge`, hors de sa portée (D2) —
+ * une carte de plus les ferait entrer par la fenêtre.
+ */
+export function bilanVentes(
+  ventes: readonly Pick<Vente, "prixConvenu" | "totalPaye" | "resteDu">[],
+): BilanVentes {
+  return ventes.reduce<BilanVentes>(
+    (bilan, vente) => ({
+      ventes: bilan.ventes + 1,
+      chiffreAffaires: bilan.chiffreAffaires + vente.prixConvenu,
+      encaisse: bilan.encaisse + vente.totalPaye,
+      resteAPercevoir: bilan.resteAPercevoir + vente.resteDu,
+    }),
+    { ventes: 0, chiffreAffaires: 0, encaisse: 0, resteAPercevoir: 0 },
+  );
 }
 
 /**

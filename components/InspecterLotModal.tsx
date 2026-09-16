@@ -1,8 +1,9 @@
 "use client";
 
-import { Ban, Pencil, Printer, RotateCcw, Trash2, X } from "lucide-react";
+import { Ban, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
+import { Modale } from "@/components/patrons/Modale";
 import {
   completudeCmc,
   ecoulement,
@@ -21,8 +22,10 @@ import type { Auteur } from "@/lib/repositories/referentiels";
  * écrit aussitôt (cache local), sans toucher au coût (D2). Les actions du lot —
  * corriger, annuler, effacer — vivent au pied, pas dans un menu par ligne.
  *
- * Monté seulement à l'ouverture ; c'est un calque, pas un `<dialog>` natif, pour
- * ne pas se faire refermer par le modal de correction qui s'ouvre par-dessus.
+ * Monté seulement à l'ouverture. Le calque, le focus, Échap et le verrou de
+ * défilement viennent de `Modale` depuis S44 — ils étaient recopiés ici, et
+ * **Échap ne marchait pas** : la touche était écoutée sur une boîte que rien ne
+ * focalisait à l'ouverture, donc l'événement ne lui parvenait jamais.
  */
 export function InspecterLotModal({
   arrivage,
@@ -71,48 +74,63 @@ export function InspecterLotModal({
   ];
 
   return (
-    <div
-      className="fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-nuit/45 p-4"
-      onMouseDown={(evenement) => {
-        if (evenement.target === evenement.currentTarget) onFermer();
-      }}
-    >
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="titre-inspecter-lot"
-        onKeyDown={(evenement) => {
-          if (evenement.key === "Escape") {
-            evenement.preventDefault();
-            onFermer();
-          }
-        }}
-        className="my-8 w-[min(56rem,calc(100vw-2rem))] rounded-carte border border-bord bg-papier text-encre shadow-panneau"
-      >
-        <div className="flex items-start gap-3 border-b border-bord p-5">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h2 id="titre-inspecter-lot" className="text-lg font-semibold text-encre">
-                {arrivage.nom}
-              </h2>
-              {arrivage.annule && <span className="pastille pastille-retard">Annulé</span>}
-            </div>
-            <p className="text-corps text-encre-doux">
-              Expéditeur : {nomFournisseur}
-              {arrivage.date ? ` — Arrivée ${formaterDate(arrivage.date)}` : ""}
-            </p>
+    <Modale
+      ouvert
+      onFermer={onFermer}
+      titre={arrivage.nom}
+      description={
+        <>
+          Expéditeur : {nomFournisseur}
+          {arrivage.date ? ` — Arrivée ${formaterDate(arrivage.date)}` : ""}
+          {arrivage.annule && (
+            <span className="pastille pastille-retard ml-2">Annulé</span>
+          )}
+        </>
+      }
+      taille="large"
+      pied={
+        <>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={onModifier} className="bouton bouton-discret">
+              <Pencil aria-hidden="true" className="size-4" />
+              Modifier
+            </button>
+            <button type="button" onClick={onExporterPdf} className="bouton bouton-discret">
+              <Printer aria-hidden="true" className="size-4" />
+              Exporter en PDF
+            </button>
+            {vide ? (
+              <button
+                type="button"
+                onClick={onSupprimer}
+                className="bouton bouton-discret text-alerte"
+              >
+                <Trash2 aria-hidden="true" className="size-4" />
+                Supprimer
+              </button>
+            ) : arrivage.annule ? (
+              <button type="button" onClick={onRetablir} className="bouton bouton-discret">
+                <RotateCcw aria-hidden="true" className="size-4" />
+                Rétablir
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={onAnnuler}
+                className="bouton bouton-discret text-alerte"
+              >
+                <Ban aria-hidden="true" className="size-4" />
+                Annuler le lot
+              </button>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={onFermer}
-            aria-label="Fermer"
-            className="bouton bouton-discret shrink-0 px-2"
-          >
-            <X aria-hidden="true" className="size-4" />
+          <button type="button" onClick={onFermer} className="ml-auto bouton bouton-principal">
+            Fermer
           </button>
-        </div>
-
-        <div className="colonne-formulaire p-5">
+        </>
+      }
+    >
+      <div className="space-y-4">
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             {stats.map((stat) => (
               <div key={stat.nom} className="cadre p-3">
@@ -199,48 +217,7 @@ export function InspecterLotModal({
               </table>
             </div>
           )}
-        </div>
-
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-b-carte border-t border-bord bg-fond px-5 py-3">
-          <div className="flex flex-wrap gap-2">
-            <button type="button" onClick={onModifier} className="bouton bouton-discret">
-              <Pencil aria-hidden="true" className="size-4" />
-              Modifier
-            </button>
-            <button type="button" onClick={onExporterPdf} className="bouton bouton-discret">
-              <Printer aria-hidden="true" className="size-4" />
-              Exporter en PDF
-            </button>
-            {vide ? (
-              <button
-                type="button"
-                onClick={onSupprimer}
-                className="bouton bouton-discret text-alerte"
-              >
-                <Trash2 aria-hidden="true" className="size-4" />
-                Supprimer
-              </button>
-            ) : arrivage.annule ? (
-              <button type="button" onClick={onRetablir} className="bouton bouton-discret">
-                <RotateCcw aria-hidden="true" className="size-4" />
-                Rétablir
-              </button>
-            ) : (
-              <button
-                type="button"
-                onClick={onAnnuler}
-                className="bouton bouton-discret text-alerte"
-              >
-                <Ban aria-hidden="true" className="size-4" />
-                Annuler le lot
-              </button>
-            )}
-          </div>
-          <button type="button" onClick={onFermer} className="bouton bouton-principal">
-            Fermer
-          </button>
-        </div>
       </div>
-    </div>
+    </Modale>
   );
 }

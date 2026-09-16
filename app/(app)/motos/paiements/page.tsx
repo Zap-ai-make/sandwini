@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useMemo, type ReactNode } from "react";
 import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
+import { nomDuClient } from "@/lib/domain/client";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
 import { formaterDateCourte, formaterMontant, formaterNombre } from "@/lib/domain/format";
@@ -121,7 +122,7 @@ export default function PagePaiements() {
   );
 
   const nomClient = useCallback(
-    (clientId: string) => clients.find((client) => client.id === clientId)?.nom ?? "Client inconnu",
+    (clientId: string) => nomDuClient(clients.find((client) => client.id === clientId)),
     [clients],
   );
   const moto = useCallback(

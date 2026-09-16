@@ -569,16 +569,30 @@ service cloud.firestore {
     // toujours pas : les ventes, les montants et les dossiers des autres
     // boutiques, qui restent cloisonnés ailleurs dans ce fichier.
 
+    // `prenom` et `nip` sont dans le `hasOnly` et **pas** dans le `hasAll`, et
+    // c'est ce qui rend S44 rétro-compatible : ce validateur tourne à la
+    // création **comme à la modification**, et une fiche saisie avant S44 ne
+    // porte ni l'un ni l'autre. Les exiger rendrait tout le fichier clients
+    // incorrigible du jour au lendemain. Même montage que `motos.cmcRecu` (S43).
     function clientValide(donnees) {
-      return donnees.keys().hasOnly(['nom', 'nomNormalise', 'telephone', 'telephoneNormalise',
-                                     'telephone2', 'adresse', 'note'].concat(champsAudit()))
+      return donnees.keys().hasOnly(['nom', 'prenom', 'nip', 'nomNormalise', 'telephone',
+                                     'telephoneNormalise', 'telephone2', 'adresse',
+                                     'note'].concat(champsAudit()))
              && donnees.keys().hasAll(['nom', 'nomNormalise', 'telephone', 'telephoneNormalise',
                                        'telephone2', 'adresse', 'note'].concat(champsAudit()))
              && donnees.nom is string
              && donnees.nom.size() > 0
              && donnees.nom.size() <= 80
+             && (!donnees.keys().hasAny(['prenom'])
+                 || (donnees.prenom is string && donnees.prenom.size() <= 80))
+             // Le numéro de la pièce d'identité : dix-sept chiffres, ou rien.
+             // Vide est une valeur ordinaire — une vente ne s'arrête pas parce
+             // que le client a oublié sa carte (D76).
+             && (!donnees.keys().hasAny(['nip'])
+                 || (donnees.nip is string
+                     && (donnees.nip == '' || donnees.nip.matches('^[0-9]{17}$'))))
              && donnees.nomNormalise is string
-             && donnees.nomNormalise.size() <= 80
+             && donnees.nomNormalise.size() <= 161
              && donnees.telephone is string
              && donnees.telephone.size() > 0
              && donnees.telephone.size() <= 32
@@ -624,9 +638,9 @@ service cloud.firestore {
       return valeur is string && valeur.matches('^[A-Z]{3}-[0-9]{4}-[0-9]{4,}$');
     }
 
-    function listeBornee(valeur, maximum) {
-      return valeur is list && valeur.size() <= maximum;
-    }
+    // `listeBornee` était ici, pour les deux listes de texte libre « inclus »
+    // et « non inclus ». S44 les a remplacées par deux booléens : ce qui part
+    // avec la moto se coche, et deux cases n'ont pas de taille à borner.
 
     function dateAppareil(valeur) {
       // La date métier vient de l'appareil (D38). On ne peut pas vérifier une
@@ -636,13 +650,13 @@ service cloud.firestore {
 
     function venteValide(donnees) {
       return donnees.keys().hasOnly(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
-                                     'date', 'prixConvenu', 'modePaiement', 'inclus', 'nonInclus',
+                                     'date', 'prixConvenu', 'modePaiement', 'carteGrise', 'casque',
                                      'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
                                      'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
                                      'lienSuiviEnvoyeAt', 'statutDossier',
                                      'dateClotureDossier'].concat(champsAudit()))
              && donnees.keys().hasAll(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
-                                       'date', 'prixConvenu', 'modePaiement', 'inclus', 'nonInclus',
+                                       'date', 'prixConvenu', 'modePaiement', 'carteGrise', 'casque',
                                        'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
                                        'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
                                        'lienSuiviEnvoyeAt', 'statutDossier',
@@ -661,8 +675,12 @@ service cloud.firestore {
              && montantValide(donnees.prixConvenu)
              && donnees.prixConvenu > 0
              && donnees.modePaiement in ['comptant', 'credit', 'tranches']
-             && listeBornee(donnees.inclus, 20)
-             && listeBornee(donnees.nonInclus, 20)
+             // Ce qui part avec la moto : deux cases, pas deux listes (S44).
+             // Les ventes d'avant gardent leurs listes sans être inquiétées —
+             // ce validateur ne tourne qu'à la création, et une vente ne se
+             // modifie que par les deux gestes ouverts plus bas.
+             && donnees.carteGrise is bool
+             && donnees.casque is bool
              // L'arithmétique de la vente, vérifiée ici et pas seulement dans le
              // formulaire : c'est le seul endroit qu'un client modifié ne
              // contourne pas.
