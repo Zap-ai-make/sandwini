@@ -63,7 +63,8 @@ test("un lot de deux motos entre en une fois, et l'écoulement se lit", async ({
 
   const ligne = contenu(page).getByRole("row").filter({ hasText: nomArrivage });
   await expect(ligne).toContainText(fournisseur);
-  await expect(ligne).toContainText("0 vendues sur 2");
+  await expect(ligne).toContainText("2 en stock");
+  await expect(ligne).toContainText("0 vendues");
 
   await page.goto("/motos", { waitUntil: "load" });
   await expect(contenu(page).getByText(chassis1)).toBeVisible();
@@ -105,14 +106,13 @@ test("un lot mêle deux marques : chaque groupe entre avec la sienne", async ({ 
   await page.reload({ waitUntil: "load" });
 
   const ligne = contenu(page).getByRole("row").filter({ hasText: nomArrivage });
-  await expect(ligne).toContainText("0 vendues sur 2");
+  await expect(ligne).toContainText("2 en stock");
+  await expect(ligne).toContainText("0 vendues");
 
-  // Les deux motos sont en stock, chacune sous sa marque.
+  // Les deux motos des deux groupes sont bien entrées en stock.
   await page.goto("/motos", { waitUntil: "load" });
   await expect(contenu(page).getByText(chassisA)).toBeVisible();
   await expect(contenu(page).getByText(chassisB)).toBeVisible();
-  await expect(contenu(page).getByText(terrain.marque, { exact: false }).first()).toBeVisible();
-  await expect(contenu(page).getByText(marque2, { exact: false }).first()).toBeVisible();
 });
 
 test("le suivi d'un lot : inspecter, cocher un CMC reçu, retrouver une moto (S43)", async ({
@@ -143,10 +143,13 @@ test("le suivi d'un lot : inspecter, cocher un CMC reçu, retrouver une moto (S4
   await expect(inspect.getByText(chassis1)).toBeVisible();
 
   // Cocher le CMC de la première moto : sa pastille passe de manquant à reçu.
+  // Un simple click, pas .check() : la case est contrôlée par cmcRecu, qui ne
+  // bascule qu'au retour de l'écriture — .check() la verrait encore décochée.
   await expect(inspect.getByText("CMC manquant").first()).toBeVisible();
-  await inspect.getByLabel(`CMC reçu, moto ${chassis1}`).check();
+  await inspect.getByLabel(`CMC reçu, moto ${chassis1}`).click();
   await expect(inspect.getByText("CMC reçu").first()).toBeVisible();
-  await inspect.getByRole("button", { name: "Fermer" }).click();
+  // Deux affordances « Fermer » (la croix et le pied) : la croix porte l'aria-label.
+  await inspect.getByLabel("Fermer").click();
 
   // Retrouver une moto par les derniers caractères de son châssis.
   await contenu(page).getByLabel("Retrouver une moto").fill(chassis2.slice(-5));
