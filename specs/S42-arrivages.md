@@ -1,7 +1,7 @@
 # S42 — L'arrivage : faire entrer un lot de motos d'un même fournisseur
 
 ```
-Statut     : en cours
+Statut     : terminée
 Périmètre  : post-MVP
 Dépend de  : S4, S5, S39, S40
 ```
@@ -119,10 +119,10 @@ un téléphone ni une localité.
   fournisseurs. `motoValide` accepte l'origine provenance **ou** arrivage. **14 tests**.
   Le passage aux groupes ne touche ni les règles ni ces tests (documents bruts).
 - **E2e** (`e2e/arrivages.spec.ts`, sur émulateurs) : suite portée à **3 cas** — le lot
-  d'une marche, le refus de deux châssis identiques, et **un lot à deux marques** (bouton
+  d'une marque, le refus de deux châssis identiques, et **un lot à deux marques** (bouton
   « Ajouter une marque », un groupe par marque, deux motos en stock chacune sous la sienne).
-  **À rejouer sur émulateurs** : l'environnement de dev pointe pour l'instant sur le vrai
-  projet, et la suite refuse de tourner hors émulateurs.
+  **Rejoué sur émulateurs jetables** (`npm run test:e2e:propre`), **vert** — les cas de lot
+  ont dû retenter une fois sous la contention S27, verts au rejeu.
 - **Rendu** : le serveur de dev (projet réel) recompile `/motos/arrivages` et la sert en
   200. `tsc` sans erreur de source, `eslint` propre.
 - **Rendu regardé** (règle 5) : `captures/arrivage-modal-clair.png`,

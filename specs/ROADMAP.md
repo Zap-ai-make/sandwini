@@ -231,8 +231,8 @@ c'est le voir revenir sous un autre nom.
 | S40 | Le contrôle d'unicité répond avant de savoir | S5, S20, S39 | post-MVP | terminée |
 | S27 | La suite bout en bout rend un verdict qu'on peut croire | aucune | post-MVP | terminée |
 | S41 | Le second lecteur ne voit pas une sortie de caisse déjà publiée | S22, S27 | post-MVP | **ouverte** |
-| S42 | L'arrivage : faire entrer un lot de motos d'un même fournisseur | S4, S5, S39, S40 | post-MVP | **en cours** |
-| S43 | L'arrivage : l'espace de suivi d'un lot (bilan, CMC, inspection, actions) | S42, S11, S39 | post-MVP | **en cours** |
+| S42 | L'arrivage : faire entrer un lot de motos d'un même fournisseur | S4, S5, S39, S40 | post-MVP | terminée |
+| S43 | L'arrivage : l'espace de suivi d'un lot (bilan, CMC, inspection, actions) | S42, S11, S39 | post-MVP | terminée |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
@@ -352,6 +352,40 @@ navigateur ne l'avait pas**. Le décor coupait le réseau avant que ses propres
 quelques centaines de millisecondes, ce qui suffisait à faire basculer une course
 déjà là. Le test attend maintenant « À jour » avant de débrancher, et passe en
 **7,1 s** contre 90 s d'expiration. D97 en tire la règle.
+
+S42 et S43 sont fermées ensemble — elles forment un seul commit (l'arrivage :
+l'entrée par lot, puis l'espace qui la suit). Le concurrent (KYSG) fait entrer un
+lot en deux formulaires ; **S42 le fait en un seul**, où l'on choisit ou crée le
+fournisseur, puis, **par groupe de marque**, on fixe une fois ce qui est commun
+(marque, modèle, prix) et on saisit les châssis à la chaîne — un même lot mêle
+plusieurs marques. Là où KYSG tape le fournisseur en texte libre, on tient un vrai
+fichier ; et **le coût reste cloisonné** (D2/S39) : la colonne prix n'existe que
+pour le responsable, un lot « gérant » n'écrit aucun `prive/cout`, prouvé par un
+test de règles, pas seulement masqué à l'écran.
+
+**S43 suit ce que S42 fait entrer** : cinq cartes de tête lues du stock (reçues, en
+stock, vendues, CMC manquants), une liste enrichie (ancienneté, barre d'écoulement,
+complétude CMC), trois filtres, « Retrouver une moto » par suffixe de châssis,
+l'inspection d'un lot avec la case « CMC reçu », la modification de l'entête, le
+retrait **adapté au journal** (un lot vide s'efface, un lot plein s'annule et se
+rétablit — rien ne s'efface en cascade), et l'export PDF par impression, hors ligne,
+sans librairie. Rien n'est stocké : compteurs, écoulement et complétude se calculent
+en lecture (D61). Deux booléens suffisent — `motos.cmcRecu`, `arrivages.annule` —
+ajoutés aux validateurs de façon **rétro-compatible**, de sorte que les motos et lots
+d'avant S43 restent modifiables.
+
+**Ce que le rendu a trouvé, et qu'aucun test de domaine n'aurait vu** : deux
+`<dialog>` natifs imbriqués (le modal fournisseur dans celui du lot) se chassaient,
+et le lot partait **sans fournisseur** ; le modal fournisseur est devenu un calque
+simple, et le centrage cassé par la Preflight de Tailwind a été refait à la main.
+
+**Vérifié** : 533 tests d'unité, 20 tests de règles sur émulateur, et la suite bout
+en bout arrivages **rejouée verte** sur émulateurs jetables (`npm run test:e2e:propre`)
+— les quatre cas passent, deux ayant dû retenter une fois sous la contention S27, le
+défaut que S27 a lui-même mesuré et outillé. Les règles sont déployées sur le projet
+réel. Le rendu a été regardé en clair ; les captures sombres n'ont pas été régénérées
+sous l'instabilité de l'émulateur, mais `captures/` est gitignore — c'est un œil, pas
+une garantie, et la garantie est ailleurs.
 
 ---
 

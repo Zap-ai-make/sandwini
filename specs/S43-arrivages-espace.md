@@ -1,7 +1,7 @@
 # S43 — L'arrivage : l'espace de suivi d'un lot
 
 ```
-Statut     : en cours
+Statut     : terminée
 Périmètre  : post-MVP
 Dépend de  : S42, S11, S39
 ```
@@ -30,30 +30,30 @@ physique de cartes** (attribution, remise) reste S16, à part.
 
 ## Critères d'acceptation
 
-- [ ] **Cartes de tête** sur `/motos/arrivages` : arrivages, motos reçues, en stock,
+- [x] **Cartes de tête** sur `/motos/arrivages` : arrivages, motos reçues, en stock,
       vendues, **CMC manquants** — calculées en lecture sur le périmètre affiché,
       jamais stockées.
-- [ ] La **liste** s'enrichit : date d'arrivée + son ancienneté relative
+- [x] La **liste** s'enrichit : date d'arrivée + son ancienneté relative
       (« aujourd'hui », « il y a 3 jours », « il y a 1 mois »), **barre d'écoulement**
       (en stock / vendues), **complétude CMC** (« k manquants · reçus / total »).
-- [ ] **Filtres** : Tous · CMC incomplets · Écoulés (un lot est écoulé quand toutes
+- [x] **Filtres** : Tous · CMC incomplets · Écoulés (un lot est écoulé quand toutes
       ses motos sont vendues).
-- [ ] **Retrouver une moto** : un champ cherche par numéro de châssis, **complet ou
+- [x] **Retrouver une moto** : un champ cherche par numéro de châssis, **complet ou
       par ses derniers caractères**, et mène à la moto (et à son lot).
-- [ ] **Inspecter le lot** : un panneau montre l'entête, les compteurs du lot, et la
+- [x] **Inspecter le lot** : un panneau montre l'entête, les compteurs du lot, et la
       table de ses motos (cadre, marque, statut, CMC). Une **case « CMC reçu »** y
       bascule `cmcRecu` — écriture ordinaire de moto, sans jamais toucher au coût.
-- [ ] **Modifier** l'entête (nom, fournisseur, date, description) depuis la liste —
+- [x] **Modifier** l'entête (nom, fournisseur, date, description) depuis la liste —
       déjà permis par les règles (responsable ou gérant de la boutique du lot).
-- [ ] **Retirer un lot**, adapté au journal : un lot **sans moto** s'efface (entête
+- [x] **Retirer un lot**, adapté au journal : un lot **sans moto** s'efface (entête
       seule) ; un lot **avec motos** s'**annule** (masqué, réversible), ses motos
       restant en stock. Un lien « Voir les annulés » les révèle avec **Rétablir**.
-- [ ] **Exporter le lot en PDF** : une vue imprimable du bordereau (entête, motos,
+- [x] **Exporter le lot en PDF** : une vue imprimable du bordereau (entête, motos,
       écoulement, CMC) + impression navigateur → PDF. Hors-ligne, sans librairie ni
       Cloud Function (D66).
-- [ ] **Le coût reste cloisonné (D2/S39)** : aucune de ces écritures (CMC, annule,
+- [x] **Le coût reste cloisonné (D2/S39)** : aucune de ces écritures (CMC, annule,
       entête) ne lit ni n'écrit `prive/cout`. Prouvé par un test de règles.
-- [ ] États couverts : liste vide, chargement, périmètre « toutes boutiques » (lecture
+- [x] États couverts : liste vide, chargement, périmètre « toutes boutiques » (lecture
       seule, pas de création), erreur nommée — `DESIGN.md` §10.
 
 ---
@@ -129,12 +129,20 @@ Le PDF est une page imprimable, pas un service.
 - **Types + lint** ✅ : `tsc` sans erreur de source, `eslint` propre.
 - **Rendu** ✅ : le serveur de dev (projet réel) recompile `/motos/arrivages` et la sert
   en 200.
-- **E2e** ✍️ **écrit, pas rejoué** (`e2e/arrivages.spec.ts`) : un lot suivi — inspecter,
-  cocher un CMC reçu (la pastille passe de manquant à reçu), retrouver une moto par ses
-  derniers caractères. À rejouer sur émulateurs : l'environnement de dev pointe sur le
-  vrai projet, et la suite refuse de tourner hors émulateurs.
-- **À faire pour clore** : déployer les règles sur le projet réel (les actions CMC /
-  annuler / supprimer l'exigent), rejouer l'e2e sur émulateurs, captures clair/sombre.
+- **E2e** ✅ **rejoué sur émulateurs jetables, vert** (`e2e/arrivages.spec.ts`,
+  `npm run test:e2e:propre`) : un lot suivi — inspecter, cocher un CMC reçu (la pastille
+  passe de manquant à reçu), retrouver une moto par ses derniers caractères ; plus, côté
+  S42, le lot à deux marques et le refus du châssis en double. Les **quatre** cas passent
+  (deux ont dû retenter une fois sous la contention S27, verts au rejeu — le défaut mesuré
+  et outillé par S27 lui-même).
+- **Règles déployées** ✅ sur le projet réel (sandwini), après feu vert du commanditaire :
+  `cmcRecu`/`annule` dans les validateurs (facultatifs, rétro-compatibles), `delete` d'un
+  arrivage ouvert à sa boutique — sans quoi les actions CMC / annuler / supprimer seraient
+  refusées en production.
+- **Captures** : les claires (liste enrichie + inspection) ont été regardées ; les sombres
+  n'ont **pas** été régénérées cette session — l'émulateur Firestore s'écrase au lancement
+  sous la contention (instabilité Windows S27). `captures/` étant gitignore, c'est un œil
+  local (règle 5), hors livrable ; le produit, lui, est couvert par l'e2e.
 
 ---
 
