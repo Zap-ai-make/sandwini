@@ -233,6 +233,8 @@ c'est le voir revenir sous un autre nom.
 | S41 | Le second lecteur ne voit pas une sortie de caisse déjà publiée | S22, S27 | post-MVP | **ouverte** |
 | S42 | L'arrivage : faire entrer un lot de motos d'un même fournisseur | S4, S5, S39, S40 | post-MVP | terminée |
 | S43 | L'arrivage : l'espace de suivi d'un lot (bilan, CMC, inspection, actions) | S42, S11, S39 | post-MVP | terminée |
+| S44 | La vente en modale, l'entrée moto, les réglages | S8, S6, S10, S39, S40, S42, S43 | post-MVP | terminée |
+| S45 | L'erreur d'évaluation des règles est du bruit — piste écartée, preuve à l'appui | S39, S27 | post-MVP | écartée |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
@@ -386,6 +388,129 @@ défaut que S27 a lui-même mesuré et outillé. Les règles sont déployées su
 réel. Le rendu a été regardé en clair ; les captures sombres n'ont pas été régénérées
 sous l'instabilité de l'émulateur, mais `captures/` est gitignore — c'est un œil, pas
 une garantie, et la garantie est ailleurs.
+
+S44 est terminée. Ce n'est pas une capacité de plus : c'est la même vente, le
+même dossier, le même reçu — rendus plus rapides à faire et plus calmes à lire.
+Le geste central du produit quittait le registre des ventes pour une page de
+865 lignes ; il s'ouvre maintenant par-dessus lui, et la liste se met à jour
+dessous au moment où la vente part.
+
+**Le client se crée par défaut**, au lieu d'être d'abord cherché dans un fichier
+où l'acheteur n'est en général pas. Les deux listes — motos et clients — ne
+déroulent plus rien tant qu'on n'a pas tapé. Ce qui part avec la moto **se
+coche** au lieu de s'écrire, et le mode de paiement tient en trois segments là
+où trois pavés et un bandeau redisaient la même phrase ; la conséquence se lit
+dans le récapitulatif, à l'instant où l'on valide.
+
+**Deux changements de modèle, rétro-compatibles par deux montages différents**,
+et la différence ne tient pas au goût : `venteValide` ne tourne qu'à la
+création, donc les ventes d'avant ne sont jamais revalidées ; `clientValide`
+tourne aussi à la modification, donc `prenom` et `nip` entrent dans le `hasOnly`
+et pas dans le `hasAll` — les exiger rendrait tout le fichier clients
+incorrigible du jour au lendemain. Aucune migration, et quatre tests de règles
+le prouvent au lieu de l'affirmer. D101 porte la règle.
+
+**Un patron de modale remplace quatre copies, et en répare deux défauts que
+personne ne cherchait.** `InspecterLotModal` et `ModifierArrivageModal`
+écoutaient Échap sur une boîte que rien ne focalisait : la touche n'arrivait à
+personne. `FournisseurModal` et `ModifierArrivageModal` n'avaient ni hauteur
+bornée ni défilement : à 390 px, clavier ouvert, le bouton qui enregistre
+sortait de l'écran. Aucun test ne les voyait, parce qu'aucun test ne ferme une
+modale au clavier ni ne mesure un cadre. `ArrivageModal` quitte `<dialog>` — le
+produit tenait deux mécaniques pour un même objet, dont l'une n'existait que
+pour survivre à l'autre (D100).
+
+**Ce que la vérification a trouvé, et qu'aucune relecture n'aurait vu.**
+`chercherClients` acceptait n'importe quelle sous-chaîne : « Awa » répondait
+« S*awa*dogo ». Le défaut vivait depuis S6, invisible tant que le nom tenait en
+un seul champ long ; un prénom est court, donc d'autant plus souvent contenu au
+milieu d'un autre nom. C'est le changement de modèle qui l'a fait sortir, pas un
+test écrit pour lui.
+
+**Et la suite bout en bout a rendu trois verdicts qu'il aurait été facile de
+ranger avec le bruit de S27.** Six échecs d'abord, tous sur le même message : le
+bouton radio du segmenté est `sr-only`, et Playwright refuse de cliquer un carré
+d'un pixel recouvert par le cadre. Le dépôt avait déjà tranché ce cas en S20 —
+on clique l'étiquette dans le `radiogroup` —, et c'est sa convention qui a été
+suivie plutôt qu'un contournement. Puis trois échecs, de trois causes
+différentes : une liste de documents sans nom accessible, où « Carte grise »
+figure désormais à deux titres ; une course que D97 avait déjà nommée ; et **un
+`page.goto` posé hors ligne par ce lot**, qui rechargeait la page alors que des
+écritures attendaient encore en file — la file ne se vidait plus jamais au
+retour du réseau. Le lien profond a désormais son propre test, où rien n'attend.
+
+**Ce que le rendu a trouvé** — la règle 5, et elle a encore payé trois fois. Les
+dix-sept cases du NIP se groupaient par quatre, ce qui laisse `4·4·4·4·1` : une
+case orpheline, qui se lit comme une faute de mise en page et non comme un
+groupe. Un reliquat d'une seule case rejoint désormais le précédent. Le hub des
+réglages, lui, posait son compteur en colonne fixe : à 390 px il ne restait que
+cent cinquante pixels à la phrase, et « Déclarer un point de vente, son code et
+ses coordonnées » sortait en quatre lignes de trois mots — défaut sans
+importance tant que le hub s'affichait partout, devenu son seul rendu depuis que
+S44 le retire du bureau. Troisième trouvaille, et c'est l'outil qui était en
+faute : la spec de captures photographiait la modale en `fullPage`, ce qui étire
+la page derrière un calque fixe et fabrique un vide sous la feuille. L'image
+donnait à croire à un défaut qui n'existait pas.
+
+**Deux fausses pistes écartées en mesurant.** Le calque semblait ne pas couvrir
+la colonne de navigation : les pixels disent le contraire — le logo du rail
+passe de `[95,64,45]` à `[61,44,43]` — et c'est le fond de la colonne qui ne
+bouge pas, parce qu'un voile `nuit/45` posé sur du `nuit` rend du `nuit`. Le reçu
+semblait taire les exclusions : il écrit « Casque : non inclus » en toutes
+lettres, le commentaire du code ayant tranché avant nous que « le mot porte
+l'information, le signe ne fait que la doubler ».
+
+**Ce que la vérification n'a pas donné, et qu'il faut dire.** Les trois suites du
+contrat sont vertes — 559 unitaires, 347 de règles, 27 de déclencheurs, ces
+derniers exécutés seulement parce qu'un échec bout en bout sur la marge a révélé
+qu'on les avait oubliés. Le bout en bout, lui, ne l'est pas : 106 sur 113 à la
+passe complète, puis 11 puis 12 sur 13 pour `ventes.spec.ts` seul sur émulateurs
+neufs. Chaque test du fichier a été vu passer, et **aucun échec n'a jamais porté
+sur une valeur fausse** — pas une inclusion, pas un montant, pas un numéro, pas
+un droit : toujours une donnée qui n'arrive pas, bandeau sur « Hors ligne ».
+Deux courses de décor ont été corrigées au passage, dont une que le README
+n'écrivait que dans un sens : fermer un contexte détruit ce qu'il n'a pas envoyé,
+exactement comme en ouvrir un second ne montre que ce qui est parti. Le reste
+appartient à S27, et S45 ci-dessous raconte la piste qui semblait l'expliquer et
+ne l'expliquait pas.
+
+S45 est **écartée**, et elle reste écrite parce qu'une piste explorée jusqu'au
+bout vaut d'être connue : elle évite à la suivante de refaire le chemin.
+
+Le symptôme est réel. `firestore-debug.log` porte, environ une fois par test
+bout en bout, non pas un refus mais une *erreur d'évaluation* :
+
+```
+evaluation error at L268:24 for 'create' @ L268, false for 'create' @ L1390, …
+```
+
+La ligne 268 est la création d'un modèle. Dans `modeleValide`, un seul terme
+semblait pouvoir lever au lieu de rendre `false` :
+`exists(.../marques/$(donnees.marqueId))`. L'hypothèse tenait : un `marqueId`
+**présent mais vide** y fabrique un segment de chemin nul, et c'est justement le
+seul cas que les tests de règles ne couvrent pas — ils ont le `marqueId`
+inexistant et le `marqueId` absent, pas la chaîne vide.
+
+**Une sonde jetable l'a réfutée.** Deux écritures, l'une avec `marqueId: ''`,
+l'autre avec `marqueId: 'marque-inexistante'` — le témoin déjà couvert par la
+suite. *Les deux* produisent l'erreur. Ce n'est donc pas la chaîne vide : **tout
+`exists()` qui ne trouve pas** la journalise, c'est-à-dire le chemin de refus
+normal et voulu de cette règle. Le journal le dit lui-même en toutes lettres,
+pour peu qu'on lise la ligne entière plutôt que son début : l'erreur
+d'évaluation est suivie d'un `false` définitif. L'écriture est refusée
+proprement, le client reçoit son `PERMISSION_DENIED`, et rien en aval ne casse.
+
+*Conséquence sur l'autre enquête :* cette erreur n'explique **pas** les
+`WebChannelConnection RPC 'Write' stream transport errored` ni les passages en
+« Hors ligne » qui ont coûté sept échecs à la passe complète de S44. La cause de
+l'instabilité bout en bout reste inconnue, et elle reste donc chez S27 — l'avoir
+attribuée aux règles aurait fermé une enquête ouverte sur une fausse piste, ce
+qui est pire que de la laisser ouverte.
+
+*Ce qui reste vrai et mérite une ligne un jour :* l'émulateur journalise en
+`WARNING`, avec pile d'exception Java, ce qui est un refus attendu. C'est du
+bruit, et le bruit dans un journal coûte le jour où l'on y cherche un signal —
+ce qui vient précisément d'arriver.
 
 ---
 

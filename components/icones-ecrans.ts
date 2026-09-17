@@ -34,7 +34,7 @@ import {
 export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/supervision": Activity,
   "/dashboard": LayoutGrid,
-  "/motos/ventes/nouvelle": Plus,
+  "/motos/ventes?nouvelle=1": Plus,
   "/motos": Bike,
   "/motos/nouvelle": Store,
   "/motos/arrivages": Truck,

@@ -242,7 +242,7 @@ function Ventes() {
           cette carte. */}
       <CartesVentes bilan={bilan} />
 
-      <ModaleVente ouverte={modaleOuverte} onFermer={fermerLaModale} />
+      {modaleOuverte && <ModaleVente onFermer={fermerLaModale} />}
 
       <AvecPanneau
         panneau={venteOuverte ? <FicheVente id={venteOuverte} /> : null}

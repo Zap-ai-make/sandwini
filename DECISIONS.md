@@ -2696,3 +2696,103 @@ d'emblée toute explication par la lenteur.
 *Conséquence :* le protocole est écrit dans `e2e/README.md`, avec le tableau des
 trois réponses et ce que chacune veut dire. Il y est plutôt que dans un message
 de commit parce que c'est là qu'on le cherchera.
+
+---
+
+## D100 — La modale du produit est un calque, et ses garanties s'écrivent une fois
+
+*S44, en factorisant quatre copies — dont deux étaient fausses.*
+
+D72 avait tranché « pas de bibliothèque de composants : `<dialog>` suffit », et
+l'argument tenait : le natif donne gratuitement le piège de focus, Échap, le
+fond inerte, la restitution du focus au déclencheur, et une couche supérieure
+sans `z-index`. Cinq garanties pour une balise.
+
+**S42 a mesuré que ça ne tient pas dès qu'il y en a deux.** Le modal fournisseur
+s'ouvre par-dessus celui de l'arrivage ; deux `<dialog>` modaux imbriqués se
+referment l'un l'autre, et le lot partait **sans fournisseur**. Le remède du
+moment fut local : le modal intérieur est devenu un calque. Puis le suivant, et
+le suivant. À la fin de S43, le produit tenait **deux mécaniques pour un même
+objet** — un `<dialog>` et trois calques —, et la seule raison d'être des trois
+était de survivre au premier.
+
+**Ce que la copie a coûté, et qu'aucun test ne montrait.** Chaque calque
+réimplémentait un bout de ce que le natif donnait, et deux l'ont mal fait :
+
+- `InspecterLotModal` et `ModifierArrivageModal` écoutaient Échap sur leur
+  boîte, sans jamais lui donner le focus à l'ouverture. **La touche n'arrivait
+  à personne.** `FournisseurModal` n'y échappait que par accident, grâce à un
+  `autoFocus` posé pour une autre raison.
+- `FournisseurModal` et `ModifierArrivageModal` étaient centrés sans `max-h` ni
+  défilement : à 390 px, clavier ouvert, le pied du formulaire — donc le bouton
+  qui enregistre — sortait de l'écran sans moyen de l'atteindre. Sur une
+  application dont la suite bout en bout tourne sur un Pixel 7.
+
+Aucun des deux ne cassait un test, parce qu'aucun test ne ferme une modale au
+clavier ni ne mesure la hauteur d'un cadre.
+
+**Décision.** Un patron, `components/patrons/Modale.tsx`, et un seul mécanisme :
+un calque `fixed inset-0`. Il reprend à sa charge les cinq garanties du natif —
+focus pris, piégé, rendu ; Échap ; fond inerte — plus ce que le natif ne donnait
+pas : une hauteur bornée avec défilement, une feuille montée du bas sur
+téléphone, et un empilement décidé par une **pile de modules** plutôt que par
+des `z-index` recopiés à la main, qui se départagent sinon par l'ordre du DOM.
+
+*Conséquence :* les quatre modals du produit passent dessus, `ArrivageModal`
+compris — il quitte `<dialog>`. `PaletteCommandes` le garde : rien ne s'y
+imbrique, et ce n'est pas une modale de saisie. D72 n'est pas renversée sur le
+fond — on n'ajoute toujours aucune dépendance — mais sa justification est
+corrigée : `<dialog>` suffit **tant qu'il est seul**, et ce produit en imbrique.
+
+La leçon générale est celle de D92 dans une autre matière : **une correction
+locale répétée trois fois est une factorisation qu'on n'a pas faite**, et le
+prix ne se paie pas au troisième exemplaire — il se paie le jour où l'on
+découvre que deux des trois étaient faux depuis le début.
+
+---
+
+## D101 — Un champ qui manque n'est pas un champ à zéro, et c'est ce qui évite les migrations
+
+*S44, en séparant le prénom du nom et en remplaçant deux listes par deux cases.*
+
+Deux changements de modèle dans le même lot, et deux façons différentes de les
+rendre rétro-compatibles — la différence ne tient pas au goût, elle tient à
+**quand le validateur tourne**.
+
+**La vente.** `venteValide` ne s'exécute qu'à la création : une vente ne se
+modifie que par deux gestes étroits, qui passent par `seulsChangent`. Les ventes
+d'avant S44 ne sont donc jamais revalidées, et on peut retirer `inclus` /
+`nonInclus` du contrat et exiger `carteGrise` / `casque` sans toucher à une
+seule ligne existante.
+
+**Le client.** `clientValide` tourne à la création **et** à la modification.
+Exiger `prenom` et `nip` rendrait tout le fichier d'avant S44 incorrigible du
+jour au lendemain — un gérant qui corrige un numéro mal noté se verrait refuser
+l'écriture. Les deux champs entrent donc dans le `hasOnly` et **pas** dans le
+`hasAll`. Même montage que `motos.cmcRecu` en S43.
+
+**Et à la lecture, le champ absent se lit `null`, jamais `false`.** Une vente
+d'avant S44 ne disait pas « la carte grise n'est pas incluse » : elle ne le
+disait pas du tout. `inclusionsDeVente` rend donc `null` pour elle, et la fiche
+comme le reçu retombent sur les deux listes que le gérant avait réellement
+écrites. Traduire les unes dans les autres fabriquerait une donnée que personne
+n'a saisie, sur un document qui prétend faire foi — et un reçu réimprimé six
+mois plus tard ne dirait plus ce que le client a lu le jour de la vente (D61).
+
+C'est D95 vu une troisième fois : *« pas encore lu »* n'est pas *« vide »*, et
+*« jamais dit »* n'est pas *« dit non »*. Chaque fois, l'aplatissement se paie à
+l'endroit où l'on décide de quelque chose.
+
+*Conséquence :* aucune migration, donc aucune fenêtre pendant laquelle deux
+formes coexistent mal — elles coexistent **pour de bon**, et quatre tests de
+règles le prouvent au lieu de l'affirmer. `nom` garde son sens et devient le nom
+de famille ; une fiche d'avant porte tout dans `nom` avec `prenom` vide, et
+`nomComplet` rend exactement la chaîne qu'elle rendait déjà.
+
+**Un défaut est sorti de là, et il ne venait pas du changement.** En vérifiant
+que la recherche trouve encore un client dont le prénom est un champ à part, on
+a découvert que `chercherClients` acceptait **n'importe quelle sous-chaîne** :
+« Awa » répondait « S*awa*dogo ». Le défaut vivait depuis S6, invisible tant que
+le nom était un seul champ long ; un prénom est court, donc d'autant plus
+souvent contenu au milieu d'un autre nom. La recherche se fait maintenant par
+début de mot — ce que son propre commentaire annonçait déjà.

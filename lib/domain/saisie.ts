@@ -1,16 +1,22 @@
 /**
  * Lecture des champs de saisie libres, une valeur par ligne.
  *
- * Trois listes du produit se saisissent ainsi — les papiers fournis avec une
- * moto d'occasion (S5), ce qui est inclus dans une vente et ce qui ne l'est pas
- * (S8) — parce qu'aucune ne mérite un référentiel : « casque », « bidon
- * d'huile » ou « rétroviseur gauche cassé » ne se choisissent pas dans une
- * liste, ils se notent.
+ * Une liste du produit se saisit ainsi — les papiers fournis avec une moto
+ * d'occasion (S5) — parce qu'elle ne mérite pas de référentiel : « carte grise
+ * barrée » ou « facture du premier propriétaire » ne se choisissent pas dans
+ * une liste, ils se notent.
  *
- * Le module existe pour que ces trois lectures soient la même. La borne haute
- * n'est pas décorative : les règles Firestore la vérifient aussi, et un
- * copier-coller de deux cents lignes dans un textarea ne doit pas produire un
- * document que le serveur refusera après coup.
+ * **Elles étaient trois jusqu'à S44.** Ce qui est inclus dans une vente et ce
+ * qui ne l'est pas (S8) se saisissaient ici aussi, et c'est précisément ce que
+ * la refonte a retiré : au comptoir, les deux textes libres se remplissaient
+ * toujours des deux mêmes mots, et deux cases à cocher les disent mieux — elles
+ * se relisent, elles se comptent, et elles ne s'orthographient pas de trois
+ * façons. Le module reste parce que les papiers d'occasion, eux, ne se
+ * ferment pas : on ne sait pas d'avance ce qu'un vendeur tend avec la moto.
+ *
+ * La borne haute n'est pas décorative : les règles Firestore la vérifient
+ * aussi, et un copier-coller de deux cents lignes dans un textarea ne doit pas
+ * produire un document que le serveur refusera après coup.
  */
 
 export const LIGNES_MAX = 20;

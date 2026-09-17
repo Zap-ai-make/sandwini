@@ -318,6 +318,44 @@ export function chassisUnique(prefixe: string): string {
  * `encaisse` est le montant déposé le jour de la vente, celui que S8 écrit dans
  * le lot. Tout le reste vient après.
  */
+/**
+ * Choisit la moto et le client dans la modale de vente déjà ouverte.
+ *
+ * **Les deux listes sont vides tant qu'on n'a pas tapé** (S44) : ce n'est pas
+ * une commodité du décor, c'est le comportement même de l'écran. Remplir le
+ * champ de recherche est donc la seule façon de faire apparaître le bouton
+ * radio — et c'est aussi ce qui donne au test un point d'attente réel.
+ */
+export async function ouvrirLaVente(
+  page: Page,
+  { chassis, client }: { chassis: string; client: string },
+) {
+  await page.getByLabel("Chercher dans le stock").fill(chassis);
+  await page.getByRole("radio", { name: new RegExp(chassis) }).check();
+  await page.getByLabel("Chercher un client").fill(client);
+  await page.getByRole("radio", { name: new RegExp(client) }).check();
+}
+
+/**
+ * Choisit une option dans un groupe segmenté (`components/patrons/Segmente`).
+ *
+ * **On clique l'étiquette, pas le bouton radio.** Le radio y est `sr-only` —
+ * un carré d'un pixel que Playwright refuse de cliquer, parce que le point
+ * qu'il vise tombe sur le cadre qui le recouvre. C'est déjà la convention du
+ * dépôt pour les deux radios de `PanneauPiece` (`pieces.spec.ts`), et c'est
+ * aussi le geste réel : personne ne vise un pixel, on touche le segment.
+ *
+ * Le groupe est nommé parce que la modale de vente en porte deux — le mode et
+ * le moyen de paiement — et que « Espèces » ne doit pas se chercher dans le
+ * mauvais.
+ */
+export async function choisirSegment(page: Page, groupe: string, option: string) {
+  await page
+    .getByRole("radiogroup", { name: groupe })
+    .getByText(option, { exact: true })
+    .click();
+}
+
 export async function vendre(
   page: Page,
   options: { mode: "Crédit" | "Tranches"; prix: string; encaisse: string },
@@ -338,13 +376,14 @@ export async function vendre(
      et l'échec ressemblait trait pour trait à de la lenteur. */
   await attendreLaFileVide(page);
 
-  await page.goto("/motos/ventes/nouvelle", { waitUntil: "load" });
-  await page.getByLabel("Chercher dans le stock").fill(chassis);
-  await page.getByRole("radio", { name: new RegExp(chassis) }).check();
-  await page.getByLabel("Chercher un client").fill(client);
-  await page.getByRole("radio", { name: new RegExp(client) }).check();
+  /* Depuis S44 la vente s'enregistre dans une modale posée sur le registre,
+     et non plus sur une page à elle. Le paramètre d'écran l'ouvre directement :
+     c'est le chemin qu'un raccourci emprunte, et il évite au décor de dépendre
+     de la place d'un bouton. */
+  await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+  await ouvrirLaVente(page, { chassis, client });
   await page.getByLabel("Prix convenu", { exact: true }).fill(options.prix);
-  await page.getByRole("radio", { name: new RegExp(options.mode) }).check();
+  await choisirSegment(page, "Mode de paiement", options.mode);
   await page.getByLabel(/Montant reçu/).fill(options.encaisse);
   await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 

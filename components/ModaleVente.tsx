@@ -87,13 +87,16 @@ import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
 /** Assez pour reconnaître la bonne ligne, trop peu pour noyer l'écran. */
 const PREMIERS_RESULTATS = 8;
 
-export function ModaleVente({
-  ouverte,
-  onFermer,
-}: {
-  ouverte: boolean;
-  onFermer: () => void;
-}) {
+/**
+ * **Montée seulement quand elle est ouverte**, et c'est la page qui en décide.
+ *
+ * Elle ouvre trois écoutes Firestore — le stock, les ventes, les ventes de
+ * pièces —, dont deux que l'écran des ventes tient déjà. Laissée montée en
+ * permanence, elle les doublait pour un formulaire fermé les trois quarts du
+ * temps. Le démontage remet aussi la saisie à zéro sans qu'un effet ait à s'en
+ * charger, comme pour les trois autres modals du produit.
+ */
+export function ModaleVente({ onFermer }: { onFermer: () => void }) {
   const { perimetre } = usePerimetre();
   const session = useSession();
   const catalogue = useCatalogue();
@@ -159,10 +162,9 @@ export function ModaleVente({
     setEnregistree(null);
   }
 
-  function fermer() {
-    repartirDeZero();
-    onFermer();
-  }
+  /* Pas de remise à zéro ici : la modale se démonte en se fermant, et l'état
+     repart de ses valeurs initiales à la réouverture. */
+  const fermer = onFermer;
 
   /* Seules les motos réellement disponibles sont proposées. Une moto vendue ou
      réservée qui resterait dans la liste finirait par être vendue deux fois —
@@ -252,7 +254,7 @@ export function ModaleVente({
   if (perimetre.type !== "boutique") {
     return (
       <Modale
-        ouvert={ouverte}
+        ouvert
         onFermer={fermer}
         titre="Nouvelle vente"
         taille="moyenne"
@@ -273,7 +275,7 @@ export function ModaleVente({
   if (enregistree) {
     return (
       <Modale
-        ouvert={ouverte}
+        ouvert
         onFermer={fermer}
         titre="Vente enregistrée"
         taille="moyenne"
@@ -311,7 +313,7 @@ export function ModaleVente({
 
   return (
     <Modale
-      ouvert={ouverte}
+      ouvert
       onFermer={fermer}
       titre="Nouvelle vente"
       description="Le numéro de la pièce sera attribué à l’enregistrement, même sans réseau."

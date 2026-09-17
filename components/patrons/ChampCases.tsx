@@ -33,7 +33,6 @@ export function ChampCases({
   groupe = 4,
   facultatif = false,
   aide,
-  erreur,
 }: {
   id: string;
   libelle: string;
@@ -45,7 +44,9 @@ export function ChampCases({
   groupe?: number;
   facultatif?: boolean;
   aide?: string;
-  erreur?: string | null;
+  /* Pas d'`erreur` ici, contrairement à `Champ` : le NIP se refuse avec le
+     reste de la fiche, dans la zone d'erreur du formulaire, et un second
+     endroit où dire non n'aurait eu aucun appelant (règle 1). */
 }) {
   const [focalise, setFocalise] = useState(false);
 
@@ -55,12 +56,7 @@ export function ChampCases({
      saisie continuait. */
   const active = focalise && !complet ? valeur.length : -1;
 
-  const paquets: number[][] = [];
-  for (let debut = 0; debut < longueur; debut += groupe) {
-    paquets.push(
-      Array.from({ length: Math.min(groupe, longueur - debut) }, (_, rang) => debut + rang),
-    );
-  }
+  const paquets = grouperCases(longueur, groupe);
 
   return (
     <Champ
@@ -68,7 +64,6 @@ export function ChampCases({
       libelle={libelle}
       facultatif={facultatif}
       aide={aide ?? `${longueur} chiffres, tels qu’ils sont écrits sur la pièce.`}
-      erreur={erreur}
     >
       {/* Le champ posé par-dessus est transparent et sans contour : le focus
           clavier serait donc invisible, ce que `DESIGN.md` §11 ne permet pas.
@@ -139,4 +134,35 @@ export function ChampCases({
       </div>
     </Champ>
   );
+}
+
+/**
+ * Découpe les cases en paquets qui se relisent — et jamais sur une orpheline.
+ *
+ * Dix-sept chiffres par quatre donnent « 4·4·4·4·1 », et cette dernière case
+ * seule ne se lit pas comme un groupe : elle se lit comme une faute de mise en
+ * page. Un reliquat d'une seule case rejoint donc le paquet précédent, ce qui
+ * rend « 4·4·4·5 ».
+ *
+ * **Vu sur la capture de S44, pas déduit** : la règle 5 d'`AGENTS.md` sert
+ * exactement à ça — la boucle était juste, et le résultat était laid.
+ *
+ * Pas de test unitaire, et ce n'est pas un oubli : `vitest.config.mts` ne
+ * couvre que `lib/**`, parce que « le rendu est l'affaire de Playwright ». Une
+ * règle de mise en page se vérifie en la regardant.
+ */
+function grouperCases(longueur: number, groupe: number): number[][] {
+  const paquets: number[][] = [];
+  for (let debut = 0; debut < longueur; debut += groupe) {
+    paquets.push(
+      Array.from({ length: Math.min(groupe, longueur - debut) }, (_, rang) => debut + rang),
+    );
+  }
+
+  const derniere = paquets.at(-1);
+  if (paquets.length > 1 && derniere?.length === 1) {
+    paquets.pop();
+    paquets[paquets.length - 1].push(...derniere);
+  }
+  return paquets;
 }

@@ -1,7 +1,7 @@
 # S44 — La vente en modale, l'entrée moto, les réglages
 
 ```
-Statut     : en cours
+Statut     : terminée
 Périmètre  : post-MVP
 Dépend de  : S8, S6, S10, S39, S40, S42, S43
 ```
@@ -27,96 +27,104 @@ reçu — rendus plus rapides à faire et plus calmes à lire.
 
 ### La modale de vente
 
-- [ ] « Nouvelle vente » ouvre une modale sur `/motos/ventes` ; la liste reste
+- [x] « Nouvelle vente » ouvre une modale sur `/motos/ventes` ; la liste reste
       derrière et la fiche ouverte ne se ferme pas
-- [ ] La modale s'ouvre aussi par `?nouvelle=1` (paramètre d'écran, pas de route
+- [x] La modale s'ouvre aussi par `?nouvelle=1` (paramètre d'écran, pas de route
       dynamique — D39), et `/motos/ventes/nouvelle` y redirige
-- [ ] Mobile (390 px) : feuille montée du bas, barre de validation collée en bas.
+- [x] La colonne de gauche et la palette visent l'adresse **directe**, sans
+      traverser la redirection ; « Nouvelle vente » y devient un renvoi, et
+      c'est « Ventes » que la colonne allume pendant la saisie
+- [x] Mobile (390 px) : feuille montée du bas, barre de validation collée en bas.
       Bureau : boîte centrée, saisie en une colonne, récapitulatif collé à droite
-- [ ] Échap ferme, le clic au fond ferme, le focus est pris à l'ouverture, piégé
+- [x] Échap ferme, le clic au fond ferme, le focus est pris à l'ouverture, piégé
       dedans, et rendu au bouton déclencheur à la fermeture
-- [ ] **Entrée n'enregistre jamais une vente**, quel que soit le champ
+- [x] **Entrée n'enregistre jamais une vente**, quel que soit le champ
 - [ ] Le contenu reste atteignable à 390 px clavier ouvert (`max-h` + défilement)
+      — **construit, non mesuré.** Le mécanisme est là (`max-h-[min(92dvh,56rem)]`,
+      corps défilant, pied collé avec `env(safe-area-inset-bottom)`), et `dvh`
+      est précisément l'unité qui se rétracte quand le clavier monte. Mais
+      aucune capture ni aucun test bout en bout n'ouvre un clavier logiciel :
+      Playwright n'en a pas. Cocher reviendrait à créditer une intention.
 
 ### Le client
 
-- [ ] Créer un nouveau client est le geste **par défaut** : nom, prénom,
+- [x] Créer un nouveau client est le geste **par défaut** : nom, prénom,
       téléphone, numéro de pièce d'identité ; le reste est replié
-- [ ] Un champ « Utiliser un client existant » n'affiche **aucun résultat tant
+- [x] Un champ « Utiliser un client existant » n'affiche **aucun résultat tant
       qu'on n'a pas tapé** ; les correspondances apparaissent à la frappe
-- [ ] La recherche trouve sur le début de **chaque mot** du nom — « Ali » trouve
+- [x] La recherche trouve sur le début de **chaque mot** du nom — « Ali » trouve
       « Zongo Ali », nom et prénom séparés compris
-- [ ] Avant de créer, le rapprochement par téléphone **et par NIP** a lieu ; s'il
+- [x] Avant de créer, le rapprochement par téléphone **et par NIP** a lieu ; s'il
       trouve, l'écran **propose la fiche existante** au lieu de refuser (D95/D96)
-- [ ] Le contrôle lit la liste **lue**, jamais la liste aplatie ; le bouton
+- [x] Le contrôle lit la liste **lue**, jamais la liste aplatie ; le bouton
       annonce la lecture en cours tant qu'elle n'est pas revenue
 
 ### Le numéro de pièce d'identité
 
-- [ ] 17 chiffres, saisis dans **17 cases**, sur un seul champ réel : le collage
+- [x] 17 chiffres, saisis dans **17 cases**, sur un seul champ réel : le collage
       d'un numéro entier fonctionne, le clavier numérique s'ouvre sur téléphone,
       et le lecteur d'écran annonce un champ nommé, pas dix-sept
-- [ ] Espaces et tirets collés sont absorbés, pas refusés
-- [ ] Facultatif : une vente ne s'arrête pas parce que le client a oublié sa carte
-- [ ] Un NIP renseigné qui n'a pas 17 chiffres est refusé, au formulaire **et**
+- [x] Espaces et tirets collés sont absorbés, pas refusés
+- [x] Facultatif : une vente ne s'arrête pas parce que le client a oublié sa carte
+- [x] Un NIP renseigné qui n'a pas 17 chiffres est refusé, au formulaire **et**
       dans les règles Firestore
 
 ### La moto, les inclusions, le paiement
 
-- [ ] **Rien n'est listé** tant qu'aucune référence n'est saisie ; châssis, marque
+- [x] **Rien n'est listé** tant qu'aucune référence n'est saisie ; châssis, marque
       ou modèle font apparaître les résultats à la frappe
-- [ ] Le choix reste un `radiogroup` : flèches du clavier, nom accessible, annonce
+- [x] Le choix reste un `radiogroup` : flèches du clavier, nom accessible, annonce
       « 2 sur 8 ». Pas de liste déroulante à recherche (D72)
-- [ ] Ce qui est inclus se coche : **« Carte grise » et « Casque »**, cochées par
+- [x] Ce qui est inclus se coche : **« Carte grise » et « Casque »**, cochées par
       défaut. Plus aucune zone de texte libre, et plus de « plaque » dans les
       inclusions
-- [ ] Le mode de paiement est un segmenté exclusif et accessible ; les trois
+- [x] Le mode de paiement est un segmenté exclusif et accessible ; les trois
       pavés `EFFET_MODE` et le bandeau `Info` ont disparu de l'écran
-- [ ] La conséquence du mode se lit dans le **récapitulatif**, en une ligne — et
+- [x] La conséquence du mode se lit dans le **récapitulatif**, en une ligne — et
       le comportement ne bouge pas : comptant préremplit le montant entier,
       tranches retient la moto
-- [ ] Le moyen de paiement est un segmenté, plus un `<select>`
+- [x] Le moyen de paiement est un segmenté, plus un `<select>`
 
 ### Les chiffres de tête des ventes
 
-- [ ] Quatre cartes : **Ventes**, **Chiffre d'affaires**, **Encaissé**,
+- [x] Quatre cartes : **Ventes**, **Chiffre d'affaires**, **Encaissé**,
       **Reste à percevoir**
-- [ ] Calculées **en lecture**, des documents déjà écoutés — aucun agrégat stocké,
+- [x] Calculées **en lecture**, des documents déjà écoutés — aucun agrégat stocké,
       aucune écoute nouvelle (D61)
-- [ ] **Aucune marge, pour personne** : un gérant ne peut pas en déduire un coût
+- [x] **Aucune marge, pour personne** : un gérant ne peut pas en déduire un coût
       (D2)
-- [ ] Un périmètre sans vente écrit une phrase vraie, pas quatre zéros (D63)
+- [x] Un périmètre sans vente écrit une phrase vraie, pas quatre zéros (D63)
 
 ### L'entrée d'une moto
 
-- [ ] Le champ *Modèle* se lit et se comporte comme *Marque* : ni grisé, ni
+- [x] Le champ *Modèle* se lit et se comporte comme *Marque* : ni grisé, ni
       verrouillé
-- [ ] La dépendance marque → modèle tient : sans marque, la liste est vide et
+- [x] La dépendance marque → modèle tient : sans marque, la liste est vide et
       l'invite **dit pourquoi avant le geste**, et « + Ajouter un modèle… » reste
       masqué
-- [ ] Choisir ou créer une marque enchaîne le focus sur le modèle
-- [ ] Changer de marque vide toujours le modèle
+- [x] Choisir ou créer une marque enchaîne le focus sur le modèle
+- [x] Changer de marque vide toujours le modèle
 
 ### Les réglages
 
-- [ ] Sur bureau (≥ 1024 px), le sommaire « Ce qui change » a disparu : la colonne
+- [x] Sur bureau (≥ 1024 px), le sommaire « Ce qui change » a disparu : la colonne
       de gauche le disait déjà
-- [ ] En dessous de 1024 px il reste — la colonne n'y existe pas, et il est le
+- [x] En dessous de 1024 px il reste — la colonne n'y existe pas, et il est le
       seul chemin vers les six écrans d'administration
-- [ ] L'identité de l'entreprise **et de la boutique du périmètre** se lisent
+- [x] L'identité de l'entreprise **et de la boutique du périmètre** se lisent
       directement, en tête
-- [ ] « Cet appareil » et « Votre compte » sont intacts
+- [x] « Cet appareil » et « Votre compte » sont intacts
 
 ### Transversal
 
-- [ ] Les ventes et les clients d'avant S44 s'affichent et se modifient sans
+- [x] Les ventes et les clients d'avant S44 s'affichent et se modifient sans
       migration, fiche comme reçu imprimé
-- [ ] Toute la séquence fonctionne **réseau coupé**, numéro compris (D66, D76)
-- [ ] Les états sont couverts : vide, chargement, clairsemé, dense, erreur, refus
+- [x] Toute la séquence fonctionne **réseau coupé**, numéro compris (D66, D76)
+- [x] Les états sont couverts : vide, chargement, clairsemé, dense, erreur, refus
       de droits, désactivé, hors ligne — cf. `DESIGN.md` §10
-- [ ] Les points de `SECURITY.md` applicables sont respectés ; chaque
+- [x] Les points de `SECURITY.md` applicables sont respectés ; chaque
       cloisonnement est prouvé par un test de règles, pas seulement masqué
-- [ ] Rendu regardé en clair **et** en sombre, mobile **et** bureau ; le reçu
+- [x] Rendu regardé en clair **et** en sombre, mobile **et** bureau ; le reçu
       regardé sous média `print` (D77)
 
 ---

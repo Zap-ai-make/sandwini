@@ -110,7 +110,7 @@ describe("le second niveau de navigation", () => {
         "/motos/nouvelle",
         "/motos/arrivages",
         "/motos/ventes",
-        "/motos/ventes/nouvelle",
+        "/motos/ventes?nouvelle=1",
         "/motos/paiements",
         "/motos/dossiers",
         "/motos/recus",
@@ -214,9 +214,15 @@ describe("ecranCourant", () => {
   it("n’allume qu’une entrée, la plus précise", () => {
     expect(ecranCourant("motos", "gerant", "/motos/dossiers")).toBe("/motos/dossiers");
     expect(ecranCourant("motos", "gerant", "/motos")).toBe("/motos");
-    expect(ecranCourant("motos", "gerant", "/motos/ventes/nouvelle")).toBe(
-      "/motos/ventes/nouvelle",
-    );
+  });
+
+  /* Depuis S44, l'ancienne adresse de la vente n'est plus qu'une redirection, et
+     « Nouvelle vente » un renvoi vers `/motos/ventes`. La colonne allume donc
+     « Ventes » des deux côtés du renvoi : pendant la redirection, et une fois la
+     modale ouverte. Deux chemins, un seul repère — c'est la règle de ce test. */
+  it("allume « Ventes » quand la vente s’ouvre, quel que soit le chemin", () => {
+    expect(ecranCourant("motos", "gerant", "/motos/ventes/nouvelle")).toBe("/motos/ventes");
+    expect(ecranCourant("motos", "gerant", "/motos/ventes")).toBe("/motos/ventes");
   });
 
   it("n’allume rien quand le chemin ne fait partie d’aucun écran de l’espace", () => {

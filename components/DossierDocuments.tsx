@@ -33,7 +33,10 @@ export function DossierDocuments({ documents }: { documents: DocumentDossier[] |
     );
   }
   return (
-    <ul className="divide-y divide-bord">
+    /* Nommée : le panneau d'une vente porte plusieurs listes, et « Carte grise »
+       y figure à deux titres depuis S44 — le papier à obtenir, et ce qui part
+       avec la moto. Sans nom, rien ne les distingue pour qui n'a pas l'écran. */
+    <ul aria-label="Documents du dossier" className="divide-y divide-bord">
       {documents.map((document) => (
         <LigneDocument key={document.id} document={document} />
       ))}

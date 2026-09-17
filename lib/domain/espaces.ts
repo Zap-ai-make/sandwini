@@ -207,7 +207,11 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
     {
       titre: "Vendre",
       ecrans: [
-        { href: "/motos/ventes/nouvelle", libelle: "Nouvelle vente" },
+        /* Un renvoi depuis S44 : la vente est une modale posée sur le registre,
+           et non plus un écran à elle. L'entrée ouvre donc `/motos/ventes` avec
+           son paramètre — elle mentionne cet écran, elle ne le possède pas, et
+           c'est « Ventes » que la colonne allume pendant la saisie. */
+        { href: "/motos/ventes?nouvelle=1", libelle: "Nouvelle vente", renvoi: true },
         { href: "/motos/nouvelle", libelle: "Faire entrer une moto" },
       ],
     },
