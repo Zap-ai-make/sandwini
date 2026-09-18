@@ -224,25 +224,50 @@ Un compte créé dans la console Firebase n'a **pas de rôle**. Le rôle est un 
 et la console ne sait pas en poser. La connexion réussit, puis l'application refuse
 d'ouvrir. Il faut donc :
 
+Étapes 1 et 5, communes aux deux shells :
+
 ```
-# 1. Créer le compte dans la console Firebase (Authentication), avec son mot de passe.
+# 1. Creer le compte dans la console Firebase (Authentication), avec son mot de passe.
 # 2. Deployer la fonction d'amorcage :
 npm run deployer -- --only functions --project <projet>
 
-# 3. Obtenir un jeton d'identite pour ce compte. Le mot de passe ne quitte pas votre
-#    machine ; la cle d'API est publique, elle part deja dans chaque navigateur.
+# 5. La supprimer, une fois l'amorcage reussi :
+npx firebase functions:delete amorcerResponsable --project <projet> --region europe-west1 --force
+```
+
+Les étapes 3 et 4 envoient du JSON, et c'est là que les deux shells divergent. **PowerShell**
+— celui de la machine de développement :
+
+```powershell
+# 3. Obtenir un jeton d'identite. Le mot de passe ne quitte pas votre machine ;
+#    la cle d'API est publique, elle part deja dans chaque navigateur.
+$corps = @{ email = "<email>"; password = "<motdepasse>"; returnSecureToken = $true } | ConvertTo-Json
+$reponse = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $corps `
+  -Uri "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<API_KEY>"
+
+# 4. Appeler l'amorcage. Le jeton reste dans la variable : il ne passe pas par l'historique.
+Invoke-RestMethod -Method Post -ContentType "application/json" -Body "{}" `
+  -Headers @{ Authorization = "Bearer $($reponse.idToken)" } `
+  -Uri "https://europe-west1-<projet>.cloudfunctions.net/amorcerResponsable"
+```
+
+**bash** — CI, WSL, macOS :
+
+```bash
+# 3.
 curl "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"email":"...","password":"...","returnSecureToken":true}'
 
-# 4. Appeler l'amorcage avec le champ idToken de la reponse :
+# 4. Avec le champ idToken de la reponse :
 curl -X POST -H "Content-Type: application/json" \
   -H "Authorization: Bearer <idToken>" -d '{}' \
   https://europe-west1-<projet>.cloudfunctions.net/amorcerResponsable
-
-# 5. La supprimer :
-npx firebase functions:delete amorcerResponsable --project <projet> --region europe-west1 --force
 ```
+
+*Les deux formes sont là pour la même raison que `scripts/deployer.mjs` existe* (D29) : cette
+page n'avait que la forme POSIX, et une commande qu'on ne peut pas coller se recopie de
+travers plutôt que pas du tout.
 
 `amorcerResponsable` exige un jeton d'identité valide et ne promeut **que l'appelant
 lui-même** ; elle refuse s'il y a plus d'un compte, et refuse dès que ce compte porte un
