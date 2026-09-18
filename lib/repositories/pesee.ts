@@ -1,43 +1,47 @@
 "use client";
 
 import { useCallback, useMemo } from "react";
-import { moisDe, memeMois } from "@/lib/domain/chiffres";
 import type { Moto } from "@/lib/domain/moto";
+import { peserBoutiques, type PeseeBoutique } from "@/lib/domain/pesee";
+import type { MouvementPiece, Piece } from "@/lib/domain/piece";
 import type { Vente } from "@/lib/domain/vente";
+import type { VentePiece } from "@/lib/domain/vente-piece";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterStock } from "@/lib/repositories/motos";
+import { ecouterCatalogue, ecouterMouvements } from "@/lib/repositories/pieces";
 import { ecouterVentes } from "@/lib/repositories/ventes";
+import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
+
+export {
+  PESEE_VIDE,
+  additionnerPesees,
+  type PeseeBoutique,
+  type PeseeMotos,
+  type PeseePieces,
+} from "@/lib/domain/pesee";
 
 /**
- * Ce que chaque boutique pèse, pour sa carte de supervision (S24, A2.3).
+ * Les écoutes qui alimentent la pesée des cartes de supervision (S24, S47).
  *
- * **Trois faits, et pas un agrégat de plus.** Motos en stock, ventes du mois,
- * reste dû : c'est ce que la maquette annonce sur chaque carte (`a2:93-97`), et
- * c'est ce qui répond à la question de l'écran — *laquelle je regarde d'abord*.
- * Les chiffres du commerce, eux, ont leur propre écran.
+ * Le calcul lui-même vit dans `lib/domain/pesee.ts`, pur et testé ; ici il n'y
+ * a que le branchement.
  *
- * **« Reste dû » est le total à ce jour, pas celui des ventes du mois.** Une
- * carte sert à choisir où aller : ce qui compte est ce qui attend là-bas, pas
- * ce que le mois a produit. L'écran des chiffres raisonne par mois parce qu'il
- * répond à une autre question.
+ * **Aucune écoute nouvelle n'est ouverte côté motos.** Les ventes et le stock
+ * sont déjà lus par les écrans du périmètre courant ; ici on les relit sur le
+ * périmètre entier, une fois. C'est la même décision qu'au reçu (D61) : ce qui
+ * se recalcule à la lecture ne peut pas diverger de ce dont il est tiré, et
+ * continue de fonctionner hors ligne.
  *
- * **Aucune écoute nouvelle n'est ouverte pour ce calcul.** Les ventes et le
- * stock sont déjà lus par les écrans du périmètre courant ; ici on les relit
- * sur le périmètre entier, une fois, et tout le reste est un `useMemo`. C'est
- * la même décision qu'au reçu (D61) : ce qui se recalcule à la lecture ne peut
- * pas diverger de ce dont il est tiré, et continue de fonctionner hors ligne.
+ * **Côté pièces, les écoutes sont conditionnelles, et il fallait qu'elles le
+ * soient.** Le journal des mouvements se lit en entier — c'est ce que borne
+ * `SEUIL_MOUVEMENTS` — et le payer sur une entreprise qui ne vend que des motos
+ * serait une lecture sans lecteur. `avecPieces` reprend donc exactement la
+ * garde que l'écran applique déjà à `PiecesEnAlerte` ; quand les deux sont
+ * montés sur le périmètre « toutes les boutiques », ils demandent la même
+ * requête, et le SDK Firestore ne l'ouvre qu'une fois.
  */
-export type PeseeBoutique = {
-  enStock: number;
-  ventesDuMois: number;
-  resteDu: number;
-};
-
-/** Ce qu'on montre à une boutique dont on ne sait encore rien de chiffré. */
-export const PESEE_VIDE: PeseeBoutique = { enStock: 0, ventesDuMois: 0, resteDu: 0 };
-
-export function usePeseeDesBoutiques(): {
+export function usePeseeDesBoutiques(avecPieces: boolean): {
   pesee: ReadonlyMap<string, PeseeBoutique>;
   chargement: boolean;
 } {
@@ -47,6 +51,7 @@ export function usePeseeDesBoutiques(): {
      gérant n'atteint jamais cet écran (la garde de capacité le refuse), donc
      aucune règle n'est mise en défaut. */
   const global = perimetre.type !== "aucune";
+  const globalPieces = global && avecPieces;
 
   const souscrireVentes = useCallback(
     (auChangement: (ventes: Vente[]) => void, enErreur: (cause: unknown) => void) =>
@@ -62,33 +67,47 @@ export function usePeseeDesBoutiques(): {
   );
   const { valeur: stock } = useAbonnement(souscrireStock, "Le stock n’a pas pu être lu.");
 
-  return useMemo(() => {
-    const pesee = new Map<string, PeseeBoutique>();
-    const mois = moisDe(new Date());
+  const souscrireVentesPieces = useCallback(
+    (auChangement: (ventes: VentePiece[]) => void, enErreur: (cause: unknown) => void) =>
+      globalPieces ? ecouterVentesPieces(null, auChangement, enErreur) : () => {},
+    [globalPieces],
+  );
+  const { valeur: ventesPieces } = useAbonnement(
+    souscrireVentesPieces,
+    "Les ventes de pièces n’ont pas pu être lues.",
+  );
 
-    const pour = (id: string) => {
-      const actuel = pesee.get(id) ?? { ...PESEE_VIDE };
-      pesee.set(id, actuel);
-      return actuel;
-    };
+  const souscrireCatalogue = useCallback(
+    (auChangement: (pieces: Piece[]) => void, enErreur: (cause: unknown) => void) =>
+      globalPieces ? ecouterCatalogue(auChangement, enErreur) : () => {},
+    [globalPieces],
+  );
+  const { valeur: catalogue } = useAbonnement(
+    souscrireCatalogue,
+    "Le catalogue des pièces n’a pas pu être lu.",
+  );
 
-    for (const moto of stock ?? []) {
-      /* « En stock » compte ce qui peut encore se vendre : une moto réservée ou
-         vendue n'est plus du stock, et la gonfler ferait promettre au
-         responsable une disponibilité qui n'existe pas. */
-      if (moto.statut !== "en_stock") continue;
-      pour(moto.boutiqueId).enStock += 1;
-    }
+  const souscrireMouvements = useCallback(
+    (auChangement: (mouvements: MouvementPiece[]) => void, enErreur: (cause: unknown) => void) =>
+      globalPieces ? ecouterMouvements(null, auChangement, enErreur) : () => {},
+    [globalPieces],
+  );
+  const { valeur: mouvements } = useAbonnement(
+    souscrireMouvements,
+    "Les mouvements de pièces n’ont pas pu être lus.",
+  );
 
-    for (const vente of ventes ?? []) {
-      const ligne = pour(vente.boutiqueId);
-      if (vente.date !== null && memeMois(moisDe(vente.date), mois)) ligne.ventesDuMois += 1;
-      ligne.resteDu += vente.resteDu;
-    }
-
-    return {
-      pesee,
-      chargement: perimetreEnCours || (global && (ventes === null || stock === null)),
-    };
-  }, [ventes, stock, perimetreEnCours, global]);
+  return useMemo(
+    () => ({
+      pesee: peserBoutiques(
+        { ventes, stock, ventesPieces, catalogue, mouvements },
+        new Date(),
+      ),
+      chargement:
+        perimetreEnCours ||
+        (global && (ventes === null || stock === null)) ||
+        (globalPieces && (ventesPieces === null || catalogue === null || mouvements === null)),
+    }),
+    [ventes, stock, ventesPieces, catalogue, mouvements, perimetreEnCours, global, globalPieces],
+  );
 }
