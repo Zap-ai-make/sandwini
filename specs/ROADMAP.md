@@ -452,6 +452,22 @@ faute : la spec de captures photographiait la modale en `fullPage`, ce qui étir
 la page derrière un calque fixe et fabrique un vide sous la feuille. L'image
 donnait à croire à un défaut qui n'existait pas.
 
+**Ce que l'essai du commanditaire a trouvé, et que la suite ne pouvait pas
+voir.** La modale gardait un bouton « Créer le client » : une validation de plus
+au milieu d'un geste qui n'en demande qu'une, et la saisie se perdait dès qu'on
+touchait au mode de paiement, parce qu'elle appartenait à un composant voisin
+avec son propre état. Les champs du client (`ChampsClient`) sont désormais posés
+seuls dans la modale, leur saisie vit dans son état, et « Enregistrer la vente »
+crée la fiche en même temps que la vente — hors ligne compris. Effet de bord :
+la modale ne contient plus **aucun** `<form>`, là où l'invariant tenait
+jusqu'ici sur un équilibre.
+
+**Aucun des quatorze tests de cet écran n'empruntait ce chemin** : tous
+*choisissaient un client existant* dans la liste, et pas un n'en saisissait un
+neuf — c'est-à-dire le cas le plus fréquent au comptoir. Une suite peut être
+verte et ne rien dire du geste principal. Le défaut a été trouvé en cinq minutes
+d'usage réel, et c'est la leçon la plus chère de S44.
+
 **Deux fausses pistes écartées en mesurant.** Le calque semblait ne pas couvrir
 la colonne de navigation : les pixels disent le contraire — le logo du rail
 passe de `[95,64,45]` à `[61,44,43]` — et c'est le fond de la colonne qui ne

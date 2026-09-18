@@ -76,9 +76,6 @@ export function FormulaireClient({
   /* La fiche qu'on a reconnue, gardée à part de l'erreur : on ne se contente
      plus de refuser, on la propose. */
   const [rapproche, setRapproche] = useState<Client | null>(null);
-  /* Replié par défaut : trois champs sur cinq ne servent qu'une fois sur dix,
-     et le geste du comptoir est « nom, prénom, téléphone, pièce ». */
-  const [details, setDetails] = useState(false);
 
   const changer = (partie: Partial<SaisieClient>) =>
     setSaisie((actuel) => ({ ...actuel, ...partie }));
@@ -145,6 +142,61 @@ export function FormulaireClient({
      levée. */
   return (
     <form onSubmit={soumettre} className="colonne-formulaire max-w-[40rem]" noValidate>
+      <ChampsClient prefixe={prefixe} saisie={saisie} changer={changer} />
+
+      {rapproche && (
+        <FicheReconnue
+          client={rapproche}
+          surUtilisation={surFicheExistante}
+          surAbandon={() => setRapproche(null)}
+        />
+      )}
+
+      <EtatErreurSaisie message={erreur} className="mt-3" />
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button type="submit" disabled={clients === null} className="bouton bouton-principal">
+          {clients === null ? "Lecture du fichier…" : existant ? "Enregistrer" : "Créer le client"}
+        </button>
+        {surAnnulation && (
+          <button type="button" onClick={surAnnulation} className="bouton bouton-neutre">
+            Annuler
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Les champs d'un client, sans formulaire ni bouton autour.
+ *
+ * **Deux écrans les posent, et pour deux gestes différents.** Le fichier
+ * clients les enveloppe dans un `<form>` avec son bouton : là, créer un client
+ * *est* le geste. La modale de vente, elle, ne les enveloppe de rien — le
+ * client neuf n'y a pas d'étape à lui, il part avec la vente (S44, corrigé
+ * après essai du commanditaire).
+ *
+ * Les extraire n'est pas de l'élégance : c'est ce qui empêche les deux écrans
+ * de diverger sur ce qu'on demande d'une personne. Et c'est ce qui permet à la
+ * modale de n'avoir **aucun `<form>` imbriqué**, ce que son commentaire de tête
+ * promettait déjà sans pouvoir le tenir.
+ */
+export function ChampsClient({
+  prefixe,
+  saisie,
+  changer,
+}: {
+  prefixe: string;
+  saisie: SaisieClient;
+  changer: (partie: Partial<SaisieClient>) => void;
+}) {
+  /* Replié par défaut : trois champs sur cinq ne servent qu'une fois sur dix,
+     et le geste du comptoir est « nom, prénom, téléphone, pièce ». */
+  const [details, setDetails] = useState(false);
+
+  return (
+    <>
       <div className="space-y-4">
         {/* Le nom et le prénom côte à côte : ce sont deux moitiés d'une même
             information, et les empiler ferait lire deux questions là où il n'y
@@ -236,40 +288,7 @@ export function FormulaireClient({
           </div>
         )}
       </div>
-
-      {rapproche && (
-        <FicheReconnue
-          client={rapproche}
-          surUtilisation={surFicheExistante}
-          surAbandon={() => setRapproche(null)}
-        />
-      )}
-
-      <EtatErreurSaisie message={erreur} className="mt-3" />
-
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={clients === null}
-          className="bouton bouton-principal"
-        >
-          {clients === null
-            ? "Lecture du fichier…"
-            : existant
-              ? "Enregistrer"
-              : "Créer le client"}
-        </button>
-        {surAnnulation && (
-          <button
-            type="button"
-            onClick={surAnnulation}
-            className="bouton bouton-neutre"
-          >
-            Annuler
-          </button>
-        )}
-      </div>
-    </form>
+    </>
   );
 }
 
@@ -282,7 +301,7 @@ export function FormulaireClient({
  * ce qui fabrique exactement le doublon qu'on voulait empêcher. Ici la fiche
  * est nommée, et le geste qui l'adopte est à côté d'elle.
  */
-function FicheReconnue({
+export function FicheReconnue({
   client,
   surUtilisation,
   surAbandon,

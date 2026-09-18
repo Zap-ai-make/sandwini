@@ -3,14 +3,25 @@
 import { Bike, Lock, Search, UserRound } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
-import { FormulaireClient } from "@/components/FormulaireClient";
+import { ChampsClient, FicheReconnue } from "@/components/FormulaireClient";
 import { Champ } from "@/components/patrons/Champ";
 import { EtatErreur, EtatErreurSaisie, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
 import { Groupe } from "@/components/patrons/Formulaire";
 import { Modale } from "@/components/patrons/Modale";
 import { Segmente } from "@/components/patrons/Segmente";
 import { useSession } from "@/lib/auth/session";
-import { chercherClients, formaterTelephone, nomComplet, type Client } from "@/lib/domain/client";
+import {
+  SAISIE_CLIENT_VIDE,
+  chercherClients,
+  formaterTelephone,
+  nipDejaPris,
+  nomComplet,
+  telephoneDejaPris,
+  validerClient,
+  type Client,
+  type SaisieClient,
+} from "@/lib/domain/client";
+import { creerClient, messageErreurClient } from "@/lib/repositories/clients";
 import { formaterMontant } from "@/lib/domain/format";
 import { normaliserChassis, type Moto } from "@/lib/domain/moto";
 import {
@@ -50,12 +61,17 @@ import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
  *
  * Ce que S44 a changé dans le formulaire lui-même, et pourquoi :
  *
- * - **Le client se crée par défaut.** C'est le cas ordinaire au comptoir, et
- *   c'était l'inverse : on cherchait d'abord dans un fichier où l'acheteur
- *   n'est en général pas. Le rapprochement, lui, n'a pas bougé d'un pouce —
- *   téléphone et pièce d'identité sont lus avant d'écrire, sur la liste **lue**
- *   et jamais aplatie (D95/D96), et une fiche reconnue est proposée au lieu
- *   d'être opposée.
+ * - **Le client se crée par défaut, et sans étape à lui.** C'est le cas
+ *   ordinaire au comptoir, et c'était l'inverse : on cherchait d'abord dans un
+ *   fichier où l'acheteur n'est en général pas. On tape son nom ici, et c'est
+ *   « Enregistrer la vente » qui le crée en passant — la première version
+ *   gardait un bouton « Créer le client », soit une validation de plus au
+ *   milieu d'un geste qui n'en demande qu'une ; le commanditaire l'a dit après
+ *   essai. Le rapprochement, lui, n'a pas bougé d'un pouce — téléphone et pièce
+ *   d'identité sont lus avant d'écrire, sur la liste **lue** et jamais aplatie
+ *   (D95/D96), et une fiche reconnue est proposée au lieu d'être opposée.
+ *   **Tout se valide avant que rien ne s'écrive** : une vente refusée pour son
+ *   montant ne doit pas laisser derrière elle une fiche client sans vente.
  * - **Rien ne se déroule tant qu'on n'a pas tapé.** Les deux listes montraient
  *   tout par défaut : tout le stock vendable, tout le fichier. Elles ne
  *   répondent plus qu'à une recherche.
@@ -68,11 +84,14 @@ import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
  *
  * **Deux choses ne bougent pas, et elles sont délibérées.**
  *
- * Ce n'est toujours **pas un `<form>`** : il en contient un, celui de la
- * création du client, et deux formulaires ne s'imbriquent pas. L'absence de
- * validation par Entrée est un gain — le premier champ de l'écran est une
- * recherche de châssis, et enregistrer une vente en tapant Entrée après un
- * numéro serait une catastrophe silencieuse.
+ * Ce n'est **pas un `<form>`**, et il n'en contient plus aucun. La règle était
+ * la même avant — on ne peut pas imbriquer deux formulaires —, mais elle se
+ * tenait alors sur un équilibre : la modale s'abstenait parce que le bloc
+ * client, lui, en était un. Depuis que les champs du client sont posés seuls
+ * (`ChampsClient`), il n'y a plus rien à ménager. L'absence de validation par
+ * Entrée reste un gain — le premier champ de l'écran est une recherche de
+ * châssis, et enregistrer une vente en tapant Entrée après un numéro serait
+ * une catastrophe silencieuse.
  *
  * Et **les listes ne se replient pas quand on a choisi.** La maquette le
  * demandait, ç'a été essayé, puis retiré : dans un groupe de boutons radio les
@@ -146,6 +165,16 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
   );
 
   const [saisie, setSaisie] = useState<SaisieVente>(SAISIE_VENTE_VIDE);
+  /* **La saisie du client vit ici, et pas dans un formulaire à part.** C'est ce
+     que le commanditaire a demandé après essai : le client neuf n'a pas
+     d'étape à lui. Le garder dans l'état de la modale a une seconde vertu, et
+     c'est un défaut réel qu'il a trouvé — tant que ces champs appartenaient à
+     un composant voisin, toucher au mode de paiement pouvait les lui faire
+     perdre. Un seul état, un seul geste. */
+  const [client, setClient] = useState<SaisieClient>(SAISIE_CLIENT_VIDE);
+  /* La fiche reconnue au moment d'enregistrer, gardée à part de l'erreur : on
+     ne se contente pas de refuser, on la propose (D95/D96). */
+  const [rapproche, setRapproche] = useState<Client | null>(null);
   const [rechercheMoto, setRechercheMoto] = useState("");
   const [rechercheClient, setRechercheClient] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
@@ -154,8 +183,13 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
   const changer = (partie: Partial<SaisieVente>) =>
     setSaisie((actuel) => ({ ...actuel, ...partie }));
 
+  const changerClient = (partie: Partial<SaisieClient>) =>
+    setClient((actuel) => ({ ...actuel, ...partie }));
+
   function repartirDeZero() {
     setSaisie(SAISIE_VENTE_VIDE);
+    setClient(SAISIE_CLIENT_VIDE);
+    setRapproche(null);
     setRechercheMoto("");
     setRechercheClient("");
     setErreur(null);
@@ -217,10 +251,44 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
     setErreur(null);
   }
 
+  /**
+   * Enregistre la vente — et le client avec elle s'il est neuf.
+   *
+   * **Le client n'a pas d'étape à lui.** On tape son nom dans la modale et
+   * c'est ce bouton-ci qui le crée, juste avant la vente. Le commanditaire l'a
+   * dit après essai, et il avait raison : « Créer le client » était une
+   * validation de plus au milieu d'un geste qui n'en demande qu'une.
+   *
+   * **Tout se valide avant que rien ne s'écrive.** L'ordre n'est pas
+   * cosmétique : créer le client d'abord, puis buter sur un montant refusé,
+   * laisserait derrière soi une fiche sans vente — et le fichier clients se
+   * remplirait de gens qui ne sont jamais venus.
+   */
   function enregistrer() {
     if (session.statut !== "connecte" || !boutiqueId || perimetre.type !== "boutique") return;
 
-    const probleme = validerVente(saisie);
+    const clientRetenu = saisie.clientId;
+    const clientANaitre = clientRetenu === "";
+
+    if (clientANaitre) {
+      const problemeClient = validerClient(client);
+      if (problemeClient) {
+        setErreur(problemeClient);
+        return;
+      }
+      /* Un fichier pas encore lu n'est pas un fichier vide : sans ce garde, le
+         rapprochement répondrait « numéro libre » sur une liste qu'il n'a pas
+         lue, et la même personne existerait deux fois (D95). */
+      if (lus === null) {
+        setErreur("Le fichier clients n’a pas fini d’arriver. Réessayez dans un instant.");
+        return;
+      }
+    }
+
+    /* Le client n'existe pas encore, mais il existera : la vente se valide
+       avec un identifiant de remplacement, pour que le contrôle porte sur ce
+       qui reste — la moto, le prix, le montant reçu. */
+    const probleme = validerVente({ ...saisie, clientId: clientRetenu || "client-a-naitre" });
     if (probleme) {
       setErreur(probleme);
       return;
@@ -230,16 +298,38 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
       return;
     }
 
+    const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
+    let clientId = clientRetenu;
+
+    if (clientANaitre && lus !== null) {
+      /* Le rapprochement au dernier moment, sur la liste **lue** : on propose
+         la fiche trouvée au lieu de refuser, et la vente attend ce choix
+         plutôt que de fabriquer un doublon (D95/D96). */
+      const doublon = nipDejaPris(client.nip, lus) ?? telephoneDejaPris(client.telephone, lus);
+      if (doublon) {
+        setRapproche(doublon);
+        setErreur(null);
+        return;
+      }
+      /* L'identifiant existe avant que l'écriture n'aboutisse : c'est ce qui
+         rattache la vente au client créé à l'instant, réseau ou pas (D66). */
+      const cree = creerClient(client, auteur);
+      cree.enregistre.catch((cause) => setErreur(messageErreurClient(cause)));
+      clientId = cree.id;
+    }
+
     setErreur(null);
+    setRapproche(null);
     const { id, numero, enregistre } = enregistrerVente(
-      saisie,
+      { ...saisie, clientId },
       { boutique: { boutiqueId, code: perimetre.code }, numerosConnus },
-      { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
+      auteur,
     );
     enregistre.catch((cause) => setErreur(messageErreurVente(cause)));
 
     setEnregistree({ id, numero });
     setSaisie(SAISIE_VENTE_VIDE);
+    setClient(SAISIE_CLIENT_VIDE);
     setRechercheMoto("");
     setRechercheClient("");
   }
@@ -395,13 +485,16 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
               ))}
           </Groupe>
 
-          {/* Hors du `Groupe` : `FormulaireClient` est lui-même un `<form>`, et
-              un formulaire ne se range pas dans le `fieldset` d'un autre.
-
-              C'est **ce bloc-ci** qui change quand un client est retenu, et
+          {/* C'est **ce bloc-ci** qui change quand un client est retenu, et
               jamais la liste au-dessus : replier un groupe de boutons radio au
               moment du choix le détruirait sous les doigts de qui le parcourt
-              aux flèches. */}
+              aux flèches.
+
+              Il vivait hors du `Groupe` parce qu'il portait un `<form>` et
+              qu'un formulaire ne se range pas dans le `fieldset` d'un autre.
+              Ce n'est plus le cas — `ChampsClient` n'est que des champs —, mais
+              la séparation reste : elle dit que ce bloc répond à la liste, au
+              lieu d'en faire partie. */}
           <section className="mb-8">
             {clientChoisi ? (
               <ClientRetenu
@@ -414,17 +507,25 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
                 <p className="mt-1 text-corps text-encre-doux">
                   Il sera rattaché à cette vente immédiatement, réseau ou pas.
                 </p>
-                <div className="mt-4">
-                  <FormulaireClient
-                    clients={lus}
-                    surEnregistrement={(id) => changer({ clientId: id })}
-                    surFicheExistante={(client) => {
-                      changer({ clientId: client.id });
-                      /* La recherche se cale sur la fiche adoptée : si on
-                         revient changer d'avis, elle est encore là. */
-                      setRechercheClient(nomComplet(client));
-                    }}
-                  />
+                <div className="mt-4 max-w-[40rem]">
+                  {/* Les champs seuls : pas de `<form>`, pas de bouton. Le
+                      client part avec la vente, et c'est le pied de la modale
+                      qui conclut les deux. */}
+                  <ChampsClient prefixe="nouveau-client" saisie={client} changer={changerClient} />
+
+                  {rapproche && (
+                    <FicheReconnue
+                      client={rapproche}
+                      surUtilisation={(trouve) => {
+                        changer({ clientId: trouve.id });
+                        setRapproche(null);
+                        /* La recherche se cale sur la fiche adoptée : si on
+                           revient changer d'avis, elle est encore là. */
+                        setRechercheClient(nomComplet(trouve));
+                      }}
+                      surAbandon={() => setRapproche(null)}
+                    />
+                  )}
                 </div>
               </div>
             )}

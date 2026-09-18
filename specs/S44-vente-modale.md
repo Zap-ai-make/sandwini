@@ -50,6 +50,13 @@ reçu — rendus plus rapides à faire et plus calmes à lire.
 
 - [x] Créer un nouveau client est le geste **par défaut** : nom, prénom,
       téléphone, numéro de pièce d'identité ; le reste est replié
+- [x] **Le client neuf n'a aucune étape à lui** : pas de bouton « Créer le
+      client », pas de validation intermédiaire. On tape, et « Enregistrer la
+      vente » crée la fiche en même temps que la vente — réseau coupé compris.
+      *Ajouté après essai du commanditaire : la première version gardait ce
+      bouton, et la saisie se perdait dès qu'on touchait au paiement.*
+- [x] Tout se valide **avant** que rien ne s'écrive : une vente refusée pour son
+      montant ne laisse pas derrière elle une fiche client sans vente
 - [x] Un champ « Utiliser un client existant » n'affiche **aucun résultat tant
       qu'on n'a pas tapé** ; les correspondances apparaissent à la frappe
 - [x] La recherche trouve sur le début de **chaque mot** du nom — « Ali » trouve

@@ -68,23 +68,41 @@ async function preparerVente(
   const telephone = `70${String(Date.now()).slice(-6)}`;
   await creerClientDepuisLeFichier(page, client, telephone);
 
-  if (options.synchroniser) await attendreSynchronisation(page);
+  /* **Vidée par défaut, et c'est un revirement mesuré.** La règle écrite plus
+     bas — « un navigateur qui vient d'écrire lit son propre cache et n'a rien à
+     attendre » — est juste, mais elle ne tient que tant qu'il ne recharge pas.
+     Or *tous* les appelants enchaînent sur un `page.goto` vers la modale, et
+     D97 dit ce qui se passe alors : Firestore repart du cache sur disque, où
+     une écriture encore en vol n'est pas. Le client venait donc de disparaître
+     de la recherche, par intermittence — quatre verdicts perdus sur cette
+     seule cause pendant S44, chaque fois accusant l'écran plutôt que le décor.
+     Qui n'a pas besoin de la frontière passe `synchroniser: false`. */
+  if (options.synchroniser !== false) await attendreSynchronisation(page);
   return { terrain, chassis, client, telephone };
 }
 
 /**
  * Attend que le décor soit réellement parti au serveur.
  *
- * **À n'appeler que quand un second navigateur doit voir ces données.** Un
- * navigateur qui vient d'écrire lit son propre cache et n'a rien à attendre —
- * c'est même exactement la promesse du produit. Mais le cache n'est pas
- * partagé : le gérant du test de la marge ouvre une autre session, et ne verra
- * la moto que lorsqu'elle sera parvenue au serveur.
+ * **Deux situations l'exigent, et elles se ressemblent plus qu'il n'y paraît.**
+ *
+ * *Un second navigateur* : son cache n'est pas celui du premier. Le gérant du
+ * test de la marge ouvre une autre session, et ne verra la moto que lorsqu'elle
+ * sera parvenue au serveur.
+ *
+ * *Un rechargement*, et c'est ce que S44 a dû corriger. On lisait ici qu'« un
+ * navigateur qui vient d'écrire lit son propre cache et n'a rien à attendre ».
+ * C'est vrai — tant qu'il ne recharge pas. Un `page.goto` repart du cache **sur
+ * disque**, où une écriture encore en vol n'est pas (D97) ; le client venait
+ * donc de disparaître de la recherche, par intermittence. Recharger et ouvrir
+ * un second navigateur sont le même geste vu de la file d'écritures : les deux
+ * abandonnent ce qui n'est pas parti.
  *
  * Le budget est large parce que la file met du temps à se vider : le SDK
  * Firestore reste dans son cycle de reconnexion à attente croissante (D50, S27
- * au backlog). L'imposer à chaque test rendait la suite plus lente **et** plus
- * fragile — l'attente elle-même finissait par expirer.
+ * au backlog). Ce qu'il ne faut toujours pas faire, c'est l'appeler **document
+ * par document** — c'est cela qui fabriquait la contention, et non la frontière
+ * unique posée à la sortie du décor.
  */
 async function attendreSynchronisation(page: Page) {
   await attendreLaFileVide(page);
@@ -244,7 +262,7 @@ test.describe("enregistrer une vente", () => {
        l'écrire : `page.goto` recharge tout, et une écriture encore en file s'y
        perd (D97). Les tests voisins courent la même course et la gagnent le
        plus souvent ; celui-ci l'a perdue, ce qui suffit à la rendre visible. */
-    const { chassis, client } = await preparerVente(page, { synchroniser: true });
+    const { chassis, client } = await preparerVente(page);
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
@@ -274,6 +292,60 @@ test.describe("enregistrer une vente", () => {
     /* Le focus rendu à son déclencheur : sans lui, on repart au début du
        document, et qui navigue au clavier a tout l'écran à reparcourir. */
     await expect(ouvrir).toBeFocused();
+  });
+
+  /**
+   * **Le client neuf n'a pas d'étape à lui.** On le tape dans la modale, et
+   * c'est « Enregistrer la vente » qui le crée en passant.
+   *
+   * Ce chemin n'était couvert par aucun test : tous les autres *choisissent un
+   * client existant* dans la liste. C'est le commanditaire qui l'a trouvé à
+   * l'usage — la saisie disparaissait dès qu'on touchait au mode de paiement,
+   * et il fallait passer par un bouton « Créer le client » qui n'avait rien à
+   * faire là. Le test porte donc les deux moitiés du défaut : la saisie
+   * survit aux autres gestes, et la vente se conclut sans étape intermédiaire.
+   */
+  test("un client nouveau se crée avec la vente, sans étape à part", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    const terrain = await preparerTerrain(page);
+    const chassis = chassisUnique("NOUVCLI");
+    await saisirMoto(page, terrain, chassis, { prixAchat: "850000", conseille: "1200000" });
+
+    await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+    const modale = page.getByRole("dialog", { name: "Nouvelle vente" });
+    await expect(modale).toBeVisible({ timeout: 30_000 });
+
+    // Aucune étape de création : le bouton n'existe pas dans la modale.
+    await expect(modale.getByRole("button", { name: "Créer le client" })).toHaveCount(0);
+
+    const nom = `Compaoré ${Date.now().toString(36)}`;
+    const telephone = `76${String(Date.now()).slice(-6)}`;
+    await modale.getByLabel("Nom", { exact: true }).fill(nom);
+    await modale.getByLabel("Téléphone", { exact: true }).fill(telephone);
+
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
+    await page.getByRole("radio", { name: new RegExp(chassis) }).check();
+
+    /* Le cœur du défaut signalé : choisir un mode, puis un moyen, ne doit rien
+       effacer de ce qui est déjà tapé — ni laisser le groupe sans réponse. */
+    await choisirSegment(page, "Mode de paiement", "Tranches");
+    await expect(modale.getByLabel("Nom", { exact: true })).toHaveValue(nom);
+    await expect(page.getByRole("radio", { name: "Tranches" })).toBeChecked();
+
+    await choisirSegment(page, "Moyen de paiement", "Orange Money");
+    await expect(modale.getByLabel("Nom", { exact: true })).toHaveValue(nom);
+    await expect(modale.getByLabel("Téléphone", { exact: true })).toHaveValue(telephone);
+    await expect(page.getByRole("radio", { name: "Orange Money" })).toBeChecked();
+
+    await page.getByLabel(/Montant reçu/).fill("300000");
+    await page.getByRole("button", { name: "Enregistrer la vente" }).click();
+    await expect(contenu(page).getByRole("status")).toContainText("Vente enregistrée", {
+      timeout: 20_000,
+    });
+
+    // Le client a bien été créé, et la vente le cite.
+    await page.getByRole("link", { name: "Voir la vente" }).click();
+    await expect(contenu(page).getByRole("complementary")).toContainText(nom);
   });
 
   /* Ce qui part avec la moto se coche depuis S44, et se relit sur la fiche.
@@ -309,12 +381,7 @@ test.describe("enregistrer une vente", () => {
 
   test("les chiffres de tête somment les ventes affichées", async ({ page }) => {
     await seConnecterEtEntrer(page);
-    /* `synchroniser` parce que la ligne suivante **recharge la page**, et qu'un
-       client tout juste écrit n'est pas encore sur le disque : au retour, la
-       recherche ne le trouvait pas et l'échec accusait les chiffres de tête
-       (D97, mesuré en S44). Les tests qui ouvrent la modale sans recharger
-       n'en ont pas besoin — c'est le rechargement qui coûte, pas l'écriture. */
-    const { chassis, client } = await preparerVente(page, { synchroniser: true });
+    const { chassis, client } = await preparerVente(page);
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
@@ -414,7 +481,7 @@ test.describe("le raccourci de l’ancienne adresse", () => {
    */
   test("l’ancienne adresse ouvre la modale, réseau coupé", async ({ page, context }) => {
     await seConnecterEtEntrer(page);
-    await preparerVente(page, { synchroniser: true });
+    await preparerVente(page);
 
     await page.goto("/motos/ventes", { waitUntil: "load" });
     await prendreLaMainEtMettreEnCache(page, "/motos/ventes");
@@ -441,7 +508,7 @@ test.describe("la marge est réservée au responsable", () => {
     await seConnecterEtEntrer(page);
     /* Le seul test à deux navigateurs : le gérant ouvre sa propre session, et
        ne verra le décor que lorsqu'il sera parvenu au serveur. */
-    const { terrain, chassis, client } = await preparerVente(page, { synchroniser: true });
+    const { terrain, chassis, client } = await preparerVente(page);
 
     // Un gérant rattaché à cette boutique.
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
@@ -552,22 +619,15 @@ test.describe("hors ligne", () => {
     await page.getByLabel("Chercher dans le stock").fill(chassis);
     await page.getByRole("radio", { name: new RegExp(chassis) }).check();
 
-    /* Le client se crée à la volée, sans réseau, et se rattache immédiatement.
-       C'est le geste **par défaut** depuis S44 : le formulaire est déjà là, il
-       n'y a plus de bouton à ouvrir. */
+    /* **Le client se tape, il ne se crée pas à part.** Il n'y a aucun bouton
+       intermédiaire : les champs sont là, et c'est « Enregistrer la vente » qui
+       créera la fiche en même temps que la vente — réseau coupé compris, ce que
+       ce test-ci est le seul à prouver. Le commanditaire a demandé ce
+       raccourci après essai, et il a raison : au comptoir, créer le client
+       n'est pas un geste, c'est une conséquence. */
     const client = `Kaboré ${Date.now().toString(36)}`;
-    const formulaireClient = page.locator("form").filter({
-      has: page.getByRole("button", { name: "Créer le client" }),
-    });
-    await formulaireClient.getByLabel("Nom", { exact: true }).fill(client);
-    await formulaireClient
-      .getByLabel("Téléphone", { exact: true })
-      .fill(`76${String(Date.now()).slice(-6)}`);
-    await formulaireClient.getByRole("button", { name: "Créer le client" }).click();
-    /* Le client retenu remplace le formulaire — la liste de recherche, elle,
-       ne bouge pas : replier un groupe de boutons radio au moment du choix le
-       détruirait sous les doigts de qui le parcourt au clavier. */
-    await expect(modale).toContainText(client);
+    await modale.getByLabel("Nom", { exact: true }).fill(client);
+    await modale.getByLabel("Téléphone", { exact: true }).fill(`76${String(Date.now()).slice(-6)}`);
 
     // Le numéro est disponible sans réseau : c'est tout l'objet de S7.
     const recap = page.getByRole("region", { name: "Récapitulatif de la vente" });
