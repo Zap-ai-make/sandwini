@@ -53,6 +53,18 @@ export function Segmente<T extends string>({
             <label
               key={option.valeur}
               className={[
+                /* **`relative` n'est pas décoratif : sans lui la modale se
+                   vide.** Le radio est `sr-only`, donc `position: absolute`.
+                   Si l'étiquette n'est pas positionnée, son bloc conteneur
+                   devient le premier ancêtre qui l'est — le cadre de la
+                   modale —, et ces boutons dispersés étirent sa zone
+                   défilable bien au-delà de sa hauteur. Au clic, le navigateur
+                   fait défiler ce cadre pour révéler le radio qui vient de
+                   prendre le focus : mesuré à 856 px, contenu hors champ, et
+                   comme le cadre est `overflow-hidden`, aucun moyen de
+                   revenir. L'écran restait vide jusqu'à la fermeture.
+                   Trouvé à l'usage par le commanditaire (S44). */
+                "relative",
                 "flex h-12 min-w-[7rem] flex-1 cursor-pointer items-center justify-center gap-2",
                 "rounded-plaque border px-3 text-center font-medium",
                 /* Le focus vit sur l'étiquette, puisque le radio est masqué :

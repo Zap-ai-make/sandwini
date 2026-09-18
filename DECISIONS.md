@@ -2796,3 +2796,45 @@ a découvert que `chercherClients` acceptait **n'importe quelle sous-chaîne** :
 le nom était un seul champ long ; un prénom est court, donc d'autant plus
 souvent contenu au milieu d'un autre nom. La recherche se fait maintenant par
 début de mot — ce que son propre commentaire annonçait déjà.
+
+---
+
+## D102 — Un champ masqué reste un champ : le focus le cherche, et l'écran le suit
+
+*S44, après un essai du commanditaire — la modale se vidait au premier clic sur
+un segment.*
+
+Le motif est celui du dépôt depuis S20, et il est bon : un choix exclusif se
+dessine en rangée de boutons, mais **ce sont de vrais boutons radio**, masqués
+sous leur étiquette par `sr-only`. Les flèches du clavier parcourent le groupe
+toutes seules, le lecteur d'écran annonce « 2 sur 3 », le groupe porte un nom.
+Une pile de `<button aria-pressed>` aurait le même dessin et ne dirait rien de
+tel.
+
+**Ce que `sr-only` fait et qu'on oublie : il pose `position: absolute`.** Un
+élément absolu se place par rapport à son premier ancêtre *positionné*. Si
+l'étiquette ne l'est pas, ce n'est pas elle : c'est le cadre de la modale, plus
+haut. Sept boutons ainsi projetés ont étiré sa zone défilable de 789 à 1666 px,
+sans que rien ne se voie — un cadre `overflow-hidden` ne montre pas qu'il est
+devenu défilable.
+
+**Le coup de grâce vient du navigateur, et il a raison de le porter.** Cliquer
+une étiquette donne le focus au radio ; le navigateur fait alors défiler le plus
+proche ancêtre défilable pour le révéler. Mesuré : `scrollTop` à 856. Le
+contenu part hors champ, et comme le cadre est `overflow-hidden`, il n'y a ni
+barre de défilement ni geste pour revenir. L'écran reste vide jusqu'à la
+fermeture.
+
+**Décision.** L'étiquette qui enveloppe un champ masqué porte `relative`. Ce
+n'est pas un ajustement de mise en page : c'est ce qui garde le champ dans la
+boîte qui le représente. La règle vaut partout où le dépôt masque un champ sous
+son étiquette — `Segmente`, et le même motif dans `PanneauPiece`.
+
+*Ce que cet épisode dit des tests, et c'est le plus cher.* La suite cliquait ces
+segments et passait au vert. Rien ne disparaissait du DOM : tout était présent,
+simplement défilé hors du cadre — et `toBeChecked`, `toHaveValue`, `toContainText`
+répondent sur un élément invisible. **Une assertion de présence ne dit rien d'un
+écran.** C'est une capture d'écran qui a tranché, pendant que la sonde affirmait
+« Le paiement : 1 » devant un panneau vide. La règle 5 d'`AGENTS.md` n'est pas
+une politesse de fin de spec : ici, elle était le seul instrument capable de
+voir le défaut.

@@ -331,11 +331,22 @@ test.describe("enregistrer une vente", () => {
     await choisirSegment(page, "Mode de paiement", "Tranches");
     await expect(modale.getByLabel("Nom", { exact: true })).toHaveValue(nom);
     await expect(page.getByRole("radio", { name: "Tranches" })).toBeChecked();
+    /* **Visible, et pas seulement présent.** Le défaut que cette ligne garde ne
+       retirait rien du DOM : le radio `sr-only`, absolu sous une étiquette non
+       positionnée, prenait le cadre de la modale pour bloc conteneur et
+       étirait sa zone défilable ; le focus le révélait en faisant défiler ce
+       cadre de 856 px, contenu hors champ, sans retour possible puisqu'il est
+       `overflow-hidden`. Une assertion de présence passait au vert devant un
+       écran vide — c'est exactement ce qui est arrivé. */
+    await expect(modale.getByLabel("Nom", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Enregistrer la vente" })).toBeVisible();
 
     await choisirSegment(page, "Moyen de paiement", "Orange Money");
     await expect(modale.getByLabel("Nom", { exact: true })).toHaveValue(nom);
     await expect(modale.getByLabel("Téléphone", { exact: true })).toHaveValue(telephone);
     await expect(page.getByRole("radio", { name: "Orange Money" })).toBeChecked();
+    await expect(modale.getByLabel("Nom", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Enregistrer la vente" })).toBeVisible();
 
     await page.getByLabel(/Montant reçu/).fill("300000");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
