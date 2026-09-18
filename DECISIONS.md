@@ -483,6 +483,18 @@ Deux corrections, parce qu'il y a deux défauts distincts :
 service qui répond n'est pas un service qui fonctionne.** Le préflight vérifie désormais la
 capacité, pas la présence.
 
+**Quatrième fois, S44 — et le chemin manquant était le déploiement.** Les émulateurs et la
+passe bout en bout portaient leur délai depuis D29 ; le déploiement, lui, ne l'avait que
+sous forme de ligne à recopier dans `DEPLOIEMENT.md`, écrite en syntaxe POSIX
+(`FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy …`). Ce dépôt se développe sous
+Windows, où ce préfixe n'existe pas : PowerShell cherche une commande de ce nom et refuse.
+Le commanditaire a donc retiré le préfixe pour faire passer la commande — et a retrouvé
+`Timeout after 10000`, soit le même diagnostic à repayer. `scripts/deployer.mjs` porte
+désormais le délai et transmet le reste sans le relire (`npm run deployer -- --only
+functions --project sandwini`). La leçon se généralise au-delà du délai : **une consigne
+d'environnement dans un bloc de code est un piège de portabilité ; un lanceur n'en est
+pas un.**
+
 ## D34 — La suite bout en bout tourne sur un seul worker
 S3 — constaté en exécutant la suite complète
 

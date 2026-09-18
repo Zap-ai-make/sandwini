@@ -91,11 +91,21 @@ fonctions il déclare. Elle accorde dix secondes. Sur cette machine, le seul cha
 module en prend près de quatre à froid — le reste n'a pas la marge.
 
 Ce n'est pas une erreur de code : `functions/src/index.ts` charge déjà le SDK Admin
-paresseusement, précisément pour ce genre de délai. Le remède est le délai lui-même :
+paresseusement, précisément pour ce genre de délai. Le remède est le délai lui-même, et il
+vit maintenant dans le chemin de déploiement plutôt que dans cette page :
 
 ```
-FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy --only functions --project sandwini
+npm run deployer -- --only functions --project sandwini
 ```
+
+**Ne déployez pas par `npx firebase deploy` en direct.** Cette page portait auparavant la
+ligne `FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy …`, qui est de la syntaxe POSIX :
+PowerShell, où ce dépôt se développe, n'a pas de préfixe de variable — il cherche une
+commande nommée `FUNCTIONS_DISCOVERY_TIMEOUT=120` et refuse. Qui recopie la ligne la voit
+échouer, retire le préfixe pour la faire passer, et retrouve les dix secondes par défaut.
+C'est exactement ce qui s'est produit en S44, après D23, D25 et D29 : *une ligne de
+documentation se recopie mal ; un chemin unique ne se recopie pas.* `scripts/deployer.mjs`
+porte le délai et transmet le reste sans le relire.
 
 ### Le premier déploiement de 2ᵉ génération échoue à moitié
 
@@ -217,7 +227,7 @@ d'ouvrir. Il faut donc :
 ```
 # 1. Créer le compte dans la console Firebase (Authentication), avec son mot de passe.
 # 2. Deployer la fonction d'amorcage :
-FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy --only functions --project <projet>
+npm run deployer -- --only functions --project <projet>
 
 # 3. Obtenir un jeton d'identite pour ce compte. Le mot de passe ne quitte pas votre
 #    machine ; la cle d'API est publique, elle part deja dans chaque navigateur.
@@ -259,7 +269,7 @@ de l'application fonctionne.
 Une fois activé :
 
 ```
-npx firebase deploy --only storage --project <projet>
+npm run deployer -- --only storage --project <projet>
 ```
 
 **Déployer les fonctions par leur nom**, et non en bloc, quand le dépôt contient une
@@ -267,7 +277,7 @@ fonction qu'on ne veut pas remettre en ligne — `amorcerResponsable` en particu
 supprime après usage :
 
 ```
-npx firebase deploy --only functions:cloturerSurVente,functions:cloturerSurDocument --project <projet>
+npm run deployer -- --only functions:cloturerSurVente,functions:cloturerSurDocument --project <projet>
 ```
 
 ### Ce qui est en ligne
