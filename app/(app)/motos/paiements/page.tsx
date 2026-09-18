@@ -2,8 +2,9 @@
 
 import { Bike, Warehouse } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { nomDuClient } from "@/lib/domain/client";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -11,9 +12,17 @@ import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/e
 import { formaterDateCourte, formaterMontant, formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
+  PLAGE_VIDE,
+  bornesPeriode,
+  libellePeriode,
+  type Periode,
+  type PlagePeriode,
+} from "@/lib/domain/periode";
+import {
   dettes,
   estInactive,
   LIBELLE_STATUT_PAIEMENT,
+  paiementsDeLaPeriode,
   suivrePaiements,
   totalDetenu,
   totalDu,
@@ -110,12 +119,32 @@ export default function PagePaiements() {
 
   const surTitre = useSurTitre("Motos");
 
+  /* État local, comme les filtres des Ventes : une période dans l'URL
+     obligerait à décider ce que devient un lien « ce mois-ci » ouvert le mois
+     suivant. */
+  const [periode, setPeriode] = useState<Periode>("tout");
+  const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
+
+  /* Figé sur la durée du rendu : l'ancienneté d'une dette et les bornes de la
+     période doivent se calculer sur le même instant. */
+  const maintenant = useMemo(() => new Date(), []);
+
   const lignes = useMemo(
-    () => suivrePaiements(ventes ?? [], versements ?? [], new Date()),
-    [ventes, versements],
+    () => suivrePaiements(ventes ?? [], versements ?? [], maintenant),
+    [ventes, versements, maintenant],
   );
-  const listeDettes = useMemo(() => dettes(lignes), [lignes]);
-  const listeTranches = useMemo(() => tranchesEnCours(lignes), [lignes]);
+
+  /* « Les paiements de septembre » : une ligne paraît si elle a reçu de
+     l'argent dans la période, pas si la vente y a été conclue. Le filtre
+     s'applique avant le partage entre dettes et tranches, donc les deux
+     en-têtes — « 1 vente · 415 000 FCFA dus » — le suivent d'eux-mêmes. */
+  const retenues = useMemo(
+    () => paiementsDeLaPeriode(lignes, bornesPeriode(periode, maintenant, plage)),
+    [lignes, periode, plage, maintenant],
+  );
+
+  const listeDettes = useMemo(() => dettes(retenues), [retenues]);
+  const listeTranches = useMemo(() => tranchesEnCours(retenues), [retenues]);
   const inactives = useMemo(
     () => listeTranches.filter((ligne) => estInactive(ligne, seuil)),
     [listeTranches, seuil],
@@ -229,12 +258,29 @@ export default function PagePaiements() {
     );
 
   const chargement = (ventes === null || versements === null) && !erreur && !erreurVersements;
+  const nomPeriode = libellePeriode(periode, maintenant, plage);
 
   return (
     <div>
       <TetePage
         surTitre={surTitre}
         titre="Paiements"
+        sousTitre={
+          nomPeriode
+            ? `Les ventes sur lesquelles un versement a été reçu — ${nomPeriode}`
+            : undefined
+        }
+      />
+
+      {/* Au-dessus des deux sections et non dans l'une d'elles : il les borne
+          toutes les deux, et un filtre posé dans un tableau se lit comme le
+          filtre de ce tableau. */}
+      <FiltrePeriode
+        periode={periode}
+        changer={setPeriode}
+        plage={plage}
+        changerPlage={setPlage}
+        className="mb-5"
       />
 
       {(erreur ?? erreurVersements) && (
@@ -269,9 +315,20 @@ export default function PagePaiements() {
         }
       >
         {!chargement && listeDettes.length === 0 ? (
-          <EtatVide titre="Aucune dette.">
-            Toutes les ventes à crédit sont soldées : le magasin n’attend d’argent de personne.
-          </EtatVide>
+          /* Deux phrases, parce que ce sont deux faits différents. « Toutes les
+             ventes sont soldées » est une bonne nouvelle ; « aucun versement en
+             août » n'en est pas une, et la confondre avec la première ferait
+             croire à un registre à jour. */
+          nomPeriode ? (
+            <EtatVide titre={`Aucun versement reçu — ${nomPeriode}.`}>
+              Aucune vente à crédit n’a reçu d’argent sur cette période. Les dettes en cours
+              restent visibles sur «&nbsp;Tout&nbsp;».
+            </EtatVide>
+          ) : (
+            <EtatVide titre="Aucune dette.">
+              Toutes les ventes à crédit sont soldées : le magasin n’attend d’argent de personne.
+            </EtatVide>
+          )
         ) : (
           <div className="cadre cadre-tableau lg:max-h-none">
             <Tableau
@@ -312,9 +369,16 @@ export default function PagePaiements() {
         }
       >
         {!chargement && listeTranches.length === 0 ? (
-          <EtatVide titre="Aucune moto retenue au magasin.">
-            Aucune vente en tranches n’attend son dernier versement.
-          </EtatVide>
+          nomPeriode ? (
+            <EtatVide titre={`Aucun versement reçu — ${nomPeriode}.`}>
+              Aucune vente en tranches n’a reçu d’argent sur cette période. Les motos retenues
+              restent visibles sur «&nbsp;Tout&nbsp;».
+            </EtatVide>
+          ) : (
+            <EtatVide titre="Aucune moto retenue au magasin.">
+              Aucune vente en tranches n’attend son dernier versement.
+            </EtatVide>
+          )
         ) : (
           <div className="cadre cadre-tableau lg:max-h-none">
             <Tableau

@@ -16,8 +16,14 @@ import type { BilanVentes } from "@/lib/domain/vente";
  *
  * Un périmètre sans vente n'affiche rien du tout : quatre zéros alignés
  * ressemblent à une information, et n'en sont pas une (D63).
+ *
+ * **Chaque carte porte sa période** quand une période est choisie (S46). Une
+ * seule mention au-dessus du lot aurait suffi sur bureau ; à 390 px les cartes
+ * se rangent en deux sur deux, et la dernière se lit sans que la mention soit à
+ * l'écran. Un montant qu'on croit total alors qu'il porte sur un mois est une
+ * erreur qu'on ne rattrape pas — elle ne se voit pas.
  */
-export function CartesVentes({ bilan }: { bilan: BilanVentes }) {
+export function CartesVentes({ bilan, periode }: { bilan: BilanVentes; periode?: string | null }) {
   if (bilan.ventes === 0) return null;
 
   const cartes = [
@@ -45,6 +51,9 @@ export function CartesVentes({ bilan }: { bilan: BilanVentes }) {
           <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
             {carte.nom}
           </p>
+          {/* En minuscules, sans graisse : c'est une précision sur le titre, pas
+              un second titre. */}
+          {periode && <p className="text-legende text-encre-doux">{periode}</p>}
           {/* Les montants sont plus longs qu'un compteur : ils descendent d'un
               cran pour ne pas se casser en deux dans une carte de quart de
               largeur. Les chiffres restent tabulaires — ces quatre cartes se

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { CartesVentes } from "@/components/CartesVentes";
 import { FicheVente } from "@/components/FicheVente";
+import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { ModaleVente } from "@/components/ModaleVente";
 import {
   ErreurDeLecture,
@@ -31,6 +32,14 @@ import {
   type Vente,
   type VenteCherchable,
 } from "@/lib/domain/vente";
+import {
+  PLAGE_VIDE,
+  bornesPeriode,
+  dansLaPeriode,
+  libellePeriode,
+  type Periode,
+  type PlagePeriode,
+} from "@/lib/domain/periode";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -83,6 +92,11 @@ function Ventes() {
   const { clients } = useFichierClients();
   const [recherche, setRecherche] = useState("");
   const [statut, setStatut] = useState<StatutPaiement | "">("");
+  /* La période n'est pas un paramètre d'écran, à la différence de la vente
+     ouverte et de la modale : un lien « ce mois-ci » partagé ne veut plus dire
+     la même chose le mois suivant, et l'état local ne pose pas la question. */
+  const [periode, setPeriode] = useState<Periode>("tout");
+  const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
 
   const boutiqueId = perimetre.boutiqueId;
 
@@ -130,10 +144,25 @@ function Ventes() {
     });
   }, [ventes, clients, stock]);
 
+  /* `maintenant` est figé sur la durée du rendu : calculer les bornes et le
+     libellé sur deux `new Date()` différents ferait diverger l'un de l'autre à
+     la seconde près d'un changement de mois. */
+  const maintenant = useMemo(() => new Date(), []);
+
+  /* La période borne le périmètre : les cartes et le tableau lisent la même
+     liste. La recherche et le statut, eux, servent à retrouver une ligne dans
+     ce périmètre — ils ne redéfinissent pas ce dont on parle, et le comptage
+     « 3 ventes sur 12 » dit déjà leur effet. */
+  const duPerimetre = useMemo(() => {
+    const bornes = bornesPeriode(periode, maintenant, plage);
+    if (bornes === null) return cherchables;
+    return cherchables.filter((ligne) => dansLaPeriode(ligne.vente.date, bornes));
+  }, [cherchables, periode, plage, maintenant]);
+
   const resultats = useMemo(() => {
-    const trouves = chercherVentes(cherchables, recherche, normaliserNom);
+    const trouves = chercherVentes(duPerimetre, recherche, normaliserNom);
     return statut ? trouves.filter((ligne) => ligne.vente.statutPaiement === statut) : trouves;
-  }, [cherchables, recherche, statut]);
+  }, [duPerimetre, recherche, statut]);
 
   const colonnes = useMemo<Colonne<Cherchable>[]>(() => {
     const liste: Colonne<Cherchable>[] = [
@@ -205,10 +234,17 @@ function Ventes() {
       />
     );
 
+  /* Deux totaux, et la distinction compte. `total` est le registre entier :
+     c'est lui qui décide si la boutique n'a jamais rien vendu — une période
+     vide n'est pas un registre vide, et proposer « enregistrez la première
+     vente » à qui consulte le mois dernier serait faux. `retenues` est le
+     dénominateur du comptage, donc la période choisie. */
   const total = cherchables.length;
+  const retenues = duPerimetre.length;
   const enCours = resultats.filter((ligne) => ligne.vente.resteDu > 0).length;
   const chargement = ventes === null && !erreur;
-  const bilan = bilanVentes(ventes ?? []);
+  const bilan = bilanVentes(duPerimetre.map((ligne) => ligne.vente));
+  const nomPeriode = libellePeriode(periode, maintenant, plage);
 
   /* Ouvrir et fermer la modale ne perd pas la fiche ouverte derrière : les
      deux paramètres d'écran cohabitent, et fermer l'une ne referme pas
@@ -240,7 +276,21 @@ function Ventes() {
           (D2). Ils portent le périmètre courant : « toutes boutiques » les
           somme, une boutique les borne — c'est l'écoute qui en décide, pas
           cette carte. */}
-      <CartesVentes bilan={bilan} />
+      {/* Au-dessus des cartes, et non dans l'en-tête du tableau avec la
+          recherche : c'est lui qui décide ce que les quatre chiffres
+          additionnent. Rangé en bas avec les autres filtres, on l'actionnerait
+          à 390 px sans voir bouger ce qu'il change — les cartes seraient déjà
+          sorties de l'écran. La recherche et les statuts, eux, restent là où
+          ils agissent, sur le tableau. */}
+      <FiltrePeriode
+        periode={periode}
+        changer={setPeriode}
+        plage={plage}
+        changerPlage={setPlage}
+        className="mb-4"
+      />
+
+      <CartesVentes bilan={bilan} periode={nomPeriode} />
 
       {modaleOuverte && <ModaleVente onFermer={fermerLaModale} />}
 
@@ -304,7 +354,7 @@ function Ventes() {
                     <strong className="font-semibold text-encre">
                       {resultats.length === 1 ? "1 vente" : `${resultats.length} ventes`}
                     </strong>
-                    {resultats.length !== total && ` sur ${total}`} · {enCours} en cours
+                    {resultats.length !== retenues && ` sur ${retenues}`} · {enCours} en cours
                   </>
                 )}
               </p>

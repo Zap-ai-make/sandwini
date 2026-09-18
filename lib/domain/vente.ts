@@ -1,4 +1,5 @@
 import { formaterMontant } from "./format";
+import { dansLaPeriode, type BornesPeriode } from "./periode";
 
 /**
  * Une vente de moto (`prompt.md` §5.4, §6.1, §6.2).
@@ -513,6 +514,15 @@ export function joursDepuis(date: Date | null, maintenant: Date): number | null 
  */
 export type LignePaiement = {
   vente: Vente;
+  /**
+   * Les versements de cette vente, tels qu'ils ont servi aux totaux.
+   *
+   * Portés par la ligne plutôt que relus à côté : c'est ce qui permet de la
+   * borner dans le temps sans redonner la collection entière à qui filtre
+   * (S46). `dernierVersementAt` ne suffisait pas — un mois se juge sur tous
+   * les versements qu'il contient, pas sur le plus récent de la vente.
+   */
+  versements: readonly Versement[];
   totalPaye: number;
   resteDu: number;
   statutPaiement: StatutPaiement;
@@ -536,6 +546,7 @@ export function lignePaiement(
   );
   return {
     vente,
+    versements,
     totalPaye,
     resteDu,
     statutPaiement,
@@ -598,6 +609,36 @@ export function tranchesEnCours(lignes: readonly LignePaiement[]): LignePaiement
  */
 export function estInactive(ligne: LignePaiement, seuil: number): boolean {
   return ligne.joursSansVersement !== null && ligne.joursSansVersement >= seuil;
+}
+
+/**
+ * Les lignes qui ont reçu de l'argent pendant la période (S46).
+ *
+ * **La règle est celle du versement, pas celle de la vente.** « Les paiements
+ * de septembre », ce sont les ventes sur lesquelles quelqu'un a versé quelque
+ * chose en septembre — qu'elles aient été conclues en septembre ou en mars.
+ * L'acompte encaissé au comptoir étant lui-même un versement daté du jour de la
+ * vente (`enregistrerVente`), une vente de septembre entre d'elle-même dans
+ * septembre : il n'y a pas deux règles à tenir, il y en a une.
+ *
+ * **Ce qui sort du filtre, et c'est assumé** : un crédit conclu sans le moindre
+ * acompte ne porte aucun versement, donc aucune période ne le montre — sauf
+ * « Tout », qui ne borne rien. C'est la lecture littérale d'un écran de
+ * paiements : personne n'a payé, il n'y a pas de paiement à dater. La dette,
+ * elle, reste entière dans le total de « Tout ».
+ *
+ * Les montants affichés ne sont pas recoupés par la période : un reste dû est
+ * un état, pas un flux. On choisit **quelles lignes** paraissent, jamais ce
+ * qu'elles valent.
+ */
+export function paiementsDeLaPeriode(
+  lignes: readonly LignePaiement[],
+  bornes: BornesPeriode,
+): LignePaiement[] {
+  if (bornes === null) return [...lignes];
+  return lignes.filter((ligne) =>
+    ligne.versements.some((versement) => dansLaPeriode(versement.date, bornes)),
+  );
 }
 
 /** Le total dû par les clients — l'en-tête de la liste des dettes. */

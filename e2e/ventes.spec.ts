@@ -424,6 +424,59 @@ test.describe("enregistrer une vente", () => {
     await expect(chiffres).not.toContainText("Marge");
   });
 
+  test("le filtre de période borne les chiffres de tête et la liste", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    const { chassis, client } = await preparerVente(page);
+
+    await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+    await choisirMotoEtClient(page, chassis, client);
+    await choisirSegment(page, "Mode de paiement", "Comptant");
+    await page.getByRole("button", { name: "Enregistrer la vente" }).click();
+    await expect(contenu(page).getByRole("status")).toContainText("Vente enregistrée", {
+      timeout: 20_000,
+    });
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog", { name: "Vente enregistrée" })).toBeHidden();
+
+    const ecran = contenu(page);
+    const periodes = page.getByRole("group", { name: "Filtrer par période" });
+    await expect(periodes).toBeVisible();
+
+    /* La vente vient d'être faite : elle est dans le mois courant, et les
+       cartes disent laquelle. */
+    await periodes.getByRole("button", { name: "Ce mois-ci" }).click();
+    await expect(ecran).toContainText("Chiffre d’affaires", { timeout: 30_000 });
+    await expect(ecran).toContainText("1 200 000 FCFA");
+
+    /* Le mois dernier ne contient rien : toute la suite écrit aujourd'hui. Les
+       cartes disparaissent avec le bilan vide (D63), et le tableau le dit. */
+    await periodes.getByRole("button", { name: "Mois dernier" }).click();
+    await expect(ecran).not.toContainText("Chiffre d’affaires");
+    await expect(ecran).toContainText("Aucune vente ne correspond");
+
+    /* Et l'on revient : « Tout » ne borne rien, donc la vente est de retour. */
+    await periodes.getByRole("button", { name: "Tout" }).click();
+    await expect(ecran).toContainText("1 200 000 FCFA");
+  });
+
+  test("la plage libre se saisit, et une fin antérieure au début le dit", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    await preparerVente(page);
+    await page.goto("/motos/ventes", { waitUntil: "load" });
+
+    const periodes = page.getByRole("group", { name: "Filtrer par période" });
+    await periodes.getByRole("button", { name: "Du… au…" }).click();
+
+    const debut = page.getByLabel("Du", { exact: true });
+    const fin = page.getByLabel("Au", { exact: true });
+    await expect(debut).toBeVisible();
+    await expect(fin).toBeVisible();
+
+    await debut.fill("2026-09-30");
+    await fin.fill("2026-09-01");
+    await expect(contenu(page)).toContainText("La date de fin précède la date de début");
+  });
+
   test("une vente demande une boutique précise : son numéro en porte le code", async ({
     page,
   }) => {

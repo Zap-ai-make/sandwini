@@ -21,6 +21,7 @@ import {
   lireMontantEncaisse,
   motoRemiseA,
   numeroRecuVersement,
+  paiementsDeLaPeriode,
   peutRemettreMoto,
   resumerDossier,
   statutMotoApresVente,
@@ -631,5 +632,81 @@ describe("remise de la moto en fin de tranches", () => {
 
   it("ne se refait pas une seconde fois", () => {
     expect(peutRemettreMoto(venteS9({ modePaiement: "tranches", motoRemise: true }), 0)).toBe(false);
+  });
+});
+
+describe("paiementsDeLaPeriode", () => {
+  /* Septembre 2026, bornes locales. On construit les dates du même bord que
+     `bornesPeriode` : ce qui se compare doit se fabriquer pareil. */
+  const septembre = { debut: new Date(2026, 8, 1), fin: new Date(2026, 9, 1) };
+
+  const ventesDuLot = [
+    venteS9({ id: "ancienne", date: new Date(2026, 2, 5) }),
+    venteS9({ id: "recente", date: new Date(2026, 8, 5) }),
+    venteS9({ id: "sans-acompte", date: new Date(2026, 8, 7) }),
+  ];
+
+  const lignesDuLot = (versementsDuLot: Versement[]) =>
+    suivrePaiements(ventesDuLot, versementsDuLot, MAINTENANT);
+
+  it("retient une vente ancienne qui a reçu de l’argent dans la période", () => {
+    const lignes = lignesDuLot([
+      versement({ id: "a", venteId: "ancienne", date: new Date(2026, 8, 12) }),
+    ]);
+    const retenues = paiementsDeLaPeriode(lignes, septembre);
+    expect(retenues.map((ligne) => ligne.vente.id)).toEqual(["ancienne"]);
+  });
+
+  /* L'acompte encaissé au comptoir est un versement daté du jour de la vente
+     (`enregistrerVente`) : une vente de septembre entre donc dans septembre
+     sans qu'on ait à écrire une seconde règle pour elle. */
+  it("retient une vente de la période par son acompte, sans règle ajoutée", () => {
+    const lignes = lignesDuLot([
+      versement({ id: "b", venteId: "recente", date: new Date(2026, 8, 5) }),
+    ]);
+    expect(paiementsDeLaPeriode(lignes, septembre).map((l) => l.vente.id)).toEqual(["recente"]);
+  });
+
+  it("écarte une vente dont le seul versement est hors période", () => {
+    const lignes = lignesDuLot([
+      versement({ id: "c", venteId: "ancienne", date: new Date(2026, 2, 5) }),
+    ]);
+    expect(paiementsDeLaPeriode(lignes, septembre)).toEqual([]);
+  });
+
+  /* Le trou assumé : sans acompte, aucun versement, donc aucune période ne la
+     montre. « Tout » la garde, et c'est là que la dette se compte. */
+  it("écarte un crédit sans le moindre versement, et « Tout » le garde", () => {
+    const lignes = lignesDuLot([]);
+    expect(paiementsDeLaPeriode(lignes, septembre)).toEqual([]);
+    expect(paiementsDeLaPeriode(lignes, null)).toHaveLength(3);
+  });
+
+  it("ne retient une vente qu’une fois, quel que soit le nombre de versements", () => {
+    const lignes = lignesDuLot([
+      versement({ id: "d", venteId: "recente", date: new Date(2026, 8, 5) }),
+      versement({ id: "e", venteId: "recente", date: new Date(2026, 8, 20) }),
+    ]);
+    expect(paiementsDeLaPeriode(lignes, septembre)).toHaveLength(1);
+  });
+
+  /* D66 : un versement enregistré hors ligne n'a pas encore l'horodatage du
+     serveur. Le masquer ferait disparaître l'encaissement qu'on vient de
+     saisir, au moment où l'on vérifie qu'il est passé. */
+  it("retient un versement sans date, quelle que soit la période", () => {
+    const lignes = lignesDuLot([versement({ id: "f", venteId: "recente", date: null })]);
+    expect(paiementsDeLaPeriode(lignes, septembre).map((l) => l.vente.id)).toEqual(["recente"]);
+  });
+
+  it("les montants ne sont pas recoupés : un reste dû est un état, pas un flux", () => {
+    const lignes = lignesDuLot([
+      versement({ id: "g", venteId: "ancienne", montant: 200_000, date: new Date(2026, 2, 5) }),
+      versement({ id: "h", venteId: "ancienne", montant: 300_000, date: new Date(2026, 8, 12) }),
+    ]);
+    const [retenue] = paiementsDeLaPeriode(lignes, septembre);
+    /* 500 000 et non 300 000 : la ligne paraît parce qu'elle a bougé en
+       septembre, elle vaut ce qu'elle vaut depuis toujours. */
+    expect(retenue.totalPaye).toBe(500_000);
+    expect(retenue.resteDu).toBe(700_000);
   });
 });

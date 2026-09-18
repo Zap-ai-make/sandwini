@@ -235,6 +235,7 @@ c'est le voir revenir sous un autre nom.
 | S43 | L'arrivage : l'espace de suivi d'un lot (bilan, CMC, inspection, actions) | S42, S11, S39 | post-MVP | terminée |
 | S44 | La vente en modale, l'entrée moto, les réglages | S8, S6, S10, S39, S40, S42, S43 | post-MVP | terminée |
 | S45 | L'erreur d'évaluation des règles est du bruit — piste écartée, preuve à l'appui | S39, S27 | post-MVP | écartée |
+| S46 | Filtrer les ventes et les paiements par période | S8, S9, S44 | post-MVP | terminée |
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
