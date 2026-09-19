@@ -757,7 +757,10 @@ export const amorcerResponsable = onRequest({ region: REGION, cors: false }, asy
 
 /* --- Clôture automatique du dossier (§7.1) -------------------------------- */
 
-const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise", "plaque"] as const;
+/* Trois depuis S48 : la plaque a quitte le dossier, l'immatriculation etant
+   obtenue avec la carte grise. Un dossier ancien qui porte encore un document
+   `plaque` a `a_faire` se cloture donc desormais — c'est l'effet voulu. */
+const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise"] as const;
 
 /**
  * Le dossier est-il fini ?

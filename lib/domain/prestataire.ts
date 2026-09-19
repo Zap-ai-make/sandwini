@@ -8,12 +8,16 @@
  * qu'une semaine plus tard.
  */
 
-export const TYPES_DOCUMENTS = ["carte_grise", "plaque"] as const;
+/* La plaque a quitte le dossier en S48 : un prestataire ne traite plus qu'un
+   type de document. On garde le tableau plutot que de le reduire a une
+   constante — c'est la forme que portent les fiches deja enregistrees, et la
+   regle Firestore continue d'accepter `plaque` pour qu'elles restent
+   modifiables. */
+export const TYPES_DOCUMENTS = ["carte_grise"] as const;
 export type TypeDocument = (typeof TYPES_DOCUMENTS)[number];
 
 export const LIBELLE_TYPE_DOCUMENT: Record<TypeDocument, string> = {
   carte_grise: "Carte grise",
-  plaque: "Plaque",
 };
 
 export type Prestataire = {

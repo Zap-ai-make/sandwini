@@ -37,8 +37,8 @@ const etat = (partie: Partial<EtatDossier> = {}): EtatDossier => ({
 
 /** Ceux qui arrivent finis, hors du périmètre de l’entreprise (D65). */
 const ARRIVENT_FAITS = ["quittance", "cmc"] as const;
-/** Ceux qu’un intervenant externe traite. */
-const VIA_PRESTATAIRE = ["carte_grise", "plaque"] as const;
+/** Ceux qu’un intervenant externe traite. La plaque en faisait partie jusqu’à S48. */
+const VIA_PRESTATAIRE = ["carte_grise"] as const;
 
 describe("passeParUnPrestataire", () => {
   it("distingue ce qui arrive fait de ce qui se confie", () => {
@@ -66,7 +66,7 @@ describe("la quittance et le CMC arrivent déjà faits", () => {
   });
 });
 
-describe("la carte grise et la plaque passent par un prestataire", () => {
+describe("la carte grise passe par un prestataire", () => {
   it("suivent le cycle complet du cahier", () => {
     for (const type of VIA_PRESTATAIRE) {
       expect(transitionAutorisee(type, "a_faire", "chez_prestataire"), type).toBe(true);
@@ -170,8 +170,7 @@ describe("dossierCloturable", () => {
           documents: [
             doc("quittance", "remis_client"),
             doc("cmc", "non_applicable"),
-            doc("carte_grise", "remis_client"),
-            doc("plaque", "non_applicable"),
+            doc("carte_grise", "non_applicable"),
           ],
         }),
       ),
@@ -187,7 +186,6 @@ describe("dossierCloturable", () => {
               doc("quittance", "remis_client"),
               doc("cmc", "remis_client"),
               doc("carte_grise", statut),
-              doc("plaque", "remis_client"),
             ],
           }),
         ),
@@ -343,7 +341,7 @@ describe("etapesRelais", () => {
   /* Le voyage est fini : un point « en cours » sur la dernière étape dirait que
      le document est encore en route. */
   it("ne laisse rien « en cours » sur une étape terminale", () => {
-    expect(noms("plaque", "remis_client")).toEqual([
+    expect(noms("carte_grise", "remis_client")).toEqual([
       "a_faire:fait",
       "chez_prestataire:fait",
       "revenu_magasin:fait",
@@ -447,7 +445,7 @@ describe("dossiersEnAttente", () => {
     const liste = lister(
       [vente()],
       [
-        document({ id: "plaque", type: "plaque" }),
+        document({ id: "carte_grise", type: "carte_grise" }),
         document({
           id: "quittance",
           type: "quittance",
@@ -456,17 +454,17 @@ describe("dossiersEnAttente", () => {
         document({ id: "cmc", type: "cmc" }),
       ],
     );
-    expect(liste[0].enCours.map((d) => d.type)).toEqual(["cmc", "plaque"]);
+    expect(liste[0].enCours.map((d) => d.type)).toEqual(["cmc", "carte_grise"]);
   });
 
   /* L'écran montre une colonne par document : « remis » y compte autant que
-     « à faire », c'est en voyant les trois premiers réglés qu'on comprend qu'il
-     ne manque que le quatrième. */
-  it("rend les quatre documents par type, réglés compris, et rien pour ceux qui manquent", () => {
+     « à faire », c'est en voyant les premiers réglés qu'on comprend lequel
+     manque encore. */
+  it("rend les trois documents par type, réglés compris, et rien pour ceux qui manquent", () => {
     const liste = lister(
       [vente()],
       [
-        document({ id: "plaque", type: "plaque" }),
+        document({ id: "carte_grise", type: "carte_grise" }),
         document({
           id: "quittance",
           type: "quittance",
@@ -475,9 +473,65 @@ describe("dossiersEnAttente", () => {
       ],
     );
     expect(liste[0].documents.quittance?.statut).toBe("remis_client");
-    expect(liste[0].documents.plaque?.statut).toBe("a_faire");
+    expect(liste[0].documents.carte_grise?.statut).toBe("a_faire");
     expect(liste[0].documents.cmc).toBeNull();
-    expect(liste[0].documents.carte_grise).toBeNull();
+  });
+
+  /* S48 : la plaque a quitté le dossier, mais les dossiers ouverts avant en
+     portent encore un en base. Il ne doit peser sur rien — ni « en cours », ni
+     la détention, ni le retard —, sans quoi l'écran contredirait le serveur,
+     qui vient de clore ce dossier sur trois documents. */
+  it("ignore un document d’un type retiré du dossier", () => {
+    const liste = lister(
+      [vente()],
+      [
+        document({ id: "quittance", type: "quittance", statut: "remis_client" }),
+        document({ id: "cmc", type: "cmc", statut: "remis_client" }),
+        document({ id: "carte_grise", type: "carte_grise", statut: "remis_client" }),
+        /* Le type n'existe plus dans `TypeDocument` : c'est bien le cas d'une
+           donnée plus vieille que le code, et le compilateur ne peut pas la
+           décrire. */
+        document({
+          id: "plaque",
+          type: "plaque" as unknown as DocumentDossier["type"],
+          statut: "chez_prestataire",
+          prestataireNom: "Fabricant de plaques",
+          deposeLe: new Date("2026-08-01T12:00:00"),
+          disponibleLe: new Date("2026-08-05T10:00:00"),
+        }),
+      ],
+    );
+    /* Le dossier quitte la file : ses trois documents sont réglés. Avant S48,
+       la plaque l'y aurait retenu — chez un prestataire, avec une date dépassée
+       — pendant que le serveur, lui, venait de le clore. */
+    expect(liste).toEqual([]);
+  });
+
+  it("ne laisse pas un type retiré retenir un dossier qui attend encore", () => {
+    const liste = lister(
+      [vente()],
+      [
+        document({ id: "quittance", type: "quittance", statut: "remis_client" }),
+        document({ id: "carte_grise", type: "carte_grise", statut: "chez_prestataire",
+          prestataireNom: "Zongo Prestations", deposeLe: new Date("2026-09-01T12:00:00") }),
+        document({
+          id: "plaque",
+          type: "plaque" as unknown as DocumentDossier["type"],
+          statut: "chez_prestataire",
+          prestataireNom: "Fabricant de plaques",
+          deposeLe: new Date("2026-08-01T12:00:00"),
+        }),
+      ],
+    );
+    /* La carte grise reste en cours, seule. La détention nomme son prestataire
+       et non celui de la plaque, pourtant déposée un mois plus tôt : un dépôt
+       qu'on ne suit plus ne peut pas nommer le dossier. */
+    expect(liste[0].enCours.map((document) => document.type)).toEqual(["carte_grise"]);
+    expect(liste[0].detention).toEqual({
+      chez: "prestataire",
+      nom: "Zongo Prestations",
+      depuisJours: joursEcoules(new Date("2026-09-01T12:00:00"), AUJOURDHUI),
+    });
   });
 
   it("signale le retard d’après la date annoncée, jamais d’après une requête figée", () => {
@@ -528,15 +582,18 @@ describe("dossiersEnAttente", () => {
       });
     });
 
-    /* Deux documents peuvent être chez deux prestataires : la colonne n'en
-       nomme qu'un, et c'est celui dont le délai s'allonge. */
-    it("nomme le plus ancien dépôt quand deux prestataires détiennent un papier", () => {
+    /* Un seul type passe par un prestataire depuis S48, donc une vente n'a plus
+       qu'un dépôt à la fois. La règle du plus ancien reste écrite et testée :
+       elle tient la promesse de la colonne — nommer celui dont le délai
+       s'allonge — et la prochaine pièce confiée à l'extérieur la retrouvera.
+       On la vérifie ici sur deux documents du même type, ce que la base
+       n'interdit pas. */
+    it("nomme le plus ancien dépôt quand deux documents sont chez un prestataire", () => {
       const liste = lister(
         [vente()],
         [
           document({
-            id: "plaque",
-            type: "plaque",
+            id: "recent",
             statut: "chez_prestataire",
             prestataireNom: "Récent",
             deposeLe: new Date("2026-09-01T12:00:00"),
@@ -579,7 +636,6 @@ describe("dossiersEnAttente", () => {
       document({
         id: "d3",
         venteId: "v3",
-        type: "plaque",
         statut: "revenu_magasin",
       }),
     ];

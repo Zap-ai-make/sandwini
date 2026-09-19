@@ -129,15 +129,15 @@ describe("la quittance et le CMC, qui arrivent déjà faits", () => {
   });
 });
 
-describe("la carte grise et la plaque, qui passent par un prestataire", () => {
-  it("ne sautent pas le dépôt", async () => {
-    await poser({ carte_grise: {}, plaque: {} });
-    const base = gerant();
-    for (const type of ["carte_grise", "plaque"]) {
-      await assertFails(
-        updateDoc(doc(base, chemin(type)), { statut: "revenu_magasin", ...traceMaj }),
-      );
-    }
+describe("la carte grise, qui passe par un prestataire", () => {
+  it("ne saute pas le dépôt", async () => {
+    await poser({ carte_grise: {} });
+    await assertFails(
+      updateDoc(doc(gerant(), chemin("carte_grise")), {
+        statut: "revenu_magasin",
+        ...traceMaj,
+      }),
+    );
   });
 
   it("se déposent avec le prestataire, la date et l’avance", async () => {
@@ -239,7 +239,7 @@ describe("ce qu’aucun document ne peut faire", () => {
 
   it("ne change ni de boutique, ni de vente, ni de type", async () => {
     const base = gerant();
-    for (const fraude of [{ boutiqueId: "KDG" }, { venteId: "vente-kdg" }, { type: "plaque" }]) {
+    for (const fraude of [{ boutiqueId: "KDG" }, { venteId: "vente-kdg" }, { type: "carte_grise" }]) {
       await poser({ quittance: {} });
       await assertFails(
         updateDoc(doc(base, chemin("quittance")), {

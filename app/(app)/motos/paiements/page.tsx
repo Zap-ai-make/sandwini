@@ -1,8 +1,7 @@
 "use client";
 
-import { Bike, Warehouse } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
@@ -19,14 +18,18 @@ import {
   type PlagePeriode,
 } from "@/lib/domain/periode";
 import {
-  dettes,
-  estInactive,
+  FILTRES_PAIEMENT,
+  LIBELLE_FILTRE_PAIEMENT,
+  LIBELLE_MODE,
   LIBELLE_STATUT_PAIEMENT,
+  estInactive,
+  filtrerPaiements,
+  paiementsASuivre,
   paiementsDeLaPeriode,
   suivrePaiements,
   totalDetenu,
   totalDu,
-  tranchesEnCours,
+  type FiltrePaiement,
   type LignePaiement,
   type StatutPaiement,
   type Vente,
@@ -43,28 +46,33 @@ import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/
 /**
  * Le suivi des paiements (§6.3).
  *
- * **Deux sections, nommées, jamais mêlées.** C'est la raison d'être de cet
- * écran, et la confusion métier la plus coûteuse du projet (§13). Une *dette*
- * est de l'argent qui manque au magasin : la moto est partie avec le client.
- * Une *tranche* est de l'argent que le magasin détient : la moto n'est pas
- * sortie, et l'argent peut repartir. Les additionner ferait un chiffre qui ne
- * veut rien dire — d'où deux tableaux, deux totaux, deux vocabulaires, jamais
- * un cumul.
+ * **Une liste, deux notions qui restent nommées.** L'écran a porté deux
+ * tableaux séparés, chacun sous sa phrase d'explication ; le commanditaire les
+ * a trouvés lourds à l'usage et a demandé une liste unique (S48). La séparation
+ * quitte donc la mise en page pour entrer dans la ligne : une colonne **Mode**
+ * dit sur chaque vente si la moto est partie (*crédit*) ou si elle est retenue
+ * (*tranches*).
  *
- * **Elles sont visibles en même temps, et ce n'est pas un détail.** L'écran
- * précédent les rangeait derrière trois boutons dont un seul était pressé à la
- * fois : on ne pouvait pas se tromper, mais on ne pouvait pas non plus voir la
- * différence — et c'est la voir qui l'enseigne. La bande d'explication de
- * chaque section dit, en une phrase, où est la moto et qui détient l'argent.
+ * **Ce que cette fusion n'a pas le droit de perdre.** Une *dette* est de
+ * l'argent qui manque au magasin ; une *tranche* est de l'argent que le magasin
+ * détient pour le compte du client, et qui peut repartir. Les additionner
+ * donnerait un chiffre qui ne veut rien dire — c'est la confusion métier la plus
+ * coûteuse du projet (`AGENTS.md`, §13). D'où **deux totaux distincts** en tête,
+ * jamais une somme, et le mot du mode sur chaque ligne plutôt qu'au-dessus d'un
+ * tableau qu'on déroule.
  *
- * **La troisième liste a disparu.** « Tranches inactives » était un filtre de
- * la deuxième ; l'information vit désormais dans la colonne « État » de chaque
- * ligne — « Aucun versement depuis 60 jours » —, dans le filet rouge qui marque
- * la ligne, et dans le comptage en tête de section. Une liste dont chaque
- * élément se lit déjà dans une autre n'est pas une liste, c'est un tri.
+ * **Une seule rangée de filtres**, sur deux axes qui ne se recouvrent pas :
+ * crédit / tranches dit où est la moto, partiellement payées / impayées dit où
+ * en est l'argent. Le raisonnement est dans `filtrerPaiements`.
+ *
+ * **La liste des tranches inactives a disparu il y a longtemps.** Elle était un
+ * filtre de la seconde ; l'information vit dans la colonne « État » — « Aucun
+ * versement depuis 60 jours » —, dans le filet rouge de la ligne, et dans le
+ * comptage en tête. Une liste dont chaque élément se lit déjà dans une autre
+ * n'est pas une liste, c'est un tri.
  *
  * Tout est calculé en mémoire à partir des versements chargés, jamais depuis un
- * agrégat serveur (`prompt.md` §3.4, D56) : ces listes doivent s'ouvrir sans
+ * agrégat serveur (`prompt.md` §3.4, D56) : cette liste doit s'ouvrir sans
  * réseau comme le reste du produit.
  */
 export default function PagePaiements() {
@@ -122,6 +130,7 @@ export default function PagePaiements() {
   /* État local, comme les filtres des Ventes : une période dans l'URL
      obligerait à décider ce que devient un lien « ce mois-ci » ouvert le mois
      suivant. */
+  const [filtre, setFiltre] = useState<FiltrePaiement>("tout");
   const [periode, setPeriode] = useState<Periode>("tout");
   const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
 
@@ -143,11 +152,22 @@ export default function PagePaiements() {
     [lignes, periode, plage, maintenant],
   );
 
-  const listeDettes = useMemo(() => dettes(retenues), [retenues]);
-  const listeTranches = useMemo(() => tranchesEnCours(retenues), [retenues]);
+  /* Une seule liste (S48). Les deux totaux restent calcules a part : additionner
+     une dette et une tranche donnerait un chiffre qui ne veut rien dire. */
+  const aSuivre = useMemo(() => paiementsASuivre(retenues), [retenues]);
+  const lignesVues = useMemo(() => filtrerPaiements(aSuivre, filtre), [aSuivre, filtre]);
+
+  const duParLesClients = useMemo(
+    () => totalDu(lignesVues.filter((ligne) => ligne.vente.modePaiement === "credit")),
+    [lignesVues],
+  );
+  const detenuPourEux = useMemo(
+    () => totalDetenu(lignesVues.filter((ligne) => ligne.vente.modePaiement === "tranches")),
+    [lignesVues],
+  );
   const inactives = useMemo(
-    () => listeTranches.filter((ligne) => estInactive(ligne, seuil)),
-    [listeTranches, seuil],
+    () => lignesVues.filter((ligne) => estInactive(ligne, seuil) && ligne.resteDu > 0),
+    [lignesVues, seuil],
   );
 
   const nomClient = useCallback(
@@ -159,15 +179,42 @@ export default function PagePaiements() {
     [stock],
   );
 
-  const communes = useMemo<Colonne<LignePaiement>[]>(
-    () => colonnesCommunes({ nomClient }),
-    [nomClient],
-  );
-
-  const colonnesDettes = useMemo<Colonne<LignePaiement>[]>(
+  const colonnes = useMemo<Colonne<LignePaiement>[]>(
     () => [
-      ...communes,
+      {
+        cle: "numero",
+        titre: "Pièce",
+        principal: true,
+        rendu: (ligne) => (
+          <Link
+            href={`/motos/ventes?vente=${ligne.vente.id}`}
+            className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
+          >
+            {ligne.vente.numero}
+          </Link>
+        ),
+      },
+      {
+        cle: "client",
+        titre: "Client",
+        principal: true,
+        rendu: (ligne) => nomClient(ligne.vente.clientId),
+      },
       { cle: "moto", titre: "Moto", rendu: (ligne) => nomMoto(ligne, moto, catalogue) },
+      /* La colonne qui porte, à elle seule, ce que les deux bandeaux disaient.
+         Un mot par ligne — « Crédit » ou « Tranches » — au lieu d'une phrase
+         au-dessus d'un tableau : la mention voyage avec la ligne, et ne se
+         perd pas quand on défile. Sans elle, cette liste additionnerait dans
+         l'esprit du lecteur une dette et un dépôt (`AGENTS.md`, §13). */
+      {
+        cle: "mode",
+        titre: "Mode",
+        rendu: (ligne) => (
+          <span className="whitespace-nowrap font-medium text-encre">
+            {LIBELLE_MODE[ligne.vente.modePaiement]}
+          </span>
+        ),
+      },
       /* Le prix convenu de la maquette n’est pas ici : il vaut exactement
          « déjà versé + reste dû », et sa colonne poussait « Action » hors du
          cadre à 1280 px, colonne des écrans dépliée — un geste qu’on ne voit
@@ -176,42 +223,26 @@ export default function PagePaiements() {
         cle: "verse",
         titre: "Déjà versé",
         chiffre: true,
-        rendu: (l) => formaterNombre(l.totalPaye),
+        rendu: (ligne) => formaterNombre(ligne.totalPaye),
       },
-      { cle: "reste", titre: "Reste dû", chiffre: true, rendu: (l) => formaterNombre(l.resteDu) },
+      {
+        /* « Reste à percevoir » couvre les deux modes sans mentir sur aucun :
+           c'est ce que le magasin attend encore, que le client le doive ou
+           qu'il complète un dépôt. « Reste dû » aurait fait du tranches une
+           dette, ce qu'il n'est pas. */
+        cle: "reste",
+        titre: "Reste à percevoir",
+        titreReplie: "Reste",
+        chiffre: true,
+        rendu: (ligne) => formaterNombre(ligne.resteDu),
+      },
       {
         cle: "dernier",
         titre: "Dernier versement",
+        titreReplie: "Dernier",
         chiffre: true,
         rendu: (ligne) =>
           ligne.dernierVersementAt ? formaterDateCourte(ligne.dernierVersementAt) : "aucun",
-      },
-      {
-        cle: "etat",
-        titre: "État",
-        rendu: (ligne) => <Etat statut={ligne.statutPaiement} />,
-      },
-      {
-        cle: "action",
-        titre: "Action",
-        rendu: (ligne) => <Encaisser vente={ligne.vente.id} numero={ligne.vente.numero} />,
-      },
-    ],
-    [communes, moto, catalogue],
-  );
-
-  const colonnesTranches = useMemo<Colonne<LignePaiement>[]>(
-    () => [
-      ...communes,
-      { cle: "moto", titre: "Moto retenue", rendu: (ligne) => nomMoto(ligne, moto, catalogue) },
-      /* « Détenu », pas « déjà versé » : le mot dit chez qui est l'argent, et
-         c'est toute la différence avec le tableau du dessus. */
-      { cle: "detenu", titre: "Détenu", chiffre: true, rendu: (l) => formaterNombre(l.totalPaye) },
-      {
-        cle: "reste",
-        titre: "Reste à percevoir",
-        chiffre: true,
-        rendu: (l) => formaterNombre(l.resteDu),
       },
       {
         cle: "etat",
@@ -229,7 +260,7 @@ export default function PagePaiements() {
         cle: "action",
         titre: "Action",
         rendu: (ligne) =>
-          ligne.resteDu === 0 ? (
+          ligne.vente.modePaiement === "tranches" && ligne.resteDu === 0 ? (
             /* Le geste du jour : la moto peut sortir. C'est la seule ligne de
                l'écran qui appelle une action plutôt qu'un encaissement, et elle
                se voit depuis la liste — sans quoi une moto soldée dort au
@@ -246,7 +277,7 @@ export default function PagePaiements() {
           ),
       },
     ],
-    [communes, moto, catalogue, seuil],
+    [nomClient, moto, catalogue, seuil],
   );
 
   if (perimetre.type === "aucune")
@@ -262,25 +293,34 @@ export default function PagePaiements() {
 
   return (
     <div>
-      <TetePage
-        surTitre={surTitre}
-        titre="Paiements"
-        sousTitre={
-          nomPeriode
-            ? `Les ventes sur lesquelles un versement a été reçu — ${nomPeriode}`
-            : undefined
-        }
-      />
+      <TetePage surTitre={surTitre} titre="Paiements" />
 
-      {/* Au-dessus des deux sections et non dans l'une d'elles : il les borne
-          toutes les deux, et un filtre posé dans un tableau se lit comme le
-          filtre de ce tableau. */}
+      {/* Le mode et l'état d'abord, la période ensuite : on choisit ce qu'on
+          regarde avant de choisir quand. */}
+      <div
+        className="mb-3 flex flex-wrap items-center gap-2"
+        role="group"
+        aria-label="Filtrer les paiements"
+      >
+        {FILTRES_PAIEMENT.map((valeur) => (
+          <button
+            key={valeur}
+            type="button"
+            className="filtre"
+            aria-pressed={filtre === valeur}
+            onClick={() => setFiltre(valeur)}
+          >
+            {LIBELLE_FILTRE_PAIEMENT[valeur]}
+          </button>
+        ))}
+      </div>
+
       <FiltrePeriode
         periode={periode}
         changer={setPeriode}
         plage={plage}
         changerPlage={setPlage}
-        className="mb-5"
+        className="mb-4"
       />
 
       {(erreur ?? erreurVersements) && (
@@ -295,103 +335,42 @@ export default function PagePaiements() {
         </ErreurDeLecture>
       )}
 
-      <Section
-        titre="Dettes — crédit"
-        resume={
-          chargement
-            ? "Lecture des dettes…"
-            : listeDettes.length === 0
-              ? ""
-              : `${compter(listeDettes.length, "vente", "ventes")} · ${formaterMontant(totalDu(listeDettes))} dus`
-        }
-        explication={
-          <>
-            <Bike aria-hidden="true" className="mt-0.5 size-[17px] shrink-0 text-encre-doux" />
-            <span>
-              La moto est partie avec le client.{" "}
-              <strong>Le client doit cet argent au magasin.</strong>
-            </span>
-          </>
-        }
-      >
-        {!chargement && listeDettes.length === 0 ? (
-          /* Deux phrases, parce que ce sont deux faits différents. « Toutes les
-             ventes sont soldées » est une bonne nouvelle ; « aucun versement en
-             août » n'en est pas une, et la confondre avec la première ferait
-             croire à un registre à jour. */
-          nomPeriode ? (
-            <EtatVide titre={`Aucun versement reçu — ${nomPeriode}.`}>
-              Aucune vente à crédit n’a reçu d’argent sur cette période. Les dettes en cours
-              restent visibles sur «&nbsp;Tout&nbsp;».
-            </EtatVide>
-          ) : (
-            <EtatVide titre="Aucune dette.">
-              Toutes les ventes à crédit sont soldées : le magasin n’attend d’argent de personne.
-            </EtatVide>
-          )
+      {/* **Deux totaux, jamais leur somme.** Les clients doivent de l'argent au
+          magasin ; le magasin en détient pour le compte des clients. Un seul
+          chiffre les mêlerait, et c'est précisément ce que la liste unique
+          rendait possible — d'où deux phrases, séparées par un point médian. */}
+      <p aria-live="polite" aria-atomic="true" className="mb-3 text-corps text-encre-doux">
+        {chargement ? (
+          "Lecture des paiements…"
+        ) : lignesVues.length === 0 ? (
+          ""
         ) : (
-          <div className="cadre cadre-tableau lg:max-h-none">
-            <Tableau
-              legende="Ventes à crédit dont il reste quelque chose à percevoir. Montants en francs CFA."
-              colonnes={colonnesDettes}
-              lignes={listeDettes}
-              cleDe={(ligne) => ligne.vente.id}
-              chargement={chargement}
-            />
-          </div>
+          <>
+            <strong className="font-semibold text-encre">
+              {compter(lignesVues.length, "vente", "ventes")}
+            </strong>
+            {duParLesClients > 0 && ` · ${formaterMontant(duParLesClients)} dus par les clients`}
+            {detenuPourEux > 0 && ` · ${formaterMontant(detenuPourEux)} détenus pour eux`}
+            {inactives.length > 0 &&
+              ` · ${inactives.length} sans versement depuis ${seuil} jours ou plus`}
+          </>
         )}
-      </Section>
+      </p>
 
-      <Section
-        titre="Tranches — motos retenues au magasin"
-        resume={
-          chargement
-            ? "Lecture des tranches…"
-            : listeTranches.length === 0
-              ? ""
-              : [
-                  `${compter(listeTranches.length, "moto", "motos")} · ${formaterMontant(totalDetenu(listeTranches))} détenus`,
-                  inactives.length > 0
-                    ? `${inactives.length} sans versement depuis ${seuil} jours ou plus`
-                    : "",
-                ]
-                  .filter(Boolean)
-                  .join(" · ")
-        }
-        explication={
-          <>
-            <Warehouse aria-hidden="true" className="mt-0.5 size-[17px] shrink-0 text-encre-doux" />
-            <span>
-              La moto n’est pas sortie. <strong>Le magasin détient l’argent déjà versé</strong> — ce
-              n’est pas une dette du client.
-            </span>
-          </>
-        }
-      >
-        {!chargement && listeTranches.length === 0 ? (
-          nomPeriode ? (
-            <EtatVide titre={`Aucun versement reçu — ${nomPeriode}.`}>
-              Aucune vente en tranches n’a reçu d’argent sur cette période. Les motos retenues
-              restent visibles sur «&nbsp;Tout&nbsp;».
-            </EtatVide>
-          ) : (
-            <EtatVide titre="Aucune moto retenue au magasin.">
-              Aucune vente en tranches n’attend son dernier versement.
-            </EtatVide>
-          )
-        ) : (
-          <div className="cadre cadre-tableau lg:max-h-none">
-            <Tableau
-              legende="Ventes en tranches : motos retenues jusqu’au dernier versement. Montants en francs CFA."
-              colonnes={colonnesTranches}
-              lignes={listeTranches}
-              cleDe={(ligne) => ligne.vente.id}
-              chargement={chargement}
-              enRetard={(ligne) => estInactive(ligne, seuil) && ligne.resteDu > 0}
-            />
-          </div>
-        )}
-      </Section>
+      {!chargement && lignesVues.length === 0 ? (
+        <EtatVide titre={titreDuVide(filtre, nomPeriode)}>{phraseDuVide(filtre, nomPeriode)}</EtatVide>
+      ) : (
+        <div className="cadre cadre-tableau lg:max-h-none">
+          <Tableau
+            legende="Ventes dont il reste quelque chose à percevoir. La colonne « Mode » dit où est la moto. Montants en francs CFA."
+            colonnes={colonnes}
+            lignes={lignesVues}
+            cleDe={(ligne) => ligne.vente.id}
+            chargement={chargement}
+            enRetard={(ligne) => estInactive(ligne, seuil) && ligne.resteDu > 0}
+          />
+        </div>
+      )}
 
       {perimetreEnCours && <span className="sr-only">Chargement du périmètre…</span>}
     </div>
@@ -399,46 +378,25 @@ export default function PagePaiements() {
 }
 
 /**
- * Une des deux sections, avec son titre, son compte et sa phrase.
+ * L'état vide, qui doit dire **laquelle** des trois absences on regarde.
  *
- * La phrase n'est pas de la décoration : c'est elle qui empêche de lire les
- * deux tableaux comme deux moitiés d'une même somme. Elle dit où est la moto —
- * partie ou retenue —, et de là découle qui détient l'argent.
+ * « Aucune dette » est une bonne nouvelle ; « aucun versement en août » n'en est
+ * pas une, et « aucune tranche parmi les impayées » n'est qu'un filtre trop
+ * serré. Les confondre ferait croire à un registre à jour — la même faute que
+ * D63 relève sur les compteurs à zéro, transposée à une phrase.
  */
-function Section({
-  titre,
-  resume,
-  explication,
-  children,
-}: {
-  titre: string;
-  /** Le compte et le total. Vide quand la liste l’est : l’état vide le dit déjà,
-      et « 0 vente · 0 FCFA dus » est un chiffre qu’on n’a pas demandé. */
-  resume: string;
-  explication: ReactNode;
-  children: ReactNode;
-}) {
-  const identifiant = `section-${titre.split(" ")[0].toLowerCase()}`;
-  return (
-    <section aria-labelledby={identifiant} className="mb-8">
-      <div className="mb-3 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-        <h2 id={identifiant} className="text-bloc font-bold tracking-tight text-encre">
-          {titre}
-        </h2>
-        {resume && <p className="text-corps text-encre-doux">{resume}</p>}
-      </div>
+function titreDuVide(filtre: FiltrePaiement, nomPeriode: string | null): string {
+  if (nomPeriode) return `Aucun versement reçu — ${nomPeriode}.`;
+  if (filtre !== "tout") return `Rien sous « ${LIBELLE_FILTRE_PAIEMENT[filtre]} ».`;
+  return "Aucun paiement en attente.";
+}
 
-      {/* Une surface, pas seulement un fond : la maquette pose la bande sur
-          `--fond`, qui est ici le sol de la page — elle y était littéralement
-          invisible, en clair comme en sombre. Elle prend donc le papier et un
-          filet, comme tout ce qui se détache du sol. */}
-      <p className="mb-3 flex items-start gap-2 rounded-champ border border-bord bg-papier px-3 py-2 text-corps text-encre">
-        {explication}
-      </p>
-
-      {children}
-    </section>
-  );
+function phraseDuVide(filtre: FiltrePaiement, nomPeriode: string | null): string {
+  if (nomPeriode)
+    return "Aucune vente n’a reçu d’argent sur cette période. Ce qui reste à percevoir est visible sur « Tout ».";
+  if (filtre !== "tout")
+    return "Le filtre ne laisse rien passer. Les autres ventes en attente sont visibles sur « Tout ».";
+  return "Toutes les ventes sont soldées, et aucune moto n’attend son dernier versement : le magasin n’attend d’argent de personne.";
 }
 
 /* Jamais la couleur seule : le mot est écrit, la pastille ne fait que le
@@ -474,43 +432,6 @@ function Encaisser({ vente, numero }: { vente: string; numero: string }) {
       Encaisser
     </Link>
   );
-}
-
-/** Les colonnes que les deux tableaux partagent : la pièce et le client. */
-function colonnesCommunes({
-  nomClient,
-}: {
-  nomClient: (clientId: string) => string;
-}): Colonne<LignePaiement>[] {
-  const liste: Colonne<LignePaiement>[] = [
-    {
-      cle: "numero",
-      titre: "Pièce",
-      principal: true,
-      rendu: (ligne) => (
-        <Link
-          href={`/motos/ventes?vente=${ligne.vente.id}`}
-          className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
-        >
-          {ligne.vente.numero}
-        </Link>
-      ),
-    },
-    {
-      cle: "client",
-      titre: "Client",
-      principal: true,
-      rendu: (ligne) => nomClient(ligne.vente.clientId),
-    },
-  ];
-
-    /* Pas de colonne « Boutique » : les trois premières lettres du numéro de
-       pièce la disent déjà, sur chaque ligne, et un second pavé jaune juste à
-       côté ne fait que diluer le signal (D70). C'est ce que montrent les
-       maquettes A6, A7 et A8 — aucune des trois n'a cette colonne, y compris
-       pour le responsable qui regarde toutes les boutiques. Le stock (A4) la
-       garde : une moto n'a pas de numéro de pièce, donc rien ne la porte. */
-  return liste;
 }
 
 function nomMoto(

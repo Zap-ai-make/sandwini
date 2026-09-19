@@ -1,6 +1,6 @@
 "use client";
 
-import { Wallet } from "lucide-react";
+import { Search, Wallet } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { FraisEntree } from "@/components/FraisEntree";
 import { ErreurDeLecture, EtatErreurSaisie, EtatVide } from "@/components/patrons/Etats";
@@ -62,12 +62,16 @@ export default function PageCouts() {
 
   const { etats, chargement, noter, reessayer } = useCoutsDesMotos(motos);
   const [filtre, setFiltre] = useState<Filtre>("a_renseigner");
+  const [recherche, setRecherche] = useState("");
   const [ouverte, setOuverte] = useState<string | null>(null);
 
   const comptes = useMemo(() => compter(motos ?? [], etats), [motos, etats]);
   const lignes = useMemo(
-    () => (motos ?? []).filter((moto) => retenue(etats.get(moto.id), filtre)),
-    [motos, etats, filtre],
+    () =>
+      (motos ?? [])
+        .filter((moto) => retenue(etats.get(moto.id), filtre))
+        .filter((moto) => correspondAuChassis(moto.numeroChassis, recherche)),
+    [motos, etats, filtre, recherche],
   );
 
   if (echec) {
@@ -155,6 +159,10 @@ export default function PageCouts() {
           </p>
         </Avis>
       )}
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <RechercheChassis valeur={recherche} changer={setRecherche} />
+      </div>
 
       <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer les motos">
         {FILTRES.map(({ cle, libelle }) => (
@@ -381,4 +389,56 @@ function ValeurCout({ etat }: { etat: EtatCout | undefined }) {
   if (etat.sorte === "connu") return <>{formaterMontant(etat.cout.coutTotal)}</>;
   if (etat.sorte === "absent") return <span className="text-encre-doux">À renseigner</span>;
   return <span className="text-encre-doux">Lecture tombée</span>;
+}
+
+/**
+ * Cherche une moto par son châssis, sur cet écran seulement.
+ *
+ * **Sans casse ni séparateur.** Un châssis se relève sur le cadre, se recopie
+ * sur un bon de livraison, se retape ici : les espaces et les tirets ne
+ * survivent pas à ce trajet, et exiger la forme exacte ferait échouer la
+ * recherche sur une saisie juste. C'est le même traitement que la recherche des
+ * ventes applique déjà au châssis (`chercherVentes`).
+ *
+ * **Une sous-chaîne, pas un début.** On tape souvent les quatre derniers
+ * caractères, seuls lisibles sur une plaque gravée.
+ */
+function correspondAuChassis(chassis: string, recherche: string): boolean {
+  const cherche = recherche.toUpperCase().replace(/[\s-]+/g, "");
+  if (cherche.length === 0) return true;
+  return chassis.toUpperCase().replace(/[\s-]+/g, "").includes(cherche);
+}
+
+function RechercheChassis({
+  valeur,
+  changer,
+}: {
+  valeur: string;
+  changer: (valeur: string) => void;
+}) {
+  /* Bornée comme les autres recherches du produit (`socle.css:448`). */
+  return (
+    <div className="relative min-w-56 flex-1 sm:max-w-80">
+      <label htmlFor="recherche-chassis" className="sr-only">
+        Chercher un numéro de châssis
+      </label>
+      <Search
+        aria-hidden="true"
+        className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
+      />
+      <input
+        id="recherche-chassis"
+        type="search"
+        inputMode="search"
+        autoComplete="off"
+        placeholder="Numéro de châssis"
+        value={valeur}
+        onChange={(evenement) => changer(evenement.target.value)}
+        /* En `font-code` : c'est ainsi que le châssis s'affiche dans la
+           colonne, et une recherche qui ne ressemble pas à ce qu'elle cherche
+           se relit mal caractère par caractère. */
+        className="saisie pr-3 pl-9 font-code placeholder:font-sans placeholder:text-encre-doux"
+      />
+    </div>
+  );
 }

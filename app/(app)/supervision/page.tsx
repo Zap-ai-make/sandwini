@@ -304,9 +304,9 @@ function CarteBoutique({
           et une carte muette laisse croire que la question n'a pas été posée.
           Jamais la couleur seule : les mots portent le sens (DESIGN.md §5).
 
-          Un dossier — carte grise, plaque — n'existe que pour une moto. La
-          boutique de pièces a son propre sujet d'alerte, et c'est la même
-          question posée à son métier : qu'est-ce qui demande une décision
+          Un dossier — quittance, CMC, carte grise — n'existe que pour une
+          moto. La boutique de pièces a son propre sujet d'alerte, et c'est la
+          même question posée à son métier : qu'est-ce qui demande une décision
           ici ? Une rupture de stock. */}
       {/* Le filet et la marge ne se posent que s'il y a une ligne à séparer :
           pendant le chargement, les deux alertes manquent, et un cadre vide se

@@ -49,7 +49,7 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * l'atomicité d'un `writeBatch` y compris hors ligne — il le garde entier dans
  * sa file et le rejoue tel quel au retour du réseau.
  *
- * Sept documents au maximum voyagent ensemble : la vente, ses quatre documents
+ * Six documents au maximum voyagent ensemble : la vente, ses trois documents
  * de dossier, le versement du jour et son encaissement, plus la mise à jour du
  * statut de la moto.
  *
@@ -139,7 +139,7 @@ export function ecouterVentes(
  * Les documents de dossier de tout le périmètre, en une seule écoute.
  *
  * Une requête de groupe de collections plutôt qu'une écoute par vente : la
- * liste des ventes affiche l'état des quatre documents de chaque ligne (§6.4),
+ * liste des ventes affiche l'état des documents de chaque ligne (§6.4),
  * et ouvrir un flux par vente ferait cinquante flux pour un écran. Le
  * `boutiqueId` est répété sur chaque document précisément pour rendre ce filtre
  * possible — une sous-collection ne connaît pas son grand-parent.
@@ -184,7 +184,7 @@ function lireDocumentDossier(instantane: QueryDocumentSnapshot<DocumentData>): D
 }
 
 /**
- * Les quatre documents d'un dossier précis.
+ * Les documents d'un dossier précis.
  *
  * Une écoute de chemin direct plutôt que le groupe de collections : sur une
  * fiche, on connaît la vente, et cette requête-là ne demande aucun index.

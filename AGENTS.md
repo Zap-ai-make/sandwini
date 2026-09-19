@@ -9,7 +9,7 @@
 ```
 NOM        : SDI pour Sandwidi et frere
 QUOI       : Application de gestion multi-boutique pour un commerce de vente de motos — ventes,
-             paiements échelonnés, dossiers administratifs (carte grise, plaque), pièces détachées —
+             paiements échelonnés, dossiers administratifs (quittance, CMC, carte grise), pièces détachées —
              utilisée au comptoir par des gérants et pilotée par un responsable.
 STACK      : Next.js (App Router) + TypeScript strict + Tailwind + PWA
              Firebase : Auth, Firestore (persistance hors-ligne), Storage, Cloud Functions

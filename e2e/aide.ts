@@ -407,7 +407,7 @@ export async function encaisser(page: Page, montant: string) {
 }
 
 /**
- * Déclare un prestataire qui traite la carte grise et la plaque.
+ * Déclare un prestataire qui traite la carte grise.
  *
  * Attend la synchronisation : la liste du formulaire de dépôt lit le serveur,
  * et un prestataire encore dans la file d'écriture n'y apparaît pas (D64).

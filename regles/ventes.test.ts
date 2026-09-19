@@ -328,7 +328,8 @@ describe("le lot complet d’une vente", () => {
     const lot = writeBatch(base);
 
     lot.set(reference, vente());
-    for (const type of ["quittance", "cmc", "carte_grise", "plaque"]) {
+    /* Trois depuis S48 : la plaque a quitté le dossier. */
+    for (const type of ["quittance", "cmc", "carte_grise"]) {
       lot.set(doc(reference, "documents", type), documentDossier({ type, venteId: reference.id }));
     }
     lot.set(doc(collection(reference, "versements")), {
@@ -567,13 +568,30 @@ describe("le dossier naît ouvert, ses quatre documents à faire", () => {
     );
     await assertFails(inconnu.commit());
 
+    /* L'identifiant du document est un type valide, et le champ `type` en
+       nomme un autre, valide lui aussi : c'est bien le **mensonge** qu'on
+       éprouve ici, et non un type inconnu — que le cas précédent couvre déjà.
+       Avec « plaque » comme identifiant, retiré du dossier en S48, ce test
+       aurait continué de passer pour la mauvaise raison. */
     const menteur = writeBatch(base);
     menteur.set(reference, vente());
     menteur.set(
-      doc(reference, "documents", "plaque"),
+      doc(reference, "documents", "cmc"),
       documentDossier({ type: "carte_grise", venteId: reference.id }),
     );
     await assertFails(menteur.commit());
+  });
+
+  it("refuse un document « plaque » : il a quitté le dossier en S48", async () => {
+    const base = gerant();
+    const reference = doc(collection(base, "ventesMotos"));
+    const lot = writeBatch(base);
+    lot.set(reference, vente());
+    lot.set(
+      doc(reference, "documents", "plaque"),
+      documentDossier({ type: "plaque", venteId: reference.id }),
+    );
+    await assertFails(lot.commit());
   });
 
   /* Le cycle des documents appartient à S11, et se prouve dans

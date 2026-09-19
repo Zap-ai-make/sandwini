@@ -381,7 +381,7 @@ describe("résumé du dossier", () => {
     ).toBe("2 à faire · 1 chez le prestataire · 1 remis au client");
   });
 
-  it("un dossier tout neuf a ses quatre documents à faire", () => {
+  it("un dossier tout neuf a tous ses documents à faire", () => {
     expect(
       resumerDossier([
         document("quittance", "a_faire"),

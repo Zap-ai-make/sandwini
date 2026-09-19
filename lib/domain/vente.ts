@@ -60,15 +60,27 @@ export const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {
   wave: "Wave",
 };
 
-/** Les quatre documents du dossier, dans l'ordre où le magasin les traite (§13). */
-export const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise", "plaque"] as const;
+/**
+ * Les documents du dossier, dans l'ordre où le magasin les traite (§13).
+ *
+ * **La plaque n'en fait plus partie (S48).** Elle y figurait comme une
+ * quatrième pièce à obtenir, alors que dans ce commerce l'immatriculation *est*
+ * la carte grise : la plaque se pose dans la foulée, chez le même prestataire,
+ * et la suivre à part créait une ligne qui restait « à faire » sur des dossiers
+ * en réalité terminés. Un dossier se ferme donc sur **trois** documents.
+ *
+ * Les documents `plaque` déjà écrits restent en base — on n'efface pas
+ * l'historique — mais plus rien ne les lit, et plus rien n'en crée. Les règles
+ * continuent d'accepter leurs mises à jour, faute de quoi un dossier ancien
+ * deviendrait impossible à corriger.
+ */
+export const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise"] as const;
 export type TypeDocument = (typeof TYPES_DOCUMENT)[number];
 
 export const LIBELLE_DOCUMENT: Record<TypeDocument, string> = {
   quittance: "Quittance",
   cmc: "CMC",
   carte_grise: "Carte grise",
-  plaque: "Plaque",
 };
 
 export const STATUTS_DOCUMENT = [
@@ -639,6 +651,68 @@ export function paiementsDeLaPeriode(
   return lignes.filter((ligne) =>
     ligne.versements.some((versement) => dansLaPeriode(versement.date, bornes)),
   );
+}
+
+/**
+ * Tout ce que l'écran des paiements suit, en une liste (S48).
+ *
+ * L'union des dettes et des tranches en cours, de la plus ancienne à la plus
+ * récente : on relance d'abord celui qui attend depuis le plus longtemps. Ce
+ * qui n'y figure pas n'y figurait pas non plus avant — un comptant est soldé
+ * par définition, un crédit payé n'attend rien, une moto remise a fini son
+ * parcours.
+ *
+ * **Les deux notions restent nommées sur chaque ligne, et c'est la condition
+ * pour qu'elles puissent partager un tableau.** Une *dette* est de l'argent qui
+ * manque au magasin ; une *tranche* est de l'argent que le magasin détient. Les
+ * additionner donnerait un chiffre qui ne veut rien dire — c'est la confusion
+ * métier la plus coûteuse du projet (`AGENTS.md`, `prompt.md` §13). D'où la
+ * colonne « Mode » sur l'écran, et **deux totaux distincts** en tête, jamais
+ * une somme.
+ */
+export function paiementsASuivre(lignes: readonly LignePaiement[]): LignePaiement[] {
+  return [...dettes(lignes), ...tranchesEnCours(lignes)].sort(comparerParAnciennete);
+}
+
+export const FILTRES_PAIEMENT = ["tout", "credit", "tranches", "partiel", "impaye"] as const;
+export type FiltrePaiement = (typeof FILTRES_PAIEMENT)[number];
+
+export const LIBELLE_FILTRE_PAIEMENT: Record<FiltrePaiement, string> = {
+  tout: "Tout",
+  credit: "Crédit",
+  tranches: "Tranches",
+  partiel: "Partiellement payées",
+  impaye: "Impayées",
+};
+
+/**
+ * Le filtre d'une seule rangée, sur deux axes qui ne se recouvrent pas.
+ *
+ * « Crédit » et « Tranches » disent **où est la moto** ; « Partiellement
+ * payées » et « Impayées » disent **où en est l'argent**. On aurait pu en faire
+ * deux rangées combinables ; une seule suffit, parce que la question qu'on pose
+ * à cet écran est toujours l'une *ou* l'autre — « qui me doit ? » ou « qui n'a
+ * rien versé ? » —, et deux rangées de pastilles au-dessus d'un tableau se
+ * lisent comme un formulaire à remplir avant de voir quoi que ce soit.
+ *
+ * « Soldées » n'est pas proposé : la liste ne contient que ce qui attend encore
+ * quelque chose, donc ce filtre ne rendrait jamais rien.
+ */
+export function filtrerPaiements(
+  lignes: readonly LignePaiement[],
+  filtre: FiltrePaiement,
+): LignePaiement[] {
+  switch (filtre) {
+    case "tout":
+      return [...lignes];
+    case "credit":
+      return lignes.filter((ligne) => ligne.vente.modePaiement === "credit");
+    case "tranches":
+      return lignes.filter((ligne) => ligne.vente.modePaiement === "tranches");
+    case "partiel":
+    case "impaye":
+      return lignes.filter((ligne) => ligne.statutPaiement === filtre);
+  }
 }
 
 /** Le total dû par les clients — l'en-tête de la liste des dettes. */

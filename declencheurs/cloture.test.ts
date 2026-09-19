@@ -24,7 +24,12 @@ process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE;
 process.env.GCLOUD_PROJECT = PROJET;
 
 const BOUTIQUE = "CLO";
-const TYPES = ["quittance", "cmc", "carte_grise", "plaque"] as const;
+/* Trois depuis S48 : la plaque a quitté le dossier, l'immatriculation étant
+   obtenue avec la carte grise. C'est donc la carte grise qui joue « le document
+   qui traîne » — sans quoi ce test resterait vert en laissant en souffrance un
+   type que plus personne ne compte. */
+const TYPES = ["quittance", "cmc", "carte_grise"] as const;
+const QUI_TRAINE = "carte_grise";
 
 let base: Firestore;
 let rang = 0;
@@ -91,7 +96,7 @@ async function poser(options: {
   /* Les documents d'abord, la vente ensuite : chaque écriture réveille les
      déclencheurs, et on veut que la dernière trouve le dossier complet. */
   for (const type of TYPES) {
-    const regle = options.documents === "tous_regles" || type !== "plaque";
+    const regle = options.documents === "tous_regles" || type !== QUI_TRAINE;
     await reference.collection("documents").doc(type).set({
       boutiqueId: BOUTIQUE,
       venteId,

@@ -19,7 +19,7 @@ import {
  * fini. Personne ne les détient jamais, donc l’écran ne doit même pas proposer
  * de les confier à quelqu’un.
  *
- * La carte grise et la plaque passent par un prestataire, et le dépôt ne se
+ * La carte grise passe par un prestataire, et le dépôt ne se
  * saute pas : c’est lui qui dit qui détient le document en ce moment, la seule
  * chose que la liste des dossiers sert à répondre.
  *
@@ -89,20 +89,20 @@ test.describe("confier un document à un prestataire", () => {
     await creerPrestataire(page, prestataire);
     await vendre(page, { mode: "Crédit", prix: "1200000", encaisse: "400000" });
 
-    const plaque = ligne(page, "Plaque");
-    await plaque.getByRole("button", { name: "Déposer chez un prestataire" }).click();
+    const carteGrise = ligne(page, "Carte grise");
+    await carteGrise.getByRole("button", { name: "Déposer chez un prestataire" }).click();
 
     /* L’écran annonce la conséquence sur la caisse avant qu’on valide, plutôt
        que de la laisser découvrir dans le journal. */
-    await expect(plaque).toContainText("sortie de caisse");
+    await expect(carteGrise).toContainText("sortie de caisse");
 
-    await plaque.getByLabel("Prestataire").selectOption({ label: prestataire });
-    await plaque.getByLabel("Avance versée").fill("15000");
-    await plaque.getByRole("button", { name: "Enregistrer le dépôt" }).click();
+    await carteGrise.getByLabel("Prestataire").selectOption({ label: prestataire });
+    await carteGrise.getByLabel("Avance versée").fill("15000");
+    await carteGrise.getByRole("button", { name: "Enregistrer le dépôt" }).click();
 
-    await expect(plaque).toContainText("Chez le prestataire");
-    await expect(plaque).toContainText(prestataire);
-    await expect(plaque).toContainText("15 000");
+    await expect(carteGrise).toContainText("Chez le prestataire");
+    await expect(carteGrise).toContainText(prestataire);
+    await expect(carteGrise).toContainText("15 000");
 
     /* Le dépôt survit à un rechargement : ce que l'écran montrait n'était pas
        seulement l'état optimiste du lot en cours.
@@ -113,7 +113,7 @@ test.describe("confier un document à un prestataire", () => {
        échouait une fois sur deux sans que le dépôt soit en cause : le test du
        cycle complet, qui fait le même dépôt, passait dans les mêmes minutes. */
     await page.reload({ waitUntil: "load" });
-    const apresRechargement = ligne(page, "Plaque");
+    const apresRechargement = ligne(page, "Carte grise");
     await expect(apresRechargement).toContainText("Chez le prestataire");
     await expect(apresRechargement).toContainText(prestataire);
   });
@@ -124,16 +124,16 @@ test.describe("confier un document à un prestataire", () => {
     await creerPrestataire(page, prestataire);
     await vendre(page, { mode: "Crédit", prix: "1200000", encaisse: "400000" });
 
-    const plaque = ligne(page, "Plaque");
-    await plaque.getByRole("button", { name: "Déposer chez un prestataire" }).click();
-    await plaque.getByLabel("Prestataire").selectOption({ label: prestataire });
-    await plaque.getByLabel("Avance versée").fill("0");
-    await plaque.getByRole("button", { name: "Enregistrer le dépôt" }).click();
+    const carteGrise = ligne(page, "Carte grise");
+    await carteGrise.getByRole("button", { name: "Déposer chez un prestataire" }).click();
+    await carteGrise.getByLabel("Prestataire").selectOption({ label: prestataire });
+    await carteGrise.getByLabel("Avance versée").fill("0");
+    await carteGrise.getByRole("button", { name: "Enregistrer le dépôt" }).click();
 
-    await expect(plaque.getByRole("alert")).toContainText("crédit");
+    await expect(carteGrise.getByRole("alert")).toContainText("crédit");
     /* Le formulaire reste ouvert et la saisie reste là : on corrige le montant,
        on ne recommence pas le dépôt. */
-    await expect(plaque.getByLabel("Avance versée")).toHaveValue("0");
+    await expect(carteGrise.getByLabel("Avance versée")).toHaveValue("0");
   });
 
   test("le dépôt se termine sans réseau : l’écran rend la main tout de suite", async ({

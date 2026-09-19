@@ -43,9 +43,15 @@ import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
  * **Une colonne par document.** L’écran empilait des cartes qui listaient, en
  * petites lignes grises, les documents encore en cours d’une vente. La question
  * qu’on lui pose est « qui détient quel papier » : elle se compare d’un dossier
- * à l’autre, donc elle se range en colonnes. Les quatre documents y sont
- * toujours, réglés compris — c’est en voyant les trois premiers remis qu’on
- * comprend qu’il ne manque que le quatrième.
+ * à l’autre, donc elle se range en colonnes. Tous les documents y sont
+ * toujours, réglés compris — c’est en voyant les premiers remis qu’on comprend
+ * lequel manque encore.
+ *
+ * **Ils sont trois depuis S48**, et non plus quatre : la plaque a quitté le
+ * dossier, l’immatriculation étant obtenue avec la carte grise et chez le même
+ * prestataire. La suivre à part laissait une ligne « à faire » sur des dossiers
+ * en réalité terminés. Les colonnes se dérivent de `TYPES_DOCUMENT` — retirer
+ * un type suffit donc à retirer sa colonne.
  *
  * **Et le papier avance sans quitter l’écran.** Cliquer un document ouvre son
  * relais sous le tableau : le chemin entier, et le geste suivant. Il fallait
@@ -201,7 +207,7 @@ export default function PageDossiers() {
       <TetePage
         surTitre={surTitre}
         titre="Dossiers en attente"
-        sousTitre="Les quatre documents ne suivent pas le même chemin. Un dossier se ferme quand les quatre sont remis, ou déclarés sans objet."
+        sousTitre="Les documents ne suivent pas le même chemin. Un dossier se ferme quand tous sont remis, ou déclarés sans objet."
       />
 
       {erreur && (
@@ -328,7 +334,7 @@ export default function PageDossiers() {
               )
             ) : (
               <Tableau
-                legende="Dossiers ouverts : pour chaque vente, où en est chacun des quatre documents"
+                legende="Dossiers ouverts : pour chaque vente, où en est chacun des documents"
                 colonnes={colonnes}
                 lignes={resultats}
                 cleDe={(dossier) => dossier.venteId}
@@ -366,7 +372,7 @@ function FileVide({ className }: { className?: string }) {
  *
  * Un document vit en `ventesMotos/{venteId}/documents/{type}` : son identifiant
  * est donc « carte_grise », le même pour toutes les ventes du monde. S’en servir
- * seul marquait les quatre cartes grises de l’écran d’un coup et ouvrait le
+ * seul marquait toutes les cartes grises de l’écran d’un coup et ouvrait le
  * relais de la première venue — vu sur capture.
  */
 function cleDocument(document: DocumentDossier): string {

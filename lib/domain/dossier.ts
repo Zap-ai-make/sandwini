@@ -1,14 +1,14 @@
 /**
  * Le dossier documents — sa machine à états (`prompt.md` §7).
  *
- * Un dossier est l'ensemble vente + paiements + quatre documents (§13). Ce
+ * Un dossier est l'ensemble vente + paiements + ses documents (§13). Ce
  * module ne sait rien de Firestore ni de React : il dit ce qu'un document a le
  * droit de devenir, et quand un dossier est fini. Ces règles sont réutilisées
  * telles quelles par la page client (S13) et la page prestataire (S15), qui les
  * appliqueront côté serveur — d'où le fait qu'elles vivent ici, en fonctions
  * pures, plutôt qu'en conditions dispersées dans des composants.
  *
- * **Les quatre documents ne suivent pas le même chemin** (`DECISIONS.md` D65).
+ * **Les documents ne suivent pas le même chemin** (`DECISIONS.md` D65).
  * Deux d'entre eux arrivent déjà faits, deux passent par un prestataire ; le
  * chemin dépend donc du type, pas seulement du statut de départ.
  */
@@ -42,9 +42,15 @@ const CHEMIN_ARRIVE_FAIT: Record<StatutDocument, readonly StatutDocument[]> = {
 };
 
 /**
- * Ce qui passe par un prestataire : la **carte grise** et la **plaque**. Le
- * dépôt exige un prestataire, une date et une avance versée (§7.1), et l'étape
- * ne se saute pas — c'est elle qui dit qui détient le document.
+ * Ce qui passe par un prestataire : la **carte grise**. Le dépôt exige un
+ * prestataire, une date et une avance versée (§7.1), et l'étape ne se saute pas
+ * — c'est elle qui dit qui détient le document.
+ *
+ * La plaque suivait le même chemin jusqu'à S48 ; elle a quitté le dossier,
+ * l'immatriculation étant obtenue avec la carte grise et chez le même
+ * prestataire. Le chemin reste écrit à part : il n'a aucune raison d'être
+ * fondu dans son unique usage, et la prochaine pièce confiée à l'extérieur le
+ * reprendra tel quel.
  */
 const CHEMIN_PRESTATAIRE: Record<StatutDocument, readonly StatutDocument[]> = {
   a_faire: ["chez_prestataire", "non_applicable"],
@@ -58,7 +64,6 @@ const CHEMIN: Record<TypeDocument, Record<StatutDocument, readonly StatutDocumen
   quittance: CHEMIN_ARRIVE_FAIT,
   cmc: CHEMIN_ARRIVE_FAIT,
   carte_grise: CHEMIN_PRESTATAIRE,
-  plaque: CHEMIN_PRESTATAIRE,
 };
 
 /** Ce document est-il confié à un intervenant externe ? */
@@ -102,7 +107,7 @@ function estRegle(statut: StatutDocument): boolean {
 /**
  * Le dossier peut-il se clore ? (§7.1)
  *
- * Les quatre documents réglés, la vente soldée, la moto partie. Les trois à la
+ * Tous les documents réglés, la vente soldée, la moto partie. Les trois à la
  * fois : une vente en tranches entièrement payée dont la moto dort encore au
  * magasin n'est pas un dossier fini, et c'est précisément la confusion que le
  * cahier interdit entre crédit et tranches (§13).
@@ -296,7 +301,7 @@ export type DossierEnAttente = {
   clientId: string;
   date: Date | null;
   /**
-   * Les quatre documents, par type. `null` tant que le document n'est pas
+   * Les documents du dossier, par type. `null` tant que le document n'est pas
    * parvenu du serveur : une colonne vide dit « on ne sait pas encore », ce qui
    * n'est pas la même chose que « rien à faire ».
    */
@@ -349,7 +354,7 @@ export const FILTRES_DOSSIERS_VIDES: FiltresDossiers = { etat: "" };
  * plus longtemps est ce qu'il faut traiter en premier — et c'est aussi le
  * client qui a le plus de raisons d'appeler.
  *
- * **Les quatre documents sortent ensemble, réglés compris.** La liste ne
+ * **Tous les documents sortent ensemble, réglés compris.** La liste ne
  * rendait que les documents en cours ; l'écran montre désormais une colonne par
  * document, où « Remis au client » compte autant que « À faire » — c'est en
  * voyant les trois premiers remis qu'on comprend qu'il ne manque que le
@@ -378,7 +383,17 @@ export function dossiersEnAttente(
     ventes
       .filter((vente) => vente.statutDossier === "ouvert")
       .map((vente) => {
-        const tous = parVente.get(vente.id) ?? [];
+        /* **Filtré sur les types connus, et ce filtre n'est pas décoratif.**
+           Un dossier ouvert avant S48 porte encore un document `plaque` en
+           base. `dossierCloturable` ne le regarde plus — il itère
+           `TYPES_DOCUMENT` —, mais tout ce qui suit lit la liste brute : sans
+           ce filtre, la plaque resterait « en cours », compterait dans la
+           détention et pourrait marquer le dossier en retard, sur un dossier
+           que le serveur vient de clore. Deux lectures contradictoires du même
+           dossier, à deux centimètres l'une de l'autre. */
+        const tous = (parVente.get(vente.id) ?? []).filter((document) =>
+          TYPES_DOCUMENT.includes(document.type),
+        );
         const parType = Object.fromEntries(
           TYPES_DOCUMENT.map((type) => [
             type,
@@ -418,7 +433,7 @@ export function dossiersEnAttente(
  * Deux documents peuvent être chez deux prestataires différents. La colonne n'en
  * nomme qu'un, et c'est le plus ancien dépôt — celui dont le délai s'allonge,
  * pas celui qu'on vient de confier. Le détail des quatre est sur la même ligne,
- * dans les colonnes des documents.
+ * dans les colonnes des documents. Depuis S48 ils sont trois.
  */
 function detentionDe(enCours: readonly DocumentDossier[], aujourdhui: Date): Detention {
   const dehors = enCours
@@ -473,7 +488,7 @@ export type DossierCherchable = {
  *
  * C'est cette recherche qui remplace les listes déroulantes « Prestataire » et
  * « Document » de l'écran précédent : la première est ici, et la seconde n'a
- * plus lieu d'être puisque les quatre documents ont chacun leur colonne.
+ * plus lieu d'être puisque chaque document a sa colonne.
  */
 export function chercherDossiers<T extends DossierCherchable>(
   lignes: readonly T[],

@@ -834,7 +834,11 @@ service cloud.firestore {
              && donnees.boutiqueId is string
              && donnees.venteId == venteId
              && donnees.type == type
-             && type in ['quittance', 'cmc', 'carte_grise', 'plaque']
+             // Trois depuis S48 : la plaque a quitte le dossier. Seule la
+             // CREATION est resserree ; `documentDossierMaj` ne revalide pas le
+             // type, donc les documents `plaque` deja en base restent
+             // modifiables et un vieux dossier reste corrigeable.
+             && type in ['quittance', 'cmc', 'carte_grise']
              // S8 ouvre le dossier ; c'est S11 qui fera vivre les autres statuts.
              && donnees.statut == 'a_faire';
     }
