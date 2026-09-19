@@ -495,6 +495,17 @@ functions --project sandwini`). La leçon se généralise au-delà du délai : *
 d'environnement dans un bloc de code est un piège de portabilité ; un lanceur n'en est
 pas un.**
 
+**Et le lanceur s'appelle par `node`, pas par `npm run` — cinquième fois, le même jour.**
+`npm run deployer -- --only functions --project sandwini` ne marche pas davantage : `--only`
+est une option de npm, qui l'avale avec sa valeur avant de transmettre la ligne, `--project`
+de même. Le script recevait `sandwini` seul et `firebase` refusait sur « Too many
+arguments » — une erreur qui ne parle plus du problème. Le `--` protège des options du
+script, jamais de celles que npm reconnaît. `scripts/deployer.mjs` lit `npm_config_only`
+pour détecter le cas et redonner la bonne ligne. La règle se généralise une fois de plus :
+**tout ce qui se tient entre l'intention et la commande peut la réécrire — le shell, puis
+le gestionnaire de paquets. Un remède qui tient dans une ligne à recopier n'en est pas un ;
+il faut qu'il tienne dans un chemin, et que ce chemin refuse d'être emprunté de travers.**
+
 ## D34 — La suite bout en bout tourne sur un seul worker
 S3 — constaté en exécutant la suite complète
 

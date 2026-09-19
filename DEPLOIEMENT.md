@@ -95,7 +95,7 @@ paresseusement, précisément pour ce genre de délai. Le remède est le délai 
 vit maintenant dans le chemin de déploiement plutôt que dans cette page :
 
 ```
-npm run deployer -- --only functions --project sandwini
+node scripts/deployer.mjs --only functions --project sandwini
 ```
 
 **Ne déployez pas par `npx firebase deploy` en direct.** Cette page portait auparavant la
@@ -106,6 +106,14 @@ commande nommée `FUNCTIONS_DISCOVERY_TIMEOUT=120` et refuse. Qui recopie la lig
 C'est exactement ce qui s'est produit en S44, après D23, D25 et D29 : *une ligne de
 documentation se recopie mal ; un chemin unique ne se recopie pas.* `scripts/deployer.mjs`
 porte le délai et transmet le reste sans le relire.
+
+**Et pas non plus par `npm run deployer -- …`.** `npm` lit la ligne avant de la transmettre,
+et `--only` est une de *ses* propres options : il l'avale avec sa valeur, `--project` aussi,
+et le script ne reçoit que le nom du projet, seul. `firebase` refuse alors sur « Too many
+arguments », une erreur qui ne parle plus de rien. Le `--` n'y change rien — il protège des
+options du script, pas de celles que npm reconnaît. Le script détecte ce cas et redonne la
+bonne ligne ; c'est la même leçon que le paragraphe ci-dessus, avec un autre intermédiaire :
+**tout ce qui se trouve entre vous et la commande peut la réécrire.**
 
 ### Le premier déploiement de 2ᵉ génération échoue à moitié
 
@@ -229,7 +237,7 @@ d'ouvrir. Il faut donc :
 ```
 # 1. Creer le compte dans la console Firebase (Authentication), avec son mot de passe.
 # 2. Deployer la fonction d'amorcage :
-npm run deployer -- --only functions --project <projet>
+node scripts/deployer.mjs --only functions --project <projet>
 
 # 5. La supprimer, une fois l'amorcage reussi :
 npx firebase functions:delete amorcerResponsable --project <projet> --region europe-west1 --force
@@ -294,7 +302,7 @@ de l'application fonctionne.
 Une fois activé :
 
 ```
-npm run deployer -- --only storage --project <projet>
+node scripts/deployer.mjs --only storage --project <projet>
 ```
 
 **Déployer les fonctions par leur nom**, et non en bloc, quand le dépôt contient une
@@ -302,7 +310,7 @@ fonction qu'on ne veut pas remettre en ligne — `amorcerResponsable` en particu
 supprime après usage :
 
 ```
-npm run deployer -- --only functions:cloturerSurVente,functions:cloturerSurDocument --project <projet>
+node scripts/deployer.mjs --only functions:cloturerSurVente,functions:cloturerSurDocument --project <projet>
 ```
 
 ### Ce qui est en ligne

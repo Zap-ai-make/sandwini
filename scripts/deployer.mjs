@@ -23,9 +23,23 @@
  * pour la passe bout en bout. Une ligne de documentation se recopie mal ; un
  * chemin unique ne se recopie pas.
  *
- *     npm run deployer -- --only functions --project sandwini
+ *     node scripts/deployer.mjs --only functions --project sandwini
  *
- * Tout ce qui suit `--` part à `firebase deploy` sans être relu : le script
+ * **Appelé par `node`, et non par `npm run`.** `npm` lit la ligne avant de la
+ * transmettre, et `--only` est une de ses propres options : il l'avale avec sa
+ * valeur, et n'en laisse rien au script. `--project` subit le même sort. Le
+ * `--` censé protéger la suite n'y change rien — npm continue d'interpréter ce
+ * qu'il reconnaît. La commande partait donc en `firebase deploy sandwini`, que
+ * la CLI refuse pour une raison sans aucun rapport avec la demande : « Too many
+ * arguments », sur une ligne qui n'en portait qu'un.
+ *
+ * *Deuxième fois en une journée qu'un intermédiaire réécrit une commande avant
+ * de la passer* — PowerShell pour le préfixe de variable, npm pour les options.
+ * Le script détecte ce cas et donne la bonne ligne plutôt que de laisser
+ * `firebase` échouer ailleurs. `npm run deployer` reste dans `package.json`
+ * pour la découverte.
+ *
+ * Tout ce qui est passé part à `firebase deploy` sans être relu : le script
  * porte le délai, pas la politique de déploiement. Le projet se nomme
  * explicitement — sans `--project`, la CLI vise `default`, c'est-à-dire
  * `sdi-dev` (`.firebaserc`), et un déploiement ne se devine pas.
@@ -43,12 +57,28 @@ const SECONDES_DECOUVERTE = "120";
 
 const arguments_ = process.argv.slice(2);
 
-if (arguments_.length === 0) {
+const EXEMPLES =
+  "  node scripts/deployer.mjs --only functions --project sandwini\n" +
+  "  node scripts/deployer.mjs --only firestore:rules,functions --project sandwini";
+
+/* npm expose ce qu'il a intercepté : si `npm_config_only` existe, c'est que la
+   ligne est passée par `npm run` et que `--only` n'est jamais arrivé jusqu'ici.
+   On le dit, plutôt que de laisser `firebase` refuser pour une tout autre
+   raison — « Too many arguments », sur une ligne qui n'en portait qu'un. */
+const avales = ["only", "project"].filter((nom) => process.env[`npm_config_${nom}`]);
+if (avales.length > 0) {
   console.error(
-    "Rien à déployer. Nommez la cible et le projet, par exemple :\n" +
-      "  npm run deployer -- --only functions --project sandwini\n" +
-      "  npm run deployer -- --only firestore:rules --project sandwini",
+    `npm a intercepté ${avales.map((nom) => `--${nom}`).join(" et ")} : ce sont ses propres\n` +
+      "options, et il les retire de la ligne avant que ce script les voie. Le `--`\n" +
+      "n'y change rien — npm continue d'interpréter ce qu'il reconnaît.\n" +
+      "Appelez le script directement :\n" +
+      EXEMPLES,
   );
+  process.exit(1);
+}
+
+if (arguments_.length === 0) {
+  console.error(`Rien à déployer. Nommez la cible et le projet, par exemple :\n${EXEMPLES}`);
   process.exit(1);
 }
 
