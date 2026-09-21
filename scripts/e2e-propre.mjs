@@ -24,16 +24,51 @@
  * répertoire.
  */
 import { spawnSync } from "node:child_process";
-import { rmSync } from "node:fs";
+import { readFileSync, rmSync } from "node:fs";
 import { createConnection } from "node:net";
 
-const PORTS = [
-  { port: 8181, nom: "Firestore" },
-  { port: 9399, nom: "Authentication" },
-  { port: 5301, nom: "Functions" },
-  { port: 9199, nom: "Storage" },
-  { port: 4400, nom: "hub des émulateurs" },
-];
+/**
+ * Les ports à surveiller, **lus dans `firebase.json`** et non recopiés.
+ *
+ * Ils l'étaient, et les deux listes avaient divergé dans les deux sens : le
+ * script guettait le hub sur 4400 et Storage sur 9199 — les ports *par défaut*
+ * de Firebase —, quand SDI les a déplacés sur 4700 et 9599. Or `firebase.json`
+ * dit pourquoi il les a déplacés : « la machine de développement fait tourner
+ * d'autres projets Firebase, et les ports par défaut entrent en conflit avec
+ * eux ». Le garde surveillait donc exactement la collision que la configuration
+ * avait été écrite pour éviter.
+ *
+ * Les deux conséquences sont opposées, et la seconde est la pire. Il refusait
+ * de démarrer parce qu'un **autre projet** occupait 4400 — un faux refus, qui
+ * bloque une passe légitime. Et il n'aurait rien dit d'un émulateur **SDI**
+ * resté ouvert sur 4700 ou 9599, c'est-à-dire du cas qu'il existe pour
+ * attraper.
+ *
+ * Une liste recopiée finit toujours par mentir : celle-ci se lit à la source.
+ */
+function portsDesEmulateurs() {
+  const NOMS = {
+    firestore: "Firestore",
+    auth: "Authentication",
+    functions: "Functions",
+    storage: "Storage",
+    hub: "hub des émulateurs",
+  };
+  const configuration = JSON.parse(readFileSync("firebase.json", "utf8"));
+  return Object.entries(NOMS)
+    .map(([cle, nom]) => ({ port: configuration.emulators?.[cle]?.port, nom }))
+    .filter(({ port }) => typeof port === "number");
+}
+
+const PORTS = portsDesEmulateurs();
+
+if (PORTS.length === 0) {
+  console.error(
+    "Aucun port d'émulateur lisible dans `firebase.json`. Sans eux, ce script ne " +
+      "peut pas garantir des émulateurs neufs — ce qui est sa seule raison d'être.",
+  );
+  process.exit(1);
+}
 
 /** Le délai de découverte des fonctions, pour la même raison que `emulateurs.mjs`. */
 const SECONDES_DECOUVERTE = "60";
@@ -61,9 +96,12 @@ for (const { port, nom } of PORTS) {
 if (occupes.length > 0) {
   console.error(
     [
-      "Des émulateurs tournent déjà : " + occupes.join(", ") + ".",
+      "Des émulateurs SDI tournent déjà : " + occupes.join(", ") + ".",
       "",
-      "Cette commande en démarre un jeu neuf, et refuse de mesurer sur celui",
+      "Ces ports sont ceux de `firebase.json`, donc ceux de ce projet : un autre",
+      "projet Firebase sur la machine ne déclenche plus ce refus.",
+      "",
+      "Cette commande démarre un jeu neuf, et refuse de mesurer sur celui",
       "d'à côté : c'est précisément ce qu'elle existe pour éviter (S27).",
       "",
       "Arrêtez le terminal qui fait tourner « npm run emulators », puis",
