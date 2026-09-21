@@ -118,14 +118,39 @@ async function poser(options: {
   return { venteId };
 }
 
-async function attendreStatut(venteId: string, attendu: string, budget = 30_000): Promise<void> {
+/**
+ * Attend que le déclencheur ait fait son travail.
+ *
+ * **Le budget par défaut est de 60 s, et ce n'est pas de la marge gratuite.**
+ * Ce test n'affirme rien sur la vitesse : il affirme que le dossier *finit* par
+ * se clore. Le réveil, quelques lignes plus haut, s'accorde 90 s — sur une
+ * machine où un aller-retour de déclencheur peut prendre ce temps-là, un budget
+ * de 30 s ne mesure plus la clôture, il mesure la charge de l'émulateur. Il a
+ * rendu un rouge sur trois passes, vert à chaque fois que le fichier tournait
+ * seul : un verdict qui dépend de qui tourne à côté n'est pas un verdict (S27).
+ */
+async function attendreStatut(venteId: string, attendu: string, budget = 60_000): Promise<void> {
   const limite = Date.now() + budget;
   while (Date.now() < limite) {
     const vente = await base.doc(`ventesMotos/${venteId}`).get();
     if (vente.get("statutDossier") === attendu) return;
     await new Promise((suite) => setTimeout(suite, 500));
   }
-  throw new Error(`Le dossier ${venteId} n'est jamais passé à « ${attendu} ».`);
+  /* **Ce que le dossier valait à l'expiration.** Sans cela, le message accuse
+     le budget — « il n'est jamais passé à clos » — alors que la cause est
+     toujours l'une de trois : le paiement, la moto, ou un document. Le
+     déclencheur lit exactement ces champs ; l'échec doit les montrer. */
+  const vente = await base.doc(`ventesMotos/${venteId}`).get();
+  const documents = await base.collection(`ventesMotos/${venteId}/documents`).get();
+  const etat = vente.exists
+    ? `statutDossier=${vente.get("statutDossier")} statutPaiement=${vente.get("statutPaiement")} motoRemise=${vente.get("motoRemise")}`
+    : "la vente n'existe plus";
+  const papiers = documents.docs
+    .map((document) => `${document.get("type")}:${document.get("statut")}`)
+    .join(" ");
+  throw new Error(
+    `Le dossier ${venteId} n'est jamais passé à « ${attendu} ». ${etat} · documents [${papiers || "aucun"}]`,
+  );
 }
 
 describe("clôture automatique", () => {
