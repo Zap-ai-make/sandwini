@@ -206,14 +206,17 @@ test.describe("enregistrer une vente", () => {
     await expect(contenu(page)).toContainText("800 000 FCFA"); // reste dû
     await expect(contenu(page)).toContainText("Partiellement payée");
 
-    /* Les quatre documents du dossier, créés par le même lot que la vente.
+    /* Les trois documents du dossier, créés par le même lot que la vente.
        Scopés à leur liste : depuis S44 « Carte grise » paraît deux fois dans le
        panneau — le papier à obtenir, et ce qui part avec la moto. Ce sont deux
        faits différents sous le même mot, et c'est la section qui les sépare. */
     const dossier = contenu(page).getByRole("list", { name: "Documents du dossier" });
-    for (const document of ["Quittance", "CMC", "Carte grise", "Plaque"]) {
+    for (const document of ["Quittance", "CMC", "Carte grise"]) {
       await expect(dossier.getByText(document, { exact: true })).toBeVisible();
     }
+    /* Et la plaque n'y est plus (S48) : elle y figurait comme un quatrième
+       papier à obtenir, alors que l'immatriculation vient avec la carte grise. */
+    await expect(dossier.getByText("Plaque", { exact: true })).toHaveCount(0);
     await expect(contenu(page).getByText("À faire").first()).toBeVisible();
 
     // Le versement du jour de la vente.

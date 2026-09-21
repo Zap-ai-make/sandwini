@@ -247,10 +247,10 @@ test.describe("la file des dossiers en attente", () => {
     const ligne = contenu(page).locator("tbody tr").filter({ hasText: numero });
     await expect(ligne).toHaveCount(1);
 
-    /* Les quatre documents ont chacun leur colonne, et le nom accessible de
+    /* Les trois documents ont chacun leur colonne, et le nom accessible de
        chacun dit de quel papier et de quelle pièce il s'agit — replié en carte,
        l'en-tête de colonne n'est plus là pour le dire. */
-    for (const document of ["Quittance", "CMC", "Carte grise", "Plaque"]) {
+    for (const document of ["Quittance", "CMC", "Carte grise"]) {
       await expect(
         ligne.getByRole("button", { name: `${document} de ${numero} : À faire`, exact: true }),
       ).toBeVisible();

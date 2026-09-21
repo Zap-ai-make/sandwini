@@ -16,7 +16,8 @@ import { bandeauEtat, contenu, encaisser, seConnecterEtEntrer, vendre } from "./
  *
  * Enfin la distinction que tout le produit refuse de relâcher : une **dette**
  * est de l'argent qui manque au magasin, une **tranche** est de l'argent qu'il
- * détient. Deux listes, deux totaux, jamais un cumul.
+ * détient. Depuis S48 elles partagent une liste ; elles gardent leur colonne,
+ * leur filtre et **deux totaux, jamais un cumul**.
  */
 
 /* Même raison qu'en S8 : le décor — boutique, référentiels, moto, client,
@@ -123,22 +124,29 @@ test.describe("la moto des tranches ne part qu’au dernier franc", () => {
 });
 
 /**
- * Les deux sections de l’écran des paiements (A8).
+ * La liste des paiements (A8, S48).
  *
- * Depuis S29 elles sont visibles en même temps, nommées, chacune avec son
- * total et sa phrase : la moto est partie, ou la moto est retenue. C’est la
- * distinction que tout le produit refuse de relâcher, et la voir c’est
- * l’apprendre — trois boutons dont un seul était pressé empêché de se
- * tromper, mais cachait la différence.
+ * L’écran a porté deux tableaux séparés jusqu’à S48, chacun sous sa phrase. Le
+ * commanditaire les a trouvés lourds et a demandé une liste unique. La
+ * distinction a donc changé de place, pas de statut : elle vit dans une colonne
+ * **Mode** et dans **deux totaux qui ne s’additionnent jamais**.
+ *
+ * C’est ce que ces tests protègent. Une dette est de l’argent qui manque au
+ * magasin ; une tranche est de l’argent qu’il détient pour le compte du client.
+ * Un seul chiffre qui les mêlerait serait la régression la plus coûteuse du
+ * produit (`AGENTS.md`, §13) — et une liste unique est précisément ce qui la
+ * rend possible.
  */
-const sectionDettes = (page: import("@playwright/test").Page) =>
-  contenu(page).getByRole("region", { name: /^Dettes/ });
+const ligneDe = (page: import("@playwright/test").Page, client: string) =>
+  contenu(page).locator("tbody tr").filter({ hasText: client });
 
-const sectionTranches = (page: import("@playwright/test").Page) =>
-  contenu(page).getByRole("region", { name: /^Tranches/ });
+const filtre = (page: import("@playwright/test").Page, nom: string) =>
+  contenu(page).getByRole("group", { name: "Filtrer les paiements" }).getByRole("button", { name: nom, exact: true });
 
-test.describe("les deux sections de paiement", () => {
-  test("une dette et une tranche ne se mélangent jamais", async ({ page }) => {
+test.describe("la liste des paiements", () => {
+  test("une dette porte son mode, et ne compte pas dans ce que le magasin détient", async ({
+    page,
+  }) => {
     await seConnecterEtEntrer(page);
     const { client } = await vendre(page, {
       mode: "Crédit",
@@ -148,23 +156,22 @@ test.describe("les deux sections de paiement", () => {
 
     await page.goto("/motos/paiements", { waitUntil: "load" });
 
-    /* La dette : ce qui manque au magasin, et la phrase qui dit pourquoi. */
-    await expect(sectionDettes(page)).toContainText("750 000 FCFA dus", { timeout: 30_000 });
-    await expect(sectionDettes(page)).toContainText("Le client doit cet argent au magasin");
-    await expect(sectionDettes(page).locator("tbody tr").filter({ hasText: client })).toContainText(
-      "750 000",
-    );
+    /* Le total des dettes est nommé pour ce qu'il est : de l'argent que les
+       clients doivent. */
+    await expect(contenu(page)).toContainText("750 000 FCFA dus par les clients", {
+      timeout: 30_000,
+    });
+    /* Et rien n'est détenu : cette vente est un crédit, la moto est partie.
+       Le second total ne doit même pas paraître. */
+    await expect(contenu(page)).not.toContainText("détenus pour eux");
 
-    /* Les tranches : de l’argent que le magasin détient. Cette vente-ci est un
-       crédit — elle n’a donc rien à y faire, et c’est tout l’enjeu. */
-    await expect(sectionTranches(page)).toContainText("Le magasin détient l’argent déjà versé");
-    await expect(sectionTranches(page)).toContainText("Aucune moto retenue au magasin");
-    await expect(sectionTranches(page)).not.toContainText(client);
+    const ligne = ligneDe(page, client);
+    await expect(ligne).toContainText("Crédit");
+    await expect(ligne).toContainText("750 000");
+    await expect(ligne).not.toContainText("Tranches");
   });
 
-  test("une vente en tranches compte dans le total détenu, pas dans les dettes", async ({
-    page,
-  }) => {
+  test("une tranche compte dans le détenu, jamais dans les dus", async ({ page }) => {
     await seConnecterEtEntrer(page);
     const { client } = await vendre(page, {
       mode: "Tranches",
@@ -174,16 +181,46 @@ test.describe("les deux sections de paiement", () => {
 
     await page.goto("/motos/paiements", { waitUntil: "load" });
 
-    await expect(sectionTranches(page)).toContainText("300 000 FCFA détenus", {
+    await expect(contenu(page)).toContainText("300 000 FCFA détenus pour eux", {
       timeout: 30_000,
     });
-    await expect(sectionTranches(page)).toContainText("1 moto");
-    await expect(
-      sectionTranches(page).locator("tbody tr").filter({ hasText: client }),
-    ).toContainText("600 000");
+    await expect(contenu(page)).not.toContainText("dus par les clients");
 
-    await expect(sectionDettes(page)).toContainText("Aucune dette");
-    await expect(sectionDettes(page)).not.toContainText(client);
+    const ligne = ligneDe(page, client);
+    await expect(ligne).toContainText("Tranches");
+    await expect(ligne).toContainText("600 000");
+  });
+
+  /* Le cas que la fusion des deux tableaux rendait possible : si le filtre ne
+     séparait plus, la liste unique aurait vraiment perdu la distinction au lieu
+     de la déplacer. */
+  test("le filtre sépare ce que la liste réunit", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    const { client } = await vendre(page, {
+      mode: "Crédit",
+      prix: "1000000",
+      encaisse: "250000",
+    });
+
+    await page.goto("/motos/paiements", { waitUntil: "load" });
+    await expect(ligneDe(page, client)).toBeVisible({ timeout: 30_000 });
+
+    await filtre(page, "Tranches").click();
+    await expect(ligneDe(page, client)).toHaveCount(0);
+
+    await filtre(page, "Crédit").click();
+    await expect(ligneDe(page, client)).toBeVisible();
+
+    /* Partiellement payée : 250 000 versés sur 1 000 000. Le second axe du
+       filtre répond sur la même ligne. */
+    await filtre(page, "Partiellement payées").click();
+    await expect(ligneDe(page, client)).toBeVisible();
+
+    await filtre(page, "Impayées").click();
+    await expect(ligneDe(page, client)).toHaveCount(0);
+
+    await filtre(page, "Tout").click();
+    await expect(ligneDe(page, client)).toBeVisible();
   });
 
   test("une moto soldée s’annonce depuis la liste, avec le geste qui l’attend", async ({
@@ -202,7 +239,7 @@ test.describe("les deux sections de paiement", () => {
        sans que personne le sache : c’est le seul endroit du produit où la
        liste, et non la fiche, dit qu’un geste attend. */
     await page.goto("/motos/paiements", { waitUntil: "load" });
-    const ligne = sectionTranches(page).locator("tbody tr").filter({ hasText: client });
+    const ligne = ligneDe(page, client);
     await expect(ligne).toContainText("Soldée", { timeout: 30_000 });
     await expect(ligne.getByRole("link", { name: /^Remettre la moto de / })).toBeVisible();
   });
