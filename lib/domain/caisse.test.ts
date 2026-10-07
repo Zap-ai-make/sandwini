@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bilanParBoutique,
   clotureDuJour,
   fondsOuverturePour,
   historiqueDesClotures,
@@ -10,6 +11,7 @@ import {
   motifRequis,
   mouvementsDuJour,
   resumerJournee,
+  totalDuBilan,
   validerCloture,
   SAISIE_CLOTURE_VIDE,
   SEUIL_MOTIF_DEFAUT,
@@ -385,5 +387,73 @@ describe("l’historique", () => {
 
     expect(clotureDuJour(clotures, LE_4)?.especesComptees).toBe(742_000);
     expect(clotureDuJour(clotures, LE_5)).toBeNull();
+  });
+});
+
+/**
+ * Le bilan de toutes les boutiques, quand la plaque dit « Toutes ».
+ *
+ * L'écran refusait ce périmètre : « un tiroir se compte là où il est ». La
+ * réserve était juste et reste tenue — **on ne fond pas trois tiroirs en un
+ * seul chiffre**. On rend une ligne par boutique, et un total qui n'est qu'une
+ * somme de lignes lisibles à côté, jamais un solde qu'on irait compter
+ * quelque part.
+ */
+describe("le bilan de caisse par boutique", () => {
+  const boutiques = [
+    { id: "b-ptg", code: "PTG", nom: "Pouytenga" },
+    { id: "b-kdg", code: "KDG", nom: "Koudougou" },
+    { id: "b-oua", code: "OUA", nom: "Ouagadougou" },
+  ];
+
+  const mouvements = [
+    mouvement({ boutiqueId: "b-ptg", montant: 400_000, date: a("08:00") }),
+    mouvement({ boutiqueId: "b-ptg", montant: 100_000, date: a("11:00"), sens: "sortie" }),
+    mouvement({ boutiqueId: "b-kdg", montant: 250_000, date: a("09:30") }),
+    /* La veille : elle ne doit entrer dans aucune ligne du jour regardé. */
+    mouvement({ boutiqueId: "b-kdg", montant: 999_000, date: a("10:00", LE_4) }),
+  ];
+
+  it("rend une ligne par boutique qui a bougé, entrées et sorties séparées", () => {
+    const lignes = bilanParBoutique(mouvements, boutiques, LE_5);
+    expect(lignes.map((l) => [l.code, l.entrees, l.sorties, l.solde])).toEqual([
+      ["PTG", 400_000, 100_000, 300_000],
+      ["KDG", 250_000, 0, 250_000],
+    ]);
+  });
+
+  /* Une boutique sans mouvement n'est pas une boutique à zéro : la montrer
+     avec trois zéros alignés ferait croire à une journée vide alors que
+     personne n'a encore ouvert le tiroir. C'est la règle de D63. */
+  it("laisse dehors une boutique qui n’a rien eu ce jour-là", () => {
+    expect(bilanParBoutique(mouvements, boutiques, LE_5).map((l) => l.code)).not.toContain("OUA");
+  });
+
+  it("ne compte que le jour demandé", () => {
+    const lignes = bilanParBoutique(mouvements, boutiques, LE_4);
+    expect(lignes.map((l) => [l.code, l.entrees])).toEqual([["KDG", 999_000]]);
+  });
+
+  it("le total additionne les lignes, et rien d’autre", () => {
+    expect(totalDuBilan(bilanParBoutique(mouvements, boutiques, LE_5))).toEqual({
+      entrees: 650_000,
+      sorties: 100_000,
+      solde: 550_000,
+    });
+  });
+
+  it("une journée sans aucun mouvement ne rend aucune ligne", () => {
+    expect(bilanParBoutique(mouvements, boutiques, LE_3)).toEqual([]);
+    expect(totalDuBilan([])).toEqual({ entrees: 0, sorties: 0, solde: 0 });
+  });
+
+  /* Un mouvement dont la boutique a été supprimée du référentiel ne doit pas
+     faire disparaître son argent du total : il garde son code brut plutôt que
+     de sortir du bilan en silence. */
+  it("n’efface pas l’argent d’une boutique inconnue du référentiel", () => {
+    const orphelin = [mouvement({ boutiqueId: "b-disparue", montant: 70_000, date: a("08:00") })];
+    const lignes = bilanParBoutique(orphelin, boutiques, LE_5);
+    expect(lignes).toHaveLength(1);
+    expect(totalDuBilan(lignes).entrees).toBe(70_000);
   });
 });

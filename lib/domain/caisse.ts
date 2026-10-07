@@ -96,6 +96,86 @@ export function mouvementsDuJour(
 }
 
 /* --------------------------------------------------------------------------
+   Le bilan de toutes les boutiques
+   -------------------------------------------------------------------------- */
+
+/** Une boutique du bilan, telle que l'écran la nomme. */
+export type LigneBilan = {
+  boutiqueId: string;
+  code: string;
+  nom: string;
+  entrees: number;
+  sorties: number;
+  /** `entrees - sorties` : ce que le tiroir de cette boutique a gagné ce jour. */
+  solde: number;
+};
+
+/**
+ * Ce que chaque tiroir a fait ce jour-là, une ligne par boutique.
+ *
+ * **La réserve que cet écran portait reste tenue.** Il refusait le périmètre
+ * « Toutes les boutiques » parce qu'« un tiroir se compte là où il est », et
+ * c'était juste : on ne compte pas trois tiroirs ensemble, on ne va pas
+ * vérifier un solde consolidé dans un meuble. Ce bilan ne fond donc rien — il
+ * **range** : une ligne par boutique, et le total n'est que la somme de lignes
+ * qui restent lisibles à côté de lui.
+ *
+ * **Une boutique sans mouvement n'y figure pas.** Trois zéros alignés se
+ * liraient comme une journée vide alors que personne n'a seulement ouvert le
+ * tiroir — c'est la faute que D63 relève sur les compteurs à zéro, transposée
+ * à une ligne de tableau.
+ *
+ * **Une boutique inconnue du référentiel garde son argent.** Si un mouvement
+ * porte un `boutiqueId` qu'aucune boutique ne réclame — supprimée, ou pas
+ * encore lue —, sa ligne paraît quand même, sous son identifiant brut. La
+ * faire disparaître retirerait de l'argent réel d'un total, en silence, et
+ * c'est le seul défaut qu'un bilan n'a pas le droit d'avoir.
+ */
+export function bilanParBoutique(
+  mouvements: readonly Mouvement[],
+  boutiques: readonly { id: string; code: string; nom: string }[],
+  jour: string,
+): LigneBilan[] {
+  const lignes = new Map<string, LigneBilan>();
+
+  for (const mouvement of mouvementsDuJour(mouvements, jour)) {
+    const connue = boutiques.find((boutique) => boutique.id === mouvement.boutiqueId);
+    const ligne = lignes.get(mouvement.boutiqueId) ?? {
+      boutiqueId: mouvement.boutiqueId,
+      code: connue?.code ?? mouvement.boutiqueId,
+      nom: connue?.nom ?? "Boutique inconnue",
+      entrees: 0,
+      sorties: 0,
+      solde: 0,
+    };
+
+    if (mouvement.sens === "sortie") ligne.sorties += mouvement.montant;
+    else ligne.entrees += mouvement.montant;
+    ligne.solde = ligne.entrees - ligne.sorties;
+
+    lignes.set(mouvement.boutiqueId, ligne);
+  }
+
+  return [...lignes.values()];
+}
+
+/** La somme des lignes du bilan — rien de plus, et surtout rien d'autre. */
+export function totalDuBilan(lignes: readonly LigneBilan[]): {
+  entrees: number;
+  sorties: number;
+  solde: number;
+} {
+  return lignes.reduce(
+    (total, ligne) => ({
+      entrees: total.entrees + ligne.entrees,
+      sorties: total.sorties + ligne.sorties,
+      solde: total.solde + ligne.solde,
+    }),
+    { entrees: 0, sorties: 0, solde: 0 },
+  );
+}
+
+/* --------------------------------------------------------------------------
    Le résumé d'une journée
    -------------------------------------------------------------------------- */
 

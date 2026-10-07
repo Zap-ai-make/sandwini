@@ -93,13 +93,24 @@ function lireCloture(instantane: QueryDocumentSnapshot<DocumentData>): Cloture {
  * écrites dans la spec. Le jour où il cessera d'être vrai, c'est une requête
  * bornée au mois qu'il faudra, pas un agrégat.
  */
+/**
+ * Les mouvements d'une boutique, ou **de toutes** quand `boutiqueId` est nul.
+ *
+ * Le périmètre entreprise lit la collection sans filtre, comme `ecouterDossiers`
+ * le fait déjà : la règle `encaissements` autorise la lecture à tout
+ * responsable (`peutVendrePour` → `estResponsable()`), et un gérant n'a jamais
+ * ce périmètre — le sien est sa boutique. Une lecture non filtrée venant de lui
+ * serait refusée par les règles, ce qui est le comportement voulu.
+ */
 export function ecouterMouvements(
-  boutiqueId: string,
+  boutiqueId: string | null,
   auChangement: (mouvements: Mouvement[]) => void,
   enErreur: (cause: unknown) => void,
 ): () => void {
+  const base = collection(db(), "encaissements");
+  const requete = boutiqueId ? query(base, where("boutiqueId", "==", boutiqueId)) : query(base);
   return onSnapshot(
-    query(collection(db(), "encaissements"), where("boutiqueId", "==", boutiqueId)),
+    requete,
     (instantane) => auChangement(instantane.docs.map(lireMouvement)),
     enErreur,
   );
