@@ -55,10 +55,17 @@ export function PaletteCommandes() {
 
   const entrees = useMemo<Entree[]>(() => {
     if (!role) return [];
-    return espacesVisibles(role, perimetre.metiers).flatMap((espace) =>
-      ecransVisibles(espace, role).map(({ href, libelle }) => ({ href, libelle, espace })),
+    /* La palette suit la colonne, sans quoi elle proposerait des écrans que la
+       navigation vient de retirer — et un raccourci qui mène à un espace fermé
+       est pire qu'un raccourci absent. */
+    return espacesVisibles(role, perimetre.metiers, perimetre.type).flatMap((espace) =>
+      ecransVisibles(espace, role, perimetre.metiers).map(({ href, libelle }) => ({
+        href,
+        libelle,
+        espace,
+      })),
     );
-  }, [role, perimetre.metiers]);
+  }, [role, perimetre.metiers, perimetre.type]);
 
   const resultats = useMemo(() => {
     const cherche = sansAccent(filtre.trim());

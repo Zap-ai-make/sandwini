@@ -4,6 +4,7 @@ import {
   accedeEspace,
   accueilDuRole,
   ecranCourant,
+  destinationApresPerimetre,
   ecransVisibles,
   espaceDuChemin,
   espacesVisibles,
@@ -268,5 +269,143 @@ describe("les écrans d’administration", () => {
     const diagnostic = ECRANS_DE.reglages.find(({ href }) => href === "/diagnostic");
     expect(diagnostic?.quoi).toBeTruthy();
     expect(diagnostic?.capacite).toBeUndefined();
+  });
+});
+
+/**
+ * La plaque jaune pilote l'interface.
+ *
+ * Le modèle savait déjà quels métiers porte le périmètre — c'est ce qui filtre
+ * le rail depuis D62. Ce que ces tests ajoutent, c'est que **la colonne le
+ * sache aussi**, et que choisir une boutique fasse descendre le responsable
+ * dans son espace au lieu de le laisser au-dessus.
+ */
+describe("le périmètre pilote la navigation", () => {
+  it("un responsable qui choisit une boutique prend le rail de son gérant", () => {
+    expect(espacesVisibles("responsable", ["motos"], "boutique")).toEqual([
+      "accueil",
+      "motos",
+      "caisse",
+      "reglages",
+    ]);
+  });
+
+  it("une boutique de pièces ne lui ouvre aucun espace motos", () => {
+    expect(espacesVisibles("responsable", ["pieces"], "boutique")).toEqual([
+      "accueil",
+      "pieces",
+      "caisse",
+      "reglages",
+    ]);
+  });
+
+  it("et il retrouve la supervision en revenant à toutes les boutiques", () => {
+    expect(espacesVisibles("responsable", ["motos", "pieces"], "toutes")).toEqual([
+      "supervision",
+      "motos",
+      "pieces",
+      "caisse",
+      "reglages",
+    ]);
+  });
+
+  /* Le gérant n'a jamais eu la supervision : son rail ne doit pas bouger d'un
+     cran, quel que soit ce qu'on passe en périmètre. */
+  it("ne change rien pour le gérant", () => {
+    expect(espacesVisibles("gerant", ["motos"], "boutique")).toEqual(
+      espacesVisibles("gerant", ["motos"], "toutes"),
+    );
+  });
+});
+
+describe("la colonne suit les métiers du périmètre", () => {
+  it("laisse tomber les écrans motos quand le périmètre ne vend que des pièces", () => {
+    const hrefs = ecransVisibles("supervision", "responsable", ["pieces"]).map((e) => e.href);
+    expect(hrefs).toContain("/supervision");
+    expect(hrefs).not.toContain("/motos/ventes");
+    expect(hrefs).not.toContain("/motos/paiements");
+    expect(hrefs).not.toContain("/motos/dossiers");
+  });
+
+  it("les garde quand le périmètre porte les motos", () => {
+    const hrefs = ecransVisibles("supervision", "responsable", ["motos"]).map((e) => e.href);
+    expect(hrefs).toContain("/motos/ventes");
+  });
+
+  /* Le pendant de « un groupe vidé par les droits disparaît » : un groupe vidé
+     par le métier doit disparaître pareil, sans quoi la colonne afficherait un
+     titre suivi de rien. */
+  it("retire un groupe que le métier a vidé", () => {
+    expect(groupesVisibles("supervision", "responsable", ["pieces"]).map((g) => g.titre)).toEqual([
+      "Le commerce",
+    ]);
+    const ecrans = groupesVisibles("supervision", "responsable", ["pieces"])[0].ecrans;
+    expect(ecrans.map((e) => e.href)).toEqual(["/supervision"]);
+  });
+});
+
+describe("les écrans réservés descendent dans l’espace motos", () => {
+  it("le responsable y trouve le prix d’achat et les chiffres", () => {
+    const hrefs = ecransVisibles("motos", "responsable", ["motos"]).map((e) => e.href);
+    expect(hrefs).toContain("/supervision/couts");
+    expect(hrefs).toContain("/supervision/chiffres");
+  });
+
+  /* La garde d'affichage, pas la garde de droit : les règles Firestore restent
+     seules à décider (D27), et le coût vit en sous-collection `prive/` (D2).
+     Ce test dit seulement que la colonne ne propose pas au gérant une porte
+     qui lui claquerait au nez. */
+  it("le gérant ne les voit pas, et son espace motos ne grossit pas", () => {
+    const hrefs = ecransVisibles("motos", "gerant", ["motos"]).map((e) => e.href);
+    expect(hrefs).not.toContain("/supervision/couts");
+    expect(hrefs).not.toContain("/supervision/chiffres");
+    expect(groupesVisibles("motos", "gerant", ["motos"]).map((g) => g.titre)).toEqual([
+      "Vendre",
+      "Suivre",
+      "Le fichier",
+    ]);
+  });
+
+  it("et la supervision ne les porte plus en double", () => {
+    const hrefs = ecransVisibles("supervision", "responsable", ["motos"]).map((e) => e.href);
+    expect(hrefs).not.toContain("/supervision/couts");
+  });
+});
+
+/**
+ * Où l'on atterrit quand la plaque change d'avis.
+ *
+ * Sans cette règle, choisir une boutique depuis la vue d'ensemble laissait un
+ * état bancal : l'écran de supervision restait ouvert alors que son entrée
+ * venait de quitter le rail. On ne peut pas revenir là où l'on est.
+ */
+describe("la destination après un changement de périmètre", () => {
+  it("quitte la supervision pour l’accueil de la boutique choisie", () => {
+    expect(destinationApresPerimetre("/supervision", "responsable", "boutique")).toBe("/dashboard");
+  });
+
+  /* Les deux écrans réservés portent encore `/supervision` dans leur URL mais
+     vivent désormais dans l'espace motos : ils restent ouverts en mode
+     boutique, et c'est même là qu'ils servent le plus. Les renvoyer à
+     l'accueil fermerait l'écran qu'on vient d'ouvrir. */
+  it("ne chasse pas des écrans réservés, qui ont gardé leur URL de supervision", () => {
+    expect(destinationApresPerimetre("/supervision/couts", "responsable", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/supervision/chiffres", "responsable", "boutique")).toBeNull();
+  });
+
+  it("ramène à la supervision quand on revient à toutes les boutiques", () => {
+    expect(destinationApresPerimetre("/dashboard", "responsable", "toutes")).toBe("/supervision");
+  });
+
+  it("laisse tranquille un écran qui existe des deux côtés", () => {
+    expect(destinationApresPerimetre("/motos/ventes", "responsable", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/motos/ventes", "responsable", "toutes")).toBeNull();
+  });
+
+  /* Le gérant ne choisit pas son périmètre : la question ne se pose pas, et une
+     redirection le renverrait d'un écran légitime. */
+  it("ne déplace jamais un gérant", () => {
+    expect(destinationApresPerimetre("/dashboard", "gerant", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/supervision", "gerant", "toutes")).toBeNull();
   });
 });

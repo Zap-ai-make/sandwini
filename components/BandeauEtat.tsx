@@ -1,8 +1,11 @@
 "use client";
 
 import { Check, ChevronDown, CloudOff, RefreshCw } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useId } from "react";
 import { PaletteCommandes } from "@/components/PaletteCommandes";
+import { useSession } from "@/lib/auth/session";
+import { destinationApresPerimetre } from "@/lib/domain/espaces";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 
@@ -37,6 +40,32 @@ export function BandeauEtat() {
   const { etat, enAttente } = useEtatReseau();
   const { perimetre, boutiques, peutChoisir, choisir } = usePerimetre();
   const idNom = useId();
+  const session = useSession();
+  const router = useRouter();
+  const chemin = usePathname();
+
+  /**
+   * Choisir une boutique, puis aller là où ce choix a du sens.
+   *
+   * La plaque ne fait plus que nommer le périmètre : elle fait entrer dans une
+   * boutique et en sortir. Or l'espace supervision quitte le rail dès qu'une
+   * boutique est nommée — sans ce déplacement, on restait sur un écran dont
+   * l'entrée venait de disparaître, donc sans moyen d'y revenir.
+   *
+   * La règle vit dans `lib/domain/espaces` et non ici : un test unitaire peut
+   * l'y atteindre, et elle a trop d'exceptions pour tenir dans un composant
+   * (D103).
+   */
+  function changerDePerimetre(boutiqueId: string | null) {
+    choisir(boutiqueId);
+    if (session.statut !== "connecte") return;
+    const ou = destinationApresPerimetre(
+      chemin,
+      session.utilisateur.role,
+      boutiqueId ? "boutique" : "toutes",
+    );
+    if (ou) router.push(ou);
+  }
 
   const horsLigne = etat === "hors_ligne";
 
@@ -78,7 +107,7 @@ export function BandeauEtat() {
             aria-label="Boutique affichée"
             aria-describedby={idNom}
             value={perimetre.boutiqueId ?? ""}
-            onChange={(evenement) => choisir(evenement.target.value || null)}
+            onChange={(evenement) => changerDePerimetre(evenement.target.value || null)}
             className={[
               "plaque-code h-8 cursor-pointer appearance-none rounded-plaque border py-1 pr-7 pl-2 text-sm leading-none",
               plaque,

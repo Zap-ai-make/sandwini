@@ -15,7 +15,7 @@
  * la permission se joue dans les règles Firestore (`DECISIONS.md` D27).
  */
 
-import type { Metier } from "./boutique";
+import { METIERS, type Metier } from "./boutique";
 import { peut, type Capacite, type Role } from "./roles";
 
 export type Espace = "supervision" | "accueil" | "motos" | "pieces" | "caisse" | "reglages";
@@ -60,18 +60,88 @@ export function accueilDuRole(role: Role): string {
  * sans boutique — ne rend que les espaces dont la réponse est certaine. Mieux
  * vaut une barre courte qui s'allonge qu'une entrée qui disparaît sous le doigt.
  */
-export function espacesVisibles(role: Role, metiers: readonly Metier[]): Espace[] {
-  const ordre: Espace[] = peut(role, "acceder_supervision")
+export function espacesVisibles(
+  role: Role,
+  metiers: readonly Metier[],
+  perimetre: PortéeDuPerimetre = "toutes",
+): Espace[] {
+  const ordre: Espace[] = surveille(role, perimetre)
     ? ["supervision", "motos", "pieces", "caisse", "reglages"]
     : ["accueil", "motos", "pieces", "caisse", "reglages"];
 
-  return ordre.filter((espace) => accedeEspace(role, metiers, espace));
+  return ordre.filter((espace) => accedeEspace(role, metiers, espace, perimetre));
+}
+
+/**
+ * L'étendue de ce que l'on regarde : l'entreprise, ou une boutique.
+ *
+ * C'est `Perimetre.type` de `lib/perimetre`, repris ici en type minimal pour
+ * que ce fichier reste une fonction pure sans rien importer de React.
+ * `aucune` — pas encore de boutique déclarée — se comporte comme `toutes` :
+ * il n'y a pas de boutique dans laquelle descendre.
+ */
+export type PortéeDuPerimetre = "toutes" | "boutique" | "aucune";
+
+/**
+ * Ce compte surveille-t-il, ou travaille-t-il dans une boutique ?
+ *
+ * **Le responsable qui choisit une boutique travaille dedans.** Tant que la
+ * plaque annonce « Toutes les boutiques », il est au-dessus et la supervision
+ * est son point de vue ; dès qu'il nomme une boutique, il veut l'interface de
+ * cette boutique — celle que son gérant voit — et non un poste d'observation
+ * qui en parlerait à la troisième personne. La plaque redevient le chemin du
+ * retour, et c'est le seul.
+ *
+ * Le gérant, lui, ne surveille jamais : la condition ne le concerne pas.
+ */
+function surveille(role: Role, perimetre: PortéeDuPerimetre): boolean {
+  return peut(role, "acceder_supervision") && perimetre !== "boutique";
+}
+
+/**
+ * Où emmener quelqu'un dont la plaque vient de changer, ou `null` pour le
+ * laisser où il est.
+ *
+ * **Le cas qui oblige à cette fonction.** Choisir une boutique depuis la vue
+ * d'ensemble retirait « Supervision » du rail sans fermer l'écran de
+ * supervision : on se retrouvait sur une page dont l'entrée n'existait plus,
+ * et donc sans moyen d'y revenir après l'avoir quittée. Un écran qu'aucune
+ * navigation ne mentionne est un écran qu'on croit disparu.
+ *
+ * **Les deux écrans réservés sont l'exception, et elle n'est pas cosmétique.**
+ * `/supervision/couts` et `/supervision/chiffres` ont gardé leur URL en
+ * déménageant dans l'espace motos. Les traiter comme « de la supervision »
+ * d'après leur chemin fermerait l'écran au moment précis où l'on choisit la
+ * boutique dont on veut saisir le prix d'achat. C'est le rangement qui compte,
+ * pas l'orthographe de l'adresse.
+ */
+export function destinationApresPerimetre(
+  chemin: string,
+  role: Role,
+  perimetre: PortéeDuPerimetre,
+): string | null {
+  /* Un gérant ne change pas de périmètre : le déplacer serait le chasser d'un
+     écran légitime pour une transition qui ne le concerne pas. */
+  if (!peut(role, "acceder_supervision")) return null;
+
+  const reserve = ECRANS_DE.motos.some((ecran) => ecran.href === chemin);
+  if (perimetre === "boutique") {
+    return sousChemin(chemin, ESPACES.supervision.href) && !reserve
+      ? ESPACES.accueil.href
+      : null;
+  }
+  return chemin === ESPACES.accueil.href ? ESPACES.supervision.href : null;
 }
 
 /** Cet espace est-il ouvert à ce rôle sur ce périmètre ? */
-export function accedeEspace(role: Role, metiers: readonly Metier[], espace: Espace): boolean {
-  if (espace === "supervision") return peut(role, "acceder_supervision");
-  if (espace === "accueil") return !peut(role, "acceder_supervision");
+export function accedeEspace(
+  role: Role,
+  metiers: readonly Metier[],
+  espace: Espace,
+  perimetre: PortéeDuPerimetre = "toutes",
+): boolean {
+  if (espace === "supervision") return surveille(role, perimetre);
+  if (espace === "accueil") return !surveille(role, perimetre);
 
   const metier = METIER_DE[espace];
   return metier ? metiers.includes(metier) : true;
@@ -106,6 +176,20 @@ export type EcranDEspace = {
   libelle: string;
   /** Sans elle, l'entrée est ouverte à tous les rôles qui voient l'espace. */
   capacite?: Capacite;
+  /**
+   * Le métier que cette entrée exige du périmètre, s'il en exige un.
+   *
+   * Même mécanique que `capacite`, sur l'autre axe : celle-ci filtre par droit,
+   * celle-là par ce que la boutique vend. L'espace supervision porte les deux
+   * métiers, et ses entrées motos n'ont rien à faire dans la colonne quand la
+   * plaque annonce une boutique de pièces — c'est ce qui produisait l'écran
+   * « Pas dans cette boutique », où le produit proposait une porte pour
+   * s'excuser ensuite de l'avoir ouverte.
+   *
+   * Les espaces qui portent déjà un métier (`motos`, `pieces`) n'en ont pas
+   * besoin : le rail les a déjà écartés.
+   */
+  metier?: Metier;
   /**
    * Ce qu'on y fait, en une ligne — pour les écrans où le libellé seul ne
    * suffit pas à choisir.
@@ -170,15 +254,9 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       titre: "Le commerce",
       ecrans: [
         { href: "/supervision", libelle: "Vue d’ensemble" },
-        { href: "/motos/ventes", libelle: "Ventes" },
-        { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
-        { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },
-        /* S39. Le prix d'achat ne se saisit plus au comptoir : c'est ici qu'il
-           se pose, et cet écran est le seul endroit d'où l'on sait quelles
-           motos en attendent un. Sans cette entrée il n'était atteignable que
-           par un bouton de la vue d'ensemble — et le rail surlignait « Vue
-           d'ensemble » pendant qu'on y travaillait. */
-        { href: "/supervision/couts", libelle: "Prix d’achat" },
+        { href: "/motos/ventes", libelle: "Ventes", metier: "motos" },
+        { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches", metier: "motos" },
+        { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers", metier: "motos" },
       ],
     },
     /* « Les boutiques » n'est pas ici : c'est une liste de données, pas
@@ -231,6 +309,31 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
          le retrouve. C'est le mot de la maquette `b1`. */
       titre: "Le fichier",
       ecrans: [{ href: "/clients", libelle: "Clients" }],
+    },
+    {
+      /**
+       * Les deux écrans que seul le responsable ouvre, rangés là où ils
+       * servent plutôt que dans un espace à part.
+       *
+       * Ils vivaient sous la supervision, qui disparaît du rail dès qu'une
+       * boutique est choisie — c'est-à-dire exactement quand on en a besoin :
+       * le prix d'achat se pose sur une moto, dans une boutique. Ils descendent
+       * donc dans l'espace motos, gardés par `capacite` comme tout le reste.
+       *
+       * **Leurs URL ne bougent pas.** Aucune redirection à écrire, aucun lien
+       * existant cassé, aucun signet mort : seul leur rangement change. Et
+       * `/supervision/chiffres` y gagne au passage une entrée de navigation —
+       * il n'en avait aucune, et n'était atteignable que par un bouton de la
+       * vue d'ensemble.
+       *
+       * La garde d'affichage ne protège rien : le cloisonnement réel est en
+       * sous-collection `prive/` et dans les règles Firestore (D2, D27).
+       */
+      titre: "Réservé au responsable",
+      ecrans: [
+        { href: "/supervision/couts", libelle: "Prix d’achat", capacite: "voir_marges" },
+        { href: "/supervision/chiffres", libelle: "Chiffres du mois", capacite: "voir_marges" },
+      ],
     },
   ],
   pieces: [
@@ -335,17 +438,38 @@ export const ECRANS_DE: Record<Espace, readonly EcranDEspace[]> = Object.fromEnt
  * gérant qui n'a droit à aucun écran d'administration ne doit pas lire
  * « L'entreprise » suivi de rien.
  */
-export function groupesVisibles(espace: Espace, role: Role): GroupeDEcrans[] {
+export function groupesVisibles(
+  espace: Espace,
+  role: Role,
+  metiers: readonly Metier[] = METIERS,
+): GroupeDEcrans[] {
   return GROUPES_DE[espace]
     .map((groupe) => ({
       titre: groupe.titre,
-      ecrans: groupe.ecrans.filter(({ capacite }) => !capacite || peut(role, capacite)),
+      ecrans: groupe.ecrans.filter((ecran) => ouverte(ecran, role, metiers)),
     }))
     .filter((groupe) => groupe.ecrans.length > 0);
 }
 
-export function ecransVisibles(espace: Espace, role: Role): EcranDEspace[] {
-  return ECRANS_DE[espace].filter(({ capacite }) => !capacite || peut(role, capacite));
+export function ecransVisibles(
+  espace: Espace,
+  role: Role,
+  metiers: readonly Metier[] = METIERS,
+): EcranDEspace[] {
+  return ECRANS_DE[espace].filter((ecran) => ouverte(ecran, role, metiers));
+}
+
+/**
+ * Cette entrée paraît-elle ? Deux axes, et il faut les deux.
+ *
+ * Le droit (`capacite`) et le métier du périmètre (`metier`). Les deux filtres
+ * vivent ici plutôt que recopiés dans les deux fonctions au-dessus : c'est
+ * l'endroit unique où l'on décide qu'une entrée se montre, et c'est ce qui
+ * empêche la colonne et la palette de commandes de diverger.
+ */
+function ouverte(ecran: EcranDEspace, role: Role, metiers: readonly Metier[]): boolean {
+  if (ecran.capacite && !peut(role, ecran.capacite)) return false;
+  return !ecran.metier || metiers.includes(ecran.metier);
 }
 
 /**
