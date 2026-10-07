@@ -260,7 +260,7 @@ function Ventes() {
   const fermerLaModale = () => router.replace(adresse(false), { scroll: false });
 
   return (
-    <div>
+    <div className="ecran-plein">
       <TetePage
         surTitre={surTitre}
         titre="Ventes"

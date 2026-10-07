@@ -125,7 +125,10 @@ export function CeQuiDemandeUneDecision({ className }: { className?: string } = 
         </p>
       ) : (
         <>
-          <div className="cadre cadre-tableau">
+          {/* Même raison qu'aux dernières ventes : un tableau encastré dans un
+              tableau de bord ne se borne pas à la fenêtre, sinon il ouvre une
+              seconde barre de défilement à côté de celle de la page. */}
+          <div className="cadre cadre-tableau lg:max-h-none">
             <Tableau
               legende="Dossiers et tranches qui dépassent le délai, toutes boutiques"
               colonnes={colonnes}

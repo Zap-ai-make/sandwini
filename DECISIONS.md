@@ -2912,3 +2912,68 @@ ne couvre que `lib/**` : tant qu'elle vivait dans `ModaleVente.tsx`, **aucun
 test unitaire ne pouvait l'atteindre**, et elle a traversé un lot entier. C'est
 la même manœuvre qu'en S47 pour `peserBoutiques` et qu'en S46 pour `periode.ts`
 — *une règle métier logée dans un composant est une règle sans preuve.*
+
+---
+
+## D104 — Une zone qui défile doit être le bloc conteneur de ce qu'elle contient
+
+*S49, en cherchant pourquoi le comptoir comptait deux ascenseurs.*
+
+Le commanditaire l'a dit en quatre mots : « y'a deux scroll bar ». La coquille
+promet pourtant l'inverse — navigation fixe, zone de travail qui défile, un seul
+ascenseur. **Deux causes, sans rapport l'une avec l'autre, et aucune lisible
+dans le CSS.**
+
+**La première est un piège déjà payé.** `Tableau` pose un
+`<caption class="sr-only">` pour nommer le tableau à qui ne le voit pas. Or
+`sr-only`, c'est `position: absolute` — exactement ce que [D102] avait appris à
+ses dépens sur les étiquettes de champs. Entre ce `caption` et `<html>`, aucun
+ancêtre n'était positionné : son bloc conteneur était **le document**. Un
+élément absolu n'est pas rogné par une zone de défilement dont il ne dépend pas,
+et son débordement est compté par la fenêtre.
+
+Ce que la mesure donne, et c'est la signature du défaut :
+
+| fenêtre | `html.scrollHeight` |
+|---|---|
+| 945 | 945 |
+| 900 | **944** |
+| 860 | **944** |
+| 760 | **944** |
+
+Un document dont la hauteur ne bouge pas quand la fenêtre rétrécit n'est pas un
+document : c'est un élément échappé. La correction est une ligne — `relative`
+sur `main` — mais elle est posée là plutôt que sur le `caption`, parce que la
+règle juste est générale : **une zone de défilement doit être le bloc conteneur
+de ce qu'elle contient.** Posée au coupable, elle attendrait le prochain
+`sr-only`.
+
+**La seconde est une constante qui devinait.** `.cadre-tableau` se plafonnait à
+`calc(100dvh - 14rem)` : la fenêtre moins ce qu'on estimait au-dessus de lui. Le
+commentaire d'origine l'assumait — « approchée, pas calculée au pixel — si elle
+tombe court, la page reprend le défilement, ce qui ne casse rien ». **Cela
+cassait quelque chose.** Les 14 rem comptaient le bandeau, la marge et la tête
+d'écran ; une barre de filtres de plus et la devinette tombait court. Mesuré sur
+« Ventes » à 1920×860 : le cadre bridé à 636 px pendant que la page en réclamait
+943. Les deux défilaient, côte à côte.
+
+**Décision.** On ne devine plus la hauteur de ce qui surmonte un tableau : un
+écran de liste se déclare `.ecran-plein`, remplit la zone de travail, et le
+cadre prend ce qui reste. La hauteur n'est plus estimée, elle est produite par
+la mise en page. Un écran qui ne se déclare pas garde un cadre de hauteur libre
+— c'est la page qui défile, une seule fois, ce qu'il faut pour un tableau logé
+au milieu d'un tableau de bord comme la supervision.
+
+*Ce que cet épisode dit du harnais, et c'est le plus cher.* La suite bout en
+bout ne tourne que sur un profil **Pixel 7**. Les deux défauts sont des défauts
+de bureau : le plafond ne s'applique qu'au-dessus de 1024 px, et il faut une
+fenêtre basse pour que la page déborde. **Aucun des deux ne pouvait être vu par
+la suite existante** — elle serait restée verte indéfiniment pendant que l'écran
+avait tort. `e2e/defilement.spec.ts` fixe donc sa propre fenêtre, 1920×860,
+l'ordre de grandeur de ce qu'un Chrome maximisé laisse d'un écran 1080p.
+
+Et le défaut ne se voit qu'au **chargement** de la page : après une navigation
+interne, la hauteur du document a déjà été recalculée et la fenêtre ne défile
+plus. Un test qui se contentait d'arriver par la navigation passait au vert sur
+un écran défectueux. Il faut un `goto` franc — ce que fait le comptoir, une
+adresse tapée, une touche F5.

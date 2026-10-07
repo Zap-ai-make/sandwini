@@ -160,7 +160,12 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
           Aucune vente enregistrée pour l’instant. La première apparaîtra ici.
         </p>
       ) : (
-        <div className="cadre cadre-tableau">
+        /* `lg:max-h-none` lève la borne de hauteur que `.cadre-tableau` pose
+           sur bureau. Elle est juste pour un écran de liste, où le tableau est
+           toute la page : il défile, pas elle. Ici le tableau est un bloc parmi
+           d'autres sur un tableau de bord qui défile déjà — la borne lui
+           fabriquait sa propre barre, et l'écran en montrait deux. */
+        <div className="cadre cadre-tableau lg:max-h-none">
           <Tableau
             legende="Les six dernières ventes, toutes boutiques"
             colonnes={colonnes}

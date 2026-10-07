@@ -32,8 +32,29 @@ export default function DispositionApplication({ children }: { children: ReactNo
           <NavigationPrincipale />
           <div className="travail">
             <BandeauEtat />
-            <main className="flex-1 overflow-y-auto px-5 pt-6 pb-16">
-              <div className="max-w-travail">{children}</div>
+            {/* `relative` n'est pas un réglage de mise en page : c'est ce qui
+                garde les éléments absolus **dans** la zone qui défile.
+
+                Sans lui, aucun ancêtre jusqu'à `<html>` n'est positionné, et un
+                descendant en `position: absolute` prend le document pour bloc
+                conteneur. Son débordement est alors compté par la fenêtre, qui
+                se met à défiler par-dessus `main` : deux ascenseurs à l'écran,
+                celui de la zone de travail et celui de la page.
+
+                Le coupable mesuré est le `<caption class="sr-only">` que pose
+                chaque `Tableau` — `sr-only` veut dire `position: absolute`, et
+                le dépôt a déjà payé ce piège une fois (D102). Il figeait
+                `html.scrollHeight` à 944 px quelle que soit la hauteur de la
+                fenêtre. Posé ici plutôt que sur le `caption`, parce que la
+                règle juste est générale : une zone de défilement doit être le
+                bloc conteneur de ce qu'elle contient. */}
+            <main className="relative flex-1 overflow-y-auto px-5 pt-6 pb-16">
+              {/* `h-full` pour que les écrans de liste puissent se dire « je
+                  remplis la fenêtre » (`.ecran-plein`). Sans hauteur à
+                  traverser, leur `height: 100%` ne résoudrait sur rien. Pour un
+                  écran plus court que la fenêtre, cela ne change rien : la
+                  boîte est pleine hauteur, son contenu reste en haut. */}
+              <div className="max-w-travail h-full">{children}</div>
             </main>
           </div>
         </div>

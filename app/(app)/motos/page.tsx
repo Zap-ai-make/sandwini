@@ -185,7 +185,7 @@ function Stock() {
   const chargement = stock === null && !erreur;
 
   return (
-    <div>
+    <div className="ecran-plein">
       <TetePage
         surTitre={surTitre}
         titre="Stock motos"

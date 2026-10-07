@@ -615,13 +615,36 @@
      rendu la voyait rognée par le cadre, donc perdue, la date d'entrée coupée
      en « 07/0 » sur la capture à 1280 px.
 
-     La hauteur haute est celle de la fenêtre moins ce qui la surmonte : le
-     bandeau, la marge de `main`, la tête d'écran et sa marge basse. Approchée,
-     pas calculée au pixel — si elle tombe court, la page reprend le défilement,
-     ce qui ne casse rien. */
+     **Ce que ce bloc disait avant, et pourquoi c'était faux.** Le cadre se
+     plafonnait seul, à `calc(100dvh - 14rem)` : la fenêtre moins ce qu'on
+     devinait au-dessus de lui. Ces 14 rem ne comptaient que le bandeau, la
+     marge de `main` et la tête d'écran. Dès qu'une barre de filtres s'ajoutait,
+     la devinette tombait court — et « si elle tombe court, la page reprend le
+     défilement » n'était pas inoffensif : la page défilait **en plus** du
+     tableau. Deux ascenseurs côte à côte, mesurés sur « Ventes » à 1920×860,
+     où le cadre était bridé à 636 px pendant que la page en réclamait 943.
+
+     On ne devine plus : l'écran se déclare `.ecran-plein`, remplit exactement
+     la zone de travail, et le cadre prend ce qui reste sous la tête et les
+     filtres. La hauteur n'est plus approchée, elle est mesurée par la mise en
+     page elle-même. Un écran qui ne se déclare pas garde un cadre de hauteur
+     libre : c'est la page qui défile, une seule fois — ce qu'il faut pour un
+     tableau logé au milieu d'un tableau de bord. */
   @media (min-width: 1024px) {
-    .cadre-tableau {
-      max-height: calc(100dvh - 14rem);
+    .ecran-plein {
+      display: flex;
+      height: 100%;
+      min-height: 0;
+      flex-direction: column;
+    }
+
+    /* Enfant direct, délibérément : c'est le cadre que l'écran désigne comme
+       « ce qui prend le reste ». Un cadre enfoui plus bas garde sa hauteur
+       libre, et c'est bien ce qu'on veut — sinon n'importe quel tableau d'un
+       panneau se mettrait à réclamer la fenêtre entière. */
+    .ecran-plein > .cadre-tableau {
+      min-height: 0;
+      flex: 1;
     }
 
     .tableau-defilant {
