@@ -865,7 +865,7 @@ service cloud.firestore {
     }
 
     // Les champs du depot et de la remise n'existent pas a la creation : S8
-    // ouvre quatre documents nus. Ils apparaissent au fil du cycle, d'ou un
+    // ouvre trois documents nus. Ils apparaissent au fil du cycle, d'ou un
     // `hasOnly` plus large que le `hasAll`, qui n'exige que le socle.
     function champsDossier() {
       return ['boutiqueId', 'venteId', 'type', 'statut'];

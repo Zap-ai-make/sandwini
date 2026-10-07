@@ -2861,3 +2861,54 @@ répondent sur un élément invisible. **Une assertion de présence ne dit rien 
 « Le paiement : 1 » devant un panneau vide. La règle 5 d'`AGENTS.md` n'est pas
 une politesse de fin de spec : ici, elle était le seul instrument capable de
 voir le défaut.
+
+---
+
+## D103 — Une valeur par défaut n'émet pas d'événement : ce qui s'accroche au changement ne joue jamais
+
+*S48, en donnant enfin une exécution loyale au test de période des ventes.*
+
+Le montant reçu se pré-remplissait au prix convenu quand on choisissait
+« Comptant ». Le code le disait, le commentaire l'expliquait — *« le comptant
+impose le montant entier : le pré-remplir évite de faire retaper ce que la règle
+exige déjà »* — et la règle ne s'est **jamais appliquée**.
+
+Deux faits se rencontrent, et aucun n'est surprenant seul :
+
+1. `SAISIE_VENTE_VIDE` ouvre la modale **au comptant**. C'est le bon défaut :
+   c'est la vente la plus fréquente.
+2. Le pré-remplissage vivait dans le `changer` du segment de mode. Or cliquer un
+   bouton radio déjà coché n'émet aucun `change` — il n'y a pas de changement.
+
+Le prix, lui, arrive toujours *après* le mode : il se pose en choisissant la
+moto, ou en le tapant. Au moment où le mode aurait pu pré-remplir, il n'y avait
+rien à recopier ; et quand le prix est arrivé, plus personne n'écoutait. Seul
+quelqu'un qui serait sorti du comptant puis y serait revenu aurait vu le montant
+se poser — c'est-à-dire personne.
+
+**Décision.** Une valeur qui *dépend* d'une autre se recalcule à chaque
+changement, jamais au moment où l'on croit qu'elle change. La règle vit
+maintenant dans `appliquerSaisieVente`, traversée par **tous** les changements
+de la saisie, et elle est formulée par ce qu'elle observe et non par le geste
+qui l'a déclenchée : *tant que le montant reçu n'a pas été tapé à la main, il
+suit le mode — au comptant le prix entier, ailleurs rien.*
+
+Le « tant qu'on n'y a pas touché » n'est pas un détail : c'est le principe déjà
+posé pour le prix conseillé dans `choisirMoto` — **un point de départ, jamais un
+verrou**. Dès que le gérant a mis quelque chose dans le champ, fût-ce un zéro
+délibéré, il lui appartient.
+
+*Pourquoi neuf tests l'ont manqué, et c'est le plus cher.* Les douze cas de
+vente de `ventes.spec.ts` passaient. Tous, sans exception, faisaient l'un des
+deux gestes qui masquent le défaut : ou bien ils **basculaient vers crédit ou
+tranches** — un vrai changement, qui émet l'événement —, ou bien ils
+**remplissaient le montant à la main**. L'aide `vendre()` fait les deux. Le seul
+chemin non couvert était le plus ordinaire de tous : *ouvrir, choisir la moto,
+valider*. Un décor d'essai qui remplit toujours les champs ne rencontre jamais
+les valeurs par défaut — et ce sont elles que l'utilisateur rencontre d'abord.
+
+La règle est sortie du composant pour cette raison précise. `vitest.config.mts`
+ne couvre que `lib/**` : tant qu'elle vivait dans `ModaleVente.tsx`, **aucun
+test unitaire ne pouvait l'atteindre**, et elle a traversé un lot entier. C'est
+la même manœuvre qu'en S47 pour `peserBoutiques` et qu'en S46 pour `periode.ts`
+— *une règle métier logée dans un composant est une règle sans preuve.*

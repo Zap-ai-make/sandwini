@@ -205,9 +205,6 @@ test.describe("la liste des paiements", () => {
     await page.goto("/motos/paiements", { waitUntil: "load" });
     await expect(ligneDe(page, client)).toBeVisible({ timeout: 30_000 });
 
-    await filtre(page, "Tranches").click();
-    await expect(ligneDe(page, client)).toHaveCount(0);
-
     await filtre(page, "Crédit").click();
     await expect(ligneDe(page, client)).toBeVisible();
 
@@ -216,11 +213,46 @@ test.describe("la liste des paiements", () => {
     await filtre(page, "Partiellement payées").click();
     await expect(ligneDe(page, client)).toBeVisible();
 
-    await filtre(page, "Impayées").click();
+    /* Et elle ne doit pas se trouver sous Soldées : c'est la pastille qui
+       remplace Impayées, et elle sépare sur le même axe — où en est l'argent. */
+    await filtre(page, "Soldées").click();
     await expect(ligneDe(page, client)).toHaveCount(0);
 
     await filtre(page, "Tout").click();
     await expect(ligneDe(page, client)).toBeVisible();
+  });
+
+  /**
+   * Ce que l'élargissement de la liste a rendu possible.
+   *
+   * L'écran ne gardait que les ventes en attente : une vente soldée en
+   * disparaissait, et la pastille « Soldées » n'aurait jamais rien rendu. Ce
+   * test est le témoin qu'elle rend désormais quelque chose — et qu'une vente
+   * terminée ne s'évapore plus du registre le jour où elle se termine.
+   */
+  test("une vente soldée reste au registre, sous sa pastille", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    /* Soldée d'emblée : le crédit est encaissé en entier dès la saisie. */
+    const { client } = await vendre(page, {
+      mode: "Crédit",
+      prix: "400000",
+      encaisse: "400000",
+    });
+
+    await page.goto("/motos/paiements", { waitUntil: "load" });
+    await expect(ligneDe(page, client)).toBeVisible({ timeout: 30_000 });
+
+    await filtre(page, "Soldées").click();
+    await expect(ligneDe(page, client)).toBeVisible();
+
+    await filtre(page, "Partiellement payées").click();
+    await expect(ligneDe(page, client)).toHaveCount(0);
+
+    /* Rien n'est dû sur une vente soldée : le total de tête ne doit pas la
+       compter, alors même que sa ligne est affichée. C'est le point exact que
+       l'élargissement pouvait fausser. */
+    await filtre(page, "Tout").click();
+    await expect(contenu(page)).not.toContainText("dus par les clients");
   });
 
   test("une moto soldée s’annonce depuis la liste, avec le geste qui l’attend", async ({

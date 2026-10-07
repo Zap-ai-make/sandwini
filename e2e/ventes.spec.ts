@@ -177,12 +177,15 @@ test.describe("enregistrer une vente", () => {
 
     /* L'état du dossier a quitté la ligne pour la fiche : le tableau dit ce qui
        se compare d'une vente à l'autre — le reste dû et le paiement — et le
-       détail des quatre papiers appartient au panneau, où l'on agit dessus. */
+       détail des papiers appartient au panneau, où l'on agit dessus. */
     await ligne.getByRole("link").first().click();
-    await expect(contenu(page).getByRole("complementary")).toContainText("4 à faire");
+    /* Trois, et non quatre : la plaque a quitté le dossier en S48 — la carte
+       grise porte l'immatriculation, et les deux lignes disaient la même
+       chose. */
+    await expect(contenu(page).getByRole("complementary")).toContainText("3 à faire");
   });
 
-  test("la fiche montre le dossier entier, ses quatre documents et le versement", async ({
+  test("la fiche montre le dossier entier, ses trois documents et le versement", async ({
     page,
   }) => {
     await seConnecterEtEntrer(page);

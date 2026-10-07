@@ -222,6 +222,37 @@ export const SAISIE_VENTE_VIDE: SaisieVente = {
 };
 
 /**
+ * Applique un changement à la saisie de vente, le montant reçu suivant le mode.
+ *
+ * **Tant qu'il n'a pas été tapé à la main**, le montant reçu se déduit : au
+ * comptant le prix convenu entier — que la règle exige de toute façon —, et
+ * rien ailleurs, parce qu'un crédit pré-rempli au prix entier se lirait comme
+ * une vente déjà soldée. Dès que le gérant y a mis quelque chose, fût-ce un
+ * zéro, le champ lui appartient : c'est le même principe que le prix conseillé,
+ * un point de départ et jamais un verrou.
+ *
+ * *Cette fonction existe parce que la règle vivait dans le composant, accrochée
+ * au changement de mode — et ne jouait donc jamais.* Le comptant étant le mode
+ * par défaut, le prix arrive toujours après lui, et cliquer « Comptant » quand
+ * il est déjà coché n'émet aucun `change` : seul celui qui sortait du comptant
+ * puis y revenait voyait le montant se poser. Le défaut a traversé un lot
+ * entier sans qu'aucun test unitaire puisse l'atteindre ; il est ici pour que
+ * ce ne soit plus vrai.
+ */
+export function appliquerSaisieVente(
+  actuel: SaisieVente,
+  partie: Partial<SaisieVente>,
+  montantTouche: boolean,
+): SaisieVente {
+  const suivant = { ...actuel, ...partie };
+  if (partie.montantEncaisse !== undefined || montantTouche) return suivant;
+  return {
+    ...suivant,
+    montantEncaisse: suivant.modePaiement === "comptant" ? suivant.prixConvenu : "",
+  };
+}
+
+/**
  * Le nombre saisi, ou `null` si le champ ne contient pas un entier utilisable.
  *
  * Le FCFA ne se divise pas : un montant à virgule est une erreur de saisie, pas
@@ -444,7 +475,7 @@ export function comparerVentes(a: Vente, b: Vente): number {
   return (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0);
 }
 
-/** Le résumé du dossier affiché en liste : « 4 à faire », « 2 remis, 2 à faire »… */
+/** Le résumé du dossier affiché en liste : « 3 à faire », « 2 remis · 1 à faire »… */
 export function resumerDossier(documents: readonly DocumentDossier[]): string {
   if (documents.length === 0) return "Dossier non chargé";
   const parStatut = new Map<StatutDocument, number>();
@@ -674,29 +705,74 @@ export function paiementsASuivre(lignes: readonly LignePaiement[]): LignePaiemen
   return [...dettes(lignes), ...tranchesEnCours(lignes)].sort(comparerParAnciennete);
 }
 
-export const FILTRES_PAIEMENT = ["tout", "credit", "tranches", "partiel", "impaye"] as const;
+/**
+ * Tout le paiement échelonné, soldé compris — ce que l'écran des paiements
+ * montre désormais.
+ *
+ * `paiementsASuivre` ne retient que ce qui attend encore : une dette ouverte,
+ * une tranche dont la moto n'est pas partie. C'était le bon périmètre pour une
+ * file de relance, et c'est pourquoi « Soldées » n'était pas proposé en
+ * pastille — elle n'aurait jamais rien rendu. Cet écran répond maintenant à une
+ * question plus large, « où en est chaque vente à paiement échelonné », donc il
+ * garde les ventes terminées plutôt que de les faire disparaître le jour où
+ * elles se soldent.
+ *
+ * **Le comptant reste dehors**, et ce n'est pas un oubli : il est soldé à
+ * l'instant de la saisie, il n'a jamais rien attendu, et l'inscrire ici
+ * noierait ce qu'on vient y chercher sous toutes les ventes du magasin.
+ *
+ * **Ce que l'élargissement n'a pas le droit de fausser.** Les deux totaux de
+ * l'en-tête ne portent que sur l'engagement en cours : `totalDu(dettes(...))`
+ * et `totalDetenu(tranchesEnCours(...))`. Une tranche soldée dont la moto est
+ * partie n'est plus de l'argent détenu — la compter ferait croire que le
+ * magasin tient une somme qu'il a déjà rendue en moto. Les deux fonctions
+ * écartent ces cas d'elles-mêmes ; c'est la raison pour laquelle on les garde
+ * plutôt que de sommer la liste affichée.
+ */
+export function paiementsEchelonnes(lignes: readonly LignePaiement[]): LignePaiement[] {
+  return lignes
+    .filter((ligne) => ligne.vente.modePaiement !== "comptant")
+    .sort(comparerParAnciennete);
+}
+
+export const FILTRES_PAIEMENT = ["tout", "credit", "partiel", "solde"] as const;
 export type FiltrePaiement = (typeof FILTRES_PAIEMENT)[number];
 
 export const LIBELLE_FILTRE_PAIEMENT: Record<FiltrePaiement, string> = {
   tout: "Tout",
   credit: "Crédit",
-  tranches: "Tranches",
   partiel: "Partiellement payées",
-  impaye: "Impayées",
+  solde: "Soldées",
 };
 
 /**
  * Le filtre d'une seule rangée, sur deux axes qui ne se recouvrent pas.
  *
- * « Crédit » et « Tranches » disent **où est la moto** ; « Partiellement
- * payées » et « Impayées » disent **où en est l'argent**. On aurait pu en faire
- * deux rangées combinables ; une seule suffit, parce que la question qu'on pose
- * à cet écran est toujours l'une *ou* l'autre — « qui me doit ? » ou « qui n'a
- * rien versé ? » —, et deux rangées de pastilles au-dessus d'un tableau se
- * lisent comme un formulaire à remplir avant de voir quoi que ce soit.
+ * « Crédit » dit **où est la moto** ; « Partiellement payées » et « Soldées »
+ * disent **où en est l'argent**. On aurait pu en faire deux rangées
+ * combinables ; une seule suffit, parce que la question qu'on pose à cet écran
+ * est toujours l'une *ou* l'autre, et deux rangées de pastilles au-dessus d'un
+ * tableau se lisent comme un formulaire à remplir avant de voir quoi que ce
+ * soit.
  *
- * « Soldées » n'est pas proposé : la liste ne contient que ce qui attend encore
- * quelque chose, donc ce filtre ne rendrait jamais rien.
+ * **Deux pastilles ont été retirées, chacune pour la même raison : la ligne le
+ * disait déjà.** « Tranches » doublait la colonne « Mode », « Impayées »
+ * doublait la colonne « État ». Un filtre qui ne fait que répéter une colonne
+ * visible n'est pas un tri, c'est du bruit au-dessus du tableau. Une vente
+ * impayée reste donc atteignable — sous « Tout » et sous « Crédit » —, elle n'a
+ * simplement plus de pastille à elle.
+ *
+ * **Ce que le retrait de « Tranches » n'a pas le droit de coûter.** Une *dette*
+ * est de l'argent qui manque au magasin, une *tranche* de l'argent qu'il
+ * détient pour le client ; les additionner donnerait un chiffre qui ne veut
+ * rien dire (`AGENTS.md` §13). La distinction ne vivait pas dans cette
+ * pastille : elle vit dans la colonne « Mode » de chaque ligne et dans les
+ * **deux totaux distincts** de l'en-tête, qui ne sont jamais sommés. C'est à
+ * cette condition que la pastille pouvait partir.
+ *
+ * « Soldées » rend enfin quelque chose depuis que la liste porte tout le
+ * paiement échelonné (`paiementsEchelonnes`) et non plus les seules ventes en
+ * attente.
  */
 export function filtrerPaiements(
   lignes: readonly LignePaiement[],
@@ -707,10 +783,8 @@ export function filtrerPaiements(
       return [...lignes];
     case "credit":
       return lignes.filter((ligne) => ligne.vente.modePaiement === "credit");
-    case "tranches":
-      return lignes.filter((ligne) => ligne.vente.modePaiement === "tranches");
     case "partiel":
-    case "impaye":
+    case "solde":
       return lignes.filter((ligne) => ligne.statutPaiement === filtre);
   }
 }

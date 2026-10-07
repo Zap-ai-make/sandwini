@@ -5,6 +5,7 @@ import { useCallback, useMemo, useState } from "react";
 import { FraisEntree } from "@/components/FraisEntree";
 import { ErreurDeLecture, EtatErreurSaisie, EtatVide } from "@/components/patrons/Etats";
 import { Avis } from "@/components/patrons/Avis";
+import { Modale } from "@/components/patrons/Modale";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
@@ -219,6 +220,11 @@ export default function PageCouts() {
 
 /* --- Le formulaire de pose ------------------------------------------------ */
 
+/* Le pied de la modale vit hors du `<form>` — c'est ce qui l'empêche de défiler
+   avec le corps. Le bouton de soumission le rejoint donc par `form=`, qui est
+   fait pour ça. */
+const FORMULAIRE_COUT = "formulaire-prix-achat";
+
 function PoserLeCout({
   moto,
   etat,
@@ -269,18 +275,36 @@ function PoserLeCout({
   }
 
   return (
-    <section
-      aria-label={`Prix d’achat — ${moto.numeroChassis}`}
-      className="mt-4 cadre p-4 max-w-[40rem]"
+    <Modale
+      ouvert
+      onFermer={fermer}
+      titre="Prix d’achat"
+      description={
+        <span className="flex items-center gap-2">
+          <Wallet aria-hidden="true" className="size-4" />
+          {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
+          {" — "}
+          <span className="plaque-code">{moto.numeroChassis}</span>
+        </span>
+      }
+      pied={
+        /* Les actions au pied du cadre, hors du corps qui défile : c'est la
+           garantie que le patron prend à sa charge, et la raison pour laquelle
+           ce formulaire la gagne en passant en modale — le panneau en ligne
+           poussait ses boutons hors de l'écran dès que les frais d'entrée
+           s'allongeaient. Le bouton de soumission vise le formulaire par son
+           `form`, puisqu'il n'est plus dedans. */
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" form={FORMULAIRE_COUT} className="bouton bouton-principal">
+            Enregistrer le prix d’achat
+          </button>
+          <button type="button" onClick={fermer} className="bouton bouton-neutre">
+            Fermer
+          </button>
+        </div>
+      }
     >
-      <h2 className="flex items-center gap-2 font-semibold text-encre">
-        <Wallet aria-hidden="true" className="size-4" />
-        {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
-        {" — "}
-        <span className="plaque-code">{moto.numeroChassis}</span>
-      </h2>
-
-      <form onSubmit={soumettre} className="mt-4" noValidate>
+      <form id={FORMULAIRE_COUT} onSubmit={soumettre} noValidate>
         <div>
           <label htmlFor="pose-prix-achat" className="block text-sm font-medium text-encre">
             Prix d’achat
@@ -309,17 +333,8 @@ function PoserLeCout({
         </p>
 
         <EtatErreurSaisie message={erreur} className="mt-3" />
-
-        <div className="mt-3 flex flex-wrap gap-2">
-          <button type="submit" className="bouton bouton-principal">
-            Enregistrer le prix d’achat
-          </button>
-          <button type="button" onClick={fermer} className="bouton bouton-neutre">
-            Fermer
-          </button>
-        </div>
       </form>
-    </section>
+    </Modale>
   );
 }
 

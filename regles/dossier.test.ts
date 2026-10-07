@@ -59,7 +59,7 @@ const traceMaj = {
 
 const chemin = (type: string) => `ventesMotos/vente-ptg/documents/${type}`;
 
-/** Pose les quatre documents dans le statut voulu, hors règles. */
+/** Pose les trois documents dans le statut voulu, hors règles. */
 async function poser(statuts: Record<string, Record<string, unknown>>) {
   await env.withSecurityRulesDisabled(async (contexte) => {
     const base = contexte.firestore();

@@ -14,7 +14,7 @@ import { GestesDocument } from "@/components/GestesDocument";
  * Le dossier d'une vente, dans la fiche de cette vente (S11).
  *
  * Ici le dossier est une section parmi d'autres — le client, la moto, les
- * versements —, et ce qu'on y cherche est l'état des quatre documents d'un
+ * versements —, et ce qu'on y cherche est l'état des trois documents d'un
  * coup d'œil. Le parcours détaillé de chacun, avec ses étapes, se lit dans la
  * file des dossiers en attente (A7), où c'est la question de l'écran.
  *

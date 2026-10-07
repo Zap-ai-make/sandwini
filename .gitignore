@@ -52,3 +52,10 @@ storage-debug.log*
 
 .vercel
 .env*
+
+# --- Outillage d'agent (worktrees, etat local) ---
+# `.claude/worktrees/` porte des copies de travail completes du depot, chacune
+# avec son propre `.git` et ses `node_modules`. Les commiter reviendrait a
+# emboiter le depot dans lui-meme. Le worktree S49 y vit aujourd'hui ; il est
+# enregistre dans git (`git worktree list`), ce qui suffit a le retrouver.
+/.claude/

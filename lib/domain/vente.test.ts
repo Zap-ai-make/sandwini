@@ -3,14 +3,17 @@ import { normaliserNom } from "./client";
 import { formaterMontant } from "./format";
 import { estNumeroValide } from "./numerotation";
 import {
+  FILTRES_PAIEMENT,
   MONTANT_MAX,
   SAISIE_VENTE_VIDE,
   SAISIE_VERSEMENT_VIDE,
   agregatsPaiement,
+  appliquerSaisieVente,
   bilanVentes,
   chercherVentes,
   comparerVentes,
   dettes,
+  filtrerPaiements,
   inclusionsDeVente,
   estEngagement,
   estInactive,
@@ -22,6 +25,7 @@ import {
   motoRemiseA,
   numeroRecuVersement,
   paiementsDeLaPeriode,
+  paiementsEchelonnes,
   peutRemettreMoto,
   resumerDossier,
   statutMotoApresVente,
@@ -33,6 +37,7 @@ import {
   validerVente,
   validerVersement,
   versementMaximal,
+  type FiltrePaiement,
   type SaisieVente,
   type SaisieVersement,
   type Vente,
@@ -366,6 +371,78 @@ describe("recherche d’une vente", () => {
   });
 });
 
+/**
+ * Le montant reçu suit le mode tant qu'on n'y a pas touché.
+ *
+ * Le premier cas est celui qui manquait : la modale s'ouvre **déjà** au
+ * comptant, si bien que le prix arrive toujours après le mode. La règle vivait
+ * au changement de mode, et ne s'appliquait donc jamais au chemin ordinaire.
+ */
+describe("la saisie de vente, quand le montant reçu n’a pas été tapé", () => {
+  const vierge = (partie: Partial<typeof SAISIE_VENTE_VIDE>) =>
+    appliquerSaisieVente(SAISIE_VENTE_VIDE, partie, false);
+
+  it("au comptant, le prix qui arrive après le mode entraîne le montant", () => {
+    expect(vierge({ prixConvenu: "1200000" }).montantEncaisse).toBe("1200000");
+  });
+
+  it("le montant suit le prix tant qu’on le retape, chiffre après chiffre", () => {
+    let saisie = appliquerSaisieVente(SAISIE_VENTE_VIDE, { prixConvenu: "12" }, false);
+    saisie = appliquerSaisieVente(saisie, { prixConvenu: "120" }, false);
+    expect(saisie.montantEncaisse).toBe("120");
+  });
+
+  it("hors comptant, il reste vide : un crédit pré-payé en entier serait un contresens", () => {
+    const comptant = vierge({ prixConvenu: "900000" });
+    expect(comptant.montantEncaisse).toBe("900000");
+    const credit = appliquerSaisieVente(comptant, { modePaiement: "credit" }, false);
+    expect(credit.montantEncaisse).toBe("");
+  });
+
+  it("revenir au comptant repose le prix entier", () => {
+    const credit = vierge({ prixConvenu: "500000", modePaiement: "credit" });
+    expect(credit.montantEncaisse).toBe("");
+    expect(appliquerSaisieVente(credit, { modePaiement: "comptant" }, false).montantEncaisse).toBe(
+      "500000",
+    );
+  });
+
+  it("un changement qui ne touche ni au prix ni au mode ne le dérange pas", () => {
+    const avant = vierge({ prixConvenu: "700000" });
+    const apres = appliquerSaisieVente(avant, { moyenPaiement: "orange_money" }, false);
+    expect(apres.montantEncaisse).toBe("700000");
+    expect(apres.moyenPaiement).toBe("orange_money");
+  });
+});
+
+describe("la saisie de vente, une fois le montant tapé à la main", () => {
+  /* Le champ appartient alors au gérant — y compris le zéro qu'il a mis
+     exprès. C'est le principe du prix conseillé : un point de départ, jamais
+     un verrou. */
+  const tapee = { ...SAISIE_VENTE_VIDE, prixConvenu: "1200000", montantEncaisse: "600000" };
+
+  it("changer le prix ne réécrit pas ce qu’on a tapé", () => {
+    expect(appliquerSaisieVente(tapee, { prixConvenu: "1300000" }, true).montantEncaisse).toBe(
+      "600000",
+    );
+  });
+
+  it("changer de mode ne l’efface pas davantage", () => {
+    expect(appliquerSaisieVente(tapee, { modePaiement: "tranches" }, true).montantEncaisse).toBe(
+      "600000",
+    );
+  });
+
+  it("vider le champ le laisse vide, même au comptant", () => {
+    expect(appliquerSaisieVente(tapee, { montantEncaisse: "" }, true).montantEncaisse).toBe("");
+  });
+
+  it("le zéro délibéré survit : c’est une vente à crédit sans acompte", () => {
+    const credit = { ...tapee, modePaiement: "credit" as const, montantEncaisse: "0" };
+    expect(appliquerSaisieVente(credit, { prixConvenu: "800000" }, true).montantEncaisse).toBe("0");
+  });
+});
+
 describe("résumé du dossier", () => {
   const document = (type: string, statut: string) =>
     ({ id: type, venteId: "v1", type, statut }) as never;
@@ -376,20 +453,21 @@ describe("résumé du dossier", () => {
         document("quittance", "remis_client"),
         document("cmc", "a_faire"),
         document("carte_grise", "chez_prestataire"),
-        document("plaque", "a_faire"),
       ]),
-    ).toBe("2 à faire · 1 chez le prestataire · 1 remis au client");
+    ).toBe("1 à faire · 1 chez le prestataire · 1 remis au client");
   });
 
+  /* Trois depuis S48 : la plaque a quitté le dossier, l'immatriculation étant
+     déjà portée par la carte grise. La fonction, elle, compte ce qu'on lui
+     donne — c'est l'appelant qui décide du circuit. */
   it("un dossier tout neuf a tous ses documents à faire", () => {
     expect(
       resumerDossier([
         document("quittance", "a_faire"),
         document("cmc", "a_faire"),
         document("carte_grise", "a_faire"),
-        document("plaque", "a_faire"),
       ]),
-    ).toBe("4 à faire");
+    ).toBe("3 à faire");
   });
 
   it("distingue « pas encore chargé » de « rien à faire »", () => {
@@ -593,6 +671,83 @@ describe("listes de suivi des paiements", () => {
 
   it("le total détenu additionne ce qui a été encaissé pour le compte des clients", () => {
     expect(totalDetenu(tranchesEnCours(lignes))).toBe(450_000);
+  });
+
+  /**
+   * L'écran des paiements montre désormais **tout le paiement échelonné**, et
+   * non plus seulement ce qui attend.
+   *
+   * Tant qu'il ne contenait que les dettes et les tranches en cours, la
+   * pastille « Soldées » n'aurait jamais rien rendu — c'est ce que disait la
+   * docstring de `filtrerPaiements`. On a donc élargi la liste plutôt que
+   * d'ajouter un filtre vide.
+   */
+  describe("la liste élargie du paiement échelonné", () => {
+    it("retient les crédits et les tranches, soldés compris, de la plus ancienne à la plus récente", () => {
+      expect(paiementsEchelonnes(lignes).map((ligne) => ligne.vente.id)).toEqual([
+        "ancienne",
+        "tranches",
+        "soldee",
+        "remise",
+        "recente",
+      ]);
+    });
+
+    it("laisse le comptant dehors : il est soldé à l’instant de la saisie et n’a jamais rien attendu", () => {
+      expect(paiementsEchelonnes(lignes).map((ligne) => ligne.vente.id)).not.toContain("comptant");
+    });
+
+    /* Le point de bascule de ce changement : les deux totaux ne doivent
+       compter que ce qui est encore engagé. Une tranche soldée dont la moto
+       est partie n'est plus de l'argent détenu — l'additionner ferait croire
+       que le magasin tient une somme qu'il a déjà rendue en moto. */
+    it("le total détenu ignore une tranche soldée dont la moto est partie", () => {
+      const vues = paiementsEchelonnes(lignes);
+      expect(vues.map((ligne) => ligne.vente.id)).toContain("remise");
+      expect(totalDetenu(tranchesEnCours(vues))).toBe(450_000);
+    });
+
+    it("le total dû ignore un crédit soldé", () => {
+      const vues = paiementsEchelonnes(lignes);
+      expect(vues.map((ligne) => ligne.vente.id)).toContain("soldee");
+      expect(totalDu(dettes(vues))).toBe(1_200_000 + 1_000_000);
+    });
+  });
+
+  describe("les pastilles de l’écran des paiements", () => {
+    const vues = paiementsEchelonnes(lignes);
+    const idsSous = (filtre: FiltrePaiement) =>
+      filtrerPaiements(vues, filtre).map((ligne) => ligne.vente.id);
+
+    it("« Tout » ne retire rien", () => {
+      expect(idsSous("tout")).toEqual(vues.map((ligne) => ligne.vente.id));
+    });
+
+    it("« Crédit » garde le mode, quel que soit l’état de l’argent", () => {
+      expect(idsSous("credit")).toEqual(["ancienne", "soldee", "recente"]);
+    });
+
+    it("« Partiellement payées » traverse les deux modes", () => {
+      expect(idsSous("partiel")).toEqual(["tranches", "recente"]);
+    });
+
+    it("« Soldées » rend enfin quelque chose, dans les deux modes", () => {
+      expect(idsSous("solde")).toEqual(["soldee", "remise"]);
+    });
+
+    /* « Tranches » et « Impayées » ont quitté la rangée : la première parce
+       que la colonne « Mode » la dit déjà sur chaque ligne, la seconde parce
+       que la colonne « État » la dit de même. Une vente impayée reste donc
+       visible — sous « Tout » et sous « Crédit » —, elle n'a simplement plus
+       de pastille à elle. */
+    it("la rangée ne propose que les quatre pastilles retenues", () => {
+      expect([...FILTRES_PAIEMENT]).toEqual(["tout", "credit", "partiel", "solde"]);
+    });
+
+    it("une vente impayée reste atteignable sans pastille dédiée", () => {
+      expect(idsSous("tout")).toContain("ancienne");
+      expect(idsSous("credit")).toContain("ancienne");
+    });
   });
 });
 

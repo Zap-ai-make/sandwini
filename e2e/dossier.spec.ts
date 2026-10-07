@@ -232,7 +232,7 @@ test.describe("écarter un document", () => {
  * documents, et le geste qu’on y fait s’y voit tout de suite.
  */
 test.describe("la file des dossiers en attente", () => {
-  test("dit où en sont les quatre documents, et fait avancer le papier sans quitter l’écran", async ({
+  test("dit où en sont les trois documents, et fait avancer le papier sans quitter l’écran", async ({
     page,
   }) => {
     await seConnecterEtEntrer(page);
@@ -242,7 +242,7 @@ test.describe("la file des dossiers en attente", () => {
       encaisse: "400000",
     });
 
-    /* Une vente fraîche ouvre quatre documents : le dossier attend forcément. */
+    /* Une vente fraîche ouvre trois documents : le dossier attend forcément. */
     await page.goto("/motos/dossiers", { waitUntil: "load" });
     const ligne = contenu(page).locator("tbody tr").filter({ hasText: numero });
     await expect(ligne).toHaveCount(1);

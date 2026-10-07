@@ -83,7 +83,7 @@ const audit = {
   updatedByName: "Test",
 };
 
-/** Écrit une vente et ses quatre documents dans l'état demandé. */
+/** Écrit une vente et ses trois documents dans l'état demandé. */
 async function poser(options: {
   soldee: boolean;
   motoRemise: boolean;

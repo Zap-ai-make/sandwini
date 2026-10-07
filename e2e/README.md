@@ -28,6 +28,24 @@ vieillis, ce qui est une mesure légitime, pas un accident.
 Un harnais `@firebase/rules-unit-testing` lancé contre l'émulateur partagé en
 écrase le jeu de règles.
 
+## Regarder — et ce n'est pas cette suite
+
+**Les captures ne se prennent pas d'ici.** La revue visuelle a son propre outil,
+`scripts/captures.mjs`, et il ne vit pas dans `e2e/` : il pilote un navigateur
+contre l'application déjà servie, sème son décor au SDK Admin, et n'affirme
+rien. C'est la règle 5 d'`AGENTS.md` — *terminé = vérifié, et pour de
+l'interface, vérifié veut dire regardé*.
+
+```bash
+npm run build && npm run start        # l'application sur :3000, émulateurs allumés
+node scripts/captures.mjs             # la série entière, dans captures/
+node scripts/captures.mjs paiements   # ou seulement les prises qui matchent
+```
+
+Le dépôt sait ce que cet outil vaut et ce que la suite d'à côté ne voit pas : en
+S44, une assertion de présence passait au vert devant une modale vide, et c'est
+une capture qui a tranché (D102).
+
 ---
 
 ## Lire un échec : le protocole

@@ -32,6 +32,7 @@ import {
   MOYENS_PAIEMENT,
   SAISIE_VENTE_VIDE,
   agregatsPaiement,
+  appliquerSaisieVente,
   lireMontant,
   lireMontantEncaisse,
   motoRemiseA,
@@ -180,14 +181,22 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [enregistree, setEnregistree] = useState<{ id: string; numero: string } | null>(null);
 
+  /* Le montant reçu a-t-il été tapé à la main ? Tant que non, il suit le mode
+     de paiement — voir `changer` juste en dessous. */
+  const [montantTouche, setMontantTouche] = useState(false);
+
+  /* La règle du montant reçu vit dans le domaine, où un test unitaire peut
+     l'atteindre : elle a traversé tout un lot sans jouer, faute de pouvoir
+     être éprouvée ailleurs qu'à l'écran. */
   const changer = (partie: Partial<SaisieVente>) =>
-    setSaisie((actuel) => ({ ...actuel, ...partie }));
+    setSaisie((actuel) => appliquerSaisieVente(actuel, partie, montantTouche));
 
   const changerClient = (partie: Partial<SaisieClient>) =>
     setClient((actuel) => ({ ...actuel, ...partie }));
 
   function repartirDeZero() {
     setSaisie(SAISIE_VENTE_VIDE);
+    setMontantTouche(false);
     setClient(SAISIE_CLIENT_VIDE);
     setRapproche(null);
     setRechercheMoto("");
@@ -393,7 +402,7 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
             Vente enregistrée — <span className="plaque-code">{enregistree.numero}</span>
           </p>
           <p className="mt-1 max-w-prose text-corps text-encre-doux">
-            Le dossier est ouvert avec ses quatre documents à traiter. Si le réseau manque, la vente
+            Le dossier est ouvert avec ses trois documents à traiter. Si le réseau manque, la vente
             partira seule dès son retour.
           </p>
         </div>
@@ -668,15 +677,11 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
             <Segmente
               libelle="Mode de paiement"
               valeur={saisie.modePaiement}
-              changer={(mode: ModePaiement) =>
-                changer({
-                  modePaiement: mode,
-                  /* Le comptant impose le montant entier : le pré-remplir évite
-                     de faire retaper ce que la règle exige déjà. */
-                  montantEncaisse:
-                    mode === "comptant" ? saisie.prixConvenu : saisie.montantEncaisse,
-                })
-              }
+              /* Le montant reçu n'est pas posé ici : c'est `changer` qui tient
+                 la règle, parce qu'elle doit valoir aussi quand le prix bouge
+                 — et parce que le comptant étant le mode par défaut, ce
+                 rappel-ci ne se déclenche pas au cas le plus courant. */
+              changer={(mode: ModePaiement) => changer({ modePaiement: mode })}
               options={MODES_PAIEMENT.map((mode) => ({
                 valeur: mode,
                 libelle: LIBELLE_MODE[mode],
@@ -698,7 +703,10 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
                   inputMode="numeric"
                   aria-describedby="montant-encaisse-aide"
                   value={saisie.montantEncaisse}
-                  onChange={(evenement) => changer({ montantEncaisse: evenement.target.value })}
+                  onChange={(evenement) => {
+                    setMontantTouche(true);
+                    changer({ montantEncaisse: evenement.target.value });
+                  }}
                   className="plaque-code saisie"
                 />
               </Champ>

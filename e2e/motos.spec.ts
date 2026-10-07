@@ -229,7 +229,13 @@ test.describe("le coût est réservé au responsable", () => {
     await expect(ligne).toContainText("À renseigner");
 
     await ligne.getByRole("button").first().click();
-    const pose = page.getByRole("region", { name: new RegExp(chassis) });
+    /* Une modale, et non plus un panneau sous le tableau : le formulaire de
+       coût est passé au patron `Modale`, qui lui donne le piège de focus, Échap
+       et un pied d'actions qui ne défile pas. Le cadre se vise donc par son
+       rôle `dialog` — il n'y en a jamais deux ouverts ici —, et le châssis se
+       lit dans sa description plutôt que dans son nom accessible. */
+    const pose = page.getByRole("dialog");
+    await expect(pose).toContainText(chassis);
     await pose.getByLabel("Prix d’achat").fill("775000");
     await pose.getByRole("button", { name: "Enregistrer le prix d’achat" }).click();
 

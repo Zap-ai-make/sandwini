@@ -532,7 +532,7 @@ describe("le token de suivi", () => {
   });
 });
 
-describe("le dossier naît ouvert, ses quatre documents à faire", () => {
+describe("le dossier naît ouvert, ses trois documents à faire", () => {
   it("refuse une vente qui naîtrait close ou déjà envoyée", async () => {
     await assertFails(
       addDoc(collection(gerant(), "ventesMotos"), vente({ statutDossier: "clos" })),

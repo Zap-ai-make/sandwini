@@ -23,6 +23,12 @@ const eslintConfig = defineConfig([
     "captures/**",
     // Sortie de compilation des Cloud Functions.
     "functions/lib/**",
+    // Les worktrees d'agent vivent dans le depot : `.claude/worktrees/S49` est
+    // une copie de travail complete, rapports Playwright et `node_modules`
+    // compris. Sans cette ligne, `npm run lint` relit ce bois mort — mesure du
+    // 7 octobre 2026 : 1953 erreurs, toutes de la, et huit minutes de lint
+    // pour un code source propre. Un lint qui crie faux ne se lit plus.
+    ".claude/**",
   ]),
 ]);
 

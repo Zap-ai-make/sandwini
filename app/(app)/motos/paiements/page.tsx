@@ -22,13 +22,15 @@ import {
   LIBELLE_FILTRE_PAIEMENT,
   LIBELLE_MODE,
   LIBELLE_STATUT_PAIEMENT,
+  dettes,
   estInactive,
   filtrerPaiements,
-  paiementsASuivre,
   paiementsDeLaPeriode,
+  paiementsEchelonnes,
   suivrePaiements,
   totalDetenu,
   totalDu,
+  tranchesEnCours,
   type FiltrePaiement,
   type LignePaiement,
   type StatutPaiement,
@@ -61,9 +63,15 @@ import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/
  * jamais une somme, et le mot du mode sur chaque ligne plutôt qu'au-dessus d'un
  * tableau qu'on déroule.
  *
- * **Une seule rangée de filtres**, sur deux axes qui ne se recouvrent pas :
- * crédit / tranches dit où est la moto, partiellement payées / impayées dit où
- * en est l'argent. Le raisonnement est dans `filtrerPaiements`.
+ * **Une seule rangée de filtres** : « Crédit » dit où est la moto,
+ * « Partiellement payées » et « Soldées » disent où en est l'argent. Le
+ * raisonnement est dans `filtrerPaiements`.
+ *
+ * **L'écran porte tout le paiement échelonné, soldé compris.** Il ne gardait
+ * que ce qui attendait — une file de relance —, et « Soldées » n'y aurait donc
+ * jamais rien rendu. Les pastilles « Tranches » et « Impayées » sont parties
+ * dans le même mouvement : chacune ne faisait que répéter une colonne déjà
+ * visible, « Mode » pour l'une, « État » pour l'autre.
  *
  * **La liste des tranches inactives a disparu il y a longtemps.** Elle était un
  * filtre de la seconde ; l'information vit dans la colonne « État » — « Aucun
@@ -152,19 +160,20 @@ export default function PagePaiements() {
     [lignes, periode, plage, maintenant],
   );
 
-  /* Une seule liste (S48). Les deux totaux restent calcules a part : additionner
-     une dette et une tranche donnerait un chiffre qui ne veut rien dire. */
-  const aSuivre = useMemo(() => paiementsASuivre(retenues), [retenues]);
-  const lignesVues = useMemo(() => filtrerPaiements(aSuivre, filtre), [aSuivre, filtre]);
+  /* Une seule liste (S48), élargie à tout le paiement échelonné : les ventes
+     soldées y restent, sans quoi la pastille « Soldées » ne rendrait rien. Les
+     deux totaux restent calcules a part : additionner une dette et une tranche
+     donnerait un chiffre qui ne veut rien dire. */
+  const echelonnes = useMemo(() => paiementsEchelonnes(retenues), [retenues]);
+  const lignesVues = useMemo(() => filtrerPaiements(echelonnes, filtre), [echelonnes, filtre]);
 
-  const duParLesClients = useMemo(
-    () => totalDu(lignesVues.filter((ligne) => ligne.vente.modePaiement === "credit")),
-    [lignesVues],
-  );
-  const detenuPourEux = useMemo(
-    () => totalDetenu(lignesVues.filter((ligne) => ligne.vente.modePaiement === "tranches")),
-    [lignesVues],
-  );
+  /* `dettes` et `tranchesEnCours` plutôt qu'un filtre sur le mode : depuis que
+     la liste porte aussi les soldées, le mode ne suffit plus à dire ce qui est
+     encore engagé. Une tranche soldée dont la moto est partie n'est plus de
+     l'argent détenu — la compter annoncerait une somme que le magasin a déjà
+     rendue en moto. Ces deux fonctions écartent ces cas d'elles-mêmes. */
+  const duParLesClients = useMemo(() => totalDu(dettes(lignesVues)), [lignesVues]);
+  const detenuPourEux = useMemo(() => totalDetenu(tranchesEnCours(lignesVues)), [lignesVues]);
   const inactives = useMemo(
     () => lignesVues.filter((ligne) => estInactive(ligne, seuil) && ligne.resteDu > 0),
     [lignesVues, seuil],
@@ -292,7 +301,7 @@ export default function PagePaiements() {
   const nomPeriode = libellePeriode(periode, maintenant, plage);
 
   return (
-    <div>
+    <div className="ecran-plein">
       <TetePage surTitre={surTitre} titre="Paiements" />
 
       {/* Le mode et l'état d'abord, la période ensuite : on choisit ce qu'on
@@ -360,7 +369,7 @@ export default function PagePaiements() {
       {!chargement && lignesVues.length === 0 ? (
         <EtatVide titre={titreDuVide(filtre, nomPeriode)}>{phraseDuVide(filtre, nomPeriode)}</EtatVide>
       ) : (
-        <div className="cadre cadre-tableau lg:max-h-none">
+        <div className="cadre cadre-tableau">
           <Tableau
             legende="Ventes dont il reste quelque chose à percevoir. La colonne « Mode » dit où est la moto. Montants en francs CFA."
             colonnes={colonnes}
@@ -380,23 +389,26 @@ export default function PagePaiements() {
 /**
  * L'état vide, qui doit dire **laquelle** des trois absences on regarde.
  *
- * « Aucune dette » est une bonne nouvelle ; « aucun versement en août » n'en est
- * pas une, et « aucune tranche parmi les impayées » n'est qu'un filtre trop
+ * « Aucune vente échelonnée » est un registre neuf ; « aucun versement en août » n'en est
+ * pas une, et « rien sous Soldées » n'est qu'un filtre trop
  * serré. Les confondre ferait croire à un registre à jour — la même faute que
  * D63 relève sur les compteurs à zéro, transposée à une phrase.
  */
 function titreDuVide(filtre: FiltrePaiement, nomPeriode: string | null): string {
   if (nomPeriode) return `Aucun versement reçu — ${nomPeriode}.`;
   if (filtre !== "tout") return `Rien sous « ${LIBELLE_FILTRE_PAIEMENT[filtre]} ».`;
-  return "Aucun paiement en attente.";
+  return "Aucune vente à paiement échelonné.";
 }
 
 function phraseDuVide(filtre: FiltrePaiement, nomPeriode: string | null): string {
   if (nomPeriode)
     return "Aucune vente n’a reçu d’argent sur cette période. Ce qui reste à percevoir est visible sur « Tout ».";
   if (filtre !== "tout")
-    return "Le filtre ne laisse rien passer. Les autres ventes en attente sont visibles sur « Tout ».";
-  return "Toutes les ventes sont soldées, et aucune moto n’attend son dernier versement : le magasin n’attend d’argent de personne.";
+    return "Le filtre ne laisse rien passer. Les autres ventes échelonnées sont visibles sur « Tout ».";
+  /* Le comptant ne figure pas sur cet écran : il se solde à la saisie. Un
+     magasin qui ne vendrait qu'au comptant verra donc cette phrase, et elle
+     doit lui dire que ce n'est pas une anomalie. */
+  return "Aucun crédit ni aucune vente en tranches n’a encore été enregistré. Les ventes au comptant ne figurent pas ici : elles sont soldées dès la saisie.";
 }
 
 /* Jamais la couleur seule : le mot est écrit, la pastille ne fait que le
