@@ -119,6 +119,31 @@ const csp = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  /**
+   * Le répertoire de compilation, déplaçable par l'environnement.
+   *
+   * **Il n'y a qu'un seul `.next`, et c'est ce qui coûte.** Regarder un écran
+   * avant de le déclarer fait (règle 5) demande un build pointé vers les
+   * émulateurs ; or le commanditaire fait tourner un `next start` sur le port
+   * 3000, qui sert un build de production. Reconstruire par-dessus **casse son
+   * serveur** : le processus garde en mémoire l'ancien bundle serveur pendant
+   * que les chunks sur disque changent de nom, et sa page tombe en 404 de
+   * chunks. La revue visuelle devenait donc un choix entre regarder le rendu et
+   * laisser quelqu'un travailler.
+   *
+   * `NEXT_DIST_DIR=.next-emulateurs npm run build` met le build d'à côté
+   * ailleurs. La même variable doit accompagner le `next start` qui le sert —
+   * `next start` relit cette configuration, donc les deux doivent s'accorder.
+   *
+   * Sans la variable, rien ne change : `.next`, comme avant.
+   *
+   * *Réserve connue :* Serwist écrit `public/sw.js`, hors de ce répertoire. Deux
+   * builds de configurations différentes se le disputent donc encore. Il est
+   * régénéré à chaque compilation et n'est pas commité (`.gitignore`) ; le
+   * sauvegarder le temps d'un build d'émulateurs suffit à ne pas troubler le
+   * serveur d'à côté.
+   */
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   /* Next 16 réécrit un bloc de consignes dans AGENTS.md à chaque `next dev`.
      Or AGENTS.md est la source unique de vérité de ce projet, tenue à la main :
      un outil qui y réinjecte ses propres instructions salit l'arbre git à

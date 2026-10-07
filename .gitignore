@@ -20,6 +20,10 @@
 # --- Artefacts Node / Next.js ---
 /node_modules
 /.next/
+# Le build d'a cote, pointe vers les emulateurs (`NEXT_DIST_DIR`, cf.
+# next.config.ts) : il existe pour ne pas ecraser le `.next` qu'un serveur
+# sert deja.
+/.next-emulateurs/
 /out/
 /build
 /coverage
