@@ -142,6 +142,14 @@ const nextConfig: NextConfig = {
    * régénéré à chaque compilation et n'est pas commité (`.gitignore`) ; le
    * sauvegarder le temps d'un build d'émulateurs suffit à ne pas troubler le
    * serveur d'à côté.
+   *
+   * *Seconde réserve :* `next build` **réécrit `tsconfig.json`** quand il voit
+   * un répertoire inhabituel — il y ajoute `.next-emulateurs/types/**` et, au
+   * passage, reformate tous les tableaux du fichier à raison d'un élément par
+   * ligne. Ce n'est pas un changement à garder : `tsc --noEmit` passe sans ces
+   * chemins, et le reformatage est du bruit de générateur. Un
+   * `git checkout -- tsconfig.json` après un build d'émulateurs, et ne pas le
+   * prendre pour du travail.
    */
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
   /* Next 16 réécrit un bloc de consignes dans AGENTS.md à chaque `next dev`.
