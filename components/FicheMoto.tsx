@@ -1,16 +1,21 @@
 "use client";
 
-import { ArrowLeft, Lock, LoaderCircle } from "lucide-react";
+import { ArrowLeft, Lock, LoaderCircle, Truck } from "lucide-react";
 import Link from "next/link";
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
+import { DeplacerMotoModal } from "@/components/DeplacerMotoModal";
 import { PapiersMoto } from "@/components/PapiersMoto";
 import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import { LIBELLE_ETAT, LIBELLE_STATUT, type CoutMoto, type Moto } from "@/lib/domain/moto";
+import { destinationsPossibles, raisonDeNePasPartir, type Transfert } from "@/lib/domain/transfert";
+import type { Boutique } from "@/lib/domain/boutique";
 import { useAbonnement } from "@/lib/repositories/abonnement";
+import { ecouterBoutiques } from "@/lib/repositories/boutiques";
 import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
 import { ecouterCoutMoto, ecouterMoto } from "@/lib/repositories/motos";
+import { ecouterArriveeDeLaMoto } from "@/lib/repositories/transferts";
 
 /**
  * La fiche d'une moto.
@@ -56,8 +61,13 @@ export function FicheMoto({ id }: { id: string }) {
       ) : (
         <>
           {/* Le chassis n'est pas un code boutique : il perd la plaque, comme il
-              l'a perdue dans le tableau du stock en S29 (D70). */}
-          <span className="plaque-code mt-3 inline-block text-sm text-encre-doux">
+              l'a perdue dans le tableau du stock en S29 (D70).
+
+              **`block` et non `inline-block`** : inline, il se collait au lien
+              « Stock » juste au-dessus et l'ecran affichait « StockLC6TRA… ».
+              Le `mt-3` disait pourtant qu'il etait cense occuper sa ligne. Vu a
+              l'ecran en regardant S17, corrige au passage. */}
+          <span className="plaque-code mt-3 block text-sm text-encre-doux">
             {moto.numeroChassis}
           </span>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">
@@ -101,10 +111,115 @@ export function FicheMoto({ id }: { id: string }) {
 
           <PapiersMoto moto={moto} />
 
+          <Deplacement moto={moto} estResponsable={estResponsable} />
+
           {estResponsable ? <Cout id={id} catalogue={catalogue} /> : <CoutMasque />}
         </>
       )}
     </div>
+  );
+}
+
+/**
+ * Le déplacement entre boutiques, et d'où la moto vient (S17).
+ *
+ * **Deux choses dans un seul bloc, et c'est volontaire** : « d'où elle vient »
+ * et « où elle peut aller » sont la même question posée dans les deux sens, et
+ * les séparer aurait mis deux encadrés sur une fiche qui en a déjà quatre.
+ *
+ * Le geste n'est jamais éteint en silence : quand il est impossible, la raison
+ * est écrite (`DESIGN.md` §10). Elle vient du domaine, pas d'une condition
+ * recopiée ici.
+ */
+function Deplacement({ moto, estResponsable }: { moto: Moto; estResponsable: boolean }) {
+  const session = useSession();
+  const [ouvert, setOuvert] = useState(false);
+
+  /* **La liste vient d'ici, pas du périmètre.** `usePerimetre` ne donne au
+     gérant que sa propre boutique, et c'est juste : le périmètre dit ce qu'il
+     peut regarder. Les destinations disent où il peut envoyer — deux questions
+     différentes, et S17 n'a ouvert que la seconde. */
+  const souscrireBoutiques = useCallback(
+    (auChangement: (liste: Boutique[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterBoutiques(auChangement, enErreur),
+    [],
+  );
+  const { valeur: toutesBoutiques } = useAbonnement(
+    souscrireBoutiques,
+    "La liste des boutiques n’a pas pu être lue.",
+  );
+  const chargementBoutiques = toutesBoutiques === null;
+  const boutiques = toutesBoutiques ?? [];
+
+  const souscrire = useCallback(
+    (auChangement: (arrivee: Transfert | null) => void, enErreur: (cause: unknown) => void) =>
+      ecouterArriveeDeLaMoto(moto.id, moto.boutiqueId, auChangement, enErreur),
+    [moto.id, moto.boutiqueId],
+  );
+  /* L'erreur est nommée mais pas affichée : une provenance qu'on n'a pas pu
+     lire ne vaut pas un encadré rouge sur une fiche qui, elle, s'est chargée.
+     La moto reste lisible et déplaçable sans cette ligne. */
+  const { valeur: arrivee } = useAbonnement(
+    souscrire,
+    "La provenance de cette moto n’a pas pu être lue.",
+  );
+
+  const destinations = destinationsPossibles(boutiques, moto.boutiqueId);
+  const empechement = raisonDeNePasPartir(moto, destinations);
+
+  if (session.statut !== "connecte") return null;
+  const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
+
+  return (
+    <section className="mt-6">
+      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
+        Déplacement entre boutiques
+      </h2>
+
+      <div className="mt-2 cadre p-4 sm:p-5">
+        {arrivee && (
+          <p className="text-corps text-encre">
+            Venue de <span className="plaque-code">{arrivee.deBoutiqueId}</span>
+            {arrivee.date ? ` le ${formaterDate(arrivee.date)}` : " à l’instant"}
+            {arrivee.auteur && `, par ${arrivee.auteur}`}.
+            {arrivee.motif && <span className="text-encre-doux"> {arrivee.motif}</span>}
+          </p>
+        )}
+
+        {/* **Trois états, jamais deux.** Tant que la liste des boutiques n'est pas
+            lue, elle est vide — et `raisonDeNePasPartir` dirait alors « aucune
+            autre boutique ouverte », ce qui est faux et envoie en déclarer une.
+            Le même piège a déjà coûté deux fois dans ce dépôt : un écran qui
+            affirme pendant qu'il lit. */}
+        {chargementBoutiques ? (
+          <EtatChargement className={arrivee ? "mt-2" : ""}>
+            Lecture des boutiques…
+          </EtatChargement>
+        ) : empechement ? (
+          <p className={`text-corps text-encre-doux ${arrivee ? "mt-2" : ""}`}>{empechement}</p>
+        ) : (
+          <button
+            type="button"
+            onClick={() => setOuvert(true)}
+            className={`bouton bouton-neutre ${arrivee ? "mt-3" : ""}`}
+          >
+            <Truck aria-hidden="true" className="size-4" />
+            Déplacer vers une autre boutique
+          </button>
+        )}
+      </div>
+
+      {ouvert && (
+        <DeplacerMotoModal
+          moto={moto}
+          boutiques={boutiques}
+          auteur={auteur}
+          voitLesCouts={estResponsable}
+          ouvert
+          onFermer={() => setOuvert(false)}
+        />
+      )}
+    </section>
   );
 }
 

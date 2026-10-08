@@ -55,7 +55,14 @@ function lireBoutique(instantane: DocumentSnapshot<DocumentData>): Boutique {
 }
 
 /**
- * Toutes les boutiques, en direct — réservé au responsable par les règles.
+ * Toutes les boutiques, en direct.
+ *
+ * **Ouvert à tout compte connecté depuis S17**, où un gérant a eu besoin de
+ * choisir vers quelle boutique envoyer une moto. Ce n’est pas le périmètre :
+ * `usePerimetre` continue de ne donner au gérant que la sienne, parce que « les
+ * boutiques que je peux regarder » et « les boutiques où je peux envoyer » sont
+ * deux questions différentes. Les confondre ferait croire à un gérant qu’il
+ * supervise ce qu’il ne fait qu’approvisionner.
  *
  * `includeMetadataChanges` n’est pas du zèle : c’est ce qui fait remonter
  * `fromCache`, la seule réponse fiable à « Firestore atteint-il le serveur ? »

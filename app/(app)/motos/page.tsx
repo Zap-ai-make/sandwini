@@ -13,6 +13,7 @@ import {
 } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { ExportMotos } from "@/components/ExportMotos";
+import { MotosParties } from "@/components/MotosParties";
 import { RepartitionStock } from "@/components/RepartitionStock";
 import { Statut } from "@/components/StatutMoto";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -240,6 +241,13 @@ function Stock() {
         nomMarque={catalogue.nomMarque}
         nomModele={catalogue.nomModele}
       />
+
+      {/* Ce qui a quitte cette boutique (S17). Meme traitement que le bloc
+          ci-dessus : il rend `null` quand il n'y a rien, donc il s'efface seul
+          et n'a pas besoin d'etre enferme dans une condition ici. Rien pour le
+          responsable sur « Toutes les boutiques » : une moto deplacee entre
+          deux de ses boutiques n'est partie de nulle part de son point de vue. */}
+      <MotosParties boutiqueId={boutiqueId} />
 
       {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
           vide, filtres compris, ferait croire à un stock à zéro. C'est le bloc

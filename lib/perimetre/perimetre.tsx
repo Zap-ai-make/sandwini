@@ -130,8 +130,15 @@ export function FournisseurPerimetre({ children }: { children: ReactNode }) {
       }, enEchec);
     }
 
-    /* Le gérant ne lit qu’un document : le sien. Une requête sur la collection
-       lui serait refusée par les règles, et il n’a rien à y chercher. */
+    /* Le gérant ne lit qu’un document : le sien.
+
+       **Et cela reste vrai après S17**, qui a pourtant ouvert la lecture de la
+       collection à tout compte connecté. Le périmètre répond à « que puis-je
+       regarder » ; la liste des destinations d’un transfert répond à « où
+       puis-je envoyer ». Les confondre ici ferait apparaître les autres
+       boutiques dans le sélecteur du bandeau, les compteurs et les espaces
+       d’un gérant — c’est-à-dire lui donner une supervision qu’il n’a pas.
+       `DeplacerMotoModal` s’abonne donc à la collection pour son seul besoin. */
     if (boutiqueDuGerant) {
       return ecouterBoutique(
         boutiqueDuGerant,
