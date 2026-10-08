@@ -241,6 +241,7 @@ c'est le voir revenir sous un autre nom.
 | S50 | L'historique d'un fournisseur, le bilan d'une période, l'export des motos cochées, la répartition par marque | S5, S42, S46 | post-MVP | terminée |
 | S51 | La campagne de captures ne charge pas le périmètre sur les écrans de supervision | S24, S47 | post-MVP | **ouverte** |
 | S52 | Modifier, couper et supprimer un compte de gérant | S2, S3 | post-MVP | terminée |
+| S53 | Les papiers d'une moto : identifier de bout en bout carte grise, CMC, quittance et plaque | S11, S30, S43, S44, S48 | post-MVP | **ouverte — pas encore de spec** |
 
 **S51, relevé le 8 octobre 2026.** Sur `/supervision/chiffres`, `scripts/captures.mjs`
 photographie un écran qui annonce « Responsable · 0 boutique » et reste indéfiniment en
@@ -255,6 +256,40 @@ périmètre. Les deux prises prévues pour le bilan de période ont été **reti
 laissées en place : une prise qui rend une image fausse est pire qu'une prise absente, puisque la
 revue croit avoir regardé. Le bilan de S50 a donc été vérifié par un script jetable, et les deux
 vues sont dans `captures/bilan-periode-*`.
+
+**S53, relevée le 8 octobre 2026, à la demande du commanditaire.** « Actuellement tout est
+ambigu, on comprend rien. » L'inventaire lui donne raison : **« carte grise » désigne cinq choses
+différentes** dans le produit, et rien ne les relie.
+
+| Où | Ce que c'est | Posé par |
+|----|--------------|----------|
+| `motos/{id}.cmcRecu` | une case : le CMC est-il en main ? | S43 |
+| `motos/{id}.cmcChemin` | le scan du CMC, dans Storage | S11 |
+| `ventesMotos/{id}/documents/{quittance,cmc,carte_grise}` | trois documents, cinq statuts, deux chemins | S11, S30 |
+| `ventesMotos/{id}.carteGrise` | une case au comptoir : « part avec la moto » | S44 |
+| `prestataires.types` | une liste de types de documents… à une seule valeur | S30, amputée en S48 |
+
+Le même mot nomme un **objet physique dans un tiroir**, une **étape administrative**, une **case
+sur un reçu**, et une **catégorie de fournisseur**. Deux d'entre eux — `cmcRecu` sur la moto et le
+document `cmc` sur la vente — suivent la même carte à deux endroits sans jamais se parler.
+
+S48 a retiré la plaque du dossier, mais à moitié : les règles Firestore l'acceptent encore,
+`TYPES_DOCUMENTS` dans `lib/domain/prestataire.ts` est une énumération à une seule valeur, et
+`CHEMIN_PRESTATAIRE` est écrit au pluriel pour un usage unique. Ce sont les restes d'une
+amputation, pas un modèle.
+
+**Ce que le commanditaire a déjà tranché**, et qui ne se redemande pas :
+
+- Ce qui le gêne : **trop de saisies pour la même carte**, le logiciel **ne suit pas le vrai
+  circuit**, et **trop d'écrans pour ça**.
+- La remise à un prestataire (demande 6 du 8 octobre) se fait par **paquet rendu en une fois** :
+  on tend dix cartes grises, on note la date et l'avance, il revient avec les dix. Ce n'est pas le
+  dépôt dossier-par-dossier que le produit sait faire aujourd'hui.
+- L'ordre : **les autres fonctionnalités d'abord**, puis une identification de bout en bout. Pas de
+  suppression avant elle — l'étendue de ce qui tombe est précisément ce que la spec doit établir.
+
+Rien n'a été retiré. Une suppression touche des données réelles sur `sandwini`, et la question
+« qu'est-ce qui reste » n'est pas tranchée : elle est le sujet de cette spec.
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
