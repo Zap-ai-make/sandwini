@@ -12,6 +12,7 @@ import {
   SansBoutique,
 } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
+import { ExportMotos } from "@/components/ExportMotos";
 import { RepartitionStock } from "@/components/RepartitionStock";
 import { Statut } from "@/components/StatutMoto";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -83,6 +84,10 @@ function Stock() {
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const catalogue = useCatalogue();
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
+  /* Les motos cochées pour l'export (S50). Un `Set` d'identifiants plutôt qu'un
+     drapeau porté par chaque moto : la liste se recharge en direct à chaque
+     écriture Firestore, et un état posé sur les objets repartirait avec eux. */
+  const [cochees, setCochees] = useState<ReadonlySet<string>>(new Set());
   /* Avant tout retour anticipé : un hook appelé sous condition change
      l'ordre des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
   const surTitre = useSurTitre("Motos");
@@ -108,8 +113,35 @@ function Stock() {
     : catalogue.modeles;
 
   const toutesBoutiques = perimetre.type === "toutes";
+  const basculer = useCallback((id: string) => {
+    setCochees((actuel) => {
+      const suivant = new Set(actuel);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
+  }, []);
+
   const colonnes = useMemo<Colonne<Moto>[]>(() => {
     const liste: Colonne<Moto>[] = [
+      {
+        /* La case de l'export (S50). Une colonne ordinaire : le patron
+           `Tableau` n'a pas eu à apprendre la sélection pour un seul écran, et
+           `rendu` suffisait déjà à poser ce qu'on veut dans une cellule.
+           L'étiquette nomme le châssis — « Choisir » répété quarante fois ne
+           dit à personne *laquelle* on choisit. */
+        cle: "choix",
+        titre: "Export",
+        rendu: (moto) => (
+          <input
+            type="checkbox"
+            checked={cochees.has(moto.id)}
+            onChange={() => basculer(moto.id)}
+            aria-label={`Choisir la moto ${moto.numeroChassis} pour l’export`}
+            className="size-4 accent-encre"
+          />
+        ),
+      },
       {
         cle: "chassis",
         /* « Numéro de châssis » (`a4:104`), le nom qui figure sur la carte
@@ -168,7 +200,7 @@ function Stock() {
       });
     }
     return liste;
-  }, [catalogue, toutesBoutiques]);
+  }, [catalogue, toutesBoutiques, cochees, basculer]);
 
   if (sansPerimetre)
     return (
@@ -303,6 +335,23 @@ function Stock() {
                 </>
               )}
             </p>
+
+            {/* L'export, sous les filtres : on coche ce que les filtres ont
+                laissé, donc la barre appartient à la même tête d'écran. Elle
+                n'apparaît qu'une fois le stock arrivé — proposer d'exporter
+                zéro moto pendant le chargement serait proposer un fichier
+                vide. */}
+            {!chargement && (
+              <div className="w-full border-t border-bord pt-3">
+                <ExportMotos
+                  motos={resultats.filter((moto) => cochees.has(moto.id))}
+                  nomMarque={catalogue.nomMarque}
+                  nomModele={catalogue.nomModele}
+                  toutCocher={() => setCochees(new Set(resultats.map((moto) => moto.id)))}
+                  toutDecocher={() => setCochees(new Set())}
+                />
+              </div>
+            )}
           </div>
 
           {chargement ? (

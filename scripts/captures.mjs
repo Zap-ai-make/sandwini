@@ -715,6 +715,9 @@ const PRISES = [
   { nom: "fournisseur-historique-bureau-clair", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "light", mobile: false },
   { nom: "fournisseur-historique-mobile-sombre", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "dark", mobile: true },
   { nom: "arrivages-fournisseur-lien", chemin: "/motos/arrivages", theme: "light", mobile: false },
+  // L'export par cochage (S50) : la barre ne dit quelque chose qu'une fois coche.
+  { nom: "stock-export-bureau-clair", chemin: "/motos", theme: "light", mobile: false, cocherMotos: 3 },
+  { nom: "stock-export-mobile-sombre", chemin: "/motos", theme: "dark", mobile: true, cocherMotos: 2 },
   // La repartition par marque (S50), depliee : repliee elle ne montre qu'un titre.
   { nom: "stock-repartition-bureau-clair", chemin: "/motos", theme: "light", mobile: false, ouvrirRepartition: true },
   { nom: "stock-repartition-mobile-sombre", chemin: "/motos", theme: "dark", mobile: true, ouvrirRepartition: true },
@@ -787,6 +790,7 @@ for (const {
   ouvrirPiece,
   ouvrirCout,
   ouvrirRepartition,
+  cocherMotos,
   lectureEnCours,
   hauteur,
   periode,
@@ -1041,6 +1045,16 @@ for (const {
     await ligne.click();
     await page.getByRole("dialog").waitFor({ timeout: 20000 });
     await page.waitForTimeout(600);
+  }
+  /* Cocher quelques motos : la barre d'export affiche « Aucune moto cochee »
+     au repos, et c'est l'etat le moins interessant a regarder. On veut voir le
+     compte, le bouton actif et « Tout decocher » apparu. */
+  if (cocherMotos) {
+    const cases = page.getByRole("checkbox", { name: /Choisir la moto/ });
+    await cases.first().waitFor({ timeout: 20000 });
+    const combien = Math.min(cocherMotos, await cases.count());
+    for (let i = 0; i < combien; i += 1) await cases.nth(i).check();
+    await page.waitForTimeout(400);
   }
   /* La repartition par marque est un `<details>` replie par defaut : c'est
      voulu, le tableau du stock repond a la question la plus frequente. Replie,
