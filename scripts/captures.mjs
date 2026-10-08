@@ -94,6 +94,7 @@ async function semerLeGerant() {
     { merge: true },
   );
   await semerLeStock(base, FieldValue, code);
+  await semerDesArrivages(base, FieldValue, code);
   await semerLesPieces(base, FieldValue, code);
   await semerUneBoutiqueDePieces(base, FieldValue);
   await semerDesVentes(base, FieldValue, code);
@@ -323,6 +324,88 @@ async function semerUneBoutiqueDePieces(base, FieldValue) {
  * Rien n'est écrasé si le décor est déjà là — relancer la campagne ne doit pas
  * multiplier les motos.
  */
+/**
+ * Un fournisseur et ses lots (S50).
+ *
+ * L'historique d'un fournisseur se photographiait sur une base sans aucun
+ * arrivage : l'ecran rendait son etat vide, et la revue aurait cru avoir
+ * regarde une liste de lots. Il faut donc de quoi voir ce que l'ecran doit
+ * montrer -- plusieurs lots, des dates differentes, un ecoulement partiel, et
+ * un lot annule, qui reste dans l'histoire precisement parce qu'on l'a pris.
+ *
+ * L'identifiant du fournisseur est fixe : la prise vise son adresse
+ * directement, sans avoir a cliquer dans un tableau pour la decouvrir.
+ */
+const FOURNISSEUR_CAPTURES = "fournisseur-captures";
+
+async function semerDesArrivages(base, FieldValue, code) {
+  const trace = () => ({
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: "captures",
+    createdByName: "Captures",
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: "captures",
+    updatedByName: "Captures",
+  });
+
+  await base.doc(`fournisseurs/${FOURNISSEUR_CAPTURES}`).set({
+    nom: "HAOJUE Import",
+    telephone: "70 11 22 33",
+    localite: "Lomé",
+    actif: true,
+    ...trace(),
+  });
+
+  const marque = "marque-captures-haojue";
+  const modele = "modele-captures-a7";
+  const provenance = "provenance-captures";
+
+  const lots = [
+    { id: "lot-captures-1", nom: "Lot de septembre", date: new Date("2026-09-12T09:00:00Z"), annule: false, motos: 3, vendues: 1 },
+    { id: "lot-captures-2", nom: "Lot de juin", date: new Date("2026-06-04T09:00:00Z"), annule: false, motos: 2, vendues: 2 },
+    { id: "lot-captures-3", nom: "Lot saisi en double", date: new Date("2026-05-02T09:00:00Z"), annule: true, motos: 1, vendues: 0 },
+  ];
+
+  let n = 400;
+  for (const lot of lots) {
+    await base.doc(`arrivages/${lot.id}`).set({
+      nom: lot.nom,
+      fournisseurId: FOURNISSEUR_CAPTURES,
+      boutiqueId: code,
+      date: lot.date,
+      description: "",
+      annule: lot.annule,
+      ...trace(),
+    });
+    for (let i = 0; i < lot.motos; i += 1) {
+      n += 1;
+      await base.doc(`motos/moto-lot-${n}`).set({
+        boutiqueId: code,
+        etat: "neuve",
+        marqueId: marque,
+        /* La derniere moto de chaque lot n'a pas de modele : c'est le cas que
+           S50 a ouvert, et il doit se voir ici aussi. */
+        modeleId: i === lot.motos - 1 ? "" : modele,
+        couleur: "Bleu",
+        annee: 2026,
+        numeroChassis: `LC6PCJ1A9K0000${n}`,
+        numeroMoteur: "",
+        prixVenteConseille: 900_000,
+        provenanceId: provenance,
+        arrivageId: lot.id,
+        papiersFournis: [],
+        photos: [],
+        statut: i < lot.vendues ? "vendue" : "en_stock",
+        dateEntree: lot.date,
+        quittanceChemin: null,
+        cmcChemin: null,
+        cmcRecu: i % 2 === 0,
+        ...trace(),
+      });
+    }
+  }
+}
+
 async function semerLeStock(base, FieldValue, code) {
   const marque = "marque-captures";
   const modele = "modele-captures";
@@ -628,6 +711,10 @@ const PRISES = [
      et c'est le débordement horizontal signalé par le commanditaire qui doit
      avoir disparu. Un écran jamais regardé est un écran dont personne ne sait
      rien, quel que soit le vert de sa suite. */
+  // L'historique d'un fournisseur (S50) : tous les lots pris avec lui.
+  { nom: "fournisseur-historique-bureau-clair", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "light", mobile: false },
+  { nom: "fournisseur-historique-mobile-sombre", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "dark", mobile: true },
+  { nom: "arrivages-fournisseur-lien", chemin: "/motos/arrivages", theme: "light", mobile: false },
   // La repartition par marque (S50), depliee : repliee elle ne montre qu'un titre.
   { nom: "stock-repartition-bureau-clair", chemin: "/motos", theme: "light", mobile: false, ouvrirRepartition: true },
   { nom: "stock-repartition-mobile-sombre", chemin: "/motos", theme: "dark", mobile: true, ouvrirRepartition: true },
@@ -840,6 +927,41 @@ for (const {
       .getByText(/Chargement/)
       .first()
       .waitFor({ state: "detached", timeout: 30000 })
+      .catch(() => {});
+    /* Et l'attente qui ne depend pas d'une formulation : `EtatChargement` porte
+       `role="status"`. Le filtre par texte ci-dessus ne voyait que les ecrans
+       qui disent litteralement « Chargement » -- l'historique d'un fournisseur
+       dit « Lecture des lots… », et se photographiait donc en plein vol.
+
+       **On attend qu'il apparaisse avant d'attendre qu'il parte**, et c'est
+       tout le piege : interroge trop tot, l'indicateur n'est pas encore monte,
+       Playwright le declare « deja detache » et rend la main aussitot. La page
+       etait alors photographiee a 1,5 s, pendant que les ecoutes Firestore
+       mettaient plusieurs secondes -- d'ou une capture de chargement prise pour
+       un ecran fini. */
+    /* **La quiescence applicative, pas le silence reseau.** Firestore tient une
+       requete `Listen/channel` ouverte en permanence, donc `networkidle` est
+       inatteignable ici. On interroge donc la page elle-meme : la zone de
+       travail a du contenu, et plus aucun `role="status"` -- le role ARIA que
+       porte `EtatChargement`.
+
+       Les deux formes plus simples ont echoue, et c'est instructif. Attendre le
+       texte « Chargement » ne voit que les ecrans qui emploient ce mot-la.
+       Attendre que `role=status` se detache rend la main *immediatement* quand
+       on interroge avant que React ait hydrate : l'element n'existe pas encore,
+       Playwright le declare deja detache. Un `waitForFunction` n'a pas ce
+       defaut puisqu'il reinterroge jusqu'a ce que la condition tienne. */
+    await page
+      .waitForFunction(
+        () => {
+          const travail = document.querySelector("main");
+          if (!travail) return false;
+          if (travail.querySelector('[role="status"]')) return false;
+          return travail.innerText.trim().length > 0;
+        },
+        null,
+        { timeout: 30000 },
+      )
       .catch(() => {});
     await page.waitForTimeout(1500);
   }

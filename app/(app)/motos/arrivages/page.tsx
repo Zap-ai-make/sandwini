@@ -10,6 +10,7 @@ import { InspecterLotModal } from "@/components/InspecterLotModal";
 import { ModifierArrivageModal } from "@/components/ModifierArrivageModal";
 import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
+import Link from "next/link";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -173,7 +174,18 @@ export default function PageArrivages() {
       {
         cle: "fournisseur",
         titre: "Fournisseur",
-        rendu: (arrivage) => nomFournisseur(arrivage.fournisseurId),
+        /* Le nom mène à son historique (S50) : « quand on clique sur un
+           fournisseur on atterrit sur tous les lots pris avec lui ». Un lien et
+           non un bouton — c'est une adresse, elle s'ouvre dans un onglet, elle
+           se copie, et le clavier la connaît déjà. */
+        rendu: (arrivage) => (
+          <Link
+            href={`/motos/fournisseurs/${arrivage.fournisseurId}`}
+            className="font-medium text-encre hover:underline"
+          >
+            {nomFournisseur(arrivage.fournisseurId)}
+          </Link>
+        ),
       },
       {
         cle: "motos",

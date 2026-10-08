@@ -13,17 +13,16 @@ import {
 } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { RepartitionStock } from "@/components/RepartitionStock";
+import { Statut } from "@/components/StatutMoto";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import {
   ETATS,
   FILTRES_VIDES,
   LIBELLE_ETAT,
-  LIBELLE_STATUT,
   filtrerMotos,
   type Filtres,
   type Moto,
-  type StatutMoto,
 } from "@/lib/domain/moto";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -330,21 +329,6 @@ function Stock() {
       )}
     </div>
   );
-}
-
-/* Trois statuts sur quatre se lisent d'un mot ; la couleur ne fait que doubler
-   le mot (DESIGN.md §5). « Réservée » prend le bleu de la goutte : la moto est
-   promise et n'est pas encore partie (D70). Vendue et transférée sont des faits
-   accomplis, sans rien à décider : elles restent neutres. */
-const TON_STATUT: Record<StatutMoto, string> = {
-  en_stock: "pastille-solde",
-  reservee: "pastille-transit",
-  vendue: "",
-  transferee: "",
-};
-
-function Statut({ statut }: { statut: StatutMoto }) {
-  return <span className={`pastille ${TON_STATUT[statut]}`}>{LIBELLE_STATUT[statut]}</span>;
 }
 
 function Recherche({
