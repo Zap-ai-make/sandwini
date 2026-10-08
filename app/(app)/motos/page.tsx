@@ -12,6 +12,7 @@ import {
   SansBoutique,
 } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
+import { RepartitionStock } from "@/components/RepartitionStock";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import {
@@ -195,6 +196,18 @@ function Stock() {
             Faire entrer une moto
           </Link>
         }
+      />
+
+      {/* Le comptage par marque, replié. Posé ici et non dans la branche du
+          tableau : il rend `null` sur une liste vide, donc il s'efface tout
+          seul pendant le chargement, sur une erreur et sur un stock vide — ce
+          qui évite de l'enfermer dans un fragment et de décaler tout le cadre.
+          Il compte ce que l'écran montre, filtres compris. */}
+      <RepartitionStock
+        motos={resultats}
+        filtre={resultats.length !== total}
+        nomMarque={catalogue.nomMarque}
+        nomModele={catalogue.nomModele}
       />
 
       {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre

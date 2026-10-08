@@ -342,6 +342,59 @@ async function semerLeStock(base, FieldValue, code) {
     .set({ nom: "AP 125", marqueId: marque, actif: true, ...trace() });
   await base.doc(`provenances/${provenance}`).set({ nom: "Lomé", actif: true, ...trace() });
 
+  /* Deux marques de plus, et une moto sans modele (S50).
+     La repartition par marque se photographiait sur un stock a une marque et
+     un modele : elle montrait une ligne egale a son propre total, ce qui ne
+     prouve rien. Il faut un ecart a voir -- plusieurs marques, des modeles
+     inegaux, et surtout le cas que S50 vient d'ouvrir : une moto dont le
+     modele n'a pas ete saisi, qui doit se lire « Modele non precise » et non
+     disparaitre du compte. */
+  const marqueYamaha = "marque-captures-yamaha";
+  const marqueHaojue = "marque-captures-haojue";
+  const modeleCrypton = "modele-captures-crypton";
+  const modeleA7 = "modele-captures-a7";
+
+  await base.doc(`marques/${marqueYamaha}`).set({ nom: "Yamaha", actif: true, ...trace() });
+  await base.doc(`marques/${marqueHaojue}`).set({ nom: "Haojue", actif: true, ...trace() });
+  await base
+    .doc(`modeles/${modeleCrypton}`)
+    .set({ nom: "Crypton", marqueId: marqueYamaha, actif: true, ...trace() });
+  await base
+    .doc(`modeles/${modeleA7}`)
+    .set({ nom: "A7", marqueId: marqueHaojue, actif: true, ...trace() });
+
+  const varietes = [
+    { id: "moto-rep-1", chassis: "LC6PCJ1A9K0000301", marqueId: marqueYamaha, modeleId: modeleCrypton },
+    { id: "moto-rep-2", chassis: "LC6PCJ1A9K0000302", marqueId: marqueYamaha, modeleId: modeleCrypton },
+    { id: "moto-rep-3", chassis: "LC6PCJ1A9K0000303", marqueId: marqueYamaha, modeleId: modeleCrypton },
+    /* Celle-ci n'a pas de modele : c'est le temoin visuel de S50. */
+    { id: "moto-rep-4", chassis: "LC6PCJ1A9K0000304", marqueId: marqueYamaha, modeleId: "" },
+    { id: "moto-rep-5", chassis: "LC6PCJ1A9K0000305", marqueId: marqueHaojue, modeleId: modeleA7 },
+    { id: "moto-rep-6", chassis: "LC6PCJ1A9K0000306", marqueId: marqueHaojue, modeleId: modeleA7 },
+  ];
+  for (const { id, chassis, marqueId, modeleId } of varietes) {
+    await base.doc(`motos/${id}`).set({
+      boutiqueId: code,
+      etat: "neuve",
+      marqueId,
+      modeleId,
+      couleur: "Noir",
+      annee: 2026,
+      numeroChassis: chassis,
+      numeroMoteur: "",
+      prixVenteConseille: 950_000,
+      provenanceId: provenance,
+      papiersFournis: [],
+      photos: [],
+      statut: "en_stock",
+      dateEntree: new Date("2026-09-15T09:00:00Z"),
+      quittanceChemin: null,
+      cmcChemin: null,
+      cmcRecu: false,
+      ...trace(),
+    });
+  }
+
   const motos = [
     { id: "moto-captures-1", chassis: "LC6PCJ1A9K0000111", cout: 850_000 },
     { id: "moto-captures-2", chassis: "LC6PCJ1A9K0000222", cout: null },
@@ -575,6 +628,9 @@ const PRISES = [
      et c'est le débordement horizontal signalé par le commanditaire qui doit
      avoir disparu. Un écran jamais regardé est un écran dont personne ne sait
      rien, quel que soit le vert de sa suite. */
+  // La repartition par marque (S50), depliee : repliee elle ne montre qu'un titre.
+  { nom: "stock-repartition-bureau-clair", chemin: "/motos", theme: "light", mobile: false, ouvrirRepartition: true },
+  { nom: "stock-repartition-mobile-sombre", chemin: "/motos", theme: "dark", mobile: true, ouvrirRepartition: true },
   { nom: "dossiers-bureau-clair", chemin: "/motos/dossiers", theme: "light", mobile: false },
   { nom: "dossiers-bureau-sombre", chemin: "/motos/dossiers", theme: "dark", mobile: false },
   { nom: "dossiers-mobile-clair", chemin: "/motos/dossiers", theme: "light", mobile: true },
@@ -612,8 +668,15 @@ await mkdir(DOSSIER, { recursive: true });
 /* `/supervision` tout court est dans la liste depuis S47 : sa carte de boutique
    montre désormais les faits du métier, et sans décor elle n'a aucun métier à
    montrer. La garde ne visait que `/supervision/couts`, si bien que les prises
-   de supervision se prenaient sur une base vide. */
-if (aPrendre.some((prise) => prise.gerant || /\/supervision|\/pieces/.test(prise.chemin))) {
+   de supervision se prenaient sur une base vide.
+   `/motos` y entre en S50, et le constat est le même en pire : les prises
+   `motos-bureau-clair`, `motos-bureau-sombre` et `motos-mobile-clair` ne
+   semaient rien, donc photographiaient « Aucune boutique n'est déclarée ».
+   Trois prises du stock qui ne montraient aucun stock — exactement ce que le
+   commentaire de `semerDesVentes` reproche deux cents lignes plus bas : un
+   écran vide ne prouve pas qu'on a regardé, il prouve qu'on n'avait rien à
+   voir. */
+if (aPrendre.some((prise) => prise.gerant || /\/supervision|\/pieces|\/motos/.test(prise.chemin))) {
   const code = await semerLeGerant();
   console.log(`compte gérant prêt : ${GERANT.email} (boutique ${code})`);
 }
@@ -636,6 +699,7 @@ for (const {
   bas,
   ouvrirPiece,
   ouvrirCout,
+  ouvrirRepartition,
   lectureEnCours,
   hauteur,
   periode,
@@ -846,6 +910,17 @@ for (const {
     await ligne.waitFor({ timeout: 20000 });
     await ligne.click();
     await page.getByRole("dialog").waitFor({ timeout: 20000 });
+    await page.waitForTimeout(600);
+  }
+  /* La repartition par marque est un `<details>` replie par defaut : c'est
+     voulu, le tableau du stock repond a la question la plus frequente. Replie,
+     il ne se photographie qu'en titre -- on l'ouvre donc pour regarder ce que
+     la revue doit juger : les comptes, leur ordre, et la ligne « Modele non
+     precise » que S50 vient de rendre possible. */
+  if (ouvrirRepartition) {
+    const resume = page.getByText("Répartition par marque");
+    await resume.waitFor({ timeout: 20000 });
+    await resume.click();
     await page.waitForTimeout(600);
   }
   /* `bas` fait defiler jusqu'au dernier bouton du contenu : la coquille fixe
