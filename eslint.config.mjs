@@ -9,6 +9,11 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Le build d'a cote, quand `NEXT_DIST_DIR` le deplace (cf. next.config.ts).
+    // Oublie ici alors qu'il etait deja dans `.gitignore` : le lint y trouvait
+    // 147 fichiers generes et 1687 erreurs, pour un code source propre. Un
+    // repertoire de build se range dans les deux listes, jamais dans une seule.
+    ".next-emulateurs/**",
     "out/**",
     "build/**",
     "next-env.d.ts",
