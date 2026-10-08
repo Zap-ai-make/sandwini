@@ -1,9 +1,11 @@
 "use client";
 
-import { CircleAlert, LoaderCircle, UserCheck, UserX } from "lucide-react";
+import { CircleAlert, LoaderCircle, Pencil, Trash2, UserCheck, UserX } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { ModifierGerantModal } from "@/components/ModifierGerantModal";
+import { SupprimerGerantModal } from "@/components/SupprimerGerantModal";
 import {
   EtatChargement,
   EtatErreur,
@@ -97,6 +99,9 @@ function LigneUtilisateur({
 }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  /* Les modales ne sont montees que lorsqu'elles sont ouvertes : leur etat part
+     donc du compte tel qu'il est, sans effet de remise a zero. */
+  const [modale, setModale] = useState<"modifier" | "supprimer" | null>(null);
 
   async function basculer() {
     setErreur(null);
@@ -110,7 +115,10 @@ function LigneUtilisateur({
     }
   }
 
-  const desactivable = !estMoi && utilisateur.role !== "responsable";
+  /* Exactement ce que le serveur autorise : il exige une cible de role
+     « gerant », et refuse que le responsable se gere lui-meme. Offrir un geste
+     plus large qu'il n'aboutit, c'est promettre un refus. */
+  const gerable = !estMoi && utilisateur.role === "gerant";
   const boutique = boutiques.find((candidate) => candidate.id === utilisateur.boutiqueId);
 
   return (
@@ -143,7 +151,7 @@ function LigneUtilisateur({
           {erreur && <span className="mt-1 block text-sm text-alerte">{erreur}</span>}
         </span>
 
-        {desactivable && (
+        {gerable && (
           <button
             type="button"
             onClick={basculer}
@@ -164,6 +172,38 @@ function LigneUtilisateur({
 
       {utilisateur.role === "gerant" && (
         <Rattachement utilisateur={utilisateur} boutiques={boutiques} />
+      )}
+
+      {/* Des liens, pas des boutons : trois boutons de plus par ligne auraient
+          fait de la liste des comptes un mur d'actions, alors que la question
+          qu'on vient y poser est « qui travaille ou » (DESIGN.md §14). Meme
+          traitement que « Changer de boutique » juste au-dessus. */}
+      {gerable && (
+        <div className="mt-1 flex flex-wrap gap-x-4">
+          <button
+            type="button"
+            onClick={() => setModale("modifier")}
+            className="inline-flex items-center gap-1.5 text-sm text-encre-doux underline hover:text-encre"
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+            Modifier le compte
+          </button>
+          <button
+            type="button"
+            onClick={() => setModale("supprimer")}
+            className="inline-flex items-center gap-1.5 text-sm text-alerte underline hover:text-encre"
+          >
+            <Trash2 aria-hidden="true" className="size-3.5" />
+            Effacer le compte
+          </button>
+        </div>
+      )}
+
+      {modale === "modifier" && (
+        <ModifierGerantModal utilisateur={utilisateur} ouvert onFermer={() => setModale(null)} />
+      )}
+      {modale === "supprimer" && (
+        <SupprimerGerantModal utilisateur={utilisateur} ouvert onFermer={() => setModale(null)} />
       )}
     </li>
   );
