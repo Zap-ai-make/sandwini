@@ -238,6 +238,21 @@ c'est le voir revenir sous un autre nom.
 | S46 | Filtrer les ventes et les paiements par période | S8, S9, S44 | post-MVP | terminée |
 | S47 | La carte de supervision montre les faits de son métier | S21, S24, S44 | post-MVP | terminée |
 | S48 | Les paiements en une liste, la plaque quitte le dossier, le châssis se cherche | S8, S9, S11, S39 | post-MVP | terminée |
+| S51 | La campagne de captures ne charge pas le périmètre sur les écrans de supervision | S24, S47 | post-MVP | **ouverte** |
+
+**S51, relevé le 8 octobre 2026.** Sur `/supervision/chiffres`, `scripts/captures.mjs`
+photographie un écran qui annonce « Responsable · 0 boutique » et reste indéfiniment en
+« Lecture des ventes et des versements… ». Ce n'est pas l'écran : un script jetable qui ouvre
+une session de la même façon, contre le même serveur et la même base, le rend complètement en
+moins de trois secondes, périmètre et deux boutiques compris. L'émulateur porte bien les deux
+boutiques actives et les deux ventes — vérifié par l'API REST au moment de la prise.
+
+La différence tient donc au harnais, et elle reste à trouver : contexte navigateur recréé pour
+chaque prise, application du thème avant la navigation, ou course entre la session et l'écoute du
+périmètre. Les deux prises prévues pour le bilan de période ont été **retirées** plutôt que
+laissées en place : une prise qui rend une image fausse est pire qu'une prise absente, puisque la
+revue croit avoir regardé. Le bilan de S50 a donc été vérifié par un script jetable, et les deux
+vues sont dans `captures/bilan-periode-*`.
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les

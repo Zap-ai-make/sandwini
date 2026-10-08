@@ -2,6 +2,7 @@
 
 import { TrendingUp } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
+import { BilanPeriode } from "@/components/BilanPeriode";
 import { CartesDuMois, Repartition } from "@/components/ChiffresDuMois";
 import { GardeCapacite } from "@/components/GardeSession";
 import { ErreurDeLecture, EtatChargement, EtatVide } from "@/components/patrons/Etats";
@@ -114,6 +115,21 @@ function Chiffres() {
         titre="Les chiffres"
         actions={<ChoixDuMois mois={mois} choisir={setMois} />}
       />
+
+      {/* Le bilan de période (S50), au-dessus des cartes du mois et avec son
+          propre sélecteur : les deux ne répondent pas à la même question, et
+          leur faire partager une période obligerait l'un des deux à mentir sur
+          ce qu'il montre.
+
+          **Il n'attend que les ventes**, et c'est une correction. Je l'avais
+          accroché à `chargement`, qui attend *aussi* les versements — dont ce
+          bloc ne se sert pas. Un bilan complet restait donc invisible tant que
+          la seconde écoute n'avait pas répondu, et elle peut ne jamais
+          répondre : l'écran ne relève pas l'erreur des versements, si bien
+          qu'un échec de ce côté laisse la page en lecture pour toujours. Faire
+          dépendre un bloc de données qu'il n'emploie pas, c'est hériter des
+          pannes des autres. */}
+      {!erreur && !sansPerimetre && ventes !== null && <BilanPeriode ventes={ventes} />}
 
       {erreur ? (
         <ErreurDeLecture

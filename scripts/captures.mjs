@@ -715,6 +715,12 @@ const PRISES = [
   { nom: "fournisseur-historique-bureau-clair", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "light", mobile: false },
   { nom: "fournisseur-historique-mobile-sombre", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "dark", mobile: true },
   { nom: "arrivages-fournisseur-lien", chemin: "/motos/arrivages", theme: "light", mobile: false },
+  /* Pas de prise sur `/supervision/chiffres`, et c'est volontaire : la campagne
+     y photographie « 0 boutique » et une lecture qui ne finit pas, alors qu'un
+     script jetable rend le meme ecran en trois secondes contre la meme base.
+     Le defaut est dans ce harnais et reste a trouver (S51, `specs/ROADMAP.md`).
+     Une prise qui rend une image fausse est pire qu'une prise absente : la
+     revue croit avoir regarde. */
   // L'export par cochage (S50) : la barre ne dit quelque chose qu'une fois coche.
   { nom: "stock-export-bureau-clair", chemin: "/motos", theme: "light", mobile: false, cocherMotos: 3 },
   { nom: "stock-export-mobile-sombre", chemin: "/motos", theme: "dark", mobile: true, cocherMotos: 2 },
