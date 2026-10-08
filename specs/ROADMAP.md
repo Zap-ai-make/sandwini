@@ -238,7 +238,9 @@ c'est le voir revenir sous un autre nom.
 | S46 | Filtrer les ventes et les paiements par période | S8, S9, S44 | post-MVP | terminée |
 | S47 | La carte de supervision montre les faits de son métier | S21, S24, S44 | post-MVP | terminée |
 | S48 | Les paiements en une liste, la plaque quitte le dossier, le châssis se cherche | S8, S9, S11, S39 | post-MVP | terminée |
+| S50 | L'historique d'un fournisseur, le bilan d'une période, l'export des motos cochées, la répartition par marque | S5, S42, S46 | post-MVP | terminée |
 | S51 | La campagne de captures ne charge pas le périmètre sur les écrans de supervision | S24, S47 | post-MVP | **ouverte** |
+| S52 | Modifier, couper et supprimer un compte de gérant | S2, S3 | post-MVP | terminée |
 
 **S51, relevé le 8 octobre 2026.** Sur `/supervision/chiffres`, `scripts/captures.mjs`
 photographie un écran qui annonce « Responsable · 0 boutique » et reste indéfiniment en

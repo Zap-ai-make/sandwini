@@ -3021,3 +3021,46 @@ que la fonction qu'elle interrogeait répondait autre chose. Ce n'est pas une
 faute d'inattention : c'est ce qui arrive quand une convention d'affichage
 (« un tiret pour ce qu'on ne sait pas ») n'est jamais écrite une seule fois,
 quelque part où un test peut l'atteindre.
+
+
+---
+
+## D106 — Signer, c'est engager : ce qui a été tapé ne compte pas
+
+*8 octobre 2026 — S52.*
+
+**Le problème.** Le commanditaire a tranché : un compte de gérant s'efface
+« seulement si rien n'a été signé ». Reste à dire ce que « signer » veut dire,
+et la réponse décide tout — trop large, et plus aucun compte ne s'efface jamais ;
+trop étroite, et un compte qui tient de l'argent disparaît avec son nom.
+
+**Ce qui était en jeu.** Chaque document du produit porte `createdBy`, imposé à
+l'écriture par `traceCreation` dans `firestore.rules`. Compter *toutes* les
+collections aurait rendu la question triviale à poser — et sa réponse presque
+toujours « non ». Un gérant qui a déclaré une marque « Yamaha » le premier jour
+serait indéboulonnable pour l'éternité, et l'arbitrage du commanditaire se serait
+retourné en interdiction pure : la fonction aurait existé sans jamais aboutir.
+
+**Décision.** La question se pose à **cinq** collections, celles qui engagent de
+l'argent ou du stock : `ventesMotos`, `ventesPieces`, `encaissements`,
+`cloturesCaisse`, `mouvementsPieces`. Pas les référentiels, pas les clients, pas
+les fournisseurs, pas les arrivages.
+
+La frontière n'est pas « a-t-il écrit ? » mais « son nom doit-il rester lisible
+pour qu'on comprenne un mouvement d'argent ? ». Une marque est une entrée de
+catalogue : qui l'a tapée n'éclaire rien. Un encaissement est une affirmation
+— *j'ai reçu cette somme* — et le nom qui la porte fait partie de ce qu'elle
+affirme.
+
+**Ce que la décision laisse passer, et c'est assumé.** Un compte qui n'a créé
+qu'un client ou qu'un fournisseur s'efface, et ces documents gardent un
+`createdBy` qui ne désigne plus personne. Ils portent aussi `createdByName`,
+recopié à la saisie : le nom reste lisible là où il sert. C'est exactement le
+partage retenu ailleurs dans le produit — l'identifiant pour la machine, le nom
+figé pour la personne qui lit (`lib/repositories/ventes.ts`, D56).
+
+**Où la règle vit.** Dans `supprimerGerant` (`functions/src/index.ts`), et nulle
+part ailleurs : le navigateur ne pourrait pas la rejouer sans des lectures que
+les règles refusent au gérant, et une seconde version de cette règle serait une
+occasion de diverger. L'écran annonce la condition d'avance, et affiche le refus
+du serveur tel quel (`components/SupprimerGerantModal.tsx`).
