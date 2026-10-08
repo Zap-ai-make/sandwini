@@ -75,6 +75,16 @@ retire pas — des données anciennes pourraient le porter — et on ne l'emploi
 - [ ] L'écran du stock, côté origine, porte un bloc repliable « Motos parties d'ici » — et rien du tout quand aucune n'est partie.
 - [ ] Le châssis est recopié dans la trace : elle reste lisible si la moto devient illisible pour celui qui la consulte.
 
+**Les chiffres des deux boutiques, après le déplacement**
+
+- [ ] Le stock de la boutique d'origine **perd** la moto : son total, sa répartition par marque et son compteur baissent d'une unité.
+- [ ] Le stock de la boutique d'arrivée la **gagne**, et les mêmes chiffres montent d'une unité.
+- [ ] **Aucun agrégat entretenu n'est introduit** (D61). Tout se recompte à la lecture depuis les écouteurs déjà filtrés par boutique, ce qui est la seule façon pour que les deux côtés ne puissent pas diverger.
+- [ ] Prouvé par un test de règles : après le déplacement, le gérant d'origine **ne lit plus** la moto, celui de destination la lit. Le périmètre est ce qui porte tous les comptes ; le prouver, c'est les prouver tous.
+- [ ] Les chiffres de **vente** ne bougent pas. Une vente passée garde sa boutique : déplacer une moto ne réécrit pas l'histoire commerciale de celle qui l'a vendue.
+- [ ] L'**écoulement du lot** d'arrivage reste juste : la moto compte toujours dans son lot, où qu'elle vive ensuite.
+- [ ] Le rendu est regardé **sur les deux boutiques**, avant et après un déplacement, et les nombres se recoupent.
+
 **Les gardes — chacune avec son témoin de règles, sinon elle n'existe pas**
 
 - [ ] Un gérant **ne tire pas** : il ne peut pas s'attribuer une moto d'une autre boutique en changeant son `boutiqueId`.
