@@ -212,6 +212,54 @@ export function bilanArrivages(
   };
 }
 
+export type LotDuFournisseur = {
+  arrivage: Arrivage;
+  /** Les motos venues de ce lot, dans l'ordre où l'écoute les a rendues. */
+  motos: Moto[];
+  ecoulement: Ecoulement;
+};
+
+/**
+ * Tous les lots pris chez un fournisseur, du plus récent au plus ancien.
+ *
+ * **Rien n'est lu ici.** La fonction reçoit les arrivages et les motos déjà
+ * chargés, donc déjà bornés par les règles Firestore — la boutique du gérant,
+ * toutes pour le responsable. C'est ce qui permet au même code de servir les
+ * deux rôles sans savoir lequel regarde, et de répondre coupure faite (D66).
+ *
+ * **Les lots annulés restent.** L'annulation de S43 est douce : un lot fautif
+ * qui porte déjà des motos ne s'efface pas, puisque ces motos existent et sont
+ * citées ailleurs. Le masquer ferait mentir l'historique — ce lot a bien été
+ * pris chez ce fournisseur. À l'écran de le marquer, pas à cette fonction de
+ * l'oublier.
+ *
+ * **Un lot sans date passe devant.** Même lecture que `dansLaPeriode` : un lot
+ * saisi hors ligne n'a pas encore l'horodatage du serveur, son champ vaut
+ * `null` jusqu'à la synchronisation. Ce n'est pas un lot ancien, c'est le plus
+ * récent de tous — celui qu'on vient d'enregistrer, et qu'on cherche du regard
+ * pour vérifier qu'il est passé.
+ */
+export function lotsDuFournisseur(
+  fournisseurId: string,
+  arrivages: readonly Arrivage[],
+  motos: readonly Moto[],
+): LotDuFournisseur[] {
+  return arrivages
+    .filter((arrivage) => arrivage.fournisseurId === fournisseurId)
+    .sort((a, b) => {
+      if (a.date === null || b.date === null) {
+        if (a.date === b.date) return a.nom.localeCompare(b.nom, "fr");
+        return a.date === null ? -1 : 1;
+      }
+      return b.date.getTime() - a.date.getTime();
+    })
+    .map((arrivage) => ({
+      arrivage,
+      motos: motos.filter((moto) => moto.arrivageId === arrivage.id),
+      ecoulement: ecoulement([...motos], arrivage.id),
+    }));
+}
+
 export type FiltreArrivage = "tous" | "cmc-incomplets" | "ecoules";
 
 /** Les lots actifs (jamais les annulés), restreints selon l'onglet choisi. */
