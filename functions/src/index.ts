@@ -2,6 +2,7 @@ import { logger } from "firebase-functions";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-functions/v2/https";
 import { QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
+import { fermeLesSessions, lireModification } from "./gerants";
 import { resoudreCollision, type PieceNumerotee } from "./numerotation";
 
 /**
@@ -263,6 +264,194 @@ export const attribuerBoutique = onCall({ region: REGION }, async (requete) => {
   });
 
   return { uid, boutiqueId };
+});
+
+/**
+ * Corrige l'identité d'un gérant : nom affiché, adresse de connexion, mot de passe.
+ *
+ * **Une seule fonction pour les trois**, parce qu'elles partagent exactement les
+ * mêmes gardes et la même cible : les séparer tripliquerait ces gardes sans rien
+ * clarifier. Les champs absents ne sont pas touchés — `lireModification` tient
+ * cette distinction, et la vérifie sans émulateur.
+ *
+ * **Ce que la fonction ne corrige pas : l'histoire.** Les ventes déjà
+ * enregistrées portent `createdByName`, recopié au moment de la saisie. Elles
+ * gardent l'ancien nom, et c'est voulu — un journal ne se réécrit pas. L'écran
+ * le dit au responsable avant qu'il valide.
+ *
+ * La boutique de rattachement, elle, reste chez `attribuerBoutique` : elle
+ * déplace un périmètre de sécurité, pas une identité.
+ */
+export const modifierGerant = onCall({ region: REGION }, async (requete) => {
+  exigerResponsable(requete);
+
+  const uid = texteObligatoire(requete.data?.uid, "utilisateur", 128);
+  const lecture = lireModification(requete.data);
+  if ("invalide" in lecture) {
+    throw new HttpsError("invalid-argument", lecture.invalide);
+  }
+  const { modification } = lecture;
+
+  if (uid === requete.auth!.uid) {
+    throw new HttpsError("failed-precondition", "Vous ne pouvez pas modifier votre propre compte.");
+  }
+
+  const { auth, base, horodatage } = await admin();
+
+  const cible = await auth.getUser(uid).catch(() => null);
+  if (!cible) {
+    throw new HttpsError("not-found", "Ce compte n'existe pas.");
+  }
+  if (cible.customClaims?.role === "responsable") {
+    throw new HttpsError("permission-denied", "Un compte responsable ne se modifie pas ici.");
+  }
+  if (cible.customClaims?.role !== "gerant") {
+    throw new HttpsError("failed-precondition", "Ce compte n'est pas un compte de gérant.");
+  }
+
+  const versAuth: import("firebase-admin/auth").UpdateRequest = {};
+  /* Le miroir ne reçoit jamais le mot de passe : un secret n'a rien à faire
+     dans un document que l'interface lit. */
+  const versMiroir: Record<string, unknown> = {};
+  if (modification.nom !== null) {
+    versAuth.displayName = modification.nom;
+    versMiroir.nom = modification.nom;
+  }
+  if (modification.email !== null) {
+    versAuth.email = modification.email;
+    versMiroir.email = modification.email;
+  }
+  if (modification.motDePasse !== null) {
+    versAuth.password = modification.motDePasse;
+  }
+
+  try {
+    await auth.updateUser(uid, versAuth);
+  } catch (cause) {
+    const code = (cause as { code?: string }).code;
+    if (code === "auth/email-already-exists") {
+      throw new HttpsError("already-exists", "Cette adresse e-mail a déjà un compte.");
+    }
+    throw new HttpsError("internal", "Le compte n'a pas pu être modifié.");
+  }
+
+  const sessionsFermees = fermeLesSessions(modification);
+  if (sessionsFermees) await auth.revokeRefreshTokens(uid);
+
+  await base.doc(`users/${uid}`).update({
+    ...versMiroir,
+    updatedAt: horodatage,
+    updatedBy: requete.auth!.uid,
+    updatedByName: requete.auth!.token.name ?? "",
+  });
+
+  return { uid, sessionsFermees };
+});
+
+/**
+ * Les cinq collections où une écriture **engage** — de l'argent ou du stock.
+ *
+ * Ce sont elles qui décident si un compte s'efface ou se désactive. Toutes
+ * portent `createdBy == request.auth.uid`, imposé par `traceCreation` dans
+ * `firestore.rules` : la signature n'est pas déclarative, elle est vérifiée à
+ * l'écriture.
+ *
+ * **Les référentiels n'en font pas partie, et c'est un choix.** Avoir créé une
+ * entrée « Yamaha » n'est pas une signature : les inclure rendrait quasiment
+ * tout compte indéboulonnable et transformerait l'arbitrage du commanditaire —
+ * « effacer seulement si rien n'a été signé » — en interdiction pure. On mesure
+ * ce qui engage, pas ce qui a été tapé.
+ */
+const COLLECTIONS_SIGNEES = [
+  "ventesMotos",
+  "ventesPieces",
+  "encaissements",
+  "cloturesCaisse",
+  "mouvementsPieces",
+] as const;
+
+/**
+ * La première collection où ce compte a signé, ou `null` s'il n'a rien signé.
+ *
+ * Cinq requêtes au pire, une au mieux : la boucle s'arrête à la première
+ * trouvée, et un gérant qui a vendu quoi que ce soit s'arrête sur la première
+ * ligne. Chacune porte sur un seul champ en égalité — aucun index composite à
+ * déclarer.
+ */
+async function premiereSignature(
+  base: FirebaseFirestore.Firestore,
+  uid: string,
+): Promise<string | null> {
+  for (const nom of COLLECTIONS_SIGNEES) {
+    const lot = await base.collection(nom).where("createdBy", "==", uid).limit(1).get();
+    if (!lot.empty) return nom;
+  }
+  return null;
+}
+
+/**
+ * Efface pour de bon un compte de gérant — s'il n'a rien signé.
+ *
+ * **Elle est à part de `modifierGerant` parce qu'elle est irréversible.** La
+ * noyer dans un correctif partiel la rendrait atteignable par distraction ;
+ * elle mérite son nom, sa garde propre et ses témoins.
+ *
+ * **Le refus est la règle, l'effacement l'exception.**
+ * `changerActivationUtilisateur` dit depuis S2 qu'on ne supprime jamais un
+ * utilisateur, et pour une bonne raison : ses écritures passées portent son
+ * identifiant, et un historique qui pointe vers un compte disparu n'est plus un
+ * historique. Le commanditaire a tranché le cas que cette règle traitait trop
+ * large — le compte ouvert par erreur, qui n'a jamais rien enregistré.
+ * Celui-là ne tient aucun historique, et le garder n'est qu'une ligne de plus
+ * dans une liste à relire.
+ */
+export const supprimerGerant = onCall({ region: REGION }, async (requete) => {
+  exigerResponsable(requete);
+
+  const uid = texteObligatoire(requete.data?.uid, "utilisateur", 128);
+  if (uid === requete.auth!.uid) {
+    throw new HttpsError("failed-precondition", "Vous ne pouvez pas supprimer votre propre compte.");
+  }
+
+  const { auth, base } = await admin();
+  const miroir = base.doc(`users/${uid}`);
+  const [cible, vu] = await Promise.all([auth.getUser(uid).catch(() => null), miroir.get()]);
+
+  if (!cible && !vu.exists) {
+    throw new HttpsError("not-found", "Ce compte n'existe pas.");
+  }
+
+  /* Le rôle fait autorité dans le custom claim. Le miroir ne sert de source que
+     pour un compte dont l'authentification a déjà disparu — voir l'ordre des
+     deux effacements plus bas. */
+  const role = cible ? cible.customClaims?.role : vu.get("role");
+  if (role === "responsable") {
+    throw new HttpsError("permission-denied", "Un compte responsable ne se supprime pas ici.");
+  }
+  if (role !== "gerant") {
+    throw new HttpsError("failed-precondition", "Ce compte n'est pas un compte de gérant.");
+  }
+
+  const signature = await premiereSignature(base, uid);
+  if (signature) {
+    logger.info("Suppression refusée : le compte a signé", { uid, collection: signature });
+    throw new HttpsError(
+      "failed-precondition",
+      "Ce compte a déjà enregistré des opérations : il ne peut pas être effacé. " +
+        "Désactivez-le — son nom doit rester lisible dans l'historique.",
+    );
+  }
+
+  /* **Le compte d'authentification d'abord, le miroir ensuite.** Dans l'autre
+     ordre, un échec à mi-chemin laisserait un compte capable de se connecter et
+     absent de la liste : vivant et invisible, le pire des deux états. Ici
+     l'échec laisse au pire un miroir orphelin — que l'appel suivant achève,
+     puisqu'il accepte une cible que seul le miroir atteste. */
+  if (cible) await auth.deleteUser(uid);
+  await miroir.delete();
+
+  logger.info("Compte de gérant effacé", { uid });
+  return { uid };
 });
 
 /**
