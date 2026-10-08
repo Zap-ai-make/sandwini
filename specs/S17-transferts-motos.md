@@ -1,7 +1,7 @@
 # S17 — Déplacer une moto d'une boutique à une autre
 
 ```
-Statut     : à faire
+Statut     : terminée
 Périmètre  : post-MVP
 Dépend de  : S5 (stock motos), S3 (boutiques et périmètre)
 ```
@@ -61,45 +61,45 @@ retire pas — des données anciennes pourraient le porter — et on ne l'emploi
 
 **Le geste**
 
-- [ ] Le gérant de Pouytenga fait partir une moto de son stock vers Koudougou ; elle quitte sa liste et entre dans celle de Koudougou.
-- [ ] Le responsable fait le même geste, qu'il ait basculé sur une boutique ou qu'il soit sur « Toutes les boutiques » : l'origine vient de la **moto**, jamais du sélecteur.
-- [ ] La destination se choisit parmi les boutiques **ouvertes**, la boutique d'origine exclue de la liste.
-- [ ] Une moto réservée ou vendue ne propose pas le geste, et la raison est écrite.
-- [ ] Le geste demande une confirmation qui nomme la moto et les deux boutiques.
-- [ ] Il fonctionne **hors ligne** : le lot part en file, l'écran est juste immédiatement (D66).
+- [x] Le gérant de Pouytenga fait partir une moto de son stock vers Koudougou ; elle quitte sa liste et entre dans celle de Koudougou.
+- [x] Le responsable fait le même geste, qu'il ait basculé sur une boutique ou qu'il soit sur « Toutes les boutiques » : l'origine vient de la **moto**, jamais du sélecteur.
+- [x] La destination se choisit parmi les boutiques **ouvertes**, la boutique d'origine exclue de la liste.
+- [x] Une moto réservée ou vendue ne propose pas le geste, et la raison est écrite.
+- [x] Le geste demande une confirmation qui nomme la moto et les deux boutiques.
+- [x] Il fonctionne **hors ligne** : le lot part en file, l'écran est juste immédiatement (D66).
 
 **La trace**
 
-- [ ] Chaque déplacement écrit un document : moto, châssis recopié, boutique de départ, boutique d'arrivée, date, auteur, et le motif s'il a été saisi.
-- [ ] La fiche de la moto, côté destination, dit d'où elle vient et quand.
-- [ ] L'écran du stock, côté origine, porte un bloc repliable « Motos parties d'ici » — et rien du tout quand aucune n'est partie.
-- [ ] Le châssis est recopié dans la trace : elle reste lisible si la moto devient illisible pour celui qui la consulte.
+- [x] Chaque déplacement écrit un document : moto, châssis recopié, boutique de départ, boutique d'arrivée, date, auteur, et le motif s'il a été saisi.
+- [x] La fiche de la moto, côté destination, dit d'où elle vient et quand.
+- [x] L'écran du stock, côté origine, porte un bloc repliable « Motos parties d'ici » — et rien du tout quand aucune n'est partie.
+- [x] Le châssis est recopié dans la trace : elle reste lisible si la moto devient illisible pour celui qui la consulte.
 
 **Les chiffres des deux boutiques, après le déplacement**
 
-- [ ] Le stock de la boutique d'origine **perd** la moto : son total, sa répartition par marque et son compteur baissent d'une unité.
-- [ ] Le stock de la boutique d'arrivée la **gagne**, et les mêmes chiffres montent d'une unité.
-- [ ] **Aucun agrégat entretenu n'est introduit** (D61). Tout se recompte à la lecture depuis les écouteurs déjà filtrés par boutique, ce qui est la seule façon pour que les deux côtés ne puissent pas diverger.
-- [ ] Prouvé par un test de règles : après le déplacement, le gérant d'origine **ne lit plus** la moto, celui de destination la lit. Le périmètre est ce qui porte tous les comptes ; le prouver, c'est les prouver tous.
-- [ ] Les chiffres de **vente** ne bougent pas. Une vente passée garde sa boutique : déplacer une moto ne réécrit pas l'histoire commerciale de celle qui l'a vendue.
-- [ ] L'**écoulement du lot** d'arrivage reste juste : la moto compte toujours dans son lot, où qu'elle vive ensuite.
-- [ ] Le rendu est regardé **sur les deux boutiques**, avant et après un déplacement, et les nombres se recoupent.
+- [x] Le stock de la boutique d'origine **perd** la moto : son total, sa répartition par marque et son compteur baissent d'une unité.
+- [x] Le stock de la boutique d'arrivée la **gagne**, et les mêmes chiffres montent d'une unité.
+- [x] **Aucun agrégat entretenu n'est introduit** (D61). Tout se recompte à la lecture depuis les écouteurs déjà filtrés par boutique, ce qui est la seule façon pour que les deux côtés ne puissent pas diverger.
+- [x] Prouvé par un test de règles : après le déplacement, le gérant d'origine **ne lit plus** la moto, celui de destination la lit. Le périmètre est ce qui porte tous les comptes ; le prouver, c'est les prouver tous.
+- [x] Les chiffres de **vente** ne bougent pas. Une vente passée garde sa boutique : déplacer une moto ne réécrit pas l'histoire commerciale de celle qui l'a vendue.
+- [x] L'**écoulement du lot** d'arrivage reste juste : la moto compte toujours dans son lot, où qu'elle vive ensuite.
+- [x] Le rendu est regardé **sur les deux boutiques**, avant et après un déplacement, et les nombres se recoupent.
 
 **Les gardes — chacune avec son témoin de règles, sinon elle n'existe pas**
 
-- [ ] Un gérant **ne tire pas** : il ne peut pas s'attribuer une moto d'une autre boutique en changeant son `boutiqueId`.
-- [ ] Un gérant ne déplace pas une moto d'une boutique qui n'est pas la sienne.
-- [ ] Une destination **inexistante** est refusée.
-- [ ] Une boutique **fermée** est refusée comme destination.
-- [ ] Un transfert ne se modifie pas et ne se supprime pas.
-- [ ] Un gérant lit les transferts dont l'une des deux boutiques est la sienne, **et pas les autres**.
-- [ ] Un gérant lit désormais la **liste** des boutiques, mais ne peut toujours ni en créer, ni en modifier, ni en supprimer.
-- [ ] Un compte non connecté ne lit aucun transfert et aucune boutique.
+- [x] Un gérant **ne tire pas** : il ne peut pas s'attribuer une moto d'une autre boutique en changeant son `boutiqueId`.
+- [x] Un gérant ne déplace pas une moto d'une boutique qui n'est pas la sienne.
+- [x] Une destination **inexistante** est refusée.
+- [x] Une boutique **fermée** est refusée comme destination.
+- [x] Un transfert ne se modifie pas et ne se supprime pas.
+- [x] Un gérant lit les transferts dont l'une des deux boutiques est la sienne, **et pas les autres**.
+- [x] Un gérant lit désormais la **liste** des boutiques, mais ne peut toujours ni en créer, ni en modifier, ni en supprimer.
+- [x] Un compte non connecté ne lit aucun transfert et aucune boutique.
 
 **Le reste**
 
-- [ ] Les états sont couverts : aucune autre boutique ouverte, chargement, erreur (`DESIGN.md` §10).
-- [ ] `npm run lint`, `npx tsc --noEmit`, `npm run test:unite`, `npm run test:regles`, et le rendu **regardé** en clair et en sombre.
+- [x] Les états sont couverts : aucune autre boutique ouverte, chargement, erreur (`DESIGN.md` §10).
+- [x] `npm run lint`, `npx tsc --noEmit`, `npm run test:unite`, `npm run test:regles`, et le rendu **regardé** en clair et en sombre.
 
 ---
 
@@ -210,6 +210,30 @@ Aucun écran neuf. Une modale sur le patron `components/patrons/Modale.tsx`,
 ouverte depuis la fiche de la moto. Le bloc « Motos parties d'ici » reprend le
 `<details>` replié de `components/RepartitionStock.tsx` (S50), et rend `null`
 quand il n'y a rien à montrer.
+
+---
+
+## Ce que la réalisation a changé
+
+**Le client n'écoutait que sa propre boutique.** Ouvrir la règle de lecture ne
+suffisait pas : `usePerimetre` ne donne au gérant que la sienne, et le sélecteur
+de destination est resté vide jusqu'à ce qu'on regarde l'écran. Le périmètre
+répond à « que puis-je regarder », la liste des destinations à « où puis-je
+envoyer » — deux questions différentes, et les confondre aurait fait apparaître
+les autres boutiques dans le bandeau, les compteurs et les espaces d'un gérant,
+c'est-à-dire lui donner une supervision qu'il n'a pas. `FicheMoto` s'abonne donc
+à la collection pour son seul besoin, et `usePerimetre` n'a pas bougé.
+
+**Trois états, pas deux.** La correction ci-dessus en a créé un : tant que la
+liste n'est pas lue, elle est vide, et le domaine répondait alors « aucune autre
+boutique ouverte » — ce qui est faux et envoie en déclarer une. L'écran affiche
+une lecture en cours. C'est la troisième fois que ce piège coûte dans ce dépôt :
+un écran qui affirme pendant qu'il lit.
+
+**Un défaut plus ancien, corrigé au passage.** Sur la fiche d'une moto, le lien
+« Stock » et le numéro de châssis se collaient — « StockLC6TRA… » — alors que le
+`mt-3` du châssis disait qu'il devait occuper sa ligne. `inline-block` au lieu de
+`block`. Vu en regardant S17, sur l'écran que ce lot modifiait.
 
 ---
 

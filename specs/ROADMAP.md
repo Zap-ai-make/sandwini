@@ -45,7 +45,7 @@ avant toute spec post-MVP.
 | S14 | Messages WhatsApp paramétrables               | S13         | Sans le lien de S13, il n'y a presque rien à envoyer. |
 | S15 | Prestataires — token et page `/prestataire`   | S11         | Décharge le gérant de la relance ; le circuit fonctionne sans, à la main. |
 | S16 | CMC — stock, attribution, remise              | S11         | Le document `cmc` suit déjà son cycle sans gestion du stock physique de cartes. |
-| S17 | Transferts de motos entre boutiques           | S5          | Utile dès qu'il y a plusieurs boutiques actives. |
+| S17 | Transferts de motos entre boutiques           | S5          | **Livrée le 8 octobre 2026** — en un seul geste, Q7 renversée. Les pièces détachées restent à faire. |
 | S18 | Échanges / reprises                           | S8          | Cas de vente fréquent mais contournable (vente + entrée en stock séparées). |
 | S19 | Envois de fichiers — photos et papiers        | S5          | Débloqué par D66 : un champ d'envoi peut exister s'il annonce qu'il demande du réseau. Reste une spec à part parce qu'une file d'attente locale, elle, est un vrai chantier (D14). |
 | S21 | Pièces — vente au comptoir et alertes rupture | S7, S10, S20| Suite immédiate de S20. **En cours** : le domaine, les règles, le dépôt, l'écran de vente et la carte d'alerte sont livrés ; le reçu et le bout en bout restent. Voir `specs/S21-vente-pieces.md`. |
@@ -241,6 +241,7 @@ c'est le voir revenir sous un autre nom.
 | S50 | L'historique d'un fournisseur, le bilan d'une période, l'export des motos cochées, la répartition par marque | S5, S42, S46 | post-MVP | terminée |
 | S51 | La campagne de captures ne charge pas le périmètre sur les écrans de supervision | S24, S47 | post-MVP | **ouverte** |
 | S52 | Modifier, couper et supprimer un compte de gérant | S2, S3 | post-MVP | terminée |
+| S17 | Déplacer une moto d'une boutique à une autre, en l'historisant | S5, S3 | post-MVP | terminée |
 | S53 | Les papiers d'une moto : identifier de bout en bout carte grise, CMC, quittance et plaque | S11, S30, S43, S44, S48 | post-MVP | **ouverte — pas encore de spec** |
 
 **S51, relevé le 8 octobre 2026.** Sur `/supervision/chiffres`, `scripts/captures.mjs`
