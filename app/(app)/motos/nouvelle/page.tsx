@@ -241,6 +241,7 @@ export default function PageNouvelleMoto() {
             <ChoixOuNouveau
               id="modele"
               libelle="Modèle"
+              facultatif
               singulier="modèle"
               determinant="ce"
               valeur={saisie.modeleId}

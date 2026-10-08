@@ -222,7 +222,11 @@ export function validerChassis(numero: string): string | null {
 
 export function validerMoto(saisie: SaisieMoto): string | null {
   if (!saisie.marqueId) return "Choisissez une marque.";
-  if (!saisie.modeleId) return "Choisissez un modèle.";
+  /* Le modèle n'est plus exigé — voir `validerSousLot`, qui porte la raison.
+     Les deux chemins d'entrée en stock bougent ensemble : faire dépendre
+     l'acceptation d'une moto du formulaire par lequel elle passe serait une
+     incohérence que le comptoir rencontrerait, et la règle Firestore ne sait
+     de toute façon pas distinguer un lot d'une saisie unitaire. */
   if (!saisie.provenanceId) return "Choisissez une provenance.";
 
   const messageChassis = validerChassis(saisie.numeroChassis);

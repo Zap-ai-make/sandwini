@@ -114,10 +114,19 @@ describe("validerMoto", () => {
     expect(validerMoto(saisie())).toBeNull();
   });
 
-  it("exige les trois choix qui rattachent la moto au référentiel", () => {
+  it("exige les deux choix qui rattachent la moto au référentiel", () => {
     expect(validerMoto(saisie({ marqueId: "" }))).toMatch(/marque/i);
-    expect(validerMoto(saisie({ modeleId: "" }))).toMatch(/modèle/i);
     expect(validerMoto(saisie({ provenanceId: "" }))).toMatch(/provenance/i);
+  });
+
+  /* Le modèle a quitté les champs exigés, ici comme au lot. Les deux chemins
+     d'entrée en stock devaient bouger ensemble : laisser la saisie unitaire
+     stricte aurait fait dépendre l'acceptation d'une moto du formulaire par
+     lequel elle passe, et c'est au comptoir que cette incohérence se serait
+     rencontrée. La règle Firestore ne sait de toute façon pas distinguer les
+     deux chemins. */
+  it("accepte une moto sans modèle, comme un lot", () => {
+    expect(validerMoto(saisie({ modeleId: "" }))).toBeNull();
   });
 
   it("exige un châssis — c’est l’identité de la moto", () => {

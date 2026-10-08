@@ -95,8 +95,14 @@ describe("validerSousLot", () => {
   it("exige une marque : elle est commune au groupe", () => {
     expect(validerSousLot(sousLot({ marqueId: "" }))).toMatch(/marque/i);
   });
-  it("exige un modèle", () => {
-    expect(validerSousLot(sousLot({ modeleId: "" }))).toMatch(/modèle/i);
+  /* Le modèle, lui, est facultatif — tranché par le commanditaire. Un lot se
+     réceptionne au comptoir, caisses encore fermées : la marque se lit sur le
+     carton, le modèle souvent pas. L'exiger obligeait à inventer une entrée de
+     référentiel pour pouvoir enregistrer, c'est-à-dire à salir le catalogue
+     pour contourner un champ. La marque reste exigée : c'est elle qui range le
+     stock, et on la connaît toujours. */
+  it("accepte un groupe sans modèle : il ne se lit pas toujours à la réception", () => {
+    expect(validerSousLot(sousLot({ modeleId: "" }))).toBeNull();
   });
   it("accepte un groupe avec marque et modèle", () => {
     expect(validerSousLot(sousLot())).toBeNull();

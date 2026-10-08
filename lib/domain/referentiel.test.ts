@@ -4,6 +4,7 @@ import {
   LIBELLE_COLLECTION,
   comparerReferentiels,
   nomDejaPris,
+  nommerEntree,
   optionsAvecChoix,
   reduire,
   trouverParNom,
@@ -115,5 +116,37 @@ describe("libellés", () => {
       expect(LIBELLE_COLLECTION[collection].singulier).toBeTruthy();
       expect(LIBELLE_COLLECTION[collection].pluriel).toBeTruthy();
     }
+  });
+});
+
+/**
+ * Un identifiant vide et un identifiant introuvable ne disent pas la même
+ * chose, et l'écran ne doit pas les confondre.
+ *
+ * Depuis que le modèle est facultatif à l'entrée en stock, une moto porte
+ * légitimement `modeleId: ""`. Le nommage rendait « — » dans ce cas, si bien
+ * qu'une moto sans modèle s'affichait « Yamaha — » : un tiret se lit comme une
+ * donnée manquante ou abîmée, alors qu'il n'y a tout simplement rien à dire.
+ * Un identifiant **présent mais introuvable**, lui, est une vraie anomalie —
+ * la marque a été supprimée sous les pieds de la moto — et celui-là garde son
+ * tiret, parce qu'il faut qu'il se voie.
+ *
+ * Les deux gardes qui existaient déjà dans `BordereauLot` et
+ * `InspecterLotModal` — `nomModele(id) ? … : ""` — attendaient précisément ce
+ * comportement. Elles étaient mortes : « — » n'est pas une chaîne vide.
+ */
+describe("nommerEntree", () => {
+  const liste = [entree("1", "Yamaha"), entree("2", "Haojue")];
+
+  it("rend le nom quand l’entrée existe", () => {
+    expect(nommerEntree(liste, "1")).toBe("Yamaha");
+  });
+
+  it("rend une chaîne vide pour un identifiant vide : il n’y a rien à dire", () => {
+    expect(nommerEntree(liste, "")).toBe("");
+  });
+
+  it("rend un tiret pour un identifiant présent mais introuvable : c’est une anomalie", () => {
+    expect(nommerEntree(liste, "disparue")).toBe("—");
   });
 });

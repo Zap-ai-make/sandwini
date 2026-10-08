@@ -257,9 +257,31 @@ describe("entrée en stock", () => {
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ numeroChassis: "lc6p-123" })));
   });
 
-  it("exige un rattachement au référentiel", async () => {
+  /* La marque et la provenance, et **pas** le modèle : son absence de cette
+     liste est voulue, voir le témoin suivant. */
+  it("exige un rattachement au référentiel — la marque et la provenance", async () => {
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ marqueId: "" })));
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ provenanceId: "" })));
+  });
+
+  /**
+   * Le modèle est facultatif, et la règle doit l'accepter vide.
+   *
+   * Le domaine a cessé de l'exiger — un lot se réceptionne caisses fermées, la
+   * marque se lit sur le carton, le modèle souvent pas. Mais un formulaire
+   * permissif devant une règle stricte ne donne pas un champ optionnel : il
+   * donne un `permission-denied` au comptoir, sur un geste que l'écran venait
+   * d'autoriser. Les deux doivent céder ensemble, et ce témoin est ce qui
+   * l'atteste.
+   *
+   * Le champ reste **écrit**, et reste dans `hasAll` : ce qui change est sa
+   * longueur permise, pas sa présence. Une moto sans modèle porte une chaîne
+   * vide, jamais un champ absent — c'est D101 pris par l'autre bout : le champ
+   * existe toujours, donc aucune migration ne sera nécessaire le jour où il se
+   * remplit.
+   */
+  it("accepte une moto sans modèle, pendant que la marque reste exigée", async () => {
+    await assertSucceeds(addDoc(collection(gerant(), "motos"), moto({ modeleId: "" })));
   });
 
   it("refuse un champ hors contrat — un prix d’achat glissé dans la moto, par exemple", async () => {

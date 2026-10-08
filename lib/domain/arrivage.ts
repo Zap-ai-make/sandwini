@@ -112,10 +112,22 @@ export function validerArrivage(saisie: SaisieArrivage): string | null {
   return null;
 }
 
-/** Un groupe est valide s'il a sa marque et son modèle — communs à ses motos. */
+/**
+ * Un groupe est valide s'il a sa marque. Le modèle est facultatif.
+ *
+ * **Pourquoi le modèle a cessé d'être exigé.** Un lot se réceptionne au
+ * comptoir, caisses encore fermées : la marque se lit sur le carton, le modèle
+ * souvent pas. L'exiger obligeait à inventer une entrée de référentiel pour
+ * pouvoir enregistrer le lot — c'est-à-dire à salir le catalogue pour
+ * contourner un champ, et à produire des « modèles » qui ne désignent rien.
+ * Une moto sans modèle est une information exacte ; un modèle inventé est une
+ * information fausse. On préfère la première.
+ *
+ * La marque, elle, reste exigée : c'est par elle que le stock se range et se
+ * compte, et on la connaît toujours.
+ */
 export function validerSousLot(sousLot: SousLot): string | null {
   if (!sousLot.marqueId) return "Choisissez une marque : elle est commune au groupe de motos.";
-  if (!sousLot.modeleId) return "Choisissez un modèle pour le groupe.";
   return null;
 }
 

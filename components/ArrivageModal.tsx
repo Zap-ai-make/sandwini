@@ -303,6 +303,7 @@ function CorpsArrivageModal({
               <ChoixOuNouveau
                 id={`arr-modele-${index}`}
                 libelle="Modèle"
+                facultatif
                 singulier="modèle"
                 determinant="ce"
                 valeur={groupe.modeleId}

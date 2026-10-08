@@ -48,6 +48,7 @@ export function ChoixOuNouveau({
   toutes,
   invite,
   enAttente = false,
+  facultatif = false,
   aide,
   creer,
 }: {
@@ -85,6 +86,14 @@ export function ChoixOuNouveau({
    * savoir chez quelle marque le ranger.
    */
   enAttente?: boolean;
+  /**
+   * Marque le champ comme facultatif, comme le fait `Champ` ailleurs.
+   *
+   * Posé sur la branche « choisir » uniquement : quand on bascule en création,
+   * le nom qu'on tape est, lui, bien requis — écrire « (facultatif) » au-dessus
+   * d'un champ dont la validation refuse le vide serait un mensonge d'écran.
+   */
+  facultatif?: boolean;
   aide?: string;
   /**
    * Écrit la nouvelle entrée et rend son identifiant **tout de suite**, sans
@@ -210,7 +219,7 @@ export function ChoixOuNouveau({
   }
 
   return (
-    <Champ id={id} libelle={libelle} aide={note ?? aide}>
+    <Champ id={id} libelle={libelle} facultatif={facultatif} aide={note ?? aide}>
       <select
         id={id}
         value={valeur}

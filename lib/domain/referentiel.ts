@@ -113,6 +113,27 @@ export function optionsAvecChoix<T extends Referentiel>(entrees: T[], choisi: st
   return retenue ? [retenue, ...actives] : actives;
 }
 
+/**
+ * Le nom d'une entrée, tel qu'il s'écrit à l'écran.
+ *
+ * **Trois cas, et non deux.** Un identifiant **vide** veut dire « rien n'a été
+ * saisi » : depuis que le modèle est facultatif à l'entrée en stock, c'est un
+ * état normal, et il s'écrit en n'écrivant rien. Un identifiant **présent mais
+ * introuvable** est tout autre chose — l'entrée a disparu sous les pieds de ce
+ * qui la cite —, et ce tiret est le seul endroit où cela se voit.
+ *
+ * Les confondre affichait « Yamaha — » pour une moto dont on sait seulement
+ * qu'elle est une Yamaha : un tiret se lit comme une donnée abîmée, alors qu'il
+ * n'y avait rien à dire. Deux composants s'en gardaient déjà
+ * (`nomModele(id) ? … : ""`, dans `BordereauLot` et `InspecterLotModal`) et
+ * leur garde ne pouvait pas fonctionner, « — » n'étant pas une chaîne vide.
+ * C'est cette fonction qui leur donne raison.
+ */
+export function nommerEntree(entrees: readonly Referentiel[], id: string): string {
+  if (!id) return "";
+  return entrees.find((entree) => entree.id === id)?.nom ?? "—";
+}
+
 /** Tri d'affichage : les entrées actives d'abord, puis par nom. */
 export function comparerReferentiels(a: Referentiel, b: Referentiel): number {
   if (a.actif !== b.actif) return a.actif ? -1 : 1;

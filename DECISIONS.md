@@ -2977,3 +2977,47 @@ interne, la hauteur du document a déjà été recalculée et la fenêtre ne dé
 plus. Un test qui se contentait d'arriver par la navigation passait au vert sur
 un écran défectueux. Il faut un `goto` franc — ce que fait le comptoir, une
 adresse tapée, une touche F5.
+
+---
+
+## D105 — Un identifiant vide et un identifiant introuvable ne disent pas la même chose
+
+*En rendant le modèle facultatif à l'entrée en stock.*
+
+Le modèle a cessé d'être exigé, et pour une raison de comptoir : un lot se
+réceptionne caisses encore fermées. La marque se lit sur le carton, le modèle
+souvent pas. L'exiger obligeait à **inventer une entrée de référentiel** pour
+pouvoir enregistrer le lot — c'est-à-dire à salir le catalogue pour contourner
+un champ, et à produire des « modèles » qui ne désignent rien. *Une moto sans
+modèle est une information exacte ; un modèle inventé est une information
+fausse.* La marque, elle, reste exigée : c'est par elle que le stock se range
+et se compte, et on la connaît toujours.
+
+**Ce que ce changement a révélé ailleurs.** Rendre un champ facultatif dans le
+domaine, dans la règle Firestore et dans les deux formulaires ne suffit pas :
+il reste à décider **comment son absence s'écrit**. Le nommage du catalogue
+faisait `find(…)?.nom ?? "—"`, ce qui mettait dans le même sac deux faits sans
+rapport :
+
+| `modeleId` | Ce que ça veut dire | Ce qui s'affichait |
+|---|---|---|
+| `""` | rien n'a été saisi — état **normal** | `Yamaha —` |
+| `"m-42"` introuvable | l'entrée a disparu sous les pieds de la moto — **anomalie** | `Yamaha —` |
+
+**Décision.** Trois cas, et non deux. Un identifiant vide rend la **chaîne
+vide** : il n'y a rien à dire, on n'écrit rien. Un identifiant présent mais
+introuvable garde son **tiret**, parce que c'est le seul endroit où cette
+anomalie se voit. La règle vit dans `nommerEntree` (`lib/domain/referentiel.ts`)
+et non plus dans `lib/repositories/catalogue.ts` : c'est D103 appliqué par
+avance — `vitest.config.mts` ne couvre que `lib/**`, mais un `nommer` privé de
+module restait sans preuve. Il en a trois maintenant.
+
+*Ce que cet épisode dit du dépôt, et c'est le plus utile.* Deux composants —
+`BordereauLot` et `InspecterLotModal` — portaient **déjà** la garde
+`nomModele(id) ? … : ""`. Leur auteur avait donc anticipé le bon comportement.
+La garde était **morte** : « — » n'est pas une chaîne vide, la condition était
+toujours vraie. Une intention juste, écrite au bon endroit, et inopérante parce
+que la fonction qu'elle interrogeait répondait autre chose. Ce n'est pas une
+faute d'inattention : c'est ce qui arrive quand une convention d'affichage
+(« un tiret pour ce qu'on ne sait pas ») n'est jamais écrite une seule fois,
+quelque part où un test peut l'atteindre.

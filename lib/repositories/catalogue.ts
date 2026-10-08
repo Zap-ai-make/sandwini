@@ -1,6 +1,6 @@
 "use client";
 
-import type { Modele, Referentiel } from "@/lib/domain/referentiel";
+import { nommerEntree, type Modele, type Referentiel } from "@/lib/domain/referentiel";
 import { useAbonnement } from "./abonnement";
 import { ecouterModeles, ecouterReferentiel } from "./referentiels";
 
@@ -64,10 +64,6 @@ export type Catalogue = {
   nomTypeFrais: (id: string) => string;
 };
 
-function nommer(liste: Referentiel[], id: string): string {
-  return liste.find((entree) => entree.id === id)?.nom ?? "—";
-}
-
 export function useCatalogue(): Catalogue {
   const marques = useAbonnement(souscrireMarques, MESSAGE);
   const modeles = useAbonnement(souscrireModeles, MESSAGE);
@@ -95,9 +91,9 @@ export function useCatalogue(): Catalogue {
       provenances.valeur === null ||
       typesFrais.valeur === null,
     erreur: marques.erreur ?? modeles.erreur ?? provenances.erreur ?? typesFrais.erreur,
-    nomMarque: (id) => nommer(listes.marques, id),
-    nomModele: (id) => nommer(listes.modeles, id),
-    nomProvenance: (id) => nommer(listes.provenances, id),
-    nomTypeFrais: (id) => nommer(listes.typesFrais, id),
+    nomMarque: (id) => nommerEntree(listes.marques, id),
+    nomModele: (id) => nommerEntree(listes.modeles, id),
+    nomProvenance: (id) => nommerEntree(listes.provenances, id),
+    nomTypeFrais: (id) => nommerEntree(listes.typesFrais, id),
   };
 }

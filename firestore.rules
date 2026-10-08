@@ -406,8 +406,16 @@ service cloud.firestore {
              && donnees.statut in ['en_stock', 'reservee', 'vendue', 'transferee']
              && donnees.marqueId is string
              && donnees.marqueId.size() > 0
+             // Le modele reste **ecrit** — il est dans `hasAll` — mais il
+             // s'accepte vide. Un lot se receptionne caisses fermees : la
+             // marque se lit sur le carton, le modele souvent pas, et l'exiger
+             // obligeait a inventer une entree de referentiel pour pouvoir
+             // enregistrer. Un modele invente est une information fausse ;
+             // l'absence de modele est une information exacte.
+             // La marque, elle, garde son `size() > 0` juste au-dessus : c'est
+             // par elle que le stock se range et se compte. Les deux lignes
+             // sont volontairement voisines pour que l'ecart se voie.
              && donnees.modeleId is string
-             && donnees.modeleId.size() > 0
              && donnees.provenanceId is string
              // Une moto tient son origine d'une provenance (saisie unitaire, S5)
              // ou d'un arrivage (lot, S42) : l'un des deux, jamais aucun.
