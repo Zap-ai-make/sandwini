@@ -60,6 +60,13 @@ beforeEach(async () => {
     await setDoc(doc(base, "users/resp-1"), fiche("resp", "responsable"));
     await setDoc(doc(base, "users/ger-1"), fiche("ger1", "gerant", "PTG"));
     await setDoc(doc(base, "users/ger-2"), fiche("ger2", "gerant", "KDG"));
+    /* Une moto : depuis S17 c'est elle, et non plus la boutique, dont la regle
+       de lecture fait lire le jeton par ses deux branches. */
+    await setDoc(doc(base, "motos/moto-ptg"), {
+      boutiqueId: "PTG",
+      numeroChassis: "LC6PCJ1A9K0000123",
+      statut: "en_stock",
+    });
   });
 });
 
@@ -160,30 +167,46 @@ describe("le claim fait autorité, pas le document", () => {
    * claims par la Cloud Function il s'écoule un instant réel, et c'est
    * exactement l'instant où l'application demande « où suis-je ».
    */
-  it("un compte sans claim se voit refuser une boutique par décision, non par plantage", async () => {
+  it("un compte sans claim se voit refuser une moto par décision, non par plantage", async () => {
     const sansClaim = env.authenticatedContext("sans-claim").firestore();
 
+    /* **Ce témoin visait `boutiques/PTG` jusqu’à S17**, qui a ouvert cette
+       lecture à tout compte connecté. Il serait alors devenu vert à vide : la
+       lecture réussit, le `throw` du bloc `try` est rattrapé par son propre
+       `catch`, et le message comparé n’est plus celui des règles. Il vise
+       désormais `motos/{id}`, dont les deux branches lisent le jeton — c’est
+       exactement la forme qui révélait le défaut. */
     let message = "";
+    let lecture = "refusee";
     try {
-      await getDoc(doc(sansClaim, "boutiques/PTG"));
-      throw new Error("la lecture aurait dû être refusée");
+      await getDoc(doc(sansClaim, "motos/moto-ptg"));
+      lecture = "acceptee";
     } catch (cause) {
       message = String((cause as { message?: string }).message ?? cause);
     }
 
+    expect(lecture).toBe("refusee");
     /* Le refus, oui. Mais pas celui-là : « Property role is undefined on
        object » est le moteur qui trébuche, pas la règle qui tranche. */
     expect(message).not.toContain("is undefined");
   });
 
   /**
-   * Le même mécanisme sur la boutique, dans l'autre sens : ici le refus est la
-   * bonne réponse, et ce test dit qu'il le reste. Un gérant dont le compte
-   * existe mais à qui aucune boutique n'a encore été attribuée ne lit aucune
-   * boutique.
+   * Le gérant à qui aucune boutique n'a encore été attribuée.
+   *
+   * **Depuis S17 il lit la liste des boutiques**, comme tout compte connecté :
+   * des noms, des adresses, l'enseigne au-dessus de la porte. Ce qui compte
+   * n'a pas bougé d'un pouce — son `boutiqueId` ne correspond à aucune
+   * boutique, donc `estGerantDe` est faux partout et aucune donnée ne s'ouvre.
+   *
+   * Le cas n'est pas d'école : entre la création d'un compte et son
+   * rattachement il s'écoule un délai réel, et c'est exactement l'instant où
+   * l'application demande « où suis-je ».
    */
-  it("un gérant sans boutique attribuée se voit refuser une boutique", async () => {
+  it("un gérant sans boutique attribuée ne lit aucune donnée", async () => {
     const sansBoutique = env.authenticatedContext("ger-orphelin", { role: "gerant" }).firestore();
-    await assertFails(getDoc(doc(sansBoutique, "boutiques/PTG")));
+    await assertSucceeds(getDoc(doc(sansBoutique, "boutiques/PTG")));
+    await assertFails(getDoc(doc(sansBoutique, "motos/moto-ptg")));
+    await assertFails(getDocs(collection(sansBoutique, "ventesMotos")));
   });
 });

@@ -117,8 +117,21 @@ service cloud.firestore {
     }
 
     match /boutiques/{code} {
-      allow read: if estResponsable()
-                  || (connecte() && boutiqueDuCompte() == code);
+      // **La lecture s'ouvre a tout compte connecte depuis S17.** Un gerant ne
+      // lisait que la sienne, et ne pouvait donc pas choisir ou envoyer une
+      // moto : la liste des destinations lui etait invisible. Firestore ne
+      // masque pas un champ — un document lisible l'est en entier — donc c'est
+      // tout ou rien.
+      //
+      // Ce que porte un document boutique : le nom, le code, les metiers,
+      // l'adresse, le telephone, l'etat d'ouverture. L'enseigne au-dessus de la
+      // porte, rien qu'un client ne puisse lire sur place. Aucune decision du
+      // depot ne protegeait la restriction d'avant — c'etait de la moindre
+      // exposition par defaut (SECURITY.md SS0), et elle devenait ici un
+      // obstacle reel.
+      //
+      // L'ecriture, elle, ne bouge pas d'un pouce.
+      allow read: if connecte();
 
       allow create: if estResponsable()
                     && boutiqueValide(request.resource.data, code)
@@ -464,14 +477,84 @@ service cloud.firestore {
                     && request.resource.data.statut == 'en_stock'
                     && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
 
-      // La boutique d'une moto ne change pas ici : c'est un transfert, et le
-      // transfert a sa propre spec (S17) parce qu'il laisse une trace.
+      // **Le deplacement d'une moto entre boutiques (S17), et la garde centrale
+      // du lot : on pousse, on ne tire jamais.**
+      //
+      // `estGerantDe(resource.data.boutiqueId)` vise la boutique que la moto
+      // **quitte**. Un gerant peut donc donner une moto qu'il detient, et ne
+      // peut pas s'en attribuer une qu'il ne detient pas : il n'a aucun droit
+      // d'ecriture dessus tant qu'elle est ailleurs. Le sens du transfert est
+      // porte par la regle, pas par une condition dans un ecran.
+      //
+      // `seulsChangent(['boutiqueId'])` borne le geste. Sans lui, la meme
+      // ecriture ferait passer une moto d'une boutique a l'autre **et** la
+      // marquerait vendue, ou lui changerait son chassis — une retouche que la
+      // trace decrirait comme un simple deplacement.
+      //
+      // Le statut est verifie sur l'etat **d'avant** : une moto reservee ou
+      // vendue est promise a quelqu'un, et la deplacer ferait voyager la
+      // promesse sans que le client qui l'attend en sache rien.
       allow update: if motoValide(request.resource.data)
                     && traceModification(request.resource.data, resource.data)
-                    && request.resource.data.boutiqueId == resource.data.boutiqueId
+                    && (request.resource.data.boutiqueId == resource.data.boutiqueId
+                        || deplacementValide())
                     && (estResponsable() || estGerantDe(resource.data.boutiqueId));
 
       allow delete: if false;
+    }
+
+    // --- Deplacement d'une moto entre boutiques (S17) -----------------------
+
+    function boutiqueOuverte(code) {
+      return exists(/databases/$(database)/documents/boutiques/$(code))
+             && get(/databases/$(database)/documents/boutiques/$(code)).data.actif == true;
+    }
+
+    function deplacementValide() {
+      return seulsChangent(['boutiqueId'])
+             && resource.data.statut == 'en_stock'
+             && boutiqueOuverte(request.resource.data.boutiqueId);
+    }
+
+    // La trace d'un deplacement. Une collection de premier niveau, et non une
+    // sous-collection sous la moto : **la moto quitte le perimetre de la
+    // boutique de depart**, qui ne peut plus l'ouvrir — ni elle, ni ce qui pend
+    // dessous. Or c'est precisement elle qui se demande ou la moto est passee.
+    //
+    // Le chassis y est recopie, comme `createdByName` ailleurs : la trace doit
+    // rester lisible meme quand son sujet ne l'est plus.
+    function transfertMotoValide(donnees) {
+      return donnees.keys().hasOnly(['motoId', 'numeroChassis', 'deBoutiqueId',
+                                     'versBoutiqueId', 'motif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['motoId', 'numeroChassis', 'deBoutiqueId',
+                                       'versBoutiqueId', 'motif'].concat(champsAudit()))
+             && donnees.motoId is string
+             && donnees.motoId.size() > 0
+             && texteBorne(donnees.numeroChassis, 40)
+             && donnees.deBoutiqueId is string
+             && donnees.deBoutiqueId.matches('^[A-Z]{3}$')
+             && donnees.versBoutiqueId is string
+             && donnees.versBoutiqueId.matches('^[A-Z]{3}$')
+             && donnees.deBoutiqueId != donnees.versBoutiqueId
+             && texteBorne(donnees.motif, 200);
+    }
+
+    match /transfertsMotos/{transfertId} {
+      // Les deux boutiques lisent : celle qui perd la moto veut savoir ou elle
+      // est allee, celle qui la recoit d'ou elle vient.
+      allow read: if estResponsable()
+                  || estGerantDe(resource.data.deBoutiqueId)
+                  || estGerantDe(resource.data.versBoutiqueId);
+
+      // Meme garde que sur la moto : la trace d'un depart appartient a la
+      // boutique d'ou la moto part.
+      allow create: if transfertMotoValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && (estResponsable() || estGerantDe(request.resource.data.deBoutiqueId));
+
+      // Un deplacement est un fait. On le corrige en retransferant, ce qui
+      // laisse les deux traces.
+      allow update, delete: if false;
     }
 
     // Le coût. Le `boutiqueId` y est répété : au sein d'un même lot d'écriture,
