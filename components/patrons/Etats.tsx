@@ -54,12 +54,6 @@ export function EtatChargement({
 }) {
   return (
     <p
-      /* `role="status"` est le rôle ARIA d'un message d'avancement, et il dit
-         « cet écran attend encore » à qui l'interroge — le lecteur d'écran,
-         comme la campagne de captures, qui ne doit pas photographier une page
-         à moitié arrivée. Il ne dependait avant que du texte, donc de sa
-         formulation. */
-      role="status"
       aria-live="polite"
       aria-atomic="true"
       className={`flex items-center gap-3 text-encre-doux ${className ?? ""}`}

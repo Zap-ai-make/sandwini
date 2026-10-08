@@ -941,23 +941,31 @@ for (const {
        un ecran fini. */
     /* **La quiescence applicative, pas le silence reseau.** Firestore tient une
        requete `Listen/channel` ouverte en permanence, donc `networkidle` est
-       inatteignable ici. On interroge donc la page elle-meme : la zone de
-       travail a du contenu, et plus aucun `role="status"` -- le role ARIA que
-       porte `EtatChargement`.
+       inatteignable ici. On interroge donc la page : la zone de travail a du
+       contenu, et plus rien n'y annonce une attente.
 
-       Les deux formes plus simples ont echoue, et c'est instructif. Attendre le
-       texte « Chargement » ne voit que les ecrans qui emploient ce mot-la.
-       Attendre que `role=status` se detache rend la main *immediatement* quand
-       on interroge avant que React ait hydrate : l'element n'existe pas encore,
-       Playwright le declare deja detache. Un `waitForFunction` n'a pas ce
-       defaut puisqu'il reinterroge jusqu'a ce que la condition tienne. */
+       **Pourquoi pas `getByRole("status")`, qui serait le repere evident.** Il
+       est deja pris : c'est le canal des confirmations, le bandeau en porte un
+       en permanence, et `e2e/aide.ts` compte sur son unicite. `EtatChargement`
+       s'en abstient deliberement et le dit en toutes lettres — il annonce par
+       `aria-live` + `aria-atomic`, ce qui donne la meme annonce sans prendre le
+       nom. On ne lui ajoute donc pas ce role pour la commodite d'un script.
+
+       **Et pourquoi un `waitForFunction` plutot qu'un `waitFor` sur l'element.**
+       C'etait le vrai defaut : interroge avant que React ait hydrate,
+       `waitFor({ state: "detached" })` trouve un element absent et rend la main
+       aussitot — la page etait photographiee a 1,5 s pendant que les ecoutes
+       Firestore mettaient plusieurs secondes. Un `waitForFunction` reinterroge
+       jusqu'a ce que la condition tienne, ce qui est la seule forme correcte
+       ici. */
     await page
       .waitForFunction(
         () => {
           const travail = document.querySelector("main");
           if (!travail) return false;
-          if (travail.querySelector('[role="status"]')) return false;
-          return travail.innerText.trim().length > 0;
+          const texte = travail.innerText.trim();
+          if (texte.length === 0) return false;
+          return !/chargement|lecture des|lecture du/i.test(texte);
         },
         null,
         { timeout: 30000 },
