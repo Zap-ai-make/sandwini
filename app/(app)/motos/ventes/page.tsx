@@ -234,6 +234,10 @@ function Ventes() {
       />
     );
 
+  /* Enregistrer une vente réclame un `boutiqueId` : le geste n'existe pas tant
+     qu'aucune boutique n'est choisie (S54). */
+  const dansUneBoutique = perimetre.type === "boutique";
+
   /* Deux totaux, et la distinction compte. `total` est le registre entier :
      c'est lui qui décide si la boutique n'a jamais rien vendu — une période
      vide n'est pas un registre vide, et proposer « enregistrez la première
@@ -264,11 +268,19 @@ function Ventes() {
       <TetePage
         surTitre={surTitre}
         titre="Ventes"
+        /* Une vente se fait dans une boutique (S54) : sur « Toutes les
+           boutiques », il n'y a pas de `boutiqueId` à inscrire dessus, et le
+           bouton n'ouvrait qu'une modale qui l'aurait réclamé. Absent plutôt
+           que grisé — un bouton grisé invite à chercher ce qui le débloque
+           (`DESIGN.md`), alors que la réponse est dans le bandeau du haut.
+           Même geste que sur `/pieces` et sur le stock. */
         actions={
-          <button type="button" onClick={ouvrirLaModale} className="bouton bouton-principal">
-            <Plus aria-hidden="true" className="size-4" />
-            Nouvelle vente
-          </button>
+          dansUneBoutique ? (
+            <button type="button" onClick={ouvrirLaModale} className="bouton bouton-principal">
+              <Plus aria-hidden="true" className="size-4" />
+              Nouvelle vente
+            </button>
+          ) : null
         }
       />
 
@@ -311,7 +323,11 @@ function Ventes() {
             lecture.
           </ErreurDeLecture>
         ) : !chargement && total === 0 ? (
-          <AucuneVente perimetreEnCours={perimetreEnCours} surCreation={ouvrirLaModale} />
+          <AucuneVente
+            perimetreEnCours={perimetreEnCours}
+            dansUneBoutique={dansUneBoutique}
+            surCreation={ouvrirLaModale}
+          />
         ) : (
           <div className="cadre cadre-tableau">
             <div className="cadre-tete">
@@ -433,24 +449,31 @@ function Recherche({
 
 function AucuneVente({
   perimetreEnCours,
+  dansUneBoutique,
   surCreation,
 }: {
   perimetreEnCours: boolean;
+  dansUneBoutique: boolean;
   surCreation: () => void;
 }) {
   if (perimetreEnCours) return null;
   return (
     <EtatVide
       titre="Aucune vente enregistrée pour l’instant."
+      /* Même règle qu'en tête d'écran (S54) : sans boutique, le geste n'a pas
+         de destination, et le vide dit alors quoi faire d'abord. */
       action={
-        <button type="button" onClick={surCreation} className="bouton bouton-principal">
-          <Plus aria-hidden="true" className="size-4" />
-          Enregistrer la première
-        </button>
+        dansUneBoutique ? (
+          <button type="button" onClick={surCreation} className="bouton bouton-principal">
+            <Plus aria-hidden="true" className="size-4" />
+            Enregistrer la première
+          </button>
+        ) : undefined
       }
     >
-      Une vente demande une moto en stock et un client. Le client peut se créer au moment de la
-      vente, sans quitter l’écran.
+      {dansUneBoutique
+        ? "Une vente demande une moto en stock et un client. Le client peut se créer au moment de la vente, sans quitter l’écran."
+        : "Aucune des boutiques n’a enregistré de vente. Choisissez-en une dans le bandeau pour y enregistrer la première."}
     </EtatVide>
   );
 }

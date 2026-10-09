@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, TrendingUp, TriangleAlert, Wallet } from "lucide-react";
+import { Check, ChevronRight, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
@@ -75,24 +75,11 @@ export default function Supervision() {
       <TetePage
         surTitre={`${perimetre.type === "boutique" ? perimetre.nom : "Toutes les boutiques"} · ${formaterMois(new Date())}`}
         titre="Supervision"
-        /* `a2:86`. Il est en tête et non dans la colonne : c'est une lecture du
-           mois en cours, pas un écran où l'on travaille — on y va, on regarde,
-           on revient. */
-        actions={
-          <>
-            <Link href="/supervision/chiffres" className="bouton bouton-neutre">
-              <TrendingUp aria-hidden="true" className="size-4" />
-              Voir les chiffres
-            </Link>
-            {/* S39. Les gérants ne saisissent plus les prix d'achat : c'est ici
-                qu'ils se posent, et cet écran est le seul endroit d'où l'on
-                sait quelles motos en attendent un. */}
-            <Link href="/supervision/couts" className="bouton bouton-neutre">
-              <Wallet aria-hidden="true" className="size-4" />
-              Prix d’achat
-            </Link>
-          </>
-        }
+        /* Plus d'`actions` ici (S54). « Voir les chiffres » et « Prix d'achat »
+           menaient ailleurs depuis un écran dont le seul propos est de choisir
+           où l'on travaille. Le commanditaire : « ne servent à rien, en plus
+           l'espace doit être épuré. » Deux portes de sortie en tête d'un écran
+           de choix dispersent le seul geste qu'on y fait. */
         /* Une phrase, celle de la maquette (`a2:81`). La seconde — « ce que
            vous ouvrez s'inscrit dans le bandeau… » — expliquait un mécanisme
            que le bandeau montre lui-même, deux centimètres plus haut, et

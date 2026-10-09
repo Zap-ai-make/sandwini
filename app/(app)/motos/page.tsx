@@ -101,6 +101,9 @@ function Stock() {
   );
 
   const sansPerimetre = perimetre.type === "aucune";
+  /* Ce qui fait entrer une moto réclame un `boutiqueId` : sur « Toutes les
+     boutiques », le geste n'a nulle part où aboutir (S54). */
+  const dansUneBoutique = perimetre.type === "boutique";
   const {
     valeur: stock,
     erreur,
@@ -222,11 +225,19 @@ function Stock() {
       <TetePage
         surTitre={surTitre}
         titre="Stock motos"
+        /* Le geste n'existe que dans une boutique (S54). Une moto entre
+           quelque part : sur « Toutes les boutiques », il n'y a pas de
+           `boutiqueId` à lui donner, et le bouton n'ouvrait que sur un écran
+           qui demandait de choisir. Le rail applique la même règle par
+           `exigeBoutique` ; ici c'est la même décision, prise au même endroit
+           que la lecture du périmètre. */
         actions={
-          <Link href="/motos/nouvelle" className="bouton bouton-principal">
-            <Plus aria-hidden="true" className="size-4" />
-            Faire entrer une moto
-          </Link>
+          dansUneBoutique ? (
+            <Link href="/motos/nouvelle" className="bouton bouton-principal">
+              <Plus aria-hidden="true" className="size-4" />
+              Faire entrer une moto
+            </Link>
+          ) : null
         }
       />
 
@@ -264,7 +275,7 @@ function Stock() {
           fonctionne normalement&nbsp;: ce geste n’a pas besoin de cette lecture.
         </ErreurDeLecture>
       ) : !chargement && total === 0 ? (
-        <StockVide perimetreEnCours={perimetreEnCours} />
+        <StockVide perimetreEnCours={perimetreEnCours} dansUneBoutique={dansUneBoutique} />
       ) : (
         /* `aria-busy` pendant la lecture : les lignes fantômes disent à l'œil
            que ça arrive, cet attribut le dit à qui ne les voit pas. */
@@ -464,7 +475,13 @@ function Filtre({
   );
 }
 
-function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
+function StockVide({
+  perimetreEnCours,
+  dansUneBoutique,
+}: {
+  perimetreEnCours: boolean;
+  dansUneBoutique: boolean;
+}) {
   if (perimetreEnCours) return null;
   /* Le cadre reste, et le vide s'y installe : c'est ce que montre `b4:92`. Un
      vide qui remplace aussi la boîte laisse la page nue, et l'écran a l'air
@@ -476,15 +493,21 @@ function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
     <EtatVide
       icone={<Bike aria-hidden="true" />}
       titre="Aucune moto en stock pour l’instant."
+      /* Même règle qu'en tête d'écran (S54) : sans boutique choisie, le geste
+         n'a pas de destination. Le vide dit alors quoi faire — choisir une
+         boutique — au lieu d'offrir un bouton qui s'excuserait derrière. */
       action={
-        <Link href="/motos/nouvelle" className="bouton bouton-principal">
-          <Plus aria-hidden="true" className="size-4" />
-          Faire entrer une moto
-        </Link>
+        dansUneBoutique ? (
+          <Link href="/motos/nouvelle" className="bouton bouton-principal">
+            <Plus aria-hidden="true" className="size-4" />
+            Faire entrer une moto
+          </Link>
+        ) : undefined
       }
     >
-      La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se
-      déclarent dans les réglages.
+      {dansUneBoutique
+        ? "La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se déclarent dans les réglages."
+        : "Aucune des boutiques n’a de moto en stock. Choisissez-en une dans le bandeau pour y faire entrer la première."}
     </EtatVide>
     </div>
   );

@@ -173,11 +173,12 @@ function Colonne({
   chemin: string;
   role: Role;
 }) {
-  /* Les métiers du périmètre, comme le rail les lit déjà : la colonne de
-     supervision porte des entrées motos qui n'ont rien à faire là quand la
-     plaque annonce une boutique de pièces. */
+  /* La portée du périmètre, et non plus ses métiers : le métier se joue au
+     niveau de l'espace (`accedeEspace`), et ce qui se décide ici est l'autre
+     question — « ce geste a-t-il un sens sans boutique choisie ? ». Sur
+     « Toutes les boutiques », faire entrer une moto n'en a pas (S54). */
   const { perimetre } = usePerimetre();
-  const groupes = groupesVisibles(espace, role, perimetre.metiers);
+  const groupes = groupesVisibles(espace, role, perimetre.type);
   const courant = ecranCourant(espace, role, chemin);
   const repliee = useRepli();
   const comptes = useComptes();

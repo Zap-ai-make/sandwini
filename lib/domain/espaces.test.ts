@@ -165,8 +165,12 @@ describe("le second niveau de navigation", () => {
    * le premier — et le gérant lisant sa file verrait la colonne de son accueil
    * au lieu de celle des motos.
    *
-   * Le responsable, lui, n'a pas de renvoi : sa maquette `b2` garde la colonne
-   * de supervision en affichant les ventes.
+   * **Le responsable suit désormais la même règle (S54).** Cette assertion
+   * disait auparavant l'inverse — `/motos/ventes` appartenait à la supervision,
+   * qui le déclarait en double. C'était le comportement dont le commanditaire
+   * s'est plaint : « quand on est dans l'onglet moto et qu'on va dans vente,
+   * ça s'ouvre en repartant dans l'onglet supervision. » Le test figeait le
+   * défaut ; il fige maintenant la règle, qui ne connaît plus d'exception.
    */
   it("ne laisse pas un renvoi voler l’espace de l’écran qu’il mentionne", () => {
     const gerant = espacesVisibles("gerant", ["motos"]);
@@ -174,8 +178,8 @@ describe("le second niveau de navigation", () => {
     expect(ecranCourant("accueil", "gerant", "/motos/dossiers")).toBeNull();
 
     const responsable = espacesVisibles("responsable", ["motos"]);
-    expect(espaceDuChemin("/motos/ventes", responsable)).toBe("supervision");
-    expect(ecranCourant("supervision", "responsable", "/motos/ventes")).toBe("/motos/ventes");
+    expect(espaceDuChemin("/motos/ventes", responsable)).toBe("motos");
+    expect(ecranCourant("supervision", "responsable", "/motos/ventes")).toBeNull();
   });
 
   it("cache au gérant les écrans d’administration qu’une garde lui refuserait", () => {
@@ -318,35 +322,83 @@ describe("le périmètre pilote la navigation", () => {
   });
 });
 
-describe("la colonne suit les métiers du périmètre", () => {
-  it("laisse tomber les écrans motos quand le périmètre ne vend que des pièces", () => {
-    const hrefs = ecransVisibles("supervision", "responsable", ["pieces"]).map((e) => e.href);
-    expect(hrefs).toContain("/supervision");
-    expect(hrefs).not.toContain("/motos/ventes");
-    expect(hrefs).not.toContain("/motos/paiements");
-    expect(hrefs).not.toContain("/motos/dossiers");
+/**
+ * S54 — la supervision ne porte plus le travail des boutiques.
+ *
+ * Le commanditaire : « dans la supervision, vente et paiement chacun des deux
+ * doit être rattaché aux onglets moto et pièce, ça devrait pas être accessible
+ * depuis supervision. »
+ */
+describe("la supervision ne porte que la vue d’ensemble", () => {
+  it("n’offre plus les ventes, les paiements ni les dossiers", () => {
+    const hrefs = ecransVisibles("supervision", "responsable").map((e) => e.href);
+    expect(hrefs).toEqual(["/supervision"]);
   });
 
-  it("les garde quand le périmètre porte les motos", () => {
-    const hrefs = ecransVisibles("supervision", "responsable", ["motos"]).map((e) => e.href);
+  /*
+   * Le doublon n'était pas qu'un encombrement : il décidait mal.
+   * `espaceDuChemin` départage par la longueur du chemin, et `/motos/ventes`
+   * déclaré des deux côtés donnait deux longueurs égales — le premier espace
+   * de la liste gagnait, donc la supervision. Ouvrir les ventes depuis
+   * l'espace motos ramenait la colonne de la supervision, ce que le
+   * commanditaire a vu avant nous.
+   */
+  it("laisse les ventes à l’espace motos, même pour un responsable qui surveille", () => {
+    const ouverts = espacesVisibles("responsable", ["motos"], "toutes");
+    expect(ouverts[0]).toBe("supervision");
+    expect(espaceDuChemin("/motos/ventes", ouverts)).toBe("motos");
+    expect(espaceDuChemin("/motos/paiements", ouverts)).toBe("motos");
+    expect(espaceDuChemin("/motos/dossiers", ouverts)).toBe("motos");
+  });
+});
+
+/**
+ * S54 — ce qui exige une boutique ne s'affiche pas sans boutique.
+ *
+ * Le commanditaire : « quand on est dans l'espace toutes les boutiques,
+ * supprime tout ce qui n'est pas faisable depuis cet espace, tout ce qu'il
+ * faut forcément passer par une boutique. »
+ */
+describe("la portée du périmètre filtre les gestes", () => {
+  it("retire les gestes qui réclament une boutique sur « toutes les boutiques »", () => {
+    const hrefs = ecransVisibles("motos", "responsable", "toutes").map((e) => e.href);
+    expect(hrefs).not.toContain("/motos/nouvelle");
+    expect(hrefs).not.toContain("/motos/ventes?nouvelle=1");
+    /* Ce qui se consulte reste : on peut regarder le stock des trois
+       boutiques sans en choisir une. */
+    expect(hrefs).toContain("/motos");
     expect(hrefs).toContain("/motos/ventes");
   });
 
-  /* Le pendant de « un groupe vidé par les droits disparaît » : un groupe vidé
-     par le métier doit disparaître pareil, sans quoi la colonne afficherait un
-     titre suivi de rien. */
-  it("retire un groupe que le métier a vidé", () => {
-    expect(groupesVisibles("supervision", "responsable", ["pieces"]).map((g) => g.titre)).toEqual([
-      "Le commerce",
-    ]);
-    const ecrans = groupesVisibles("supervision", "responsable", ["pieces"])[0].ecrans;
-    expect(ecrans.map((e) => e.href)).toEqual(["/supervision"]);
+  it("les rend dès qu’une boutique est choisie", () => {
+    const hrefs = ecransVisibles("motos", "responsable", "boutique").map((e) => e.href);
+    expect(hrefs).toContain("/motos/nouvelle");
+    expect(hrefs).toContain("/motos/ventes?nouvelle=1");
+  });
+
+  /* Le groupe « Vendre » n'a que ces deux entrées : vidé, il doit disparaître
+     plutôt que laisser un titre suivi de rien. Même règle que pour les droits. */
+  it("fait disparaître le groupe « Vendre », vidé par la portée", () => {
+    expect(groupesVisibles("motos", "responsable", "toutes").map((g) => g.titre)).not.toContain(
+      "Vendre",
+    );
+    expect(groupesVisibles("motos", "responsable", "boutique").map((g) => g.titre)).toContain(
+      "Vendre",
+    );
+  });
+
+  /* Le gérant est toujours dans sa boutique : ce filtre ne doit jamais lui
+     retirer le geste principal de sa journée. */
+  it("ne retire rien au gérant, qui a toujours une boutique", () => {
+    const hrefs = ecransVisibles("motos", "gerant").map((e) => e.href);
+    expect(hrefs).toContain("/motos/nouvelle");
+    expect(hrefs).toContain("/motos/ventes?nouvelle=1");
   });
 });
 
 describe("les écrans réservés descendent dans l’espace motos", () => {
   it("le responsable y trouve le prix d’achat et les chiffres", () => {
-    const hrefs = ecransVisibles("motos", "responsable", ["motos"]).map((e) => e.href);
+    const hrefs = ecransVisibles("motos", "responsable").map((e) => e.href);
     expect(hrefs).toContain("/supervision/couts");
     expect(hrefs).toContain("/supervision/chiffres");
   });
@@ -356,10 +408,10 @@ describe("les écrans réservés descendent dans l’espace motos", () => {
      Ce test dit seulement que la colonne ne propose pas au gérant une porte
      qui lui claquerait au nez. */
   it("le gérant ne les voit pas, et son espace motos ne grossit pas", () => {
-    const hrefs = ecransVisibles("motos", "gerant", ["motos"]).map((e) => e.href);
+    const hrefs = ecransVisibles("motos", "gerant").map((e) => e.href);
     expect(hrefs).not.toContain("/supervision/couts");
     expect(hrefs).not.toContain("/supervision/chiffres");
-    expect(groupesVisibles("motos", "gerant", ["motos"]).map((g) => g.titre)).toEqual([
+    expect(groupesVisibles("motos", "gerant").map((g) => g.titre)).toEqual([
       "Vendre",
       "Suivre",
       "Le fichier",
@@ -367,7 +419,7 @@ describe("les écrans réservés descendent dans l’espace motos", () => {
   });
 
   it("et la supervision ne les porte plus en double", () => {
-    const hrefs = ecransVisibles("supervision", "responsable", ["motos"]).map((e) => e.href);
+    const hrefs = ecransVisibles("supervision", "responsable").map((e) => e.href);
     expect(hrefs).not.toContain("/supervision/couts");
   });
 });

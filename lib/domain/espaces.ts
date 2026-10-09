@@ -15,7 +15,7 @@
  * la permission se joue dans les règles Firestore (`DECISIONS.md` D27).
  */
 
-import { METIERS, type Metier } from "./boutique";
+import { type Metier } from "./boutique";
 import { peut, type Capacite, type Role } from "./roles";
 
 export type Espace = "supervision" | "accueil" | "motos" | "pieces" | "caisse" | "reglages";
@@ -177,19 +177,22 @@ export type EcranDEspace = {
   /** Sans elle, l'entrée est ouverte à tous les rôles qui voient l'espace. */
   capacite?: Capacite;
   /**
-   * Le métier que cette entrée exige du périmètre, s'il en exige un.
+   * Cette entrée exige-t-elle qu'une boutique soit choisie ?
    *
-   * Même mécanique que `capacite`, sur l'autre axe : celle-ci filtre par droit,
-   * celle-là par ce que la boutique vend. L'espace supervision porte les deux
-   * métiers, et ses entrées motos n'ont rien à faire dans la colonne quand la
-   * plaque annonce une boutique de pièces — c'est ce qui produisait l'écran
-   * « Pas dans cette boutique », où le produit proposait une porte pour
-   * s'excuser ensuite de l'avoir ouverte.
+   * Troisième axe, après le droit (`capacite`) et le métier de l'espace.
+   * Certains gestes n'ont **aucun sens** sur « Toutes les boutiques » : faire
+   * entrer une moto, enregistrer une vente. Ils réclament un `boutiqueId`, et
+   * la vue d'ensemble n'en a pas à donner.
    *
-   * Les espaces qui portent déjà un métier (`motos`, `pieces`) n'en ont pas
-   * besoin : le rail les a déjà écartés.
+   * Les proposer quand même, c'est le défaut que S54 corrige : le produit
+   * ouvrait une porte pour s'excuser derrière, avec un écran « choisissez une
+   * boutique ». Une entrée qu'on ne peut pas suivre vaut moins qu'une entrée
+   * absente — le rail dit alors la vérité sur ce qu'on peut faire d'ici.
+   *
+   * C'est un filtre d'**affichage**. Ce qui protège réellement reste la règle
+   * Firestore, qui exige un `boutiqueId` valide (D27).
    */
-  metier?: Metier;
+  exigeBoutique?: true;
   /**
    * Ce qu'on y fait, en une ligne — pour les écrans où le libellé seul ne
    * suffit pas à choisir.
@@ -251,13 +254,24 @@ export type GroupeDEcrans = {
 export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
   supervision: [
     {
+      /**
+       * La supervision ne porte plus qu'un écran, et c'est le sujet de S54.
+       *
+       * **Ventes, Paiements et Dossiers en sont partis**, à la demande du
+       * commanditaire : ils appartiennent au métier, donc aux espaces Motos et
+       * Pièces. Les voir ici aussi faisait croire à deux listes là où il n'y en
+       * a qu'une — « trop d'écrans pour ça ».
+       *
+       * **Et ce doublon était un défaut, pas seulement un encombrement.**
+       * `espaceDuChemin` départage deux espaces candidats par la longueur du
+       * chemin ; pour `/motos/ventes`, déclaré ici *et* dans l'espace motos,
+       * les deux longueurs étaient égales et c'est le premier de la liste qui
+       * gagnait — la supervision. Ouvrir les ventes depuis l'espace motos
+       * ramenait donc la colonne de la supervision. Le doublon retiré, la
+       * question ne se pose plus : un écran, un espace.
+       */
       titre: "Le commerce",
-      ecrans: [
-        { href: "/supervision", libelle: "Vue d’ensemble" },
-        { href: "/motos/ventes", libelle: "Ventes", metier: "motos" },
-        { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches", metier: "motos" },
-        { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers", metier: "motos" },
-      ],
+      ecrans: [{ href: "/supervision", libelle: "Vue d’ensemble" }],
     },
     /* « Les boutiques » n'est pas ici : c'est une liste de données, pas
        d'écrans, et elle change avec l'entreprise. La colonne la monte depuis
@@ -289,8 +303,8 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
            et non plus un écran à elle. L'entrée ouvre donc `/motos/ventes` avec
            son paramètre — elle mentionne cet écran, elle ne le possède pas, et
            c'est « Ventes » que la colonne allume pendant la saisie. */
-        { href: "/motos/ventes?nouvelle=1", libelle: "Nouvelle vente", renvoi: true },
-        { href: "/motos/nouvelle", libelle: "Faire entrer une moto" },
+        { href: "/motos/ventes?nouvelle=1", libelle: "Nouvelle vente", renvoi: true, exigeBoutique: true },
+        { href: "/motos/nouvelle", libelle: "Faire entrer une moto", exigeBoutique: true },
       ],
     },
     {
@@ -441,12 +455,12 @@ export const ECRANS_DE: Record<Espace, readonly EcranDEspace[]> = Object.fromEnt
 export function groupesVisibles(
   espace: Espace,
   role: Role,
-  metiers: readonly Metier[] = METIERS,
+  portee: PortéeDuPerimetre = "boutique",
 ): GroupeDEcrans[] {
   return GROUPES_DE[espace]
     .map((groupe) => ({
       titre: groupe.titre,
-      ecrans: groupe.ecrans.filter((ecran) => ouverte(ecran, role, metiers)),
+      ecrans: groupe.ecrans.filter((ecran) => ouverte(ecran, role, portee)),
     }))
     .filter((groupe) => groupe.ecrans.length > 0);
 }
@@ -454,22 +468,29 @@ export function groupesVisibles(
 export function ecransVisibles(
   espace: Espace,
   role: Role,
-  metiers: readonly Metier[] = METIERS,
+  portee: PortéeDuPerimetre = "boutique",
 ): EcranDEspace[] {
-  return ECRANS_DE[espace].filter((ecran) => ouverte(ecran, role, metiers));
+  return ECRANS_DE[espace].filter((ecran) => ouverte(ecran, role, portee));
 }
 
 /**
  * Cette entrée paraît-elle ? Deux axes, et il faut les deux.
  *
- * Le droit (`capacite`) et le métier du périmètre (`metier`). Les deux filtres
- * vivent ici plutôt que recopiés dans les deux fonctions au-dessus : c'est
- * l'endroit unique où l'on décide qu'une entrée se montre, et c'est ce qui
- * empêche la colonne et la palette de commandes de diverger.
+ * Le droit (`capacite`) et la portée du périmètre (`exigeBoutique`). Les deux
+ * filtres vivent ici plutôt que recopiés dans les deux fonctions au-dessus :
+ * c'est l'endroit unique où l'on décide qu'une entrée se montre, et c'est ce
+ * qui empêche la colonne et la palette de commandes de diverger.
+ *
+ * **Le métier a disparu de ce filtre, et ce n'est pas un oubli.** Il n'y
+ * servait qu'aux trois entrées motos de la supervision, parties en S54 ; le
+ * métier se joue un cran plus haut, dans `accedeEspace`, qui décide si
+ * l'espace s'ouvre. Garder ici un axe sans usager aurait fait un mécanisme
+ * documenté que plus rien n'emprunte — exactement la demi-amputation que S48 a
+ * laissée derrière elle sur la plaque, et qu'on ne refait pas.
  */
-function ouverte(ecran: EcranDEspace, role: Role, metiers: readonly Metier[]): boolean {
+function ouverte(ecran: EcranDEspace, role: Role, portee: PortéeDuPerimetre): boolean {
   if (ecran.capacite && !peut(role, ecran.capacite)) return false;
-  return !ecran.metier || metiers.includes(ecran.metier);
+  return !ecran.exigeBoutique || portee === "boutique";
 }
 
 /**

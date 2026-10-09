@@ -59,7 +59,7 @@ export function PaletteCommandes() {
        navigation vient de retirer — et un raccourci qui mène à un espace fermé
        est pire qu'un raccourci absent. */
     return espacesVisibles(role, perimetre.metiers, perimetre.type).flatMap((espace) =>
-      ecransVisibles(espace, role, perimetre.metiers).map(({ href, libelle }) => ({
+      ecransVisibles(espace, role, perimetre.type).map(({ href, libelle }) => ({
         href,
         libelle,
         espace,

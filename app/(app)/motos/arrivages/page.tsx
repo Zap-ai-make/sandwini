@@ -236,20 +236,28 @@ export default function PageArrivages() {
       <TetePage
         surTitre={surTitre}
         titre="Arrivages"
+        /* Absent et non grisé (S54). Le bouton était désactivé avec une
+           infobulle ; or la maison dit l'inverse — « un bouton qui n'a pas de
+           sens n'est pas grisé, il n'existe pas » (`DESIGN.md`, et
+           `GestesDocument` l'applique déjà). Un bouton grisé invite à chercher
+           ce qui le débloquerait, et son infobulle ne se lit pas au doigt sur
+           un téléphone. La phrase en dessous, elle, reste : c'est elle qui dit
+           où aller. Trois écrans faisaient trois choses différentes de la même
+           règle — stock, ventes et arrivages la disent désormais pareil. */
         actions={
-          <button
-            type="button"
-            onClick={() => {
-              setDernierLot(null);
-              setModaleOuverte(true);
-            }}
-            disabled={!dansUneBoutique}
-            className="bouton bouton-principal"
-            title={dansUneBoutique ? undefined : "Choisissez une boutique pour enregistrer un arrivage."}
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Nouveau
-          </button>
+          dansUneBoutique ? (
+            <button
+              type="button"
+              onClick={() => {
+                setDernierLot(null);
+                setModaleOuverte(true);
+              }}
+              className="bouton bouton-principal"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Nouveau
+            </button>
+          ) : null
         }
       />
 
