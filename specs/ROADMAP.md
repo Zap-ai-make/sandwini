@@ -289,8 +289,13 @@ amputation, pas un modèle.
 - L'ordre : **les autres fonctionnalités d'abord**, puis une identification de bout en bout. Pas de
   suppression avant elle — l'étendue de ce qui tombe est précisément ce que la spec doit établir.
 
-Rien n'a été retiré. Une suppression touche des données réelles sur `sandwini`, et la question
-« qu'est-ce qui reste » n'est pas tranchée : elle est le sujet de cette spec.
+Rien n'a été retiré — mais **pas pour la raison que cette ligne donnait d'abord**. Elle disait
+qu'une suppression toucherait « des données réelles sur `sandwini` » ; c'est faux, et l'erreur
+était de nature à fausser l'arbitrage. `sandwini` est la **préversion**, et `DEPLOIEMENT.md` §4
+dit ses données jetables et sans vrais clients. Aucune migration de données réelles n'est donc en
+jeu : la seule précaution qui reste est que c'est le décor que le commanditaire ouvre depuis son
+téléphone. Ce qui bloque est ailleurs, et ne bouge pas : la question « qu'est-ce qui reste »
+n'est pas tranchée, et elle est le sujet de cette spec.
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
