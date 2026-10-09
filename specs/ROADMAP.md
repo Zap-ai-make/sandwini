@@ -242,7 +242,7 @@ c'est le voir revenir sous un autre nom.
 | S51 | La campagne de captures ne charge pas le périmètre sur les écrans de supervision | S24, S47 | post-MVP | **ouverte** |
 | S52 | Modifier, couper et supprimer un compte de gérant | S2, S3 | post-MVP | terminée |
 | S17 | Déplacer une moto d'une boutique à une autre, en l'historisant | S5, S3 | post-MVP | terminée |
-| S53 | Les papiers d'une moto : identifier de bout en bout carte grise, CMC, quittance et plaque | S11, S30, S43, S44, S48 | post-MVP | **ouverte — pas encore de spec** |
+| S53 | Les papiers d'une moto : un seul endroit par papier | S11, S30, S43, S44, S48 | post-MVP | **spec écrite, à valider** |
 
 **S51, relevé le 8 octobre 2026.** Sur `/supervision/chiffres`, `scripts/captures.mjs`
 photographie un écran qui annonce « Responsable · 0 boutique » et reste indéfiniment en
@@ -259,20 +259,25 @@ revue croit avoir regardé. Le bilan de S50 a donc été vérifié par un script
 vues sont dans `captures/bilan-periode-*`.
 
 **S53, relevée le 8 octobre 2026, à la demande du commanditaire.** « Actuellement tout est
-ambigu, on comprend rien. » L'inventaire lui donne raison : **« carte grise » désigne cinq choses
-différentes** dans le produit, et rien ne les relie.
+ambigu, on comprend rien. » L'inventaire lui donne raison : **« carte grise » désigne sept choses
+différentes** dans le produit, et rien ne les relie. *(Cinq au premier relevé du 8 octobre ; la
+reprise du 9 en a trouvé deux de plus.)*
 
 | Où | Ce que c'est | Posé par |
 |----|--------------|----------|
+| `motos/{id}.papiersFournis` | du texte libre, où l'on tape « Carte grise » à la main | S4 |
 | `motos/{id}.cmcRecu` | une case : le CMC est-il en main ? | S43 |
 | `motos/{id}.cmcChemin` | le scan du CMC, dans Storage | S11 |
 | `ventesMotos/{id}/documents/{quittance,cmc,carte_grise}` | trois documents, cinq statuts, deux chemins | S11, S30 |
 | `ventesMotos/{id}.carteGrise` | une case au comptoir : « part avec la moto » | S44 |
 | `prestataires.types` | une liste de types de documents… à une seule valeur | S30, amputée en S48 |
+| `.plaque-code`, `BandeauEtat` | la métaphore visuelle du produit — **pas une donnée** | S28 |
 
 Le même mot nomme un **objet physique dans un tiroir**, une **étape administrative**, une **case
-sur un reçu**, et une **catégorie de fournisseur**. Deux d'entre eux — `cmcRecu` sur la moto et le
-document `cmc` sur la vente — suivent la même carte à deux endroits sans jamais se parler.
+sur un reçu**, une **catégorie de fournisseur**, une **note du vendeur** et la **palette du
+produit**. Deux d'entre eux — `cmcRecu` sur la moto et le document `cmc` sur la vente — suivent la
+même carte à deux endroits sans jamais se parler. Et `lib/domain/moto.test.ts` fige le symptôme :
+son exemple de texte libre est, littéralement, « Carte grise ».
 
 S48 a retiré la plaque du dossier, mais à moitié : les règles Firestore l'acceptent encore,
 `TYPES_DOCUMENTS` dans `lib/domain/prestataire.ts` est une énumération à une seule valeur, et
@@ -296,6 +301,19 @@ dit ses données jetables et sans vrais clients. Aucune migration de données r�
 jeu : la seule précaution qui reste est que c'est le décor que le commanditaire ouvre depuis son
 téléphone. Ce qui bloque est ailleurs, et ne bouge pas : la question « qu'est-ce qui reste »
 n'est pas tranchée, et elle est le sujet de cette spec.
+
+**Trois arbitrages de plus, le 9 octobre 2026**, et la spec est écrite :
+`specs/S53-les-papiers-d-une-moto.md`.
+
+- **La moto porte son CMC.** Le dossier le lit ; il ne reste qu'un geste au comptoir, la remise.
+- **La case « Carte grise » du comptoir pilote le dossier.** Décochée, le document naît « Sans
+  objet » — le reçu et le dossier cessent de se contredire.
+- **Le paquet est un objet**, pas une sélection multiple : le retour des dix se fait en un geste.
+
+L'inventaire a aussi corrigé son propre compte : le mot désigne **sept** choses et non cinq.
+`motos.papiersFournis` — du texte libre où l'on tape « Carte grise » à la main — et la métaphore
+visuelle `.plaque-code`, qui n'est pas une donnée mais explique pourquoi `grep plaque` rend une
+centaine de fichiers. Toute suppression doit l'exclure, sinon on enlève le design.
 
 S30 est fermée : l'écran attendait l'accusé de réception du serveur avant de rendre la main, ce qui
 hors ligne n'arrive jamais. Les règles Firestore n'y étaient pour rien — le diagnostic de départ les
