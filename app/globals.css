@@ -631,10 +631,30 @@
      libre : c'est la page qui défile, une seule fois — ce qu'il faut pour un
      tableau logé au milieu d'un tableau de bord. */
   @media (min-width: 1024px) {
+    /* Les DEUX, et c'est tout le sujet (S54).
+
+       Le défaut : figé au seul `height: 100%`, l'écran ne pouvait jamais
+       dépasser la fenêtre. Tout ce que la tête, les filtres et la barre
+       d'export réclamaient était donc pris sur la seule zone élastique — le
+       tableau. Sur une fenêtre courte il ne restait qu'UNE ligne, et l'écran
+       du stock ne montrait plus de stock.
+
+       La correction évidente — remplacer `height` par `min-height` — est
+       fausse, et la mesure l'a dit : elle retire la hauteur **définie** dont
+       toute la chaîne dépend. Sans elle, `flex: 1` n'a plus rien à diviser,
+       le cadre grandit jusqu'à son contenu, et c'est la page qui défile en
+       emportant les filtres vers le haut. Vingt lignes donnaient 834 px de
+       zone défilante au lieu de la place disponible.
+
+       Il faut donc les deux. `height: 100%` garde la hauteur définie, donc le
+       défilement intérieur et les filtres collés. `min-height` l'emporte
+       quand la fenêtre est plus courte que ce plancher : l'écran déborde,
+       `main` défile — ce qu'il sait déjà faire —, et le tableau garde une
+       hauteur où l'on peut encore comparer deux lignes. */
     .ecran-plein {
       display: flex;
       height: 100%;
-      min-height: 0;
+      min-height: 44rem;
       flex-direction: column;
     }
 
@@ -642,6 +662,11 @@
        « ce qui prend le reste ». Un cadre enfoui plus bas garde sa hauteur
        libre, et c'est bien ce qu'on veut — sinon n'importe quel tableau d'un
        panneau se mettrait à réclamer la fenêtre entière. */
+    /* `min-height: 0` reste indispensable : c'est lui qui autorise le cadre à
+       se plier sous la taille de son contenu, donc qui donne au tableau sa
+       zone défilante au lieu d'une colonne qui pousse la page. Le plancher
+       n'est pas ici mais sur `.ecran-plein`, un cran plus haut — posé ici, il
+       ne servirait à rien, l'écran étant déjà borné par la fenêtre. */
     .ecran-plein > .cadre-tableau {
       min-height: 0;
       flex: 1;

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, CloudOff, RefreshCw } from "lucide-react";
+import { ChevronDown, CloudOff, RefreshCw } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useId } from "react";
 import { PaletteCommandes } from "@/components/PaletteCommandes";
@@ -69,14 +69,24 @@ export function BandeauEtat() {
 
   const horsLigne = etat === "hors_ligne";
 
+  /**
+   * Au repos, le bandeau se tait (S54).
+   *
+   * « À jour » occupait le coin de l'œil en permanence pour dire qu'il n'y
+   * avait rien à dire. C'est la même règle que D63 sur les cartes à zéro : un
+   * indicateur toujours vert n'informe plus, il devient du décor — et on cesse
+   * de le lire le jour où il change. Hors ligne et pendant l'envoi, en
+   * revanche, le bandeau parle : ce sont les deux seuls états où la réponse
+   * coûte cher.
+   */
   const message =
     etat === "hors_ligne"
       ? ["Hors ligne", libelleAttente(enAttente)].filter(Boolean).join(" · ")
       : etat === "envoi"
         ? `Envoi ${enAttente === 1 ? "d’une saisie" : enAttente > 1 ? `de ${enAttente} saisies` : "en cours"}…`
-        : "À jour";
+        : "";
 
-  const Icone = etat === "hors_ligne" ? CloudOff : etat === "envoi" ? RefreshCw : Check;
+  const Icone = etat === "hors_ligne" ? CloudOff : RefreshCw;
 
   /* Hors ligne, le bandeau passe au jaune : la plaque s’inverse en négatif pour
      rester lisible et pour que le basculement se voie du coin de l’œil, sans
@@ -159,24 +169,28 @@ export function BandeauEtat() {
       {/* aria-live : le passage hors ligne doit être annoncé, pas seulement
           coloré. Et le texte porte toute l’information — jamais la couleur
           seule (DESIGN.md §5). */}
+      {/* La zone vit en permanence, même vide : `aria-live` n'annonce que ce
+          qui change DANS un élément déjà présent. Monter le `role="status"` en
+          même temps que le texte ferait passer le retour hors ligne sous
+          silence chez qui ne regarde pas l'écran — l'inverse du but. */}
       <span
         role="status"
         aria-live="polite"
         className={[
           "flex shrink-0 items-center gap-1.5 text-sm",
           // Sur la plaque jaune, l’encre est fixe : elle ne suit pas le thème.
-          horsLigne
-            ? "font-semibold text-encre-fixe"
-            : etat === "envoi"
-              ? "text-encre"
-              : "text-encre-doux",
+          horsLigne ? "font-semibold text-encre-fixe" : "text-encre",
         ].join(" ")}
       >
-        <Icone
-          aria-hidden="true"
-          className={["size-4 shrink-0", etat === "envoi" ? "animate-spin" : ""].join(" ")}
-        />
-        {message}
+        {message && (
+          <>
+            <Icone
+              aria-hidden="true"
+              className={["size-4 shrink-0", etat === "envoi" ? "animate-spin" : ""].join(" ")}
+            />
+            {message}
+          </>
+        )}
       </span>
     </header>
   );

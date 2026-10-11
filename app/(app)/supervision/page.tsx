@@ -3,7 +3,6 @@
 import { Check, ChevronRight, TriangleAlert } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { CeQuiDemandeUneDecision } from "@/components/CeQuiDemandeUneDecision";
 import { DernieresVentes } from "@/components/DernieresVentes";
 import { PiecesEnAlerte } from "@/components/PiecesEnAlerte";
 import { InvitationBoutique } from "@/components/InvitationBoutique";
@@ -167,12 +166,16 @@ export default function Supervision() {
         </p>
       )}
 
-      <CeQuiDemandeUneDecision className="mt-8" />
+      {/* « Ce qui demande une décision » a quitté cet écran (S54), à la
+          demande du commanditaire, pour épurer le contenu. Il reste sur
+          l'accueil du gérant, où il désigne un travail à faire aujourd'hui ;
+          ici, au-dessus de trois cartes de boutiques, il redisait en liste ce
+          que chaque carte annonce déjà par « Aucun dossier en retard ». Le
+          composant n'est pas supprimé — un seul de ses deux usages l'est. */}
 
-      {/* Après ce qui demande une décision, avant ce qui vient de se passer :
-          une rupture de stock est une décision à prendre, pas une nouvelle.
-          La carte s'efface d'elle-même quand il n'y a rien à réapprovisionner
-          (S21).
+      {/* Avant ce qui vient de se passer : une rupture de stock est une
+          décision à prendre, pas une nouvelle. La carte s'efface d'elle-même
+          quand il n'y a rien à réapprovisionner (S21).
 
           **Montée seulement si une boutique tient des pièces.** Elle ouvre deux
           écoutes, dont le journal entier des mouvements ; les payer sur une
