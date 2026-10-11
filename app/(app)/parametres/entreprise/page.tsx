@@ -178,7 +178,7 @@ function Cadre({ children }: { children: React.ReactNode }) {
   return (
     <div>
       <TetePage
-        retour={{ href: "/parametres", libelle: "Réglages" }}
+        retour={{ href: "/parametres", libelle: "Paramètres" }}
         titre="Identité de l’entreprise"
       />
       <p className="mt-2 mb-6 max-w-prose text-encre-doux">

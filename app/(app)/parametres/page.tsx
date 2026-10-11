@@ -140,12 +140,9 @@ export default function Reglages() {
     icone: ICONE_ECRAN[href] ?? Settings,
   });
 
-  /* La file d’envoi appartient à l’appareil, pas à l’entreprise : elle a sa
-     propre section, et sa propre phrase. */
   const administration = visibles
-    .filter((ecran) => ecran.href !== "/diagnostic" && ecran.href !== "/parametres/entreprise")
+    .filter((ecran) => ecran.href !== "/parametres/entreprise")
     .map(versDestination);
-  const appareil = visibles.filter((ecran) => ecran.href === "/diagnostic").map(versDestination);
   /* La fiche de l’entreprise suit l’identité, pas les cinq écrans de « Ce qui
      change » : ce qu’on va y faire, c’est régler le délai des tranches
      inactives — l’en-tête, lui, se lit juste au-dessus et ne se saisit pas.
@@ -158,8 +155,8 @@ export default function Reglages() {
   return (
     <div>
       <TetePage
-        surTitre={`Réglages · ${IDENTITE.raisonSociale}`}
-        titre="Réglages"
+        surTitre={`Paramètres · ${IDENTITE.raisonSociale}`}
+        titre="Paramètres"
         sousTitre="Ce que vous changez ici s’applique à toutes les boutiques."
       />
 
@@ -207,10 +204,9 @@ export default function Reglages() {
         </section>
       )}
 
-      {/* La section ne dépend plus de la présence du lien de synchronisation :
-          ce qui tourne sur cet appareil se lit quel que soit le rôle, et c'est
-          le gérant — celui dont l'écran est le plus susceptible d'être en
-          retard — qui appelle pour décrire un comportement (S34). */}
+      {/* L'écran de synchronisation a disparu (S54) : c'était un outil de test
+          qui écrivait un document jetable à chaque essai. Ce qui reste à
+          envoyer se lit sur le bandeau, et la version de l'appareil ici. */}
       <section aria-labelledby="titre-appareil" className="mb-8">
         <TitreSection id="titre-appareil">Cet appareil</TitreSection>
         <dl className="cadre cadre-liste">
@@ -221,11 +217,6 @@ export default function Reglages() {
           ))}
         </dl>
         <MiseAJour />
-        {appareil.length > 0 && (
-          <div className="mt-3">
-            <Hub destinations={appareil} />
-          </div>
-        )}
         <p className="mt-3 max-w-prose text-corps text-encre-doux">
           Cette page est propre à l’appareil du comptoir : ce qui est en attente ici n’est pas en
           attente ailleurs.

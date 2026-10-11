@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone } from "lucide-react";
+import { Phone, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
 import {
@@ -10,6 +10,7 @@ import {
   EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
+import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -51,6 +52,8 @@ export default function PagePrestataires() {
 
 const VIDE: SaisiePrestataire = { nom: "", telephone: "", typesDocuments: [] };
 
+const FORMULAIRE_PRESTATAIRE = "creer-prestataire";
+
 function Prestataires() {
   const souscrire = useCallback(
     (auChangement: (v: Prestataire[]) => void, enErreur: (c: unknown) => void) =>
@@ -61,16 +64,34 @@ function Prestataires() {
     souscrire,
     "La liste des prestataires n’a pas pu être chargée.",
   );
+  const [creation, setCreation] = useState(false);
 
   return (
     <div>
-      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Prestataires" />
+      {/* La liste d'abord, la création en modale (S54). Le formulaire occupait
+          le haut de l'écran en permanence : on venait presque toujours pour
+          consulter ou corriger, et il fallait le dépasser à chaque fois. Un
+          bouton en tête, et l'écran redevient ce qu'il est — une liste. */}
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Paramètres" }}
+        titre="Prestataires"
+        actions={
+          <button
+            type="button"
+            onClick={() => setCreation(true)}
+            className="bouton bouton-principal"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Ajouter un prestataire
+          </button>
+        }
+      />
       <p className="mt-2 max-w-prose text-encre-doux">
-        Ceux à qui vous confiez les cartes grises et les plaques. Ils apparaîtront au moment de
-        déposer un dossier, filtrés selon ce qu’ils traitent.
+        Ceux à qui vous confiez les cartes grises. Ils apparaîtront au moment de déposer un
+        dossier, filtrés selon ce qu’ils traitent.
       </p>
 
-      <Formulaire />
+      {creation && <Formulaire onFermer={() => setCreation(false)} />}
 
       <h2 className="mt-8 text-sm font-semibold tracking-wide text-encre-doux uppercase">
         Prestataires enregistrés
@@ -176,16 +197,14 @@ function Champs({
   );
 }
 
-function Formulaire() {
+function Formulaire({ onFermer }: { onFermer: () => void }) {
   const session = useSession();
   const [saisie, setSaisie] = useState<SaisiePrestataire>(VIDE);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [succes, setSucces] = useState<string | null>(null);
 
   function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (session.statut !== "connecte") return;
-    setSucces(null);
 
     const probleme = validerPrestataire(saisie);
     if (probleme) {
@@ -194,19 +213,37 @@ function Formulaire() {
     }
 
     setErreur(null);
-    const nom = saisie.nom.trim();
+    /* Même raison que pour une boutique : l'écriture est locale d'abord
+       (D76), donc la ligne est déjà dans la liste derrière. */
     creerPrestataire(saisie, {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
     }).catch((cause) => setErreur(messageErreurReferentiel(cause)));
     setSaisie(VIDE);
-    setSucces(`${nom} est enregistré.`);
+    onFermer();
   }
 
   return (
-    <form onSubmit={soumettre} className="mt-6 cadre p-4" noValidate>
-      <h2 className="font-semibold text-encre">Ajouter un prestataire</h2>
-
+    <Modale
+      ouvert
+      onFermer={onFermer}
+      titre="Ajouter un prestataire"
+      pied={
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" form={FORMULAIRE_PRESTATAIRE} className="bouton bouton-principal">
+            Enregistrer le prestataire
+          </button>
+          {/* « Annuler » et non « Fermer » : on abandonne une saisie, on ne
+              referme pas une consultation. Sur l'écran des boutiques, le mot
+              « Fermer » est déjà pris — il désigne la fermeture d'un point de
+              vente, à deux centimètres de là. */}
+          <button type="button" onClick={onFermer} className="bouton bouton-neutre">
+            Annuler
+          </button>
+        </div>
+      }
+    >
+    <form id={FORMULAIRE_PRESTATAIRE} onSubmit={soumettre} noValidate>
       <Champs
         saisie={saisie}
         changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
@@ -214,16 +251,8 @@ function Formulaire() {
       />
 
       <EtatErreurSaisie message={erreur} className="mt-3" />
-      {succes && (
-        <p role="status" aria-live="polite" className="text-sm text-solde">
-          {succes}
-        </p>
-      )}
-
-      <button type="submit" className="mt-3 bouton bouton-principal">
-        Enregistrer le prestataire
-      </button>
     </form>
+    </Modale>
   );
 }
 

@@ -85,7 +85,7 @@ function Catalogue() {
 
   return (
     <div>
-      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Marques et modèles" />
+      <TetePage retour={{ href: "/parametres", libelle: "Paramètres" }} titre="Marques et modèles" />
       <p className="mt-2 max-w-prose text-encre-doux">
         Ce que vous vendez. Une moto entrée en stock choisira sa marque puis son modèle dans ces
         listes — jamais en texte libre, sinon le même modèle finit écrit de trois façons.

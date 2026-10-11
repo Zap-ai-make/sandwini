@@ -8,9 +8,7 @@ import {
   LayoutGrid,
   type LucideIcon,
   Plus,
-
   Receipt,
-  RefreshCw,
   Truck,
   Store,
   Tags,
@@ -50,5 +48,4 @@ export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/parametres/catalogue": Tags,
   "/parametres/referentiels": Activity,
   "/parametres/prestataires": HardHat,
-  "/diagnostic": RefreshCw,
 };

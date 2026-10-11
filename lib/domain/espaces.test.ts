@@ -143,10 +143,10 @@ describe("le second niveau de navigation", () => {
       "Ma journée",
       "Ce qui m’attend",
     ]);
+    /* Un seul groupe depuis S54 : « Le catalogue » est descendu dans l'espace
+       motos, et « Cet appareil » a disparu avec l'écran de synchronisation. */
     expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
       "L’entreprise",
-      "Le catalogue",
-      "Cet appareil",
     ]);
   });
 
@@ -156,7 +156,12 @@ describe("le second niveau de navigation", () => {
    * « L'entreprise » suivi de rien.
    */
   it("retire les groupes que les droits ont vidés", () => {
-    expect(groupesVisibles("reglages", "gerant").map((g) => g.titre)).toEqual(["Cet appareil"]);
+    /* Tous les écrans des paramètres exigent un droit que le gérant n'a pas :
+       sa colonne « Paramètres » n'a plus aucun groupe, plutôt qu'un titre nu. */
+    expect(groupesVisibles("reglages", "gerant")).toEqual([]);
+    expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
+      "L’entreprise",
+    ]);
   });
 
   /*
@@ -184,9 +189,14 @@ describe("le second niveau de navigation", () => {
   });
 
   it("cache au gérant les écrans d’administration qu’une garde lui refuserait", () => {
+    /* Plus rien du tout depuis S54 : les quatre écrans des paramètres
+       demandent un droit que le gérant n'a pas, et « Synchronisation » — la
+       seule entrée qui lui restait — a été retirée. Le groupe vide disparaît,
+       donc l'espace aussi : c'est bien ce qu'on veut dire par « un titre sans
+       entrée sous lui est un rangement qui ment ». */
     const hrefs = ecransVisibles("reglages", "gerant").map((e) => e.href);
-    expect(hrefs).toEqual(["/diagnostic"]);
-    expect(ecransVisibles("reglages", "responsable").length).toBeGreaterThan(6);
+    expect(hrefs).toEqual([]);
+    expect(ecransVisibles("reglages", "responsable").length).toBe(4);
   });
 
   it("désigne l’écran le plus précis, pas le préfixe le plus court", () => {
@@ -259,22 +269,6 @@ describe("les écrans d’administration", () => {
     }
   });
 
-  /*
-   * « Synchronisation » n'est pas une administration : elle ne demande aucun
-   * droit, elle décrit l'état de l'appareil — ce qui attend ici n'attend pas
-   * ailleurs. S29 tranche autrement que S28 : au lieu de l'écarter du hub, on
-   * l'y range sous son propre titre, « Cet appareil » (maquette A9). L'écarter
-   * la laissait dans la colonne seule, et un écran qu'un hub ne mentionne pas
-   * est un écran qu'on croit disparu.
-   *
-   * Ce qui reste vrai, et que ce test garde : elle n'exige aucune capacité, donc
-   * elle ne se range pas avec ce qui en exige une.
-   */
-  it("rangent la synchronisation à part : une phrase, mais aucun droit exigé", () => {
-    const diagnostic = ECRANS_DE.reglages.find(({ href }) => href === "/diagnostic");
-    expect(diagnostic?.quoi).toBeTruthy();
-    expect(diagnostic?.capacite).toBeUndefined();
-  });
 });
 
 /**

@@ -79,7 +79,7 @@ export function GardeCapacite({
         recours={
           <>
             Si vous devez piloter plusieurs boutiques, le responsable peut changer votre rôle
-            depuis Réglages · Utilisateurs.
+            depuis Paramètres · Utilisateurs.
           </>
         }
       >

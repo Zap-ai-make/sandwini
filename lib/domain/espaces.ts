@@ -26,7 +26,7 @@ export const ESPACES: Record<Espace, { href: string; libelle: string }> = {
   motos: { href: "/motos", libelle: "Motos" },
   pieces: { href: "/pieces", libelle: "Pièces" },
   caisse: { href: "/caisse", libelle: "Caisse" },
-  reglages: { href: "/parametres", libelle: "Réglages" },
+  reglages: { href: "/parametres", libelle: "Paramètres" },
 };
 
 /** L'espace qui porte un métier, et le métier qu'il demande. */
@@ -349,6 +349,23 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
            plus que du mois — son bilan de période couvre l'intervalle qu'on
            veut, et c'est le mot qu'emploie le commanditaire. */
         { href: "/supervision/chiffres", libelle: "Inventaire", capacite: "voir_marges" },
+        /* Les deux référentiels du catalogue, descendus des paramètres (S54).
+           Marques, modèles, provenances et frais sont les mots qu'on déclare
+           en faisant entrer une moto : on y allait depuis le formulaire
+           d'entrée, ce qui obligeait à traverser deux espaces pour ajouter une
+           marque. Ils restent gardés par `gerer_referentiels`. */
+        {
+          href: "/parametres/catalogue",
+          libelle: "Marques et modèles",
+          capacite: "gerer_referentiels",
+          quoi: "Ce que vous vendez",
+        },
+        {
+          href: "/parametres/referentiels",
+          libelle: "Provenances et frais",
+          capacite: "gerer_referentiels",
+          quoi: "D’où viennent les motos, ce qui s’ajoute à leur prix d’achat",
+        },
       ],
     },
   ],
@@ -392,45 +409,31 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
           capacite: "gerer_utilisateurs",
           quoi: "Créer un gérant, désactiver un compte",
         },
-      ],
-    },
-    {
-      titre: "Le catalogue",
-      ecrans: [
-        {
-          href: "/parametres/catalogue",
-          libelle: "Marques et modèles",
-          capacite: "gerer_referentiels",
-          quoi: "Ce que vous vendez",
-        },
-        {
-          href: "/parametres/referentiels",
-          libelle: "Provenances et frais",
-          capacite: "gerer_referentiels",
-          quoi: "D’où viennent les motos, ce qui s’ajoute à leur prix d’achat",
-        },
         {
           href: "/parametres/prestataires",
           libelle: "Prestataires",
           capacite: "gerer_referentiels",
-          quoi: "Qui traite les cartes grises et les plaques",
+          quoi: "Qui traite les cartes grises",
         },
       ],
     },
-    {
-      titre: "Cet appareil",
-      ecrans: [
-        {
-          href: "/diagnostic",
-          libelle: "Synchronisation",
-          /* Sans cette phrase, le hub des réglages l'écartait : il ne montre
-             que les destinations qui savent dire ce qu'on y fait. Un écran
-             présent dans la colonne et absent du hub est un écran qu'on croit
-             disparu. */
-          quoi: "Ce qui reste à envoyer depuis cet appareil, et depuis quand",
-        },
-      ],
-    },
+    /*
+      « Le catalogue » a disparu, et « Cet appareil » avec lui (S54).
+
+      Marques, modèles, provenances et frais sont descendus dans l'espace
+      motos : ce sont les mots qu'on déclare en faisant entrer une moto, pas
+      des réglages d'application. On y allait depuis le formulaire d'entrée,
+      ce qui obligeait à traverser deux espaces pour ajouter une marque.
+
+      Il restait alors « Prestataires » seul sous un titre qui parlait de
+      catalogue. Un prestataire n'est pas un article : c'est un intervenant de
+      l'entreprise, au même titre qu'une boutique ou qu'un gérant. Il rejoint
+      donc « L'entreprise » plutôt que de garder un groupe pour lui tout seul.
+
+      « Synchronisation » était un outil de test — il écrivait un document
+      jetable pour montrer l'aller-retour. Le bandeau dit déjà ce qui reste à
+      envoyer, et l'écran salissait la base à chaque essai.
+    */
   ],
 };
 

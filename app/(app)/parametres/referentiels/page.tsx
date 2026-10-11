@@ -63,7 +63,7 @@ function Referentiels() {
   return (
     <div>
       <TetePage
-        retour={{ href: "/parametres", libelle: "Réglages" }}
+        retour={{ href: "/parametres", libelle: "Paramètres" }}
         titre="Provenances et frais"
       />
       <p className="mt-2 max-w-prose text-encre-doux">

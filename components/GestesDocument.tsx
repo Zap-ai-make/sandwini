@@ -203,7 +203,7 @@ function FormulaireDepot({
         <p className="mt-3 text-sm text-encre-doux">Lecture des prestataires…</p>
       ) : candidats.length === 0 ? (
         <p className="mt-3 text-sm text-encre">
-          Aucun prestataire ne traite ce document. Déclarez-en un dans Réglages, puis revenez.
+          Aucun prestataire ne traite ce document. Déclarez-en un dans Paramètres, puis revenez.
         </p>
       ) : (
         <>
