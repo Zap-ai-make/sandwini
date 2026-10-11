@@ -1,20 +1,21 @@
 "use client";
 
-import { ArrowLeft, Lock, LoaderCircle, Truck } from "lucide-react";
+import { ArrowLeft, Lock, LoaderCircle, Truck, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { DeplacerMotoModal } from "@/components/DeplacerMotoModal";
 import { PapiersMoto } from "@/components/PapiersMoto";
+import { PoserCoutModal } from "@/components/PoserCoutModal";
 import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
-import { LIBELLE_ETAT, LIBELLE_STATUT, type CoutMoto, type Moto } from "@/lib/domain/moto";
+import { LIBELLE_ETAT, LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
 import { destinationsPossibles, raisonDeNePasPartir, type Transfert } from "@/lib/domain/transfert";
 import type { Boutique } from "@/lib/domain/boutique";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterBoutiques } from "@/lib/repositories/boutiques";
 import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
-import { ecouterCoutMoto, ecouterMoto } from "@/lib/repositories/motos";
+import { ABSENT, ecouterCoutMoto, ecouterMoto, type LectureCout } from "@/lib/repositories/motos";
 import { ecouterArriveeDeLaMoto } from "@/lib/repositories/transferts";
 
 /**
@@ -113,7 +114,7 @@ export function FicheMoto({ id }: { id: string }) {
 
           <Deplacement moto={moto} estResponsable={estResponsable} />
 
-          {estResponsable ? <Cout id={id} catalogue={catalogue} /> : <CoutMasque />}
+          {estResponsable ? <Cout moto={moto} catalogue={catalogue} /> : <CoutMasque />}
         </>
       )}
     </div>
@@ -239,13 +240,29 @@ function Ligne({ titre, valeur, code = false }: { titre: string; valeur: string;
  * quatre écoutes Firestore, et les rouvrir ici les doublait sur un écran qui
  * affiche pourtant les mêmes listes.
  */
-function Cout({ id, catalogue }: { id: string; catalogue: Catalogue }) {
+/**
+ * Le coût d'entrée — et, depuis S54, sa **saisie**.
+ *
+ * Ce bloc ne faisait qu'afficher ; poser un prix d'achat n'existait que sur
+ * `/supervision/couts`, retiré à la demande du commanditaire. Sans ce geste
+ * ici, plus aucune moto n'aurait pu recevoir son prix.
+ *
+ * **Trois états, et le troisième manquait.** « Absent » et « pas encore lu »
+ * rendaient tous deux `null` : une moto sans prix d'achat affichait
+ * « Chargement… » indéfiniment — sur celle-là même où il y avait à faire.
+ * `ecouterCoutMoto` distingue désormais les deux (D82 : une absence n'est pas
+ * un zéro, et pas davantage une attente).
+ */
+function Cout({ moto, catalogue }: { moto: Moto; catalogue: Catalogue }) {
+  const id = moto.id;
+  const [ouvert, setOuvert] = useState(false);
   const souscrire = useCallback(
-    (auChangement: (cout: CoutMoto | null) => void, enErreur: (cause: unknown) => void) =>
+    (auChangement: (cout: LectureCout) => void, enErreur: (cause: unknown) => void) =>
       ecouterCoutMoto(id, auChangement, enErreur),
     [id],
   );
-  const { valeur: cout, erreur } = useAbonnement(souscrire, "Le coût n’a pas pu être chargé.");
+  const { valeur: lecture, erreur } = useAbonnement(souscrire, "Le coût n’a pas pu être chargé.");
+  const cout = lecture === null || lecture === ABSENT ? null : lecture;
 
   return (
     <section className="mt-6">
@@ -255,15 +272,34 @@ function Cout({ id, catalogue }: { id: string; catalogue: Catalogue }) {
 
       {erreur ? (
         <EtatErreur message={erreur} className="mt-2" />
-      ) : cout === null ? (
+      ) : lecture === null ? (
         <p className="mt-2 flex items-center gap-3 text-sm text-encre-doux">
           <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
           Chargement…
         </p>
+      ) : lecture === ABSENT ? (
+        /* Pas un encadré d'alerte : une moto sans prix d'achat n'est pas une
+           anomalie, c'est une entrée faite par un gérant, qui ne le saisit
+           plus (S39). La phrase dit ce que l'absence empêche — la marge —
+           parce que c'est la seule conséquence visible. */
+        <div className="mt-2 cadre p-4 sm:p-5">
+          <p className="text-corps text-encre-doux">
+            Aucun prix d’achat n’est enregistré : la marge de cette moto restera muette tant qu’il
+            manquera.
+          </p>
+          <button
+            type="button"
+            onClick={() => setOuvert(true)}
+            className="bouton bouton-principal mt-3"
+          >
+            <Wallet aria-hidden="true" className="size-4" />
+            Renseigner le prix d’achat
+          </button>
+        </div>
       ) : (
         <dl className="mt-2 cadre cadre-liste">
-          <Ligne titre="Prix d’achat" valeur={formaterMontant(cout.prixAchat)} />
-          {cout.fraisEntree.map((frais, index) => (
+          <Ligne titre="Prix d’achat" valeur={formaterMontant(lecture.prixAchat)} />
+          {lecture.fraisEntree.map((frais, index) => (
             <Ligne
               key={index}
               titre={`${catalogue.nomTypeFrais(frais.typeFraisId)}${frais.note ? ` — ${frais.note}` : ""}`}
@@ -273,10 +309,32 @@ function Cout({ id, catalogue }: { id: string; catalogue: Catalogue }) {
           <div className="flex items-baseline justify-between gap-4 bg-fond px-4 py-3">
             <dt className="text-sm font-medium text-encre">Coût total</dt>
             <dd className="text-right text-lg font-semibold text-encre">
-              {formaterMontant(cout.coutTotal)}
+              {formaterMontant(lecture.coutTotal)}
             </dd>
           </div>
         </dl>
+      )}
+
+      {/* Corriger reste possible, et discrètement : une erreur de saisie sur
+          un prix d'achat fausse la marge sans que rien ne le signale. */}
+      {lecture !== null && lecture !== ABSENT && (
+        <button
+          type="button"
+          onClick={() => setOuvert(true)}
+          className="bouton bouton-neutre mt-3"
+        >
+          <Wallet aria-hidden="true" className="size-4" />
+          Corriger le prix d’achat
+        </button>
+      )}
+
+      {ouvert && (
+        <PoserCoutModal
+          moto={moto}
+          coutActuel={cout}
+          catalogue={catalogue}
+          onFermer={() => setOuvert(false)}
+        />
       )}
     </section>
   );

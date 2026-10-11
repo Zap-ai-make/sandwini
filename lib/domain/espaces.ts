@@ -108,12 +108,13 @@ function surveille(role: Role, perimetre: PortéeDuPerimetre): boolean {
  * et donc sans moyen d'y revenir après l'avoir quittée. Un écran qu'aucune
  * navigation ne mentionne est un écran qu'on croit disparu.
  *
- * **Les deux écrans réservés sont l'exception, et elle n'est pas cosmétique.**
- * `/supervision/couts` et `/supervision/chiffres` ont gardé leur URL en
- * déménageant dans l'espace motos. Les traiter comme « de la supervision »
- * d'après leur chemin fermerait l'écran au moment précis où l'on choisit la
- * boutique dont on veut saisir le prix d'achat. C'est le rangement qui compte,
- * pas l'orthographe de l'adresse.
+ * **L'écran réservé est l'exception, et elle n'est pas cosmétique.**
+ * `/supervision/chiffres` — l'Inventaire — a gardé son URL en déménageant dans
+ * l'espace motos. Le traiter comme « de la supervision » d'après son chemin le
+ * fermerait au moment précis où l'on choisit la boutique dont on veut lire les
+ * chiffres. C'est le rangement qui compte, pas l'orthographe de l'adresse.
+ * (`/supervision/couts` était le second ; S54 l'a retiré, la saisie du prix
+ * d'achat ayant rejoint la fiche de la moto.)
  */
 export function destinationApresPerimetre(
   chemin: string,
@@ -344,7 +345,6 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
        */
       titre: "Réservé au responsable",
       ecrans: [
-        { href: "/supervision/couts", libelle: "Prix d’achat", capacite: "voir_marges" },
         /* « Inventaire » et non « Chiffres du mois » (S54) : l'écran ne parle
            plus que du mois — son bilan de période couvre l'intervalle qu'on
            veut, et c'est le mot qu'emploie le commanditaire. */

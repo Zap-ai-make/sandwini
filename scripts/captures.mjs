@@ -647,11 +647,6 @@ const PRISES = [
   { nom: "motos-nouvelle-gerant-bas-mobile-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: true, gerant: true, bas: true },
   /* Les prix d'achat, l'écran que S39 crée pour que le responsable pose ce que
      le gérant ne saisit plus. */
-  { nom: "couts-mobile-clair", chemin: "/supervision/couts", theme: "light", mobile: true },
-  { nom: "couts-bureau-clair", chemin: "/supervision/couts", theme: "light", mobile: false },
-  { nom: "couts-bureau-sombre", chemin: "/supervision/couts", theme: "dark", mobile: false },
-  { nom: "couts-modale-bureau-clair", chemin: "/supervision/couts", theme: "light", mobile: false, ouvrirCout: true },
-  { nom: "couts-modale-mobile-sombre", chemin: "/supervision/couts", theme: "dark", mobile: true, ouvrirCout: true },
   /* L'espace pieces (S20). Le gerant est le vrai destinataire : le catalogue
      lui sert a vendre, et c'est lui qui fait bouger le stock. Le responsable
      le voit aussi, avec en plus le bouton de creation d'une reference. */

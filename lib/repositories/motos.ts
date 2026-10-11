@@ -43,7 +43,7 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * Le commanditaire a tranché autrement : le gérant fait entrer la moto, la
  * supervision pose ce qu'elle a coûté. Une moto peut donc exister sans son
  * coût, et cette absence n'est pas un trou à boucher — c'est le signal que
- * l'écran `/supervision/couts` cherche.
+ * la fiche d'une moto cherche.
  *
  * Ce qui n'a pas bougé : une moto qui arrive au comptoir se saisit sans
  * attendre personne, réseau compris.
@@ -124,6 +124,19 @@ export function ecouterMoto(
 }
 
 /**
+ * « Cette moto n'a pas encore de prix d'achat », et non « on ne sait pas
+ * encore » (S54, D82).
+ *
+ * Les deux se disaient `null`, et l'abonnement part lui aussi de `null` : la
+ * fiche ne pouvait pas les distinguer et affichait « Chargement… » pour
+ * toujours sur une moto sans coût — c'est-à-dire précisément sur celle où il
+ * y a quelque chose à faire. Un marqueur explicite tranche, et `null` reprend
+ * son seul sens : la lecture n'est pas revenue.
+ */
+export const ABSENT = "absent" as const;
+export type LectureCout = CoutMoto | typeof ABSENT;
+
+/**
  * Le coût d'une moto — réservé au responsable.
  *
  * Pour un gérant, cet appel échoue par les règles, et c'est voulu : la
@@ -132,7 +145,7 @@ export function ecouterMoto(
  */
 export function ecouterCoutMoto(
   id: string,
-  auChangement: (cout: CoutMoto | null) => void,
+  auChangement: (cout: LectureCout) => void,
   enErreur: (cause: unknown) => void,
 ): () => void {
   return onSnapshot(
@@ -146,7 +159,7 @@ export function ecouterCoutMoto(
               fraisEntree: Array.isArray(donnees.fraisEntree) ? donnees.fraisEntree : [],
               coutTotal: donnees.coutTotal ?? 0,
             }
-          : null,
+          : ABSENT,
       );
     },
     enErreur,

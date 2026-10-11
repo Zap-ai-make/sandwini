@@ -376,11 +376,8 @@ export default function PageNouvelleMoto() {
           <fieldset className="mt-6 cadre p-4">
             <legend className="px-1 font-semibold text-encre">Ce qu’elle a coûté</legend>
             <p className="mt-1 text-sm text-encre-doux">
-              Réservé au responsable. Vous pouvez le laisser vide et le poser plus tard depuis{" "}
-              <Link href="/supervision/couts" className="underline">
-                Prix d’achat
-              </Link>
-              .
+              Réservé au responsable. Vous pouvez le laisser vide et le poser plus tard depuis
+              la fiche de la moto, section « Coût d’entrée ».
             </p>
 
             <div className="mt-4">

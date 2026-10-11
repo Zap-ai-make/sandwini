@@ -400,7 +400,6 @@ describe("la portée du périmètre filtre les gestes", () => {
 describe("les écrans réservés descendent dans l’espace motos", () => {
   it("le responsable y trouve le prix d’achat et les chiffres", () => {
     const hrefs = ecransVisibles("motos", "responsable").map((e) => e.href);
-    expect(hrefs).toContain("/supervision/couts");
     expect(hrefs).toContain("/supervision/chiffres");
   });
 
@@ -410,7 +409,6 @@ describe("les écrans réservés descendent dans l’espace motos", () => {
      qui lui claquerait au nez. */
   it("le gérant ne les voit pas, et son espace motos ne grossit pas", () => {
     const hrefs = ecransVisibles("motos", "gerant").map((e) => e.href);
-    expect(hrefs).not.toContain("/supervision/couts");
     expect(hrefs).not.toContain("/supervision/chiffres");
     expect(groupesVisibles("motos", "gerant").map((g) => g.titre)).toEqual([
       "Vendre",
@@ -421,7 +419,7 @@ describe("les écrans réservés descendent dans l’espace motos", () => {
 
   it("et la supervision ne les porte plus en double", () => {
     const hrefs = ecransVisibles("supervision", "responsable").map((e) => e.href);
-    expect(hrefs).not.toContain("/supervision/couts");
+    expect(hrefs).toEqual(["/supervision"]);
   });
 });
 
@@ -442,7 +440,7 @@ describe("la destination après un changement de périmètre", () => {
      boutique, et c'est même là qu'ils servent le plus. Les renvoyer à
      l'accueil fermerait l'écran qu'on vient d'ouvrir. */
   it("ne chasse pas des écrans réservés, qui ont gardé leur URL de supervision", () => {
-    expect(destinationApresPerimetre("/supervision/couts", "responsable", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/supervision/chiffres", "responsable", "boutique")).toBeNull();
     expect(destinationApresPerimetre("/supervision/chiffres", "responsable", "boutique")).toBeNull();
   });
 
