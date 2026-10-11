@@ -8,7 +8,7 @@ import {
   LayoutGrid,
   type LucideIcon,
   Plus,
-  Printer,
+
   Receipt,
   RefreshCw,
   Truck,
@@ -41,7 +41,6 @@ export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/motos/ventes": Receipt,
   "/motos/paiements": Coins,
   "/motos/dossiers": FolderCheck,
-  "/motos/recus": Printer,
   "/clients": Users,
   "/pieces": Wrench,
   "/caisse": Coins,

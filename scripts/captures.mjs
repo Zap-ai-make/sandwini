@@ -736,16 +736,16 @@ const PRISES = [
      jamais regardé. */
   { nom: "vente-fiche-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, premiereVente: true },
   { nom: "vente-fiche-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, premiereVente: true },
-  { nom: "recus-mobile-clair", chemin: "/motos/recus", theme: "light", mobile: true },
-  { nom: "recus-bureau-sombre", chemin: "/motos/recus", theme: "dark", mobile: false },
+  { nom: "recus-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true },
+  { nom: "recus-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false },
   /* Le reçu lui-même : un panneau ouvert par `?recu=`, donc atteint en cliquant
      la première ligne de la liste, comme le ferait un gérant. */
-  { nom: "recu-mobile-clair", chemin: "/motos/recus", theme: "light", mobile: true, premierRecu: true },
-  { nom: "recu-bureau-sombre", chemin: "/motos/recus", theme: "dark", mobile: false, premierRecu: true },
+  { nom: "recu-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, premierRecu: true },
+  { nom: "recu-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, premierRecu: true },
   /* **Le rendu imprimé, qui est le vrai livrable de S10.** Un `@media print`
      cassé ne se voit sur aucune capture ordinaire : sans cette prise, la revue
      visuelle regarderait un écran et croirait avoir vu le papier. */
-  { nom: "recu-papier", chemin: "/motos/recus", theme: "light", mobile: false, premierRecu: true, impression: true },
+  { nom: "recu-papier", chemin: "/motos/ventes", theme: "light", mobile: false, premierRecu: true, impression: true },
   { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true, boutique: true },
   { nom: "diagnostic-bureau-sombre", chemin: "/diagnostic", theme: "dark", mobile: false, boutique: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },

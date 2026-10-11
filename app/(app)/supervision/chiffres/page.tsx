@@ -112,7 +112,7 @@ function Chiffres() {
       <TetePage
         retour={{ href: "/supervision", libelle: "Supervision" }}
         surTitre={`${ou} · ${libelleMois(mois)}`}
-        titre="Les chiffres"
+        titre="Inventaire"
         actions={<ChoixDuMois mois={mois} choisir={setMois} />}
       />
 
@@ -133,7 +133,7 @@ function Chiffres() {
 
       {erreur ? (
         <ErreurDeLecture
-          titre="Les chiffres n’ont pas pu être calculés"
+          titre="L’inventaire n’a pas pu être calculé"
           echec={echec}
           reessayer={reessayer}
           sortie={{ href: "/supervision", libelle: "Retour à la supervision" }}

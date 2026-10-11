@@ -35,6 +35,28 @@ export type ChiffresDeLaPeriode = {
   encaisseSurTranches: number;
   /** Ce qui manque encore sur ces mêmes tranches. */
   resteSurTranches: number;
+  /**
+   * Tout ce que le magasin attend encore, quel que soit le mode de paiement.
+   *
+   * **Cette addition-là est permise, et c'est la seule.** `AGENTS.md` appelle
+   * la confusion entre crédit et tranches la plus coûteuse du projet — mais
+   * elle porte sur deux grandeurs de **sens opposés** : le crédit est de
+   * l'argent qu'on nous doit, l'encaissé sur tranches est de l'argent qu'on
+   * détient. Les additionner ne désignerait rien. Ici tous les termes vont
+   * dans le même sens : ce sont des dettes de clients. `encaisseSurTranches`
+   * n'y entre pas, et aucun écran ne doit l'y faire entrer.
+   *
+   * **La somme porte sur tous les restes dus, et non sur
+   * `creditDehors + resteSurTranches`.** C'est la définition qu'emploie déjà
+   * `bilanVentes`, donc celle que l'écran des ventes affiche sous ce même
+   * nom : deux écrans qui donneraient deux nombres différents pour « reste à
+   * percevoir » seraient pires que pas de chiffre du tout. Elle rattrape en
+   * plus deux cas que l'addition des deux cartes laissait tomber — un
+   * comptant partiellement payé, et une tranche dont la moto est déjà partie.
+   * Les deux cartes, elles, restent ce qu'elles sont : une ventilation, pas
+   * les seuls termes du total.
+   */
+  resteAPercevoir: number;
   /** Aucun chiffre à montrer : l'écran écrit une phrase plutôt que des zéros. */
   vide: boolean;
 };
@@ -78,6 +100,7 @@ export function chiffresDeLaPeriode(
     creditDehors,
     encaisseSurTranches,
     resteSurTranches,
+    resteAPercevoir: retenues.reduce((somme, vente) => somme + vente.resteDu, 0),
     vide: retenues.length === 0,
   };
 }

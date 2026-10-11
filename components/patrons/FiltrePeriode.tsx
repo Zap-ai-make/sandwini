@@ -32,12 +32,26 @@ export function FiltrePeriode({
   changer,
   plage,
   changerPlage,
+  seulementPlage = false,
   className = "",
 }: {
   periode: Periode;
   changer: (periode: Periode) => void;
   plage: PlagePeriode;
   changerPlage: (plage: PlagePeriode) => void;
+  /**
+   * N'offrir que les deux dates, sans les puces (S54).
+   *
+   * Pour l'écran qui porte **déjà** un sélecteur de mois : y ajouter « Ce
+   * mois-ci » et « Mois dernier » met deux commandes de période côte à côte,
+   * et l'œil ne sait plus laquelle gouverne quoi. Le commanditaire :
+   * « supprime ce mois, le mois dernier… car on a déjà un calendrier à
+   * droite, par contre garde le filtrage par tranche du… au… »
+   *
+   * Les autres écrans gardent les puces : là-bas elles sont la seule commande,
+   * et « ce mois-ci » est le geste qu'on répète tous les jours.
+   */
+  seulementPlage?: boolean;
   className?: string;
 }) {
   const identifiant = useId();
@@ -45,21 +59,27 @@ export function FiltrePeriode({
 
   return (
     <div className={className}>
-      <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Filtrer par période">
-        {PERIODES.map((valeur) => (
-          <button
-            key={valeur}
-            type="button"
-            className="filtre"
-            aria-pressed={periode === valeur}
-            onClick={() => changer(valeur)}
-          >
-            {LIBELLE_PERIODE[valeur]}
-          </button>
-        ))}
-      </div>
+      {!seulementPlage && (
+        <div
+          className="flex flex-wrap items-center gap-2"
+          role="group"
+          aria-label="Filtrer par période"
+        >
+          {PERIODES.map((valeur) => (
+            <button
+              key={valeur}
+              type="button"
+              className="filtre"
+              aria-pressed={periode === valeur}
+              onClick={() => changer(valeur)}
+            >
+              {LIBELLE_PERIODE[valeur]}
+            </button>
+          ))}
+        </div>
+      )}
 
-      {periode === "personnalise" && (
+      {(seulementPlage || periode === "personnalise") && (
         <div className="mt-2 flex flex-wrap items-end gap-3">
           <div className="champ">
             <label htmlFor={`${identifiant}-depuis`} className="block text-sm font-medium text-encre">

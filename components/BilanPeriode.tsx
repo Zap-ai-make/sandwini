@@ -34,7 +34,10 @@ import type { Vente } from "@/lib/domain/vente";
  * parce qu'un tel total ne désignerait rien.
  */
 export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
-  const [periode, setPeriode] = useState<Periode>("ce-mois");
+  /* « personnalise » d'emblée, et une plage vide ne borne rien : le bloc
+     s'ouvre donc sur TOUT, et les deux dates sont là pour resserrer. Les
+     puces sont parties (S54) — l'écran porte déjà un sélecteur de mois. */
+  const [periode, setPeriode] = useState<Periode>("personnalise");
   const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
 
   const maintenant = useMemo(() => new Date(), []);
@@ -58,6 +61,7 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
         changer={setPeriode}
         plage={plage}
         changerPlage={setPlage}
+        seulementPlage
         className="mb-4"
       />
 
@@ -82,26 +86,48 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
             />
           </div>
 
-          {/* Le filet et le titre séparent les deux natures d'argent. Sans eux,
-              quatre cartes alignées invitent l'œil à les additionner. */}
+          {/*
+            Deux groupes, et le filet entre eux porte toute la prudence (S54).
+
+            Le commanditaire voulait « le montant total de l'argent dehors ».
+            Le refus d'un total datait d'une mise en page où les trois cartes
+            étaient alignées : additionner ce qu'on ATTEND avec ce qu'on
+            DÉTIENT ne désigne rien, et quatre cartes côte à côte y invitent.
+
+            Le total devient juste dès lors que les deux natures sont rangées à
+            part. Ici, sous « ce qui reste à percevoir », tous les termes vont
+            dans le même sens — ce sont des dettes de clients. L'argent détenu
+            est descendu sous le filet, seul, et aucun total ne le touche.
+          */}
           <h3 className="mt-6 mb-3 border-t border-bord pt-4 text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
-            Ce qui n’est pas soldé — deux natures, jamais un total
+            Ce qui reste à percevoir — l’argent dehors
           </h3>
           <div className="grid gap-4 sm:grid-cols-3">
+            <Carte
+              nom="Total dehors"
+              valeur={formaterMontant(chiffres.resteAPercevoir)}
+              detail="Tout ce que les clients doivent encore"
+            />
             <Carte
               nom="Crédit dehors"
               valeur={formaterMontant(chiffres.creditDehors)}
               detail="La moto est partie, le client doit"
             />
             <Carte
-              nom="Encaissé sur tranches"
-              valeur={formaterMontant(chiffres.encaisseSurTranches)}
-              detail="La moto est au magasin, qui détient cet argent"
-            />
-            <Carte
               nom="Reste sur tranches"
               valeur={formaterMontant(chiffres.resteSurTranches)}
-              detail="Ce qui manque encore sur ces mêmes ventes"
+              detail="La moto est au magasin, il manque encore ceci"
+            />
+          </div>
+
+          <h3 className="mt-6 mb-3 border-t border-bord pt-4 text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
+            Ce que le magasin détient — n’entre dans aucun total ci-dessus
+          </h3>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Carte
+              nom="Encaissé sur tranches"
+              valeur={formaterMontant(chiffres.encaisseSurTranches)}
+              detail="L’argent des clients, gardé contre une moto qui n’est pas partie"
             />
           </div>
         </>

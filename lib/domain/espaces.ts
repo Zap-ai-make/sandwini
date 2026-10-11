@@ -315,7 +315,6 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
         { href: "/motos/ventes", libelle: "Ventes" },
         { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
         { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },
-        { href: "/motos/recus", libelle: "Reçus" },
       ],
     },
     {
@@ -346,7 +345,10 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       titre: "Réservé au responsable",
       ecrans: [
         { href: "/supervision/couts", libelle: "Prix d’achat", capacite: "voir_marges" },
-        { href: "/supervision/chiffres", libelle: "Chiffres du mois", capacite: "voir_marges" },
+        /* « Inventaire » et non « Chiffres du mois » (S54) : l'écran ne parle
+           plus que du mois — son bilan de période couvre l'intervalle qu'on
+           veut, et c'est le mot qu'emploie le commanditaire. */
+        { href: "/supervision/chiffres", libelle: "Inventaire", capacite: "voir_marges" },
       ],
     },
   ],

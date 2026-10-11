@@ -20,7 +20,7 @@ import { ecouterVente, ecouterVersements } from "@/lib/repositories/ventes";
 /**
  * Le panneau qui montre un reçu et permet de l'imprimer ou de le partager.
  *
- * Ce n'est pas une route : c'est `/motos/recus?recu=<clé>`, comme la fiche
+ * Ce n'est pas une route : c'est `/motos/ventes?recu=<clé>`, comme la fiche
  * d'une moto ou d'une vente. Une route dynamique `/recus/[id]` obligerait le
  * navigateur à demander au serveur un document que le service worker n'a jamais
  * vu, et le reçu d'une vente saisie il y a dix secondes tomberait sur la page de
@@ -107,12 +107,14 @@ export function PanneauRecu({ cle }: { cle: string }) {
   return (
     <div>
       <div className="print:hidden">
+        {/* Retour aux ventes, et non plus « aux reçus » (S54) : les reçus
+            n'ont plus d'écran à eux, ils sont un panneau de la vente. */}
         <Link
-          href="/motos/recus"
+          href="/motos/ventes"
           className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Reçus
+          Ventes
         </Link>
       </div>
 
@@ -236,8 +238,8 @@ function Introuvable() {
       titre="Ce reçu est introuvable."
       className="mt-6 max-w-prose"
       action={
-        <Link href="/motos/recus" className="bouton bouton-neutre">
-          Revenir aux reçus
+        <Link href="/motos/ventes" className="bouton bouton-neutre">
+          Revenir aux ventes
         </Link>
       }
     >

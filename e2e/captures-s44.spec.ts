@@ -145,7 +145,7 @@ test("captures de la refonte S44", async ({ page }) => {
    * avant D77, et c'est donc le cas qui mérite l'œil.
    */
   await poserLeTheme(page, "sombre");
-  await page.goto("/motos/recus", { waitUntil: "load" });
+  await page.goto("/motos/ventes", { waitUntil: "load" });
   await poserLeTheme(page, "sombre");
   const premierRecu = contenu(page).getByRole("link").first();
   await premierRecu.click();

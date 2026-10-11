@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { CartesVentes } from "@/components/CartesVentes";
 import { FicheVente } from "@/components/FicheVente";
+import { PanneauRecu } from "@/components/PanneauRecu";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { ModaleVente } from "@/components/ModaleVente";
 import {
@@ -77,6 +78,10 @@ export default function PageVentes() {
 function Ventes() {
   const parametres = useSearchParams();
   const venteOuverte = parametres.get("vente");
+  /* Les reçus n'ont plus d'écran à eux (S54) : ils s'ouvrent dans le panneau
+     de cet écran-ci. Le reçu l'emporte sur la fiche quand les deux paramètres
+     sont là — on vient de cliquer dessus, c'est lui qu'on veut voir. */
+  const recuOuvert = parametres.get("recu");
   /* La modale s'ouvre par un paramètre d'écran, comme les fiches : une route
      `/motos/ventes/nouvelle` obligeait le navigateur à demander au serveur un
      document que le service worker sert déjà sous `/motos/ventes` (D39). Le
@@ -307,7 +312,13 @@ function Ventes() {
       {modaleOuverte && <ModaleVente onFermer={fermerLaModale} />}
 
       <AvecPanneau
-        panneau={venteOuverte ? <FicheVente id={venteOuverte} /> : null}
+        panneau={
+          recuOuvert ? (
+            <PanneauRecu cle={recuOuvert} />
+          ) : venteOuverte ? (
+            <FicheVente id={venteOuverte} />
+          ) : null
+        }
       >
         {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
             vide, filtres compris, ferait croire à une boutique sans vente. */}

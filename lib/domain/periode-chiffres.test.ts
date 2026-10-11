@@ -114,3 +114,68 @@ describe("chiffresDeLaPeriode", () => {
     expect(chiffres.resteSurTranches).toBe(60_000);
   });
 });
+
+/**
+ * « L'argent dehors » — la seule addition permise entre les deux natures.
+ *
+ * Demandé par le commanditaire : « on doit également avoir le montant total de
+ * l'argent dehors, moto crédit + partiel restant ». Ces tests existent surtout
+ * pour figer ce que le total ne contient **pas** : le jour où quelqu'un y
+ * ajoutera l'encaissé sur tranches, croyant compléter la somme, ils tomberont.
+ */
+describe("resteAPercevoir", () => {
+  it("additionne le crédit dehors et le reste sur tranches", () => {
+    const chiffres = chiffresDeLaPeriode(TOUT, [
+      vente({ id: "c1", modePaiement: "credit", resteDu: 415_000 }),
+      vente({ id: "t1", modePaiement: "tranches", totalPaye: 575_000, resteDu: 300_000 }),
+    ]);
+    expect(chiffres.resteAPercevoir).toBe(715_000);
+  });
+
+  /*
+   * Le garde-fou de la règle cardinale. L'encaissé sur tranches est de
+   * l'argent que le magasin DÉTIENT ; le reste à percevoir est de l'argent
+   * qu'il ATTEND. Les mêlanger inventerait une grandeur qui ne désigne rien —
+   * ici 575 000 de trop.
+   */
+  it("n’inclut jamais l’argent que le magasin détient déjà", () => {
+    const chiffres = chiffresDeLaPeriode(TOUT, [
+      vente({ id: "t1", modePaiement: "tranches", totalPaye: 575_000, resteDu: 300_000 }),
+    ]);
+    expect(chiffres.encaisseSurTranches).toBe(575_000);
+    expect(chiffres.resteAPercevoir).toBe(300_000);
+  });
+
+  it("vaut zéro quand tout est soldé", () => {
+    const chiffres = chiffresDeLaPeriode(TOUT, [
+      vente({ id: "s1", modePaiement: "comptant", totalPaye: 900_000, resteDu: 0 }),
+    ]);
+    expect(chiffres.resteAPercevoir).toBe(0);
+  });
+
+  /*
+   * Les deux cas que l'addition des deux cartes laissait tomber. Ils ont
+   * décidé de la définition : le total somme TOUS les restes dus, comme
+   * `bilanVentes`, et non `creditDehors + resteSurTranches`.
+   *
+   * Une moto remise sort des tranches détenues — elle ne doit pas pour autant
+   * sortir de ce qu'on attend : le client doit toujours, et la moto n'est
+   * plus là pour répondre de la dette.
+   */
+  it("garde ce qui est dû sur une vente en tranches dont la moto est partie", () => {
+    const chiffres = chiffresDeLaPeriode(TOUT, [
+      vente({ modePaiement: "tranches", totalPaye: 800_000, resteDu: 120_000, motoRemise: true }),
+    ]);
+    expect(chiffres.resteSurTranches).toBe(0);
+    expect(chiffres.resteAPercevoir).toBe(120_000);
+  });
+
+  it("compte aussi un comptant qui n’a pas été soldé", () => {
+    const chiffres = chiffresDeLaPeriode(TOUT, [
+      vente({ modePaiement: "comptant", totalPaye: 500_000, resteDu: 400_000 }),
+    ]);
+    expect(chiffres.creditDehors).toBe(0);
+    expect(chiffres.resteSurTranches).toBe(0);
+    expect(chiffres.resteAPercevoir).toBe(400_000);
+  });
+});

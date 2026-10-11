@@ -102,9 +102,11 @@ describe("accueilDuRole", () => {
 });
 
 describe("le second niveau de navigation", () => {
-  it("met les neuf écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
+  /* Huit depuis S54 : les reçus n'ont plus d'entrée à eux — ils s'ouvrent
+     dans le panneau de l'écran des ventes, d'où ils sortent déjà. */
+  it("met les huit écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
     const ecrans = ecransVisibles("motos", "gerant");
-    expect(ecrans).toHaveLength(9);
+    expect(ecrans).toHaveLength(8);
     expect(ecrans.map((e) => e.href)).toEqual(
       expect.arrayContaining([
         "/motos",
@@ -114,7 +116,6 @@ describe("le second niveau de navigation", () => {
         "/motos/ventes?nouvelle=1",
         "/motos/paiements",
         "/motos/dossiers",
-        "/motos/recus",
       ]),
     );
     /* Les titres sont ceux de `maquettes/b1-rail-gerant.html`, et non les trois

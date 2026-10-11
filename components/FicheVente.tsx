@@ -157,7 +157,7 @@ export function FicheVente({ id }: { id: string }) {
             {/* Le reçu de la vente se réimprime à tout moment, et il se compose
                 à la lecture : rien n'a été figé à la première impression (D61). */}
             <Link
-              href={`/motos/recus?recu=${identifiantRecu(vente.id, null)}`}
+              href={`/motos/ventes?recu=${identifiantRecu(vente.id, null)}`}
               className="bouton bouton-principal"
             >
               <Printer aria-hidden="true" className="size-4" />
@@ -418,7 +418,7 @@ function ListeVersements({ versements }: { versements: Versement[] | null }) {
                     accessible du lien doit dire où il mène, et une suite de
                     chiffres ne le dit pas (`DESIGN.md` §8). */}
                 <Link
-                  href={`/motos/recus?recu=${identifiantRecu(versement.venteId, versement.id)}`}
+                  href={`/motos/ventes?recu=${identifiantRecu(versement.venteId, versement.id)}`}
                   className="inline-flex items-center gap-1 font-medium text-encre underline underline-offset-2"
                 >
                   <ReceiptText aria-hidden="true" className="size-3.5" />
