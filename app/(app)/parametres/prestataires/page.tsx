@@ -14,7 +14,6 @@ import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
-  LIBELLE_TYPE_DOCUMENT,
   LONGUEUR_NOM_MAX,
   LONGUEUR_TELEPHONE_MAX,
   TYPES_DOCUMENTS,
@@ -22,7 +21,6 @@ import {
   validerPrestataire,
   type Prestataire,
   type SaisiePrestataire,
-  type TypeDocument,
 } from "@/lib/domain/prestataire";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import {
@@ -50,7 +48,15 @@ export default function PagePrestataires() {
   );
 }
 
-const VIDE: SaisiePrestataire = { nom: "", telephone: "", typesDocuments: [] };
+/* Le type est posé ici et nulle part ailleurs (S53) : tous les prestataires
+   traitent la carte grise, et c'est le seul type depuis S48. Le jour où un
+   second apparaît, c'est ce tableau qui redeviendra un choix à l'écran — pas
+   l'inverse. */
+const VIDE: SaisiePrestataire = {
+  nom: "",
+  telephone: "",
+  typesDocuments: [...TYPES_DOCUMENTS],
+};
 
 const FORMULAIRE_PRESTATAIRE = "creer-prestataire";
 
@@ -117,42 +123,6 @@ function Prestataires() {
   );
 }
 
-function ChoixTypes({
-  valeurs,
-  changer,
-  prefixe,
-}: {
-  valeurs: TypeDocument[];
-  changer: (types: TypeDocument[]) => void;
-  prefixe: string;
-}) {
-  return (
-    <fieldset className="mt-4">
-      <legend className="text-sm font-medium text-encre">Documents traités</legend>
-      <div className="mt-1.5 flex flex-wrap gap-4">
-        {TYPES_DOCUMENTS.map((type) => (
-          <label key={type} className="flex items-center gap-2 text-encre">
-            <input
-              type="checkbox"
-              id={`${prefixe}-${type}`}
-              checked={valeurs.includes(type)}
-              onChange={(evenement) =>
-                changer(
-                  evenement.target.checked
-                    ? [...valeurs, type]
-                    : valeurs.filter((autre) => autre !== type),
-                )
-              }
-              className="size-5 rounded-plaque border-bord accent-plaque"
-            />
-            {LIBELLE_TYPE_DOCUMENT[type]}
-          </label>
-        ))}
-      </div>
-    </fieldset>
-  );
-}
-
 function Champs({
   saisie,
   changer,
@@ -188,11 +158,12 @@ function Champs({
         />
       </Champ>
 
-      <ChoixTypes
-        valeurs={saisie.typesDocuments}
-        changer={(typesDocuments) => changer({ typesDocuments })}
-        prefixe={prefixe}
-      />
+      {/* **Le groupe « Documents traités » a quitté ce formulaire** (S53). Il
+          proposait une seule case depuis S48, quand la plaque est sortie du
+          dossier : un choix à une seule option n'est pas un choix, c'est une
+          saisie obligatoire déguisée — et on la découvrait en voyant le
+          formulaire refusé sans comprendre pourquoi. Le type est désormais posé
+          implicitement par `VIDE`. */}
     </div>
   );
 }

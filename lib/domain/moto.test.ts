@@ -237,9 +237,15 @@ describe("le coût, séparé de la moto (S39)", () => {
 });
 
 describe("lirePapiers", () => {
+  /* **Aucun exemple ne reprend le nom d'un papier du dossier** (S53). Celui-ci
+     prenait « Carte grise », et figeait noir sur blanc le symptôme que la spec
+     a relevé : le même papier était une chaîne tapée à la main ici, et un
+     document à cycle dans le fichier voisin. Ce champ est une note du vendeur
+     sur une occasion — ce qu'il a trouvé dans le top-case, pas un document
+     administratif à suivre. */
   it("lit une liste tapée une ligne par papier", () => {
-    expect(lirePapiers("Carte grise\n  Facture  \n\nAssurance")).toEqual([
-      "Carte grise",
+    expect(lirePapiers("Double des clés\n  Facture  \n\nAssurance")).toEqual([
+      "Double des clés",
       "Facture",
       "Assurance",
     ]);

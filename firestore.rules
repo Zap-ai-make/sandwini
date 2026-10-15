@@ -318,14 +318,34 @@ service cloud.firestore {
              && donnees.telephone.size() <= 40
              && donnees.typesDocuments is list
              && donnees.typesDocuments.size() > 0
+             // Les deux types jamais acceptes a la CREATION : voir
+             // `typesACreer` juste en dessous.
              && donnees.typesDocuments.hasOnly(['carte_grise', 'plaque'])
              && donnees.actif is bool;
+    }
+
+    // **Le trou de S48, ferme par S53.** La plaque a quitte le dossier en S48 :
+    // l'immatriculation s'obtient avec la carte grise, chez le meme
+    // prestataire. `TYPES_DOCUMENTS` ne la propose plus cote domaine, mais ces
+    // regles l'acceptaient encore — et S48 avait documente ce reste comme
+    // volontaire sans distinguer les deux gestes.
+    //
+    // **L'asymetrie est voulue, et c'est tout l'objet de cette separation.**
+    // Une fiche NEUVE ne doit plus naitre avec un type que plus aucun ecran ne
+    // sait afficher. Mais les fiches posees avant S48 en portent, et les
+    // refuser en MODIFICATION les rendrait incorrigibles : on ne pourrait plus
+    // y changer un numero de telephone sans d'abord reparer un champ que
+    // l'ecran ne montre pas. On ferme la porte d'entree, on laisse celle de la
+    // reparation.
+    function typesACreer(donnees) {
+      return donnees.typesDocuments.hasOnly(['carte_grise']);
     }
 
     match /prestataires/{id} {
       allow read: if connecte();
       allow create: if estResponsable()
                     && prestataireValide(request.resource.data)
+                    && typesACreer(request.resource.data)
                     && traceCreation(request.resource.data);
       allow update: if estResponsable()
                     && prestataireValide(request.resource.data)

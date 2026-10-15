@@ -3117,3 +3117,70 @@ part ailleurs : le navigateur ne pourrait pas la rejouer sans des lectures que
 les règles refusent au gérant, et une seconde version de cette règle serait une
 occasion de diverger. L'écran annonce la condition d'avance, et affiche le refus
 du serveur tel quel (`components/SupprimerGerantModal.tsx`).
+
+## D107 — Un papier a un seul endroit où il vit, et le mot qui le nomme n'en désigne qu'un
+
+*S53, 15 octobre 2026. Le commanditaire, après des mois d'usage : « trop de
+saisies pour la même carte », « le logiciel ne suit pas le vrai circuit »,
+« trop d'écrans pour ça ».*
+
+**Le mot « carte » désignait sept choses dans le produit, et rien ne les
+reliait.** L'inventaire du 9 octobre :
+
+| Où | Ce que ça voulait dire | Posé par |
+|----|------------------------|----------|
+| `motos.papiersFournis` | une liste de texte libre, occasion seulement | S4 |
+| `motos.quittanceChemin`, `motos.cmcChemin` | deux scans dans Storage | S11 |
+| `motos.cmcRecu` | une case : la carte est-elle dans le tiroir ? | S43 |
+| `ventesMotos/{id}/documents/{…}` | trois documents, cinq statuts, deux parcours | S11, S30 |
+| `ventesMotos/{id}.carteGrise` | une case au comptoir : « part avec la moto » | S44 |
+| `prestataires.typesDocuments` | une énumération à une seule valeur | S30, amputée en S48 |
+| `.plaque-code`, `BandeauEtat` | la métaphore visuelle du produit | S28 |
+
+Le septième n'est pas une donnée : c'est la palette, née de la plaque jaune
+d'immatriculation. Il explique pourquoi `grep plaque` rend une centaine de
+fichiers, et **toute suppression doit l'exclure explicitement** — sinon on
+enlève le design en croyant enlever une fonctionnalité.
+
+**Celui qui survit est le quatrième, et réduit.** Le document de dossier reste,
+mais il ne garde pour la quittance et le CMC qu'un seul fait : *ce papier est
+sans objet pour cette vente*. Tout le reste se calcule à la lecture (D61).
+
+**La décision.** Un papier a **un seul endroit où il vit**, et les écrans n'en
+sont que des lecteurs :
+
+| Papier | Où vit sa disponibilité | Où vit sa remise |
+|--------|-------------------------|------------------|
+| Quittance | `motos.quittanceRecue` | `ventesMotos.emporte.quittance` |
+| CMC | `motos.cmcRecu` | `ventesMotos.emporte.cmc` |
+| Carte grise | son statut stocké | — (le retour est le terme) |
+
+**Pourquoi la carte grise échappe à la règle.** Elle a une vie **dehors**, chez
+quelqu'un, que ni la moto ni la vente ne connaissent. Son statut stocké est donc
+la seule source possible — et c'est ce qui justifie qu'elle garde seule un cycle.
+
+**Ce que ça rend impossible, et c'est tout l'intérêt.** Le CMC était suivi à deux
+endroits qui ne se parlaient jamais : `motos.cmcRecu` disait « la carte est là »
+pendant que le document du dossier disait « à faire ». Les recoller à la lecture
+ne répare pas la contradiction, elle la rend **inexprimable** — il n'y a plus
+deux champs à synchroniser, il y en a un.
+
+**Le prix, et il est réel.** L'écran des dossiers ne chargeait pas les motos. Il
+lui faut une écoute de plus — celle du stock du périmètre, que l'écran des motos
+tient déjà. Si elle s'avère coûteuse, le repli est de ne calculer l'état que sur
+la fiche de la vente, où la moto est déjà chargée. À décider sur mesure.
+
+**Le corollaire de vocabulaire, sans lequel la confusion repousse.** « Papiers
+fournis » devient « Notes du vendeur » à l'écran : c'est une note sur une
+occasion, pas un document à suivre. Et aucun exemple de test ne reprend le nom
+d'un papier du dossier comme valeur de texte libre — `lib/domain/moto.test.ts`
+prenait « Carte grise », et figeait le symptôme noir sur blanc.
+
+**La leçon de méthode, payée deux fois.** Deux secondes écritures d'un même
+chemin ont survécu au changement et n'ont été trouvées que par un test de bout
+en bout : `transitionDossierAutorisee` dans `firestore.rules` autorisait encore
+un passage que le domaine venait de retirer, et `PARCOURS_*` dans
+`lib/domain/dossier.ts` annonçait encore une étape que plus aucun geste
+n'atteint. Quand une règle est écrite deux fois — ici par nécessité, le serveur
+devant juger sans le client (D27) —, **la changer d'un côté ne la change pas de
+l'autre**, et seul un test qui traverse les deux le dit.

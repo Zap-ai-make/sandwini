@@ -96,10 +96,16 @@ export function FicheMoto({ id }: { id: string }) {
             )}
           </dl>
 
+          {/* **« Notes du vendeur » et non « Papiers fournis »** (S53). Le mot
+              « papiers » nu le faisait confondre avec les documents du dossier,
+              qui sont juste au-dessus et n'ont rien à voir : ceux-ci se suivent
+              et se remettent, celui-là est du texte libre tapé à l'entrée d'une
+              occasion. Un même mot pour deux choses était l'une des sept
+              confusions relevées par la spec. */}
           {moto.papiersFournis.length > 0 && (
             <section className="mt-6">
               <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
-                Papiers fournis
+                Notes du vendeur
               </h2>
               <ul className="mt-2 cadre cadre-liste">
                 {moto.papiersFournis.map((papier) => (

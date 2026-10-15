@@ -356,7 +356,9 @@ describe("prestataires", () => {
   const prestataire = (partie: Record<string, unknown> = {}) => ({
     nom: "Ouédraogo plaques",
     telephone: "70 11 22 33",
-    typesDocuments: ["plaque"],
+    /* `carte_grise` et non `plaque` : la plaque a quitté le dossier en S48, et
+       S53 ferme la porte que S48 avait laissée ouverte à la création. */
+    typesDocuments: ["carte_grise"],
     actif: true,
     ...creation(),
     ...partie,
@@ -379,6 +381,31 @@ describe("prestataires", () => {
   it("refuse un type de document inventé", async () => {
     await assertFails(
       addDoc(collection(responsable(), "prestataires"), prestataire({ typesDocuments: ["passeport"] })),
+    );
+  });
+
+  /* **Le trou de S48, fermé par S53.** La plaque a quitté le dossier en S48 :
+     `TYPES_DOCUMENTS` ne la propose plus côté domaine, mais les règles
+     l'acceptaient encore à la CRÉATION. Une fiche neuve pouvait donc naître
+     avec un type que plus aucun écran ne sait afficher — et S48 avait documenté
+     ce reste comme volontaire pour la modification, sans voir qu'il valait
+     aussi pour la création. */
+  it("refuse plaque à la création d’un prestataire : le type n’existe plus", async () => {
+    await assertFails(
+      addDoc(collection(responsable(), "prestataires"), prestataire({ typesDocuments: ["plaque"] })),
+    );
+  });
+
+  /* L'asymétrie est voulue : les fiches posées avant S48 portent `plaque`, et
+     les refuser en modification les rendrait incorrigibles — on ne pourrait
+     plus y changer un numéro de téléphone sans d'abord réparer un champ que
+     l'écran ne montre pas. */
+  it("accepte encore plaque en modification, pour que les fiches anciennes se corrigent", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(responsable(), "prestataires/kabore"),
+        modification({ typesDocuments: ["plaque"] }),
+      ),
     );
   });
 

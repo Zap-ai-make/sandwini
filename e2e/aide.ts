@@ -449,9 +449,10 @@ export async function creerPrestataire(page: Page, nom: string) {
   const formulaire = page.getByRole("dialog");
   await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
   await formulaire.getByLabel("Téléphone").fill("70112233");
-  /* Un seul type depuis S48 : la plaque a quitté le dossier, l'immatriculation
-     étant obtenue avec la carte grise et chez le même prestataire. */
-  await formulaire.getByLabel("Carte grise").check();
+  /* **Plus de case à cocher depuis S53.** Le groupe « Documents traités » a
+     quitté ce formulaire : il n'avait plus qu'une option depuis S48, et un
+     choix à une seule option est une saisie obligatoire déguisée. Le type se
+     pose implicitement. */
   await formulaire.getByRole("button", { name: "Enregistrer le prestataire" }).click();
   /* **La ligne est la confirmation** depuis S54. Il n'y a plus de phrase verte
      à viser : l'écriture est locale d'abord (D76), donc la modale se ferme et

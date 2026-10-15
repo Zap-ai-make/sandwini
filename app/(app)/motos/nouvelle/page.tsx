@@ -366,8 +366,11 @@ export default function PageNouvelleMoto() {
 
           {saisie.etat === "occasion" && (
             <div className="mt-4">
+              {/* « Notes du vendeur » : voir `FicheMoto.tsx`. Le mot
+                  « papiers » le faisait confondre avec les documents du
+                  dossier (S53). */}
               <label htmlFor="papiers" className="block text-sm font-medium text-encre">
-                Papiers fournis
+                Notes du vendeur
               </label>
               <textarea
                 id="papiers"
