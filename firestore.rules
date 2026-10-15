@@ -999,8 +999,20 @@ service cloud.firestore {
              // type, donc les documents `plaque` deja en base restent
              // modifiables et un vieux dossier reste corrigeable.
              && type in ['quittance', 'cmc', 'carte_grise']
-             // S8 ouvre le dossier ; c'est S11 qui fera vivre les autres statuts.
-             && donnees.statut == 'a_faire';
+             // S8 ouvre le dossier ; c'est S11 qui fait vivre les autres statuts.
+             //
+             // **Decochee au comptoir, la carte grise nait « sans objet »**
+             // (S53, arbitrage 5). La decocher laissait jusqu'ici un document
+             // « a faire » que personne n'allait jamais faire, et qui bloquait
+             // la cloture : le recu imprimait « non inclus » pendant que le
+             // dossier la reclamait.
+             //
+             // Les deux autres papiers n'ont pas cette porte : leur
+             // disponibilite vient de la MOTO, pas d'une case de vente. Leur
+             // ouvrir le meme chemin inviterait a ecarter a la vente ce qui se
+             // coche a l'arrivage — deux endroits pour un fait, de nouveau.
+             && (donnees.statut == 'a_faire'
+                 || (type == 'carte_grise' && donnees.statut == 'non_applicable'));
     }
 
     // La machine a etats, cote serveur. Elle repete `lib/domain/dossier.ts`, et
@@ -1012,15 +1024,24 @@ service cloud.firestore {
       return type in ['quittance', 'cmc'];
     }
 
+    // **S53 retire leurs etapes a la quittance et au CMC.** Leur disponibilite
+    // vit sur la moto (`quittanceRecue`, `cmcRecu`) et leur remise sur la vente
+    // (`emporte`) : il ne reste au dossier qu'a dire s'ils sont ecartes. Et la
+    // carte grise s'arrete a son retour — sa preuve de remise est le scan et la
+    // plaque saisis sur la fiche de vente, non un troisieme statut a promener.
+    //
+    // Cette copie doit dire exactement ce que dit `CHEMIN_SANS_ETAPE` dans
+    // `lib/domain/dossier.ts`. Si elle en disait davantage, un appareil dont le
+    // code a ete modifie ecrirait un statut que plus personne ne lit — et le
+    // dossier redeviendrait la seconde source de verite que cette spec ferme.
     function transitionDossierAutorisee(type, de, vers) {
       return de == 'a_faire'
                ? (vers == 'non_applicable'
-                  || vers == (arriveDejaFait(type) ? 'revenu_magasin' : 'chez_prestataire'))
+                  || (!arriveDejaFait(type) && vers == 'chez_prestataire'))
              : de == 'chez_prestataire'
                ? (!arriveDejaFait(type) && vers == 'revenu_magasin')
-             : de == 'revenu_magasin'
-               ? vers == 'remis_client'
-             // 'remis_client' et 'non_applicable' ne ressortent jamais.
+             // 'revenu_magasin', 'remis_client' et 'non_applicable' ne
+             // ressortent jamais.
              : false;
     }
 

@@ -627,12 +627,44 @@ describe("le dossier naît ouvert, ses trois documents à faire", () => {
   it("refuse un document de dossier qui naîtrait déjà avancé — c’est S11 qui le fera vivre", async () => {
     const base = gerant();
     const reference = doc(collection(base, "ventesMotos"));
-    for (const statut of ["chez_prestataire", "remis_client", "non_applicable"]) {
+    /* `non_applicable` a quitté cette liste avec S53 : une carte grise décochée
+       au comptoir naît « sans objet », et c'est le cas voisin qui le fige. Un
+       statut AVANCÉ reste interdit. */
+    for (const statut of ["chez_prestataire", "remis_client"]) {
       const lot = writeBatch(base);
       lot.set(reference, vente());
       lot.set(
         doc(reference, "documents", "carte_grise"),
         documentDossier({ statut, venteId: reference.id }),
+      );
+      await assertFails(lot.commit());
+    }
+  });
+
+  /* **L'arbitrage 5 de S53, vu depuis le lot de la vente.** C'est le seul
+     endroit du produit qui écrit ce statut à la création, et le chemin réel :
+     la case décochée au comptoir, dans le même `writeBatch` que la vente. */
+  it("accepte une carte grise née « sans objet » — la case du comptoir l’a décochée", async () => {
+    const base = gerant();
+    const reference = doc(collection(base, "ventesMotos"));
+    const lot = writeBatch(base);
+    lot.set(reference, vente({ carteGrise: false }));
+    lot.set(
+      doc(reference, "documents", "carte_grise"),
+      documentDossier({ statut: "non_applicable", venteId: reference.id }),
+    );
+    await assertSucceeds(lot.commit());
+  });
+
+  it("refuse la quittance et le CMC nés « sans objet » : leur disponibilité vient de la moto", async () => {
+    const base = gerant();
+    for (const type of ["quittance", "cmc"]) {
+      const reference = doc(collection(base, "ventesMotos"));
+      const lot = writeBatch(base);
+      lot.set(reference, vente());
+      lot.set(
+        doc(reference, "documents", type),
+        documentDossier({ type, statut: "non_applicable", venteId: reference.id }),
       );
       await assertFails(lot.commit());
     }

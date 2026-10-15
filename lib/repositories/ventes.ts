@@ -416,6 +416,16 @@ export function enregistrerVente(
      cartes grises dans un dossier — une contrainte que des règles ne sauraient
      pas exprimer. */
   for (const type of TYPES_DOCUMENT) {
+    /* **La case du comptoir pilote le dossier** (S53, arbitrage 5). Décocher
+       « Carte grise » laissait jusqu'ici un document « à faire » que personne
+       n'allait jamais faire, et qui bloquait la clôture : le reçu imprimait
+       « non inclus » pendant que le dossier la réclamait.
+
+       Les deux autres papiers ne suivent pas la case : leur disponibilité vient
+       de la moto, pas d'une case de vente. */
+    const statut: StatutDocument =
+      type === "carte_grise" && saisie.carteGrise === false ? "non_applicable" : "a_faire";
+
     lot.set(doc(reference, "documents", type), {
       /* Répété ici pour la même raison qu'en S5 sur le coût : dans un lot, les
          règles évaluent chaque document contre l'état d'AVANT, donc la vente
@@ -424,7 +434,7 @@ export function enregistrerVente(
       boutiqueId,
       venteId: reference.id,
       type,
-      statut: "a_faire" satisfies StatutDocument,
+      statut,
       ...traceCreation(auteur),
     });
   }
