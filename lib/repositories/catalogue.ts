@@ -97,3 +97,32 @@ export function useCatalogue(): Catalogue {
     nomTypeFrais: (id) => nommerEntree(listes.typesFrais, id),
   };
 }
+
+const souscrirePostesDepense: Souscription<Referentiel[]> = (auChangement, enErreur) =>
+  ecouterReferentiel("postesDepense", auChangement, enErreur);
+
+/**
+ * Les postes de dépense, seuls — et délibérément hors de `useCatalogue` (S55).
+ *
+ * Ils ne servent qu'à la caisse : à la sortie d'espèces pour ranger le billet
+ * qui s'en va, et au bloc analytique pour nommer les lignes. Les ajouter au
+ * catalogue aurait fait payer une cinquième écoute Firestore à tous les écrans
+ * motos, qui n'en ont aucun usage — et une écoute de plus par écran, sur une
+ * connexion de comptoir, se paie en données mobiles (D66).
+ */
+export function usePostesDepense(): {
+  postes: Referentiel[];
+  /** La liste telle que l'écoute l'a rendue : `null` tant qu'elle n'a pas répondu (D95). */
+  lus: Referentiel[] | null;
+  nomDuPoste: (id: string) => string;
+  erreur: string | null;
+} {
+  const { valeur, erreur } = useAbonnement(souscrirePostesDepense, MESSAGE);
+  const postes = valeur ?? [];
+  return {
+    postes,
+    lus: valeur,
+    nomDuPoste: (id) => nommerEntree(postes, id),
+    erreur,
+  };
+}

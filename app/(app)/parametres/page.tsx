@@ -18,7 +18,6 @@ import { faitsDeVersion } from "@/lib/domain/version";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterBoutiques } from "@/lib/repositories/boutiques";
-import { useCatalogue } from "@/lib/repositories/catalogue";
 import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 import { ecouterUtilisateurs, type FicheUtilisateur } from "@/lib/repositories/utilisateurs";
 import { VERSION_COURANTE } from "@/lib/version/courante";
@@ -58,7 +57,6 @@ import { useMiseAJour } from "@/lib/version/mise-a-jour";
 export default function Reglages() {
   const session = useSession();
   const { perimetre } = usePerimetre();
-  const catalogue = useCatalogue();
   const [deconnexion, setDeconnexion] = useState(false);
 
   /* On n’écoute que ce que cette personne a le droit de lire. Un gérant ne voit
@@ -117,12 +115,11 @@ export default function Reglages() {
       "aucune boutique active",
     ),
     "/parametres/utilisateurs": compte(utilisateurs?.length, "compte", "comptes", "aucun compte"),
-    "/parametres/catalogue": catalogue.chargement
-      ? undefined
-      : `${compte(catalogue.marques.length, "marque", "marques", "aucune marque")} · ${compte(catalogue.modeles.length, "modèle", "modèles", "aucun modèle")}`,
-    "/parametres/referentiels": catalogue.chargement
-      ? undefined
-      : compte(catalogue.provenances.length, "provenance", "provenances", "aucune provenance"),
+    /* Plus de compte pour le catalogue ni pour les provenances : les deux
+       écrans ont quitté les paramètres pour l'espace motos (S54), et ce hub
+       n'ouvre plus dessus. Les quatre écoutes de `useCatalogue` restaient
+       ouvertes sur cette page pour alimenter des cartes qui ne s'affichent
+       plus. */
     "/parametres/prestataires": compte(
       prestataires?.filter((prestataire) => prestataire.actif).length,
       "prestataire",

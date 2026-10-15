@@ -45,7 +45,12 @@ export function ListeReferentiel({
   erreur,
   actions,
 }: {
-  titre: string;
+  /**
+   * Omis quand un onglet nomme déjà le panneau (S54) : « Marques » écrit sur
+   * l'onglet actif puis réécrit juste en dessous ne dit rien de plus, et c'est
+   * la ligne de bruit que le commanditaire appelle « pas épuré ».
+   */
+  titre?: string;
   /** « marque », « provenance »… pour les libellés de champs et de messages. */
   singulier: string;
   /** « cette » ou « ce » : le français a besoin de savoir. */
@@ -70,7 +75,9 @@ export function ListeReferentiel({
 }) {
   return (
     <section>
-      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">{titre}</h2>
+      {titre && (
+        <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">{titre}</h2>
+      )}
 
       <Ajout
         singulier={singulier}

@@ -86,6 +86,11 @@ beforeEach(async () => {
     const base = contexte.firestore();
     await setDoc(doc(base, "marques/yamaha"), { nom: "Yamaha", actif: true, ...creationFigee });
     await setDoc(doc(base, "provenances/import"), { nom: "Import", actif: true, ...creationFigee });
+    await setDoc(doc(base, "postesDepense/carburant"), {
+      nom: "Carburant",
+      actif: true,
+      ...creationFigee,
+    });
     await setDoc(doc(base, "typesFrais/transport"), {
       nom: "Transport",
       actif: true,
@@ -113,11 +118,14 @@ beforeEach(async () => {
   });
 });
 
-const TROIS = ["marques", "provenances", "typesFrais"] as const;
+/* Quatre depuis S55 : les postes de dépense ont rejoint la famille — même
+   forme, mêmes règles de lecture, et la création ouverte au gérant comme pour
+   les marques (il nomme le poste au moment où il sort le billet). */
+const TOUS = ["marques", "provenances", "typesFrais", "postesDepense"] as const;
 
 describe("lecture — le gérant a besoin de ces listes pour saisir", () => {
   it("le gérant lit les trois référentiels de même forme", async () => {
-    for (const nomCollection of TROIS) {
+    for (const nomCollection of TOUS) {
       await assertSucceeds(getDocs(collection(gerant(), nomCollection)));
     }
   });
@@ -137,7 +145,7 @@ describe("lecture — le gérant a besoin de ces listes pour saisir", () => {
 
 describe("écriture des référentiels", () => {
   it("le responsable ajoute une entrée dans chacun des trois", async () => {
-    for (const nomCollection of TROIS) {
+    for (const nomCollection of TOUS) {
       await assertSucceeds(
         addDoc(collection(responsable(), nomCollection), {
           nom: "Nouvelle",
@@ -174,6 +182,18 @@ describe("écriture des référentiels", () => {
         ...creation("ger-1"),
       }),
     );
+    /* **Le poste de dépense suit les marques, pas les types de frais (S55).**
+       Un gérant qui sort un billet pour une course imprévue doit pouvoir
+       nommer le poste sur-le-champ : l'en empêcher ferait partir la sortie
+       sans classement, et un livre de caisse analytique qui laisse passer des
+       sorties non classées ne vaut pas mieux qu'un journal. */
+    await assertSucceeds(
+      addDoc(collection(gerant(), "postesDepense"), {
+        nom: "Carburant",
+        actif: true,
+        ...creation("ger-1"),
+      }),
+    );
   });
 
   /* L'autre moitié, sans laquelle la précédente n'aurait rien cloisonné.
@@ -182,6 +202,11 @@ describe("écriture des référentiels", () => {
   it("le gérant ne renomme ni ne désactive ce qui sert déjà", async () => {
     await assertFails(
       updateDoc(doc(gerant(), "marques/yamaha"), modification({ nom: "Autre" }, "ger-1")),
+    );
+    /* Créer un poste, oui ; rebaptiser celui que des mois d'écritures citent,
+       non — c'est la même frontière que pour les marques. */
+    await assertFails(
+      updateDoc(doc(gerant(), "postesDepense/carburant"), modification({ nom: "Autre" }, "ger-1")),
     );
     await assertFails(
       updateDoc(doc(gerant(), "marques/yamaha"), modification({ actif: false }, "ger-1")),

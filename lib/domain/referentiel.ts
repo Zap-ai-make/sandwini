@@ -1,7 +1,8 @@
 /**
  * Les référentiels — le vocabulaire de la maison.
  *
- * Marques, modèles, provenances, types de frais : ce sont les mots dans
+ * Marques, modèles, provenances, types de frais, postes de dépense : ce sont
+ * les mots dans
  * lesquels les écrans de saisie feront choisir, plutôt que de laisser taper du
  * texte libre. « Yamaha » écrit de quatre façons différentes donnerait quatre
  * marques et un stock illisible.
@@ -30,13 +31,29 @@ export const LONGUEUR_NOM_MAX = 60;
  * Cette liste n'est pas décorative : les règles Firestore la connaissent aussi,
  * et l'interface s'en sert pour ne pas répéter quatre fois le même écran.
  */
-export const COLLECTIONS_REFERENTIEL = ["marques", "provenances", "typesFrais"] as const;
+/**
+ * `postesDepense` est entré en S55, et le choix de modèle vient du
+ * commanditaire : « on ne sait pas comment ils gèrent leurs flux monétaires ».
+ *
+ * Un livre de caisse qui mérite son nom range ses sorties par poste —
+ * carburant, loyer, transport — sans quoi on ne peut pas répondre à « combien
+ * ai-je dépensé en carburant ce mois-ci ». Mais figer cette liste dans le code
+ * aurait été deviner le métier de quelqu'un d'autre. Elle se déclare donc,
+ * comme les marques et les provenances, et chaque maison y met ses mots.
+ */
+export const COLLECTIONS_REFERENTIEL = [
+  "marques",
+  "provenances",
+  "typesFrais",
+  "postesDepense",
+] as const;
 export type CollectionReferentiel = (typeof COLLECTIONS_REFERENTIEL)[number];
 
 export const LIBELLE_COLLECTION: Record<CollectionReferentiel, { singulier: string; pluriel: string }> = {
   marques: { singulier: "marque", pluriel: "Marques" },
   provenances: { singulier: "provenance", pluriel: "Provenances" },
   typesFrais: { singulier: "type de frais", pluriel: "Types de frais" },
+  postesDepense: { singulier: "poste de dépense", pluriel: "Postes de dépense" },
 };
 
 /**
