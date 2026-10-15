@@ -166,18 +166,6 @@ export type EtatDossier = {
 };
 
 /**
- * Un document réglé, du seul point de vue du DOSSIER.
- *
- * `dossierCloturable` ne s'en sert plus depuis S53 — un papier se clôt sur ce
- * que la vente dit, pas sur un statut promené. Il ne reste utile qu'à l'écran
- * des dossiers, qui ne lit pas encore les motos ; `etatPapier` le remplacera
- * là-bas aussi.
- */
-function estRegle(statut: StatutDocument): boolean {
-  return statut === "remis_client" || statut === "non_applicable";
-}
-
-/**
  * Le dossier peut-il se clore ? (§7.1, révisé par S53)
  *
  * | Papier | Fini quand |
@@ -382,6 +370,33 @@ export function joursEcoules(depuis: Date | null, aujourdhui: Date): number | nu
 export type Detention =
   { chez: "prestataire"; nom: string; depuisJours: number | null } | { chez: "magasin" } | null;
 
+/** Un papier du dossier, avec son état recollé des trois sources (S53). */
+export type PapierDuDossier = {
+  type: TypeDocument;
+  etat: EtatPapier;
+  /** Le document stocké, `null` tant qu'il n'est pas parvenu du serveur. */
+  document: DocumentDossier | null;
+};
+
+/**
+ * Ce papier a-t-il fini son parcours ?
+ *
+ * **Exactement la condition de `dossierCloturable`, et ce n'est pas une
+ * coïncidence :** un papier qui a fini n'a plus rien à faire dans une file
+ * d'attente, et un dossier dont les trois papiers ont fini est un dossier que
+ * le serveur va clore. Deux définitions différentes feraient apparaître des
+ * dossiers vides dans la file, ou les en feraient sortir trop tôt.
+ *
+ * La carte grise finit à son RETOUR (arbitrage 7) : sa remise au client n'est
+ * plus un statut à promener, c'est le scan et la plaque saisis sur la fiche de
+ * vente.
+ */
+function papierFini(type: TypeDocument, etat: EtatPapier): boolean {
+  if (etat === "sans_objet") return true;
+  if (type === "carte_grise") return etat === "au_magasin";
+  return etat === "emporte";
+}
+
 /** Un dossier ouvert, réduit à ce que la liste doit montrer. */
 export type DossierEnAttente = {
   venteId: string;
@@ -395,6 +410,13 @@ export type DossierEnAttente = {
    * n'est pas la même chose que « rien à faire ».
    */
   documents: Readonly<Record<TypeDocument, DocumentDossier | null>>;
+  /**
+   * Les trois papiers avec leur état affiché, dans l'ordre de `TYPES_DOCUMENT`.
+   *
+   * C'est ce que l'écran montre depuis S53. `documents` reste à côté pour ce
+   * qui ne se calcule pas : le nom du prestataire, la date annoncée.
+   */
+  papiers: readonly PapierDuDossier[];
   /** Les documents qui restent à traiter, dans l'ordre de `TYPES_DOCUMENT`. */
   enCours: readonly DocumentDossier[];
   /** Au moins un document est chez un prestataire au-delà de la date annoncée. */
@@ -408,9 +430,24 @@ export type VenteDuDossier = {
   numero: string;
   boutiqueId: string;
   clientId: string;
+  /** Pour retrouver la moto qui porte les papiers en main (S53). */
+  motoId: string;
   date: Date | null;
   statutDossier: StatutDossier;
+  /** Ce que le client a emporté. `lireEmporte` comble les ventes anciennes. */
+  emporte: PapiersEmportes;
 };
+
+/**
+ * Ce que l'écran des dossiers a besoin de savoir d'une moto, et rien de plus.
+ *
+ * **Le vrai coût de ce modèle, et il faut le dire :** l'écran des dossiers ne
+ * chargeait pas les motos. Il lui faut désormais l'écoute du stock du
+ * périmètre, celle que l'écran des motos tient déjà : une requête de plus, pas
+ * une collection de plus. Le repli, si elle coûtait trop, serait de ne calculer
+ * l'état que sur la fiche de vente, où la moto est déjà chargée.
+ */
+export type MotoDuDossier = { id: string; quittanceRecue: boolean; cmcRecu: boolean };
 
 /**
  * Les trois questions qu'on pose à une file de dossiers.
@@ -458,9 +495,11 @@ export const FILTRES_DOSSIERS_VIDES: FiltresDossiers = { etat: "" };
 export function dossiersEnAttente(
   ventes: readonly VenteDuDossier[],
   documents: readonly DocumentDossier[],
+  motos: readonly MotoDuDossier[],
   filtres: FiltresDossiers,
   aujourdhui: Date,
 ): DossierEnAttente[] {
+  const parMoto = new Map(motos.map((moto) => [moto.id, moto]));
   const parVente = new Map<string, DocumentDossier[]>();
   for (const document of documents) {
     const liste = parVente.get(document.venteId);
@@ -490,9 +529,42 @@ export function dossiersEnAttente(
           ]),
         ) as Record<TypeDocument, DocumentDossier | null>;
 
-        const enCours = tous
-          .filter((document) => !estRegle(document.statut))
-          .sort((a, b) => TYPES_DOCUMENT.indexOf(a.type) - TYPES_DOCUMENT.indexOf(b.type));
+        /* **Une moto absente de la liste se lit comme ne portant rien.**
+           L'écoute du stock peut n'avoir pas encore répondu, ou la moto être
+           hors du périmètre courant. Le papier dit alors « à faire », ce qui est
+           le pire cas et donc le bon défaut : il garde le dossier dans la file
+           au lieu de l'en faire sortir sur une absence de données. */
+        const laMoto = parMoto.get(vente.motoId);
+        const enMain = (type: TypeDocument): boolean => {
+          if (type === "quittance") return laMoto?.quittanceRecue ?? false;
+          if (type === "cmc") return laMoto?.cmcRecu ?? false;
+          /* La carte grise ne se coche pas sur la moto : elle a une vie dehors
+             que la moto ne connaît pas, et `etatPapier` ignore ce drapeau pour
+             elle. */
+          return false;
+        };
+
+        const papiers: PapierDuDossier[] = TYPES_DOCUMENT.map((type) => ({
+          type,
+          document: parType[type],
+          etat: etatPapier({
+            type,
+            /* Un document pas encore lu compte `a_faire` : c'est le statut dans
+               lequel S8 l'ouvre, et le seul que l'on puisse supposer sans
+               inventer. */
+            statut: parType[type]?.statut ?? "a_faire",
+            enMain: enMain(type),
+            emporte: type === "carte_grise" ? false : vente.emporte[type],
+          }),
+        }));
+
+        /* `enCours` ne garde que les documents RÉELS des papiers non finis : la
+           détention et le retard se lisent sur le dépôt, qui n'existe que sur
+           un document écrit. */
+        const enCours = papiers
+          .filter((papier) => !papierFini(papier.type, papier.etat))
+          .map((papier) => papier.document)
+          .filter((document): document is DocumentDossier => document !== null);
 
         return {
           venteId: vente.id,
@@ -501,16 +573,23 @@ export function dossiersEnAttente(
           clientId: vente.clientId,
           date: vente.date,
           documents: parType,
+          papiers,
           enCours,
           enRetard: enCours.some((document) => estEnRetard(document.disponibleLe, aujourdhui)),
-          detention: detentionDe(enCours, aujourdhui),
+          detention: detentionDe(papiers, enCours, aujourdhui),
         };
       })
-      /* Un dossier sans document en cours n'a rien à faire dans une file
-       d'attente. Il n'est pas encore clos — la clôture demande aussi le
-       paiement soldé et la moto remise — mais côté documents, il n'attend
-       plus rien. */
-      .filter((dossier) => dossier.enCours.length > 0)
+      /* Un dossier dont tous les papiers ont fini n'a rien à faire dans une
+       file d'attente. Il n'est pas encore clos — la clôture demande aussi le
+       paiement soldé et la moto remise — mais côté papiers, il n'attend plus
+       rien.
+
+       Le filtre porte sur `papiers` et non sur `enCours` : un papier « à
+       faire » dont le document n'est pas encore lu doit retenir le dossier,
+       alors qu'il n'a aucun document à mettre dans `enCours`. */
+      .filter((dossier) =>
+        dossier.papiers.some((papier) => !papierFini(papier.type, papier.etat)),
+      )
       .filter((dossier) => correspondALEtat(dossier, filtres.etat))
       .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0))
   );
@@ -524,7 +603,11 @@ export function dossiersEnAttente(
  * pas celui qu'on vient de confier. Le détail des quatre est sur la même ligne,
  * dans les colonnes des documents. Depuis S48 ils sont trois.
  */
-function detentionDe(enCours: readonly DocumentDossier[], aujourdhui: Date): Detention {
+function detentionDe(
+  papiers: readonly PapierDuDossier[],
+  enCours: readonly DocumentDossier[],
+  aujourdhui: Date,
+): Detention {
   const dehors = enCours
     .filter((document) => document.statut === "chez_prestataire")
     .sort((a, b) => (a.deposeLe?.getTime() ?? 0) - (b.deposeLe?.getTime() ?? 0));
@@ -538,9 +621,18 @@ function detentionDe(enCours: readonly DocumentDossier[], aujourdhui: Date): Det
     };
   }
 
-  /* Revenu au magasin, donc détenu par le magasin : c'est ce qui se remet au
-     client aujourd'hui, sans attendre personne. */
-  if (enCours.some((document) => document.statut === "revenu_magasin")) {
+  /* Au magasin, donc détenu par le magasin : c'est ce qui se remet au client
+     aujourd'hui, sans attendre personne.
+
+     Lu sur les papiers et non sur les statuts depuis S53 : un CMC coché sur la
+     moto est au magasin alors que son document est resté « à faire ». La carte
+     grise, elle, ne compte plus ici — son retour est le terme de son parcours,
+     donc elle a déjà quitté les papiers non finis. */
+  if (
+    papiers.some(
+      (papier) => papier.etat === "au_magasin" && !papierFini(papier.type, papier.etat),
+    )
+  ) {
     return { chez: "magasin" };
   }
   return null;
@@ -553,9 +645,14 @@ function correspondALEtat(dossier: DossierEnAttente, etat: FiltreEtat | ""): boo
     case "en_retard":
       return dossier.enRetard;
     case "chez_prestataire":
-      return dossier.enCours.some((document) => document.statut === "chez_prestataire");
+      return dossier.papiers.some((papier) => papier.etat === "chez_prestataire");
+    /* « À remettre » veut dire : le papier est dans le tiroir et le client ne
+       l'a pas encore pris. Lu sur l'état et non sur le statut stocké — depuis
+       S53, un CMC au magasin ne laisse aucune trace dans son document. */
     case "a_remettre":
-      return dossier.enCours.some((document) => document.statut === "revenu_magasin");
+      return dossier.papiers.some(
+        (papier) => papier.etat === "au_magasin" && !papierFini(papier.type, papier.etat),
+      );
   }
 }
 

@@ -8,6 +8,7 @@ import {
   joursEcoules,
 } from "@/lib/domain/dossier";
 import type { Compteur } from "@/lib/domain/espaces";
+import type { Moto } from "@/lib/domain/moto";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
 import {
   dettes,
@@ -23,6 +24,7 @@ import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterReglages } from "@/lib/repositories/entreprise";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
+import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterDossiers, ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/ventes";
 
 /**
@@ -83,6 +85,14 @@ export function useCeQuiAttend(): {
       sansPerimetre ? () => {} : ecouterDossiers(boutiqueId, auChangement, enErreur),
     [boutiqueId, sansPerimetre],
   );
+  /* S53 : l'etat d'un papier se lit en partie sur la moto. La pastille « en
+     retard » du menu doit dire la meme chose que l'ecran des dossiers, et sans
+     cette ecoute elle lirait tous les papiers « a faire ». */
+  const souscrireStock = useCallback(
+    (auChangement: (motos: Moto[]) => void, enErreur: (cause: unknown) => void) =>
+      sansPerimetre ? () => {} : ecouterStock(boutiqueId, auChangement, enErreur),
+    [boutiqueId, sansPerimetre],
+  );
   const souscrireVersements = useCallback(
     (auChangement: (versements: Versement[]) => void, enErreur: (cause: unknown) => void) =>
       sansPerimetre ? () => {} : ecouterVersementsDuPerimetre(boutiqueId, auChangement, enErreur),
@@ -101,6 +111,10 @@ export function useCeQuiAttend(): {
   const { valeur: documents } = useAbonnement(
     souscrireDossiers,
     "L’état des dossiers n’a pas pu être lu.",
+  );
+  const { valeur: motos } = useAbonnement(
+    souscrireStock,
+    "Le stock n’a pas pu être lu.",
   );
   const { valeur: versements } = useAbonnement(
     souscrireVersements,
@@ -125,7 +139,7 @@ export function useCeQuiAttend(): {
     const pret = Boolean(ventes && documents && versements);
 
     const ouverts = ventes && documents
-      ? dossiersEnAttente(ventes, documents, FILTRES_DOSSIERS_VIDES, maintenant)
+      ? dossiersEnAttente(ventes, documents, motos ?? [], FILTRES_DOSSIERS_VIDES, maintenant)
       : [];
 
     const enRetard: Attente[] = ouverts
@@ -175,7 +189,17 @@ export function useCeQuiAttend(): {
       chargement: perimetreEnCours || (!sansPerimetre && !pret),
       erreur,
     };
-  }, [ventes, documents, versements, nomDuClient, seuil, erreur, perimetreEnCours, sansPerimetre]);
+  }, [
+    ventes,
+    documents,
+    motos,
+    versements,
+    nomDuClient,
+    seuil,
+    erreur,
+    perimetreEnCours,
+    sansPerimetre,
+  ]);
 }
 
 /**

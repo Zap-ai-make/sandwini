@@ -12,6 +12,10 @@ import { nomDuClient, normaliserNom } from "@/lib/domain/client";
 import {
   chercherDossiers,
   dossiersEnAttente,
+  LIBELLE_ETAT_PAPIER,
+  passeParUnPrestataire,
+  type EtatPapier,
+  type PapierDuDossier,
   FILTRES_ETAT,
   LIBELLE_FILTRE_ETAT,
   type DossierEnAttente,
@@ -20,16 +24,16 @@ import {
 import { formaterDateCourte } from "@/lib/domain/format";
 import {
   LIBELLE_DOCUMENT,
-  LIBELLE_STATUT_DOCUMENT,
   TYPES_DOCUMENT,
   type DocumentDossier,
-  type StatutDocument,
   type TypeDocument,
   type Vente,
 } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
+import type { Moto } from "@/lib/domain/moto";
+import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
 
 /**
@@ -87,6 +91,22 @@ export default function PageDossiers() {
     "Les ventes n’ont pas pu être chargées.",
   );
 
+  /* **L'ecoute du stock est le cout de S53, et il est assume.** L'etat affiche
+     d'un papier se calcule sur trois sources dont la MOTO (`quittanceRecue`,
+     `cmcRecu`), que cet ecran ne chargeait pas. C'est la meme ecoute que celle
+     de l'ecran des motos — une requete de plus sur une collection deja lue
+     ailleurs, pas une collection de plus — et c'est ce qui fait qu'une case
+     cochee a l'arrivage avance le dossier sans qu'on y touche. */
+  const souscrireStock = useCallback(
+    (auChangement: (motos: Moto[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterStock(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
+  );
+  const { valeur: motos } = useAbonnement(
+    souscrireStock,
+    "Le stock n’a pas pu être lu.",
+  );
+
   const souscrireDossiers = useCallback(
     (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) =>
       ecouterDossiers(boutiqueId, auChangement, enErreur),
@@ -103,8 +123,8 @@ export default function PageDossiers() {
      documents de la même liste pourraient être jugés à des instants
      différents. */
   const dossiers = useMemo(
-    () => dossiersEnAttente(ventes ?? [], documents ?? [], { etat }, new Date()),
-    [ventes, documents, etat],
+    () => dossiersEnAttente(ventes ?? [], documents ?? [], motos ?? [], { etat }, new Date()),
+    [ventes, documents, motos, etat],
   );
 
   const resultats = useMemo(
@@ -163,9 +183,13 @@ export default function PageDossiers() {
       liste.push({
         cle: type,
         titre: LIBELLE_DOCUMENT[type],
+        /* **La cellule lit l'état calculé, pas le statut stocké** (S53). Elle
+           lisait `document.statut`, si bien qu'un CMC coché sur la moto
+           restait affiché « À faire » : la case du comptoir n'aurait rien fait
+           bouger ici, et c'est précisément ce que la spec exige. */
         rendu: (dossier) => (
-          <CelluleDocument
-            document={dossier.documents[type]}
+          <CellulePapier
+            papier={dossier.papiers.find((papier) => papier.type === type) ?? null}
             numero={dossier.numero}
             type={type}
             ouvert={cleDe(dossier.documents[type]) === documentOuvert}
@@ -382,54 +406,71 @@ function cleDocument(document: DocumentDossier): string {
 const cleDe = (document: DocumentDossier | null) => (document ? cleDocument(document) : null);
 
 /**
- * Une case de document : le mot, et la porte vers son parcours.
+ * Une case de papier : son état, et la porte vers son parcours.
  *
- * Le mot est celui du domaine, jamais un raccourci — « Revenu au magasin » et
- * non « Revenu ». Un dossier dont le document n’est pas encore parvenu du
+ * **L'état est calculé, pas stocké** (S53, D61). La case lisait
+ * `document.statut` ; un CMC coché sur la moto restait alors affiché « À
+ * faire », et le geste du comptoir ne faisait rien bouger ici.
+ *
+ * Le mot est celui du domaine, jamais un raccourci — « Chez le prestataire » et
+ * non « Parti ». Un dossier dont le document n’est pas encore parvenu du
  * serveur laisse la case vide plutôt que d’afficher « À faire » : les deux ne
  * demandent pas le même geste.
+ *
+ * **Seule la carte grise ouvre un parcours.** Les deux autres papiers n'ont
+ * plus d'étapes à promener depuis S53 : il n'y a pas de relais à lire, et un
+ * bouton qui ouvre un panneau vide est une promesse non tenue. Ils s'affichent
+ * donc en pastille muette.
  */
-function CelluleDocument({
-  document,
+function CellulePapier({
+  papier,
   numero,
   type,
   ouvert,
   ouvrir,
 }: {
-  document: DocumentDossier | null;
+  papier: PapierDuDossier | null;
   numero: string;
   type: TypeDocument;
   ouvert: boolean;
   ouvrir: (id: string | null) => void;
 }) {
-  if (!document) return <span className="text-encre-doux">—</span>;
+  if (!papier || !papier.document) return <span className="text-encre-doux">—</span>;
+
+  const mot = LIBELLE_ETAT_PAPIER[papier.etat];
+  const classes = `pastille ${TON_PAPIER[papier.etat]}`;
+  const document = papier.document;
+
+  if (!passeParUnPrestataire(type)) {
+    return <span className={classes}>{mot}</span>;
+  }
 
   return (
     <button
       type="button"
       onClick={() => ouvrir(ouvert ? null : cleDocument(document))}
       aria-current={ouvert ? "true" : undefined}
-      /* Le nom accessible dit de quel document et de quelle pièce il s’agit :
+      /* Le nom accessible dit de quel papier et de quelle pièce il s’agit :
          replié en carte, le tableau n’a plus d’en-tête de colonne pour le
          dire, et vingt-huit boutons nommés « À faire » ne mènent nulle part. */
-      aria-label={`${LIBELLE_DOCUMENT[type]} de ${numero} : ${LIBELLE_STATUT_DOCUMENT[document.statut]}`}
-      className={`pastille pastille-bouton ${TON_DOCUMENT[document.statut]}`}
+      aria-label={`${LIBELLE_DOCUMENT[type]} de ${numero} : ${mot}`}
+      className={`${classes} pastille-bouton`}
     >
-      {LIBELLE_STATUT_DOCUMENT[document.statut]}
+      {mot}
     </button>
   );
 }
 
 /* Jamais la couleur seule : le mot est écrit, la pastille ne fait que le
-   doubler. Le vert dit réglé, le bleu de la goutte dit parti et pas revenu, le
-   gris dit qu’il n’y a rien encore. Le retard, lui, n’est pas un statut : il se
+   doubler. Le vert dit fini, le bleu de la goutte dit parti et pas revenu, le
+   gris dit qu’il n’y a rien encore. Le retard, lui, n’est pas un état : il se
    lit sur la colonne « Chez qui, depuis » et sur l’avis de tête. */
-const TON_DOCUMENT: Record<StatutDocument, string> = {
+const TON_PAPIER: Record<EtatPapier, string> = {
   a_faire: "",
   chez_prestataire: "pastille-transit",
-  revenu_magasin: "pastille-solde",
-  remis_client: "pastille-solde",
-  non_applicable: "",
+  au_magasin: "pastille-transit",
+  emporte: "pastille-solde",
+  sans_objet: "",
 };
 
 /** Qui détient le dossier, et depuis combien de temps. */
