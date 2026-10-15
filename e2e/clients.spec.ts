@@ -145,9 +145,8 @@ test.describe("droits", () => {
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
     const email = emailUnique("clients");
     const motDePasse = "gerant-clients-001";
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation.getByLabel("Nom", { exact: true }).fill("Gérant du fichier");
     await creation.getByLabel("Adresse e-mail").fill(email);
     await creation.getByLabel("Mot de passe provisoire").fill(motDePasse);
@@ -202,6 +201,6 @@ test.describe("hors ligne", () => {
     await expect(page.getByRole("listitem").filter({ hasText: nom })).toBeVisible();
 
     await context.setOffline(false);
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+    await attendreLaFileVide(page, 30_000);
   });
 });

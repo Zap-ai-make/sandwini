@@ -76,8 +76,16 @@ import {
  * trois cadres empilés de quatre lignes chacun ; dans 420 px, trois cadres font
  * une pile de boîtes. Ils sont une seule liste de faits, dans l'ordre où la
  * question se pose : qui, quoi, combien, combien reste-t-il.
+ *
+ * **`base` dit chez qui le panneau est affiché, et c'est tout son objet.** La
+ * même fiche s'ouvre désormais depuis trois écrans — les ventes, les paiements,
+ * la fiche d'un client —, et chacun doit la garder chez lui : fermer le panneau
+ * doit revenir à l'écran d'où l'on vient, pas renvoyer dans les ventes. Le
+ * commanditaire l'a dit en une phrase : « tout doit être indépendant et bien
+ * structuré » (S54). Sans ce paramètre, consulter un paiement vous déposait
+ * dans un autre onglet, sans retour.
  */
-export function FicheVente({ id }: { id: string }) {
+export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: string }) {
   const session = useSession();
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
@@ -133,7 +141,7 @@ export function FicheVente({ id }: { id: string }) {
   return (
     <PanneauLateral
       nom={vente ? `Vente ${vente.numero}` : "Vente"}
-      fermerVers="/motos/ventes"
+      fermerVers={base}
       identite={
         vente ? (
           <div className="souche">
@@ -157,7 +165,7 @@ export function FicheVente({ id }: { id: string }) {
             {/* Le reçu de la vente se réimprime à tout moment, et il se compose
                 à la lecture : rien n'a été figé à la première impression (D61). */}
             <Link
-              href={`/motos/ventes?recu=${identifiantRecu(vente.id, null)}`}
+              href={`${base}?recu=${identifiantRecu(vente.id, null)}`}
               className="bouton bouton-principal"
             >
               <Printer aria-hidden="true" className="size-4" />
@@ -202,7 +210,7 @@ export function FicheVente({ id }: { id: string }) {
 
           <section>
             <TitrePanneau>Les versements</TitrePanneau>
-            <ListeVersements versements={versements} />
+            <ListeVersements versements={versements} base={base} />
             {/* Le formulaire n’apparaît qu’une fois les versements lus : leur
                 nombre donne le rang du reçu, et leur somme le reste réellement
                 dû. Sans eux, on numéroterait à l’aveugle. */}
@@ -387,7 +395,7 @@ function RemiseMoto({ vente }: { vente: Vente }) {
   );
 }
 
-function ListeVersements({ versements }: { versements: Versement[] | null }) {
+function ListeVersements({ versements, base }: { versements: Versement[] | null; base: string }) {
   if (versements === null) return <p className="text-corps text-encre-doux">Chargement…</p>;
   if (versements.length === 0)
     return (
@@ -418,7 +426,7 @@ function ListeVersements({ versements }: { versements: Versement[] | null }) {
                     accessible du lien doit dire où il mène, et une suite de
                     chiffres ne le dit pas (`DESIGN.md` §8). */}
                 <Link
-                  href={`/motos/ventes?recu=${identifiantRecu(versement.venteId, versement.id)}`}
+                  href={`${base}?recu=${identifiantRecu(versement.venteId, versement.id)}`}
                   className="inline-flex items-center gap-1 font-medium text-encre underline underline-offset-2"
                 >
                   <ReceiptText aria-hidden="true" className="size-3.5" />

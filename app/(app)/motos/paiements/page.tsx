@@ -1,9 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
+import { FicheVente } from "@/components/FicheVente";
+import { PanneauRecu } from "@/components/PanneauRecu";
 import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
+import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { nomDuClient } from "@/lib/domain/client";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -84,6 +88,13 @@ import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/
  * réseau comme le reste du produit.
  */
 export default function PagePaiements() {
+  /* Le panneau est un état d'écran, porté par l'adresse : la fiche ouverte
+     survit à un rechargement et se passe par lien. C'est le montage de l'écran
+     des ventes, repris tel quel — la fiche s'ouvre désormais **ici**, et non
+     plus en déposant le lecteur dans un autre onglet (S54). */
+  const parametres = useSearchParams();
+  const venteOuverte = parametres.get("vente");
+  const recuOuvert = parametres.get("recu");
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
@@ -196,7 +207,7 @@ export default function PagePaiements() {
         principal: true,
         rendu: (ligne) => (
           <Link
-            href={`/motos/ventes?vente=${ligne.vente.id}`}
+            href={`/motos/paiements?vente=${ligne.vente.id}`}
             className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
           >
             {ligne.vente.numero}
@@ -275,7 +286,7 @@ export default function PagePaiements() {
                se voit depuis la liste — sans quoi une moto soldée dort au
                magasin sans que personne le sache. */
             <Link
-              href={`/motos/ventes?vente=${ligne.vente.id}`}
+              href={`/motos/paiements?vente=${ligne.vente.id}`}
               aria-label={`Remettre la moto de ${ligne.vente.numero}`}
               className="bouton bouton-principal h-9 px-3 text-legende"
             >
@@ -366,20 +377,38 @@ export default function PagePaiements() {
         )}
       </p>
 
-      {!chargement && lignesVues.length === 0 ? (
-        <EtatVide titre={titreDuVide(filtre, nomPeriode)}>{phraseDuVide(filtre, nomPeriode)}</EtatVide>
-      ) : (
-        <div className="cadre cadre-tableau">
-          <Tableau
-            legende="Ventes dont il reste quelque chose à percevoir. La colonne « Mode » dit où est la moto. Montants en francs CFA."
-            colonnes={colonnes}
-            lignes={lignesVues}
-            cleDe={(ligne) => ligne.vente.id}
-            chargement={chargement}
-            enRetard={(ligne) => estInactive(ligne, seuil) && ligne.resteDu > 0}
-          />
-        </div>
-      )}
+      <AvecPanneau
+        panneau={
+          recuOuvert ? (
+            <PanneauRecu
+              cle={recuOuvert}
+              base="/motos/paiements"
+              libelleRetour="Paiements"
+              libelleRevenir="Revenir aux paiements"
+            />
+          ) : venteOuverte ? (
+            <FicheVente id={venteOuverte} base="/motos/paiements" />
+          ) : null
+        }
+      >
+        {!chargement && lignesVues.length === 0 ? (
+          <EtatVide titre={titreDuVide(filtre, nomPeriode)}>
+            {phraseDuVide(filtre, nomPeriode)}
+          </EtatVide>
+        ) : (
+          <div className="cadre cadre-tableau">
+            <Tableau
+              legende="Ventes dont il reste quelque chose à percevoir. La colonne « Mode » dit où est la moto. Montants en francs CFA."
+              colonnes={colonnes}
+              lignes={lignesVues}
+              cleDe={(ligne) => ligne.vente.id}
+              chargement={chargement}
+              cleActive={venteOuverte}
+              enRetard={(ligne) => estInactive(ligne, seuil) && ligne.resteDu > 0}
+            />
+          </div>
+        )}
+      </AvecPanneau>
 
       {perimetreEnCours && <span className="sr-only">Chargement du périmètre…</span>}
     </div>
@@ -437,7 +466,7 @@ function Etat({ statut }: { statut: StatutPaiement }) {
 function Encaisser({ vente, numero }: { vente: string; numero: string }) {
   return (
     <Link
-      href={`/motos/ventes?vente=${vente}`}
+      href={`/motos/paiements?vente=${vente}`}
       aria-label={`Encaisser un versement sur ${numero}`}
       className="bouton bouton-neutre h-9 px-3 text-legende"
     >

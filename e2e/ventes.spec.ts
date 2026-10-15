@@ -584,9 +584,8 @@ test.describe("la marge est réservée au responsable", () => {
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
     const email = emailUnique("vente");
     const motDePasse = "gerant-vente-0001";
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation.getByLabel("Nom", { exact: true }).fill("Gérant des ventes");
     await creation.getByLabel("Adresse e-mail").fill(email);
     await creation.getByLabel("Mot de passe provisoire").fill(motDePasse);
@@ -729,6 +728,6 @@ test.describe("hors ligne", () => {
        connexion avec une attente croissante que le retour du réseau
        n'interrompt pas (D50, S27 au backlog). Ce qu'on vérifie ici, c'est que
        le lot part **tout seul** — pas en combien de temps. */
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 90_000 });
+    await attendreLaFileVide(page, 90_000);
   });
 });

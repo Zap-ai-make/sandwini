@@ -28,6 +28,7 @@ import {
   paiementsEchelonnes,
   peutRemettreMoto,
   resumerDossier,
+  ventesDuClient,
   statutMotoApresVente,
   statutPaiementDe,
   suivrePaiements,
@@ -863,5 +864,47 @@ describe("paiementsDeLaPeriode", () => {
        septembre, elle vaut ce qu'elle vaut depuis toujours. */
     expect(retenue.totalPaye).toBe(500_000);
     expect(retenue.resteDu).toBe(700_000);
+  });
+});
+
+describe("ventesDuClient", () => {
+  const vente = (p: Partial<Vente>): Vente => venteS9(p);
+
+  it("ne garde que les achats de ce client", () => {
+    const liste = ventesDuClient(
+      [vente({ id: "a", clientId: "c1" }), vente({ id: "b", clientId: "c2" })],
+      "c1",
+    );
+    expect(liste.map((v) => v.id)).toEqual(["a"]);
+  });
+
+  it("montre le plus récent d’abord", () => {
+    const liste = ventesDuClient(
+      [
+        vente({ id: "vieille", clientId: "c1", date: new Date(2026, 0, 1) }),
+        vente({ id: "fraiche", clientId: "c1", date: new Date(2026, 9, 1) }),
+      ],
+      "c1",
+    );
+    expect(liste.map((v) => v.id)).toEqual(["fraiche", "vieille"]);
+  });
+
+  it("range une vente sans date en dernier plutôt que de la perdre", () => {
+    /* Une date absente veut dire « saisi à l'instant, pas encore parvenu au
+       serveur » (D82) — la vente existe, elle doit se voir. */
+    const liste = ventesDuClient(
+      [
+        vente({ id: "sans", clientId: "c1", date: null }),
+        vente({ id: "avec", clientId: "c1", date: new Date(2026, 0, 1) }),
+      ],
+      "c1",
+    );
+    expect(liste.map((v) => v.id)).toEqual(["avec", "sans"]);
+  });
+
+  it("ne rend rien sans identifiant de client", () => {
+    /* Un client vide ne rassemble pas toutes les ventes qui n'en ont pas : ce
+       serait montrer le fichier entier sur la fiche de personne. */
+    expect(ventesDuClient([vente({ id: "a", clientId: "" })], "")).toEqual([]);
   });
 });

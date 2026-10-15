@@ -1,5 +1,12 @@
 import { expect, test } from "@playwright/test";
-import { bandeauEtat, contenu, encaisser, seConnecterEtEntrer, vendre } from "./aide";
+import {
+  attendreLaFileVide,
+  bandeauEtat,
+  contenu,
+  encaisser,
+  seConnecterEtEntrer,
+  vendre,
+} from "./aide";
 
 /**
  * Versements et suivi des paiements (S9).
@@ -320,6 +327,6 @@ test.describe("hors ligne", () => {
     /* Ce qu'on vérifie, c'est que le lot part tout seul — pas en combien de
        temps : après une coupure, le SDK Firestore reprend avec une attente
        croissante que le retour du réseau n'interrompt pas (D50, S27). */
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 90_000 });
+    await attendreLaFileVide(page, 90_000);
   });
 });

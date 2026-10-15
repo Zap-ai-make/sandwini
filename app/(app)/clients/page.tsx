@@ -2,8 +2,10 @@
 
 import { Phone, Plus, Search, UserPlus } from "lucide-react";
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { FormulaireClient } from "@/components/FormulaireClient";
 import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { chercherClients, formaterTelephone, nomComplet, type Client } from "@/lib/domain/client";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
@@ -39,34 +41,32 @@ export default function PageClients() {
             <button
               type="button"
               onClick={() => {
-                setCreation((ouvert) => !ouvert);
+                setCreation(true);
                 setConfirmation(null);
               }}
-              aria-expanded={creation}
               className="bouton bouton-principal"
             >
               <UserPlus aria-hidden="true" className="size-4" />
-              {creation ? "Fermer" : "Nouveau client"}
+              Nouveau client
             </button>
           </>
         }
       />
 
-      {creation && (
-        <section className="mt-6 cadre p-4">
-          <h2 className="font-semibold text-encre">Nouveau client</h2>
-          <div className="mt-4">
-            <FormulaireClient
-              clients={lus}
-              surEnregistrement={(_, saisie) => {
-                setConfirmation(`${nomComplet(saisie)} est enregistré.`);
-                setCreation(false);
-              }}
-              surAnnulation={() => setCreation(false)}
-            />
-          </div>
-        </section>
-      )}
+      {/* En modale depuis S54, à la demande du commanditaire. Le repli en
+          accordéon poussait la liste vers le bas au moment précis où l'on venait
+          de chercher quelqu'un — on perdait de vue ce qu'on cherchait pour
+          créer la fiche de quelqu'un d'autre. */}
+      <Modale ouvert={creation} onFermer={() => setCreation(false)} titre="Nouveau client">
+        <FormulaireClient
+          clients={lus}
+          surEnregistrement={(_, saisie) => {
+            setConfirmation(`${nomComplet(saisie)} est enregistré.`);
+            setCreation(false);
+          }}
+          surAnnulation={() => setCreation(false)}
+        />
+      </Modale>
 
       {confirmation && (
         <p role="status" aria-live="polite" className="mt-4 text-sm text-solde">
@@ -158,7 +158,11 @@ function LigneClient({
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="min-w-0 flex-1">
-          <span className="block font-medium text-encre">{nomComplet(client)}</span>
+          {/* Le nom mène à la fiche (S54) : c'est le geste qu'on fait dix fois
+              par jour, et il n'avait jusqu'ici aucune destination. */}
+          <Link href={`/clients/${client.id}`} className="lien block font-medium">
+            {nomComplet(client)}
+          </Link>
           <span className="flex items-center gap-1.5 text-sm text-encre-doux">
             <Phone aria-hidden="true" className="size-3.5 shrink-0" />
             <span className="plaque-code">{formaterTelephone(client.telephone)}</span>
@@ -173,26 +177,20 @@ function LigneClient({
         <button
           type="button"
           onClick={basculer}
-          aria-expanded={ouvert}
           className="inline-flex h-11 shrink-0 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
         >
-          {ouvert ? "Annuler" : "Corriger"}
+          Corriger
         </button>
       </div>
 
-      {ouvert && (
-        <div className="mt-3 rounded-plaque border border-bord bg-fond p-4">
-          <h3 className="text-sm font-semibold text-encre">Corriger {nomComplet(client)}</h3>
-          <div className="mt-4">
-            <FormulaireClient
-              clients={clients}
-              existant={client}
-              surEnregistrement={basculer}
-              surAnnulation={basculer}
-            />
-          </div>
-        </div>
-      )}
+      <Modale ouvert={ouvert} onFermer={basculer} titre={`Corriger ${nomComplet(client)}`}>
+        <FormulaireClient
+          clients={clients}
+          existant={client}
+          surEnregistrement={basculer}
+          surAnnulation={basculer}
+        />
+      </Modale>
     </li>
   );
 }

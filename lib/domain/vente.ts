@@ -809,3 +809,30 @@ export function totalDetenu(lignes: readonly LignePaiement[]): number {
 export function peutRemettreMoto(vente: Vente, resteDu: number): boolean {
   return vente.modePaiement === "tranches" && !vente.motoRemise && resteDu === 0;
 }
+
+/**
+ * Les achats d'un client, du plus récent au plus ancien.
+ *
+ * **Ce que la liste reçue contient décide de ce que la fiche montre, et c'est
+ * voulu.** L'écran n'interroge pas « les ventes du client X » : il écoute les
+ * ventes de son périmètre — celles que les règles laissent déjà lire, sa
+ * boutique pour un gérant, toutes pour le responsable — et trie en mémoire.
+ * Aucune règle Firestore n'est donc ouverte pour afficher une fiche, et aucun
+ * index composite n'est ajouté. C'est exactement le montage de
+ * `lotsDuFournisseur` (S50), et pour la même raison : l'écran doit répondre
+ * coupure faite (D66).
+ *
+ * La conséquence est à dire à l'écran, pas à cacher : un gérant voit les achats
+ * faits *dans sa boutique*, et la fiche l'écrit. Ouvrir les règles pour qu'il
+ * voie les autres serait élargir une lecture d'argent pour un confort
+ * d'affichage.
+ *
+ * Du plus récent d'abord : on ouvre une fiche pour « qu'est-ce qu'il a pris
+ * cette fois-ci », rarement pour remonter à son premier achat.
+ */
+export function ventesDuClient(ventes: readonly Vente[], clientId: string): Vente[] {
+  if (!clientId) return [];
+  return ventes
+    .filter((vente) => vente.clientId === clientId)
+    .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
+}
