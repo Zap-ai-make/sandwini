@@ -96,6 +96,12 @@ async function poser(options: {
   soldee: boolean;
   motoRemise: boolean;
   documents: "tous_regles" | "un_en_cours";
+  /* Ce que le client a emporté, quand le cas testé n'est pas « tout est
+     parti ». Il se pose à la CRÉATION de la vente et non après : le
+     déclencheur clôt, il ne réouvre jamais, donc une vente déjà close ne
+     redevient pas ouverte parce qu'on décoche une case. Un test qui posait
+     `emporte` après coup observait donc une clôture déjà prononcée. */
+  emporte?: { quittance: boolean; cmc: boolean };
 }): Promise<{ venteId: string }> {
   rang += 1;
   const venteId = `${BOUTIQUE}-cloture-${rang}-${Date.now()}`;
@@ -129,7 +135,7 @@ async function poser(options: {
        reste est en ordre — et c'est ce que `un_en_cours` ne teste PAS, puisqu'il
        bloque sur la carte grise. Les deux voies de blocage ont chacune son
        test. */
-    emporte: { quittance: true, cmc: true },
+    emporte: options.emporte ?? { quittance: true, cmc: true },
     statutDossier: "ouvert",
     dateClotureDossier: null,
     ...audit,
@@ -207,8 +213,8 @@ describe("clôture automatique", () => {
       soldee: true,
       motoRemise: true,
       documents: "tous_regles",
+      emporte: { quittance: true, cmc: false },
     });
-    await base.doc(`ventesMotos/${venteId}`).update({ emporte: { quittance: true, cmc: false } });
     await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
   });
 
