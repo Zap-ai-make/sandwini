@@ -1,0 +1,320 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ce qui rend le logiciel vivant — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+<style>
+/* ---------------------------------------------------------------------------
+   BANC D'ESSAI — LA SIGNATURE VIVANTE (S54).
+
+   Première tentative : une lueur de 2 px passant toutes les 6 secondes en tête
+   de coquille. Verdict du commanditaire, et il a raison : « je vois pas ».
+   C'était un signal réseau discret, pas une identité.
+
+   Ce banc corrige le dosage et change de cible. L'identité de SDI, ce n'est pas
+   un filet : c'est le **monogramme**, présent dans le rail sur tous les écrans,
+   avec ses deux dégradés — l'or qui vire au rouge, et la goutte bleue. C'est lui
+   qu'il faut faire vivre, ou le rail qui le porte.
+
+   Chaque candidat tourne **en continu** et **à l'échelle réelle**, dans une
+   coquille reconstituée. On ne juge pas ça sur une vignette : on le juge du coin
+   de l'œil, en regardant ailleurs.
+--------------------------------------------------------------------------- */
+
+.banc { background: #212125; color: #fff; padding: 24px 24px 64px; font-family: var(--f-corps); }
+.banc h1 { font-size: 22px; margin: 0 0 6px; }
+.banc > p.chapeau { max-width: 76ch; color: #cfcfd4; font-size: 14px; line-height: 1.55; margin: 0 0 20px; }
+.banc > p.chapeau strong { color: #fff; }
+
+/* --- Le choix ------------------------------------------------------------ */
+.choix { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.choix button {
+  font: inherit; font-size: 13px; cursor: pointer; padding: 7px 13px; border-radius: 999px;
+  background: #2c2c31; color: #d8d8de; border: 1px solid rgba(255,255,255,.14);
+}
+.choix button:hover { background: #38383f; }
+.choix button[aria-pressed="true"] { background: #fff; color: #18181b; border-color: #fff; font-weight: 600; }
+.legende { font-size: 13px; color: #a9a9b2; margin: 0 0 18px; min-height: 2.6em; max-width: 76ch; line-height: 1.5; }
+.legende b { color: #fff; font-weight: 600; }
+
+/* --- La coquille reconstituée -------------------------------------------- */
+.coquille {
+  display: grid; grid-template-columns: 72px 224px 1fr;
+  height: 460px; border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255,255,255,.12); position: relative;
+}
+
+/* Le filet de marque, en tête de coquille. */
+.filet {
+  position: absolute; inset: 0 0 auto 0; height: 2px; z-index: 5; overflow: hidden;
+  background: linear-gradient(90deg, var(--or), var(--orange) 55%, var(--rouge));
+}
+.filet::after { content: ""; position: absolute; inset: 0 auto 0 0; width: 20%; opacity: 0; }
+
+/* Le rail des espaces. */
+.rail {
+  background: var(--nuit); display: flex; flex-direction: column; align-items: center;
+  padding: 10px 0; gap: 4px; position: relative; overflow: hidden;
+}
+.rail .marque { width: 40px; padding: 4px 0 10px; position: relative; display: block; }
+.rail .marque svg { display: block; width: 100%; }
+.rail .espace {
+  width: 54px; height: 46px; border-radius: 8px; display: grid; place-items: center;
+  font-size: 9px; color: var(--coquille-muet); text-align: center; line-height: 1.15; gap: 2px;
+}
+.rail .espace.actif { background: var(--nuit-3); color: var(--coquille-encre); }
+.rail .espace i { display: block; width: 17px; height: 17px; border: 1.5px solid currentColor; border-radius: 4px; }
+
+/* La colonne des écrans. */
+.colonne { background: var(--nuit-2); padding: 14px 12px; color: var(--coquille-doux); }
+.colonne h2 { font-size: 15px; margin: 0 0 14px; color: var(--coquille-encre); font-family: var(--f-titre); }
+.colonne .sur-titre { font-size: 9.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--coquille-muet); margin: 14px 0 5px; }
+.colonne a { display: block; font-size: 12.5px; padding: 6px 8px; border-radius: 6px; color: var(--coquille-doux); text-decoration: none; }
+.colonne a.actif { background: var(--nuit-3); color: var(--coquille-encre); font-weight: 600; }
+
+/* La zone de travail. */
+.travail { background: var(--fond); padding: 16px; color: var(--encre); overflow: hidden; }
+.plaque { display: inline-flex; align-items: center; gap: 6px; background: var(--plaque); color: #15130c;
+  font-family: var(--f-code); font-weight: 600; font-size: 12px; letter-spacing: .08em; padding: 4px 9px; border-radius: 5px; }
+.travail h3 { font-family: var(--f-titre); font-size: 19px; margin: 12px 0 10px; }
+.cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 12px; }
+.carte { background: var(--papier); border: 1px solid var(--bord); border-radius: 7px; padding: 10px; }
+.carte .nom { font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--encre-doux); font-weight: 700; }
+.carte .val { font-family: var(--f-code); font-size: 19px; margin-top: 3px; }
+.faux-tableau { background: var(--papier); border: 1px solid var(--bord); border-radius: 7px; overflow: hidden; }
+.faux-tableau div { display: grid; grid-template-columns: 1.4fr 1fr .8fr; gap: 10px; padding: 8px 10px; border-top: 1px solid var(--bord); font-size: 12px; }
+.faux-tableau div:first-child { border-top: 0; font-size: 9.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--encre-doux); font-weight: 700; }
+.faux-tableau span.sq { display: block; height: 10px; border-radius: 3px; background: var(--bord); }
+
+/* =========================================================================
+   LES CANDIDATS. Chacun s'allume par un attribut sur la coquille.
+   ========================================================================= */
+
+/* --- 1. LE MONOGRAMME CHAUFFE -------------------------------------------
+   Le dégradé du monogramme se déplace à l'intérieur de la marque : l'or
+   remonte, le rouge descend, puis l'inverse. Comme du métal sur la forge. Rien
+   ne clignote, rien ne bouge de place — c'est la couleur qui respire. */
+[data-vivant="chauffe"] .marque .metal stop:nth-child(1) { animation: chauffe-a 4.5s ease-in-out infinite; }
+[data-vivant="chauffe"] .marque .metal stop:nth-child(3) { animation: chauffe-b 4.5s ease-in-out infinite; }
+[data-vivant="chauffe"] .marque .metal stop:nth-child(5) { animation: chauffe-c 4.5s ease-in-out infinite; }
+@keyframes chauffe-a { 0%,100% { stop-color: #E0A81A; } 50% { stop-color: #F0C33A; } }
+@keyframes chauffe-b { 0%,100% { stop-color: #DD7A28; } 50% { stop-color: #E8903A; } }
+@keyframes chauffe-c { 0%,100% { stop-color: #C93C2E; } 50% { stop-color: #E05038; } }
+
+/* --- 2. LE MONOGRAMME BALAYÉ ---------------------------------------------
+   Une lumière traverse la marque toutes les 3,5 s, en diagonale. C'est le
+   reflet sur du métal poli : on le voit passer, il ne demande rien. */
+/* Le reflet voyage DANS le glyphe, et non dans un calque posé par-dessus :
+   chacun des cinq arrêts du dégradé s'éclaircit à son tour, décalé dans le
+   temps. Un calque en mode de fusion aurait débordé de la lettre — le rail est
+   un rectangle, le monogramme non. `stop-color` est animable en CSS ; `offset`
+   ne l'est pas, d'où le relais d'arrêt en arrêt plutôt qu'un point qui glisse. */
+[data-vivant="balaye"] .marque .metal stop:nth-child(1) { animation: reflet-1 3.5s ease-in-out infinite; animation-delay: 0.00s; }
+[data-vivant="balaye"] .marque .metal stop:nth-child(2) { animation: reflet-2 3.5s ease-in-out infinite; animation-delay: 0.13s; }
+[data-vivant="balaye"] .marque .metal stop:nth-child(3) { animation: reflet-3 3.5s ease-in-out infinite; animation-delay: 0.26s; }
+[data-vivant="balaye"] .marque .metal stop:nth-child(4) { animation: reflet-4 3.5s ease-in-out infinite; animation-delay: 0.39s; }
+[data-vivant="balaye"] .marque .metal stop:nth-child(5) { animation: reflet-5 3.5s ease-in-out infinite; animation-delay: 0.52s; }
+@keyframes reflet-1 { 0%, 26%, 100% { stop-color: #E0A81A; } 9% { stop-color: #FFF6DF; } }
+@keyframes reflet-2 { 0%, 26%, 100% { stop-color: #DFA01C; } 9% { stop-color: #FFF6DF; } }
+@keyframes reflet-3 { 0%, 26%, 100% { stop-color: #DD7A28; } 9% { stop-color: #FFF6DF; } }
+@keyframes reflet-4 { 0%, 26%, 100% { stop-color: #D3592C; } 9% { stop-color: #FFF6DF; } }
+@keyframes reflet-5 { 0%, 26%, 100% { stop-color: #C93C2E; } 9% { stop-color: #FFF6DF; } }
+  8%            { stop-color: #FFF4D6; }
+}
+
+/* --- 3. LE RAIL QUI S'ALLUME ---------------------------------------------
+   Une lueur verticale descend la colonne sombre du rail, derrière les icônes,
+   toutes les 5 s. Grande surface, mouvement lent : c'est le candidat qui se
+   voit le plus sans qu'on le regarde. */
+[data-vivant="rail"] .rail::before {
+  content: ""; position: absolute; inset: -30% 0 auto 0; height: 46%; z-index: 0;
+  background: linear-gradient(180deg, transparent, rgba(224,168,26,.17) 45%, rgba(201,60,46,.14) 70%, transparent);
+  animation: rail-allume 5s linear infinite;
+}
+@keyframes rail-allume {
+  from { transform: translateY(0); }
+  to   { transform: translateY(330%); }
+}
+
+/* --- 4. LE FILET FRANC ----------------------------------------------------
+   Le candidat d'origine, mais au bon dosage : 3 px au lieu de 2, une comète
+   avec sa traîne au lieu d'un dégradé mou, 2,5 s au lieu de 6. */
+[data-vivant="filet"] .filet { height: 3px; }
+[data-vivant="filet"] .filet::after {
+  opacity: 1; width: 26%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.35) 55%, #fff 88%, rgba(255,255,255,.9));
+  animation: filet-comete 2.5s cubic-bezier(.4,0,.6,1) infinite;
+}
+@keyframes filet-comete {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(385%); }
+}
+
+/* --- 5. LE CHARGEMENT PORTE LA MARQUE ------------------------------------
+   Les lignes fantômes passent du gris au dégradé de la marque. Ça ne tourne
+   pas en permanence — mais ça apparaît à chaque écran qui charge, donc cinquante
+   fois par jour, et c'est signé. */
+[data-vivant="squelette"] .faux-tableau span.sq {
+  background: linear-gradient(90deg, var(--bord) 0%, rgba(224,168,26,.55) 38%, rgba(201,60,46,.5) 52%, var(--bord) 90%);
+  background-size: 260% 100%;
+  animation: squelette-marque 1.6s ease-in-out infinite;
+}
+@keyframes squelette-marque { to { background-position: -260% 0; } }
+
+/* --- 6. TOUT À LA FOIS ---------------------------------------------------- */
+[data-vivant="tout"] .marque .metal stop:nth-child(1) { animation: reflet-1 3.5s ease-in-out infinite; animation-delay: 0.00s; }
+[data-vivant="tout"] .marque .metal stop:nth-child(2) { animation: reflet-2 3.5s ease-in-out infinite; animation-delay: 0.13s; }
+[data-vivant="tout"] .marque .metal stop:nth-child(3) { animation: reflet-3 3.5s ease-in-out infinite; animation-delay: 0.26s; }
+[data-vivant="tout"] .marque .metal stop:nth-child(4) { animation: reflet-4 3.5s ease-in-out infinite; animation-delay: 0.39s; }
+[data-vivant="tout"] .marque .metal stop:nth-child(5) { animation: reflet-5 3.5s ease-in-out infinite; animation-delay: 0.52s; }
+[data-vivant="tout"] .rail::before {
+  content: ""; position: absolute; inset: -30% 0 auto 0; height: 46%; z-index: 0;
+  background: linear-gradient(180deg, transparent, rgba(224,168,26,.17) 45%, rgba(201,60,46,.14) 70%, transparent);
+  animation: rail-allume 5s linear infinite;
+}
+[data-vivant="tout"] .filet { height: 3px; }
+[data-vivant="tout"] .filet::after {
+  opacity: 1; width: 26%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.35) 55%, #fff 88%, rgba(255,255,255,.9));
+  animation: filet-comete 2.5s cubic-bezier(.4,0,.6,1) infinite;
+}
+
+/* Le garde du dépôt vaut ici aussi : rien ne bouge pour qui demande moins de
+   mouvement. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+.apres { margin-top: 28px; max-width: 80ch; color: #cfcfd4; font-size: 13.5px; line-height: 1.6; }
+.apres h2 { color: #fff; font-size: 16px; margin: 0 0 8px; }
+.apres li { margin-bottom: 7px; }
+.apres b { color: #fff; }
+</style>
+</head>
+<body>
+<div class="banc">
+
+<h1>Ce qui rend le logiciel vivant</h1>
+<p class="chapeau">
+  La première proposition — une lueur de 2 px toutes les 6 secondes en tête de coquille — était invisible,
+  et la critique est juste : c'était un <em>signal réseau</em> discret, pas une identité.
+  Ici on change de cible et de dosage. L'identité de SDI, c'est le <strong>monogramme</strong> : il est dans le
+  rail sur tous les écrans, et il porte les deux dégradés de la marque.
+  <strong>Chaque candidat tourne en continu, à l'échelle réelle.</strong> Regarde ailleurs sur la page —
+  c'est du coin de l'œil que ça se juge.
+</p>
+
+<div class="choix" id="choix">
+  <button data-v="aucun" aria-pressed="true">Aucune</button>
+  <button data-v="chauffe" aria-pressed="false">1 · Le monogramme chauffe</button>
+  <button data-v="balaye" aria-pressed="false">2 · Le monogramme balayé</button>
+  <button data-v="rail" aria-pressed="false">3 · Le rail qui s'allume</button>
+  <button data-v="filet" aria-pressed="false">4 · Le filet franc</button>
+  <button data-v="squelette" aria-pressed="false">5 · Le chargement signé</button>
+  <button data-v="tout" aria-pressed="false">2 + 3 + 4 ensemble</button>
+</div>
+<p class="legende" id="legende">L'application telle qu'elle est aujourd'hui : rien ne bouge tant qu'on ne fait rien.</p>
+
+<div class="coquille" id="coquille" data-vivant="aucun">
+  <span class="filet"></span>
+
+  <div class="rail">
+    <span class="marque">
+      <svg viewBox="0 0 546 402" aria-hidden="true">
+        <defs>
+          <linearGradient id="metal" class="metal" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#E0A81A"></stop>
+            <stop offset="0.5" stop-color="#DFA01C"></stop>
+            <stop offset="0.63" stop-color="#DD7A28"></stop>
+            <stop offset="0.82" stop-color="#D3592C"></stop>
+            <stop offset="1" stop-color="#C93C2E"></stop>
+          </linearGradient>
+          <linearGradient id="goutte" x1="0.1" y1="0" x2="0.9" y2="1">
+            <stop offset="0" stop-color="#2E9BC4"></stop>
+            <stop offset="1" stop-color="#1F52A8"></stop>
+          </linearGradient>
+        </defs>
+        <path fill="url(#goutte)" d="M6 126C3 160 4 210 20 246C36 285 75 315 151 334C190 331 221 314 221 286C200 258 130 236 60 212C30 196 12 162 6 126Z"></path>
+        <path fill="url(#metal)" d="M204 4H540C540 44 518 74 467 94L387 98V156H514C514 192 492 228 451 242L387 246V304L468 308C512 318 538 344 540 391V396H219C270 374 303 330 307 276C307 248 293 228 273 206C240 186 185 166 128 152C105 142 96 124 96 106C96 84 130 74 165 78C195 82 220 96 246 114L250 119L253 113L293 57C265 38 235 20 204 4Z"></path>
+      </svg>
+    </span>
+    <span class="espace"><i></i>Supervi&shy;sion</span>
+    <span class="espace actif"><i></i>Motos</span>
+    <span class="espace"><i></i>Pièces</span>
+    <span class="espace"><i></i>Caisse</span>
+  </div>
+
+  <div class="colonne">
+    <h2>Motos</h2>
+    <p class="sur-titre">Suivre</p>
+    <a href="#" class="actif">Stock motos</a>
+    <a href="#">Arrivages</a>
+    <a href="#">Ventes</a>
+    <a href="#">Paiements</a>
+    <a href="#">Dossiers</a>
+    <p class="sur-titre">Le fichier</p>
+    <a href="#">Clients</a>
+  </div>
+
+  <div class="travail">
+    <span class="plaque">SDI</span>
+    <h3>Stock motos</h3>
+    <div class="cartes">
+      <div class="carte"><p class="nom">En stock</p><p class="val">13</p></div>
+      <div class="carte"><p class="nom">Chiffre d'affaires</p><p class="val">900 000</p></div>
+      <div class="carte"><p class="nom">Reste à percevoir</p><p class="val">400 000</p></div>
+    </div>
+    <div class="faux-tableau">
+      <div><span>Numéro de châssis</span><span>Marque</span><span>Prix</span></div>
+      <div><span class="sq"></span><span class="sq"></span><span class="sq"></span></div>
+      <div><span class="sq"></span><span class="sq"></span><span class="sq"></span></div>
+      <div><span class="sq"></span><span class="sq"></span><span class="sq"></span></div>
+      <div><span class="sq"></span><span class="sq"></span><span class="sq"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="apres">
+  <h2>Ce que je retiens</h2>
+  <ul>
+    <li><b>2 · Le monogramme balayé</b> — mon choix. C'est la marque elle-même qui vit, pas un décor posé à côté. Le reflet passe sur du métal poli : c'est exactement ce que raconte le dégradé or&nbsp;→&nbsp;rouge. Et ça ne gêne personne, le monogramme n'est jamais dans la ligne de lecture.</li>
+    <li><b>3 · Le rail qui s'allume</b> — le plus visible des cinq, et de loin. À retenir si tu trouves le 2 encore trop sage. Risque assumé : c'est une grande surface qui bouge en permanence, à côté du regard pendant huit heures.</li>
+    <li><b>1 · Le monogramme chauffe</b> — le plus doux. La marque change de couleur sans que rien ne se déplace. On le remarque sans savoir ce qui a bougé.</li>
+    <li><b>4 · Le filet franc</b> — ce que la première version aurait dû être. Il peut s'ajouter à un autre : il ne vit pas au même endroit.</li>
+    <li><b>5 · Le chargement signé</b> — ne tourne pas en continu, mais apparaît cinquante fois par jour. C'est le moins cher en attention, et il transforme un moment d'attente en moment de marque.</li>
+  </ul>
+</div>
+
+</div>
+
+<script>
+const LEGENDES = {
+  aucun: "L'application telle qu'elle est aujourd'hui : rien ne bouge tant qu'on ne fait rien.",
+  chauffe: "<b>Le monogramme chauffe.</b> Le dégradé respire à l'intérieur de la marque — l'or s'éclaircit, le rouge s'avive, puis ça redescend. 4,5 s. Rien ne se déplace : c'est la couleur seule qui vit.",
+  balaye: "<b>Le monogramme balayé.</b> Un reflet traverse la marque en diagonale toutes les 3,5 s, comme la lumière sur du métal poli. C'est la marque qui vit, pas un décor posé à côté.",
+  rail: "<b>Le rail qui s'allume.</b> Une lueur descend la colonne sombre derrière les icônes, toutes les 5 s. Grande surface, mouvement lent — le plus visible des cinq.",
+  filet: "<b>Le filet franc.</b> Le candidat d'origine au bon dosage : 3 px, une comète avec sa traîne, 2,5 s au lieu de 6. Compare avec ce que tu n'as pas vu ce matin.",
+  squelette: "<b>Le chargement signé.</b> Les lignes d'attente passent du gris au dégradé de la marque. Ça n'occupe pas l'écran en permanence — ça signe chaque attente, cinquante fois par jour.",
+  tout: "<b>Les trois ensemble.</b> Monogramme balayé + rail + filet. À regarder pour savoir où est la limite : c'est probablement trop, et c'est utile de voir trop une fois.",
+};
+
+const coquille = document.getElementById("coquille");
+const legende = document.getElementById("legende");
+document.getElementById("choix").addEventListener("click", (evenement) => {
+  const bouton = evenement.target.closest("button");
+  if (!bouton) return;
+  for (const autre of document.querySelectorAll("#choix button")) {
+    autre.setAttribute("aria-pressed", String(autre === bouton));
+  }
+  coquille.dataset.vivant = bouton.dataset.v;
+  legende.innerHTML = LEGENDES[bouton.dataset.v];
+});
+</script>
+</body>
+</html>

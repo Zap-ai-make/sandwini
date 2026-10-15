@@ -1,8 +1,10 @@
 import { expect, test } from "@playwright/test";
 import {
+  attendreLaFileVide,
   bandeauEtat,
   codeUnique,
   creerBoutique,
+  nomUnique,
   prendreLaMainEtMettreEnCache,
   seConnecterEtEntrer,
 } from "./aide";
@@ -68,8 +70,13 @@ test.describe("coquille applicative", () => {
     expect(debordement).toBeLessThanOrEqual(0);
   });
 
-  test("le bandeau annonce « À jour » quand tout est parti", async ({ page }) => {
-    await expect(bandeauEtat(page)).toContainText("À jour");
+  /* Le bandeau ne dit plus « À jour » : au repos il se tait (S54). Ce qui se
+     vérifie a donc changé — non plus « la phrase est là », mais « rien ne
+     s'affiche alors que l'état est bien au repos ». Sans la seconde moitié, le
+     test passerait aussi sur un bandeau cassé qui n'affiche jamais rien. */
+  test("au repos, le bandeau se tait — et c'est bien l'état au repos", async ({ page }) => {
+    await attendreLaFileVide(page);
+    await expect(bandeauEtat(page)).toHaveText("");
   });
 });
 
@@ -130,43 +137,58 @@ test.describe("hors ligne", () => {
   });
 
   test("le bandeau bascule quand le réseau tombe, puis revient", async ({ page, context }) => {
-    await expect(bandeauEtat(page)).toContainText("À jour");
+    await attendreLaFileVide(page);
 
     await context.setOffline(true);
     await expect(bandeauEtat(page)).toContainText("Hors ligne");
 
     await context.setOffline(false);
-    await expect(bandeauEtat(page)).toContainText("À jour");
+    await attendreLaFileVide(page);
+    await expect(bandeauEtat(page)).toHaveText("");
   });
 
+  /**
+   * **Ce test se faisait sur `/diagnostic`, qui n'existe plus** (S54 : c'était
+   * un outil de test qui salissait la base à chaque essai). Il se fait donc
+   * maintenant sur une écriture ordinaire du produit — ajouter une marque au
+   * catalogue —, et c'est un gain : on ne prouve plus la promesse hors-ligne
+   * sur un écran fabriqué pour elle, mais sur un geste que quelqu'un fait
+   * vraiment au comptoir.
+   *
+   * Ce qu'on y perd : l'ancien écran disait, document par document, « encore
+   * ici » puis « confirmé par le serveur ». Aucun écran ordinaire ne le dit —
+   * et c'est voulu (D76 : on n'attend pas le serveur). La preuve que l'écriture
+   * est **partie** passe donc par le compteur du bandeau, qui retombe à zéro
+   * quand la file se vide.
+   */
   test("une saisie faite hors ligne est acceptée, comptée, puis part au retour du réseau", async ({
     page,
     context,
   }) => {
-    await page.goto("/diagnostic");
-    await prendreLaMainEtMettreEnCache(page, "/diagnostic");
+    await page.goto("/parametres/catalogue");
+    await prendreLaMainEtMettreEnCache(page, "/parametres/catalogue");
+    await attendreLaFileVide(page);
 
-    const bouton = page.getByRole("button", { name: "Écrire un test de synchronisation" });
-
-    // Ligne de base : en ligne, l’écriture est confirmée par le serveur.
-    await bouton.click();
-    await expect(page.getByText("Confirmé par le serveur")).toBeVisible({ timeout: 20_000 });
+    const marque = nomUnique("Hors-ligne");
 
     // Réseau coupé : la saisie est acceptée localement, tout de suite.
     await context.setOffline(true);
-    await bouton.click();
-    await expect(page.getByText("Enregistré ici, en attente d’envoi")).toBeVisible();
+    await page.getByLabel("Ajouter une marque").fill(marque);
+    await page.getByRole("button", { name: "Ajouter" }).click();
+
+    /* La ligne paraît sans réseau : c'est toute la promesse du produit, et
+       c'est le cache local qui la tient, pas le serveur. */
+    await expect(page.getByRole("listitem").filter({ hasText: marque })).toBeVisible();
     await expect(bandeauEtat(page)).toContainText("1 saisie en attente");
 
-    // Réseau revenu : elle part seule, sans que personne ne la relance.
-    await context.setOffline(false);
-    await expect(page.getByText("Confirmé par le serveur").first()).toBeVisible({ timeout: 30_000 });
-    /* Soixante secondes, et non trente. Après une coupure, le SDK Firestore
+    /* Réseau revenu : elle part seule, sans que personne ne la relance.
+       Soixante secondes, et non trente. Après une coupure, le SDK Firestore
        rétablit sa connexion avec un délai croissant qui peut approcher la
        minute : le retour du réseau ne le réveille pas, il finit son attente.
        Ce que ce test vérifie, c'est que la saisie **part toute seule** — pas
        en combien de temps. La rapidité du réveil est une question de produit,
        ouverte au backlog (S27), pas une question de harnais. */
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 60_000 });
+    await context.setOffline(false);
+    await attendreLaFileVide(page, 60_000);
   });
 });

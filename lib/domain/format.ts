@@ -173,3 +173,17 @@ export function depuisQuand(date: Date | null, maintenant: Date = new Date()): s
   if (jours < 30) return formaterAnciennete(jours);
   return `il y a ${Math.round(jours / 30)} mois`;
 }
+
+/**
+ * « 1 moto », « 3 motos », « 0 moto ».
+ *
+ * **Elle vivait en privé dans la navigation**, si bien que tout le reste du
+ * produit écrivait « 1 motos » : la répartition de l'inventaire le faisait sous
+ * les yeux du commanditaire. Une règle d'accord recopiée est une règle d'accord
+ * oubliée quelque part — elle descend donc ici, avec les autres mises en forme.
+ *
+ * Le zéro reste au singulier, comme en français : « 0 moto ».
+ */
+export function compter(nombre: number, singulier: string, pluriel?: string): string {
+  return `${formaterNombre(nombre)} ${nombre > 1 ? (pluriel ?? `${singulier}s`) : singulier}`;
+}

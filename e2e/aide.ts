@@ -62,9 +62,16 @@ export async function seConnecterEtEntrer(page: Page) {
 /**
  * Attend que **tout ce qui vient d'être écrit soit parti au serveur**.
  *
- * `À jour` au bandeau veut dire : la file d'écritures Firestore est vide. Rien
- * d'autre dans le produit ne dit cela, et c'est exactement la question que le
- * décor doit se poser avant deux gestes précis.
+ * `data-synchro="a_jour"` au bandeau veut dire : la file d'écritures Firestore
+ * est vide. Rien d'autre dans le produit ne dit cela, et c'est exactement la
+ * question que le décor doit se poser avant deux gestes précis.
+ *
+ * **C'était une phrase, c'est devenu un attribut** (S54). Le bandeau affichait
+ * « À jour » en permanence ; le commanditaire l'a fait retirer, et il a raison
+ * — un voyant toujours vert cesse d'être lu (D63). L'état, lui, n'a pas
+ * disparu du modèle : il est juste sorti de la prose. Viser l'attribut plutôt
+ * que le texte a d'ailleurs un mérite propre : la suite ne se casse plus quand
+ * une phrase est reformulée.
  *
  * **Avant d'ouvrir un second navigateur** (S27, D97). Un navigateur qui vient
  * d'écrire lit son propre cache et n'a rien à attendre — c'est la promesse du
@@ -88,8 +95,33 @@ export async function seConnecterEtEntrer(page: Page) {
  * reconnexion à attente croissante (D50) : après une coupure, la file peut
  * mettre près d'une minute à repartir.
  */
-export async function attendreLaFileVide(page: Page) {
-  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 120_000 });
+export async function attendreLaFileVide(page: Page, timeout = 120_000) {
+  await expect(bandeauEtat(page)).toHaveAttribute("data-synchro", "a_jour", { timeout });
+}
+
+/**
+ * Le panneau d'un écran en onglets, et le moyen d'y aller (S54).
+ *
+ * Le panneau actif est une `region` nommée par son onglet ; l'onglet lui-même
+ * est un bouton radio, parce que `Onglets` est bâti sur `Segmente`. Viser le
+ * panneau plutôt que la page entière garde les tests précis le jour où deux
+ * onglets porteront un champ du même nom.
+ */
+export function panneau(page: Page, nom: string) {
+  return page.getByRole("region", { name: nom, exact: true });
+}
+
+export async function ouvrirOnglet(page: Page, nom: string) {
+  const onglet = page.getByRole("radio", { name: nom, exact: true });
+  /* **On clique l'étiquette, pas le bouton radio.** Dans `Segmente` le radio
+     est `sr-only` : il garde une boîte de 1 px au centre de son étiquette, si
+     bien que `check()` vise un point que l'étiquette intercepte — Playwright
+     réessaie jusqu'au délai, sans jamais y arriver. Mesuré en S54. C'est de
+     toute façon le geste réel : personne ne clique un pixel invisible.
+     L'assertion qui suit n'est pas décorative — un clic d'étiquette qui ne
+     cocherait rien passerait autrement inaperçu. */
+  await page.locator("label").filter({ has: onglet }).click();
+  await expect(onglet).toBeChecked();
 }
 
 /** L'indicateur de périmètre du bandeau : sélecteur pour le responsable, texte pour le gérant. */
@@ -171,9 +203,11 @@ export async function creerBoutique(
   metiers: readonly ("Motos" | "Pièces détachées")[] = ["Motos"],
 ) {
   await page.goto("/parametres/boutiques", { waitUntil: "load" });
-  const formulaire = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Créer la boutique" }),
-  });
+  /* Le formulaire est passé en modale (S54) : l'écran s'ouvre sur la liste.
+     Son bouton d'envoi vit dans le pied du dialogue, hors du `<form>` — c'est
+     donc le dialogue qu'on vise, et non plus le formulaire. */
+  await page.getByRole("button", { name: "Ajouter une boutique" }).click();
+  const formulaire = page.getByRole("dialog");
   await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
   await formulaire.getByLabel(/^Code/).fill(code);
   for (const metier of metiers) {
@@ -188,22 +222,21 @@ export async function creerBoutique(
      lit le serveur, elle : enchainer trop vite répond « Cette boutique
      n'existe pas ». Le bandeau dit quand la file d'écritures est vidée, et
      c'est le seul signal qui le dise. */
-  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+  await attendreLaFileVide(page, 30_000);
 }
 
 /** Ajoute une marque et l'un de ses modèles au catalogue, par l'écran de S39. */
 export async function ajouterMarqueEtModele(page: Page, marque: string, modele: string) {
   await page.goto("/parametres/catalogue", { waitUntil: "load" });
-  const marques = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Marques" }) });
+  const marques = panneau(page, "Marques");
   await marques.getByLabel("Ajouter une marque").fill(marque);
   await marques.getByRole("button", { name: "Ajouter" }).click();
   await expect(marques.getByRole("listitem").filter({ hasText: marque })).toBeVisible();
 
-  const modeles = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Modèles" }) });
+  /* Les deux listes ne sont plus empilées : les modèles vivent dans l'onglet
+     voisin, et l'onglet inactif est démonté — pas seulement masqué. */
+  await ouvrirOnglet(page, "Modèles");
+  const modeles = panneau(page, "Modèles");
   await modeles.getByLabel("Marque").selectOption({ label: marque });
   await modeles.getByLabel(/^Ajouter un modèle/).fill(modele);
   await modeles.getByRole("button", { name: "Ajouter" }).click();
@@ -231,9 +264,7 @@ export async function preparerTerrain(page: Page): Promise<Terrain> {
   await ajouterMarqueEtModele(page, marque, modele);
 
   await page.goto("/parametres/referentiels", { waitUntil: "load" });
-  const provenances = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Provenances" }) });
+  const provenances = panneau(page, "Provenances");
   await provenances.getByLabel("Ajouter une provenance").fill(provenance);
   await provenances.getByRole("button", { name: "Ajouter" }).click();
   await expect(provenances.getByRole("listitem").filter({ hasText: provenance })).toBeVisible();
@@ -414,16 +445,19 @@ export async function encaisser(page: Page, montant: string) {
  */
 export async function creerPrestataire(page: Page, nom: string) {
   await page.goto("/parametres/prestataires", { waitUntil: "load" });
-  const formulaire = page.locator("form").filter({ hasText: "Ajouter un prestataire" });
+  await page.getByRole("button", { name: "Ajouter un prestataire" }).click();
+  const formulaire = page.getByRole("dialog");
   await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
   await formulaire.getByLabel("Téléphone").fill("70112233");
   /* Un seul type depuis S48 : la plaque a quitté le dossier, l'immatriculation
      étant obtenue avec la carte grise et chez le même prestataire. */
   await formulaire.getByLabel("Carte grise").check();
   await formulaire.getByRole("button", { name: "Enregistrer le prestataire" }).click();
-  /* Sur le message de confirmation, pas sur la liste : le nom apparaît aux deux
-     endroits, et Playwright refuse l'ambiguïté. Même piège qu'en D55, et même
-     remède — viser le `role="status"`, qui n'existe qu'une fois. */
-  await expect(contenu(page).getByRole("status")).toContainText("est enregistré");
-  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+  /* **La ligne est la confirmation** depuis S54. Il n'y a plus de phrase verte
+     à viser : l'écriture est locale d'abord (D76), donc la modale se ferme et
+     la ligne est déjà là derrière. Attendre la fermeture avant de lire la
+     liste évite de compter le nom deux fois — il est aussi dans le champ. */
+  await expect(formulaire).toBeHidden();
+  await expect(page.getByRole("listitem").filter({ hasText: nom })).toBeVisible();
+  await attendreLaFileVide(page, 30_000);
 }

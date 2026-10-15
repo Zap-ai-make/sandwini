@@ -8,12 +8,21 @@
    valeur d'attente : ce qui a été jugé dans le navigateur est ce qui est écrit
    ici, aux mêmes hex.
 
-   La direction en trois phrases (D70) :
+   La direction en trois phrases (D70, amendée en S54) :
 
-   - La **marque tient la coquille**. Le nuit du monogramme habille le rail,
-     l'en-tête et la connexion. Le dégradé or → rouge reste enfermé dans le
-     logo, sauf un filet de 2 px en tête de coquille : un dégradé en fond de
-     section est le tic que DESIGN.md §1 interdit.
+   - **Acier et braise.** Le logo est du feu sur de la nuit ; l'interface était
+     du gris froid sur un bleu-violet — elle ne ressemblait pas à sa propre
+     marque, et le commanditaire l'a dit dans ces termes : « manque d'identité,
+     trop standard ». Tous les neutres sont donc chauds : l'acier huilé de
+     l'atelier pour la coquille, le sable de la cour pour le fond. Aucun
+     dégradé n'est posé nulle part — c'est la **température** des gris qui
+     porte l'identité, et c'est pour ça qu'on la remarque sans savoir la
+     nommer. Le dégradé or → rouge reste enfermé dans le logo, sauf le filet de
+     2 px en tête de coquille : un dégradé en fond de section est le tic que
+     DESIGN.md §1 interdit. La braise, elle, ne prend PAS l'action principale :
+     elle dit déjà « retard et irréversible », et un bouton d'action rouge posé
+     à côté d'un bouton destructif rouge est la confusion qu'un logiciel
+     d'argent ne peut pas se permettre. L'action reste l'encre, chaude.
    - Le **jaune de plaque redevient un signal**, et n'a plus que deux emplois :
      le code boutique, et l'état hors ligne. Un signal qui apparaît partout
      n'est plus qu'une couleur.
@@ -47,12 +56,20 @@
    Vérifié dans `.next/static/css/` après compilation, pas supposé. */
 @theme static {
   /* --- La marque -----------------------------------------------------------
-     Relevés à la pipette sur `design/marque/logo-se-fond-sombre.jpg`, remontés
-     en clarté : un scan sous-exposé n'est pas une couleur de marque. */
-  --color-nuit: #14142b; /* la coquille, et le fond du monogramme */
-  --color-nuit-2: #191a32; /* la colonne des écrans, un cran au-dessus */
-  --color-nuit-3: #22243f; /* l'élément actif dans la coquille */
-  --color-nuit-filet: #2b2d4a; /* les séparations internes à la coquille */
+     Les cinq arrêts du monogramme sont relevés à la pipette sur
+     `design/marque/logo-se-fond-sombre.jpg`, remontés en clarté : un scan
+     sous-exposé n'est pas une couleur de marque.
+
+     La coquille, elle, n'est plus le nuit du logo mais **l'acier huilé de
+     l'atelier** (S54). Le bleu-violet #14142b et le gris bleuté #eef1f5
+     couvraient à eux deux plus de 90 % de la surface, et ce sont les deux
+     couleurs les plus répandues du logiciel de gestion : le produit n'avait
+     pas de visage. Les neutres passent donc au chaud, des deux côtés — la
+     coquille et le fond. */
+  --color-nuit: #1b1a17; /* acier huilé : la coquille */
+  --color-nuit-2: #22201c; /* la colonne des écrans, un cran au-dessus */
+  --color-nuit-3: #2e2b25; /* l'élément actif dans la coquille */
+  --color-nuit-filet: #3a362e; /* les séparations internes à la coquille */
 
   /* Les cinq arrêts des deux dégradés du monogramme. Ils servent au logo et au
      filet de coquille — nulle part ailleurs en aplat. */
@@ -62,19 +79,23 @@
   --color-cyan: #2e9bc4;
   --color-bleu: #1f52a8;
 
-  /* --- Surfaces et texte --------------------------------------------------- */
-  --color-encre: #0f1720;
-  --color-encre-doux: #5a6672;
+  /* --- Surfaces et texte ---------------------------------------------------
+     La feuille reste du blanc pur. L'application s'utilise au comptoir,
+     parfois dehors, sur un écran bon marché : un crème y perdrait le contraste
+     que le soleil mange déjà. C'est **autour** de la feuille que la chaleur se
+     joue — le sable de la cour, et l'acier de la coquille. */
+  --color-encre: #16130f;
+  --color-encre-doux: #5c554b; /* 7,35:1 sur la feuille */
   --color-papier: #ffffff; /* la feuille : la zone de travail */
-  --color-fond: #eef1f5; /* ce qui n'est pas la feuille */
-  --color-bord: #d5dae0; /* filets et séparations */
-  --color-bord-fort: #7c8894; /* bordure de champ : elle doit se voir — 3,6:1 */
-  --color-survol: #f4f6f9;
+  --color-fond: #efeae1; /* sable : ce qui n'est pas la feuille */
+  --color-bord: #ddd5c8; /* filets et séparations */
+  --color-bord-fort: #857c6d; /* bordure de champ : elle doit se voir — 4,12:1 */
+  --color-survol: #f7f4ee;
 
   /* Le texte posé sur la coquille sombre. Trois niveaux, pas plus. */
   --color-coquille-encre: #ffffff;
-  --color-coquille-doux: #c4c9e0;
-  --color-coquille-muet: #8289ad;
+  --color-coquille-doux: #cdc6b8;
+  --color-coquille-muet: #918979; /* intitulés de groupe — 5,02:1 sur l'acier */
 
   /* --- Le signal : la plaque -----------------------------------------------
      Deux emplois, jamais trois : le code boutique, et le hors-ligne.
@@ -98,16 +119,30 @@
      `alerte` est le mot du dépôt pour ce que les maquettes appellent la
      braise : même rôle, même hex. On garde le nom déjà employé partout dans
      `components/` plutôt que de renommer soixante occurrences. */
-  --color-alerte: #c2372a; /* retard, erreur, irréversible */
-  --color-alerte-surface: #fdecea;
+  --color-alerte: #a8392a; /* retard, irréversible. Rien d'autre. */
+  --color-alerte-surface: #fbeae6;
   --color-goutte: #1f52a8; /* parti et pas revenu : prestataire, envoi en attente */
   --color-goutte-surface: #eaf0fb;
-  --color-solde: #1b6b4a; /* réglé */
-  --color-solde-surface: #e7f3ed;
+  /* L'olive, et non le vert de succès universel : celui-ci ne venait d'aucune
+     des deux rampes du logo, il était le troisième terme du trio
+     rouge/bleu/vert qu'on trouve dans tous les tableaux de bord. L'olive tient
+     dans une palette chaude et n'appartient à personne d'autre (S54). */
+  --color-solde: #4f6b24; /* réglé */
+  --color-solde-surface: #eff2e5;
+
+  /* La paille : ce qui vient d'arriver sous les yeux, et rien d'autre.
+
+     Elle ne se pose jamais au repos — c'est une couleur d'animation, qui
+     n'existe que le temps d'une seconde. C'est à cette condition qu'elle peut
+     être chaude sans entrer en concurrence avec la braise : on ne les voit
+     jamais ensemble assez longtemps pour les confondre. Elle n'a pas de
+     `-surface` parce qu'elle n'en est pas une : rien ne s'écrit par-dessus en
+     permanence. */
+  --color-arrivee: #f6edd8;
 
   /* Anneau de focus : un trait et son halo, pour tenir sur le blanc, sur le
      nuit et sur la plaque jaune. Redéfini dans la coquille sombre. */
-  --color-focus-trait: #0f1720;
+  --color-focus-trait: #16130f;
   --color-focus-halo: #ffffff;
 
   /* --- Typographie ---------------------------------------------------------
@@ -176,76 +211,56 @@
   --container-travail: 1600px; /* la borne haute de la zone de travail */
 }
 
-/* Mode sombre : un vrai mode, pas une inversion (DESIGN.md §5).
+/* Mode sombre : un vrai mode, demandé, jamais imposé (DESIGN.md §5).
 
-   Il suit le réglage du système, et rien d'autre — le commanditaire a tranché :
-   pas de basculeur dans le produit. Les maquettes en portaient un, mais c'était
-   pour qu'il puisse voir le thème, pas une proposition de réglage.
+   **Le clair est le défaut** (S54, décision du commanditaire). Le produit
+   suivait `prefers-color-scheme`, ce qui ouvrait l'application en sombre sur
+   toute machine réglée ainsi — alors qu'on travaille au comptoir, souvent en
+   plein jour, parfois dehors. Il n'y a donc plus qu'une écriture du sombre :
+   le forçage explicite. `data-theme` absent vaut clair.
 
-   La coquille ne bouge presque pas : elle est déjà nuit, c'est l'avantage de
-   cette direction. Ce sont les surfaces de travail qui se réétagent, et les
+   Ce que cela retire, et c'est assumé : le suivi automatique du réglage
+   système. Le basculeur du pied de rail reste la porte d'entrée du sombre, et
+   le choix survit au rechargement — c'est `app/layout.tsx` qui le repose avant
+   la première peinture.
+
+   La coquille ne bouge presque pas : elle est déjà l'acier, c'est l'avantage
+   de cette direction. Ce sont les surfaces de travail qui se réétagent, et les
    trois sémantiques qui s'éclaircissent pour tenir le contraste. Le jaune de
    plaque, lui, ne bouge pas. */
-/* Deux écritures pour une seule palette, et c'est délibéré (`socle.css:155`).
-   Un basculeur explicite doit gagner **dans les deux sens** : forcer le clair
-   sur une machine réglée en sombre est le cas qui compte au comptoir, et une
-   seule règle `prefers-color-scheme` ne sait pas le faire. D'où le
-   `:not([data-theme="clair"])` qui laisse le choix explicite reprendre la
-   main, et le bloc `[data-theme="sombre"]` qui force dans l'autre sens.
-
-   Les valeurs sont volontairement recopiées plutôt qu'indirectes : une
-   indirection par variables intermédiaires aurait dupliqué la même liste
-   d'affectations sans rien économiser, en ajoutant un niveau à lire. */
 @layer theme {
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="clair"]) {
-      color-scheme: dark;
-
-      --color-encre: #e8ecef;
-      --color-encre-doux: #97a3af;
-      --color-papier: #151c24;
-      --color-fond: #0b0f14;
-      --color-bord: #2a343f;
-      --color-bord-fort: #6a7783;
-      --color-survol: #1c242e;
-
-      --color-accent-actif: #f5c518;
-
-      --color-alerte: #ff8a7a;
-      --color-alerte-surface: #3a211e;
-      --color-goutte: #7fb2ec;
-      --color-goutte-surface: #16233a;
-      --color-solde: #56c08d;
-      --color-solde-surface: #12291f;
-
-      --color-focus-trait: #ffffff;
-      --color-focus-halo: #0b0f14;
-    }
+  /* `color-scheme: light` n'est pas décoratif : sans lui, sur une machine
+     réglée en sombre, le navigateur sort ses propres contrôles en sombre —
+     le sélecteur de date de l'Inventaire, les listes déroulantes, les
+     ascenseurs — au milieu d'une application claire. */
+  :root {
+    color-scheme: light;
   }
 
-  /* Le sombre forcé, quel que soit le réglage de la machine. */
+  /* Le sombre, et seulement sur demande. */
   :root[data-theme="sombre"] {
     color-scheme: dark;
 
-    --color-encre: #e8ecef;
-    --color-encre-doux: #97a3af;
-    --color-papier: #151c24;
-    --color-fond: #0b0f14;
-    --color-bord: #2a343f;
-    --color-bord-fort: #6a7783;
-    --color-survol: #1c242e;
+    --color-encre: #ece7df;
+    --color-encre-doux: #a69d8f;
+    --color-papier: #1f1d1a;
+    --color-fond: #141310;
+    --color-bord: #363229;
+    --color-bord-fort: #847b6c;
+    --color-survol: #272420;
 
     --color-accent-actif: #f5c518;
 
-    --color-alerte: #ff8a7a;
-    --color-alerte-surface: #3a211e;
+    --color-alerte: #ff9484;
+    --color-alerte-surface: #3a211c;
     --color-goutte: #7fb2ec;
     --color-goutte-surface: #16233a;
-    --color-solde: #56c08d;
-    --color-solde-surface: #12291f;
+    --color-solde: #a8c75f;
+    --color-solde-surface: #242a18;
+    --color-arrivee: #332c1e;
 
     --color-focus-trait: #ffffff;
-    --color-focus-halo: #0b0f14;
+    --color-focus-halo: #141310;
   }
 }
 
@@ -263,25 +278,23 @@
    valeurs d'encre pour qu'un en-tête de reçu ne sorte jamais en aplat noir. */
 @layer theme {
   @media print {
-    /* Quatre sélecteurs, et non `:root` seul. Chaque branche d'une liste
-       compte sa spécificité pour elle-même : `:root` vaut (0,1,0), et perd
-       contre les deux règles sombres, qui valent (0,2,0) — la bascule
-       explicite `[data-theme="sombre"]`, et surtout le sombre système,
-       `:root:not([data-theme="clair"])`. Les deux media queries sont vraies en
-       même temps quand on imprime depuis une machine réglée en sombre : à
-       spécificité égale, l'ordre de la source tranche, et l'impression est
-       plus bas.
+    /* Trois sélecteurs, et non `:root` seul. Chaque branche d'une liste
+       compte sa spécificité pour elle-même : `:root` vaut (0,1,0), et perdrait
+       contre `:root[data-theme="sombre"]`, qui vaut (0,2,0). On reprend donc
+       la même spécificité, et c'est l'ordre de la source qui tranche —
+       l'impression est plus bas.
 
        Vu sur capture, et non déduit : `captures/s31/recu-papier-dark.png`
-       sortait le reçu blanc sur nuit. Le correctif précédent avait couvert la
-       bascule explicite et manqué le réglage système, qui est le cas courant
-       — personne ne bascule un thème, on hérite de celui du téléphone. C'est
-       la leçon de S10 : la feuille d'impression ne se laisse jamais défaire,
-       parce que c'est le seul rendu qui devient un objet physique et qu'une
-       cartouche vidée ne se rattrape pas. (`socle.css:1624` porte le même
-       trou : la maquette ne l'a jamais imprimée depuis un poste sombre.) */
+       sortait le reçu blanc sur nuit. C'est la leçon de S10 : la feuille
+       d'impression ne se laisse jamais défaire, parce que c'est le seul rendu
+       qui devient un objet physique et qu'une cartouche vidée ne se rattrape
+       pas.
+
+       Le quatrième sélecteur, `:root:not([data-theme="clair"])`, a disparu
+       avec le sombre système (S54) : il n'y a plus de règle à battre de ce
+       côté. Le cas qu'il couvrait — imprimer depuis une machine réglée en
+       sombre — ne se pose plus, l'application n'y bascule plus toute seule. */
     :root,
-    :root:not([data-theme="clair"]),
     :root[data-theme="sombre"],
     :root[data-theme="clair"] {
       --color-encre: #0f1720;
@@ -306,6 +319,9 @@
       --color-goutte-surface: #ffffff;
       --color-solde: #1b6b4a;
       --color-solde-surface: #ffffff;
+      /* Une arrivée est un événement d'écran. Sur le papier, la ligne est là
+         ou elle n'y est pas — un fond paille ne dirait plus rien. */
+      --color-arrivee: #ffffff;
     }
   }
 }
@@ -316,6 +332,18 @@
        tabulaires, une liste de prix devient illisible (DESIGN.md §4). */
     font-variant-numeric: tabular-nums;
     -webkit-text-size-adjust: 100%;
+
+    /* Ce qui permet d'animer vers `auto` : sans ce réglage, une hauteur qui va
+       de 0 à `auto` bascule d'un coup au lieu de se dérouler. Il n'ouvre
+       qu'une possibilité — aucune animation n'existe parce qu'on l'a posé — et
+       c'est le repli de la section A10 qui s'en sert, seul.
+
+       La première version du repli employait la ruse `grid-template-rows:
+       0fr → 1fr`, qui évite ce réglage. Mesurée sur `::details-content`, elle
+       ne s'interpole pas : la hauteur passait de 0 à 118 px en une image,
+       après 220 ms d'attente. `block-size` mesuré au même endroit se déroule
+       bien, image par image. */
+    interpolate-size: allow-keywords;
   }
 
   /* Le corps est à 14 px, pas aux 16 px du navigateur. C'est l'autre moitié de
@@ -439,6 +467,19 @@
   /* Le seul endroit où le dégradé du monogramme sort du logo : un filet de deux
      pixels en tête de coquille. `CAHIER-UI.md` §4 interdit le dégradé en fond de
      section — il est ici un trait, pas une surface. */
+  /* --------------------------------------------------------------------------
+     LE FILET DE MARQUE.
+
+     Le seul endroit où le dégradé du monogramme sort du logo (D70). Il ne bouge
+     pas : une lueur l'a parcouru le temps d'un essai, et elle a été retirée —
+     à deux pixels de haut, personne ne la voyait, et ce qui devait porter
+     l'identité est allé dans la marque elle-même (A10.5).
+
+     Il lui reste un état, et un seul : hors ligne, il s'éteint en gris. La
+     plaque passe au jaune plein au même instant — les deux disent la même chose
+     aux deux bouts de l'écran, et le mot « Hors ligne » reste écrit entre les
+     deux (`DESIGN.md` §5 : la couleur double le mot, elle ne le remplace pas).
+     -------------------------------------------------------------------------- */
   .coquille-filet {
     position: fixed;
     z-index: 60;
@@ -450,6 +491,11 @@
       var(--color-orange) 55%,
       var(--color-rouge)
     );
+    transition: background-color var(--duree-apparition) var(--ease-sortie);
+  }
+
+  .coquille-filet[data-synchro="hors_ligne"] {
+    background: var(--color-bord-fort);
   }
 
   /* Entre 768 et 1024, la coquille n'a plus que son rail. C'est le seuil des
@@ -1171,14 +1217,8 @@
     background: #1d2a37;
   }
 
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="clair"]) .bouton-principal:hover {
-      background: #cfd6db;
-    }
-  }
-
   :root[data-theme="sombre"] .bouton-principal:hover {
-    background: #cfd6db;
+    background: #d8d2c7;
   }
 
   .bouton-neutre {
@@ -1427,6 +1467,388 @@
 
     .tableau tbody tr.ligne-active {
       box-shadow: inset 3px 0 0 var(--color-encre);
+    }
+  }
+
+  /* ==========================================================================
+     A10 — CE QUI VIENT D'ARRIVER
+
+     Trois mouvements, et trois seulement. Un écran de comptoir se regarde huit
+     heures d'affilée : ce qui bouge sans rien dire finit par être détesté.
+     Chacun des trois répond à une question que le hors-ligne pose en
+     permanence (D66) — « ma saisie est-elle passée ? », « vient-il d'arriver
+     quelque chose des autres boutiques ? ».
+
+     Ce sont les courbes qui font le travail, pas les durées : `--ease-sortie`
+     démarre vite et s'arrête doucement. Le garde `prefers-reduced-motion` de
+     `@layer base` les éteint tous les trois d'un coup, sans exception à écrire
+     ici.
+     ========================================================================== */
+
+  /* --------------------------------------------------------------------------
+     1. LA LIGNE QUI VIENT D'ARRIVER.
+
+     Un trait se déploie de haut en bas à gauche de la ligne puis s'efface,
+     pendant qu'un fond paille redescend sous lui.
+
+     **Le trait d'arrivée vise les mêmes pixels que le filet de retard.** Les
+     deux marquages ci-dessus occupent les 3 px de gauche de la première
+     cellule ; une ligne en retard qui arrive verrait son alerte recouverte une
+     seconde durant par un trait d'encre — c'est précisément le signal qu'un
+     logiciel d'argent ne peut pas masquer, même brièvement. Le trait d'arrivée
+     se décale donc de 3 px dès que la ligne porte déjà un filet : les deux se
+     lisent côte à côte, aucun n'efface l'autre.
+
+     L'encre, et non une quatrième couleur de filet : le mouvement suffit à le
+     distinguer du filet de la ligne ouverte, qui lui ne bouge jamais. Ajouter
+     un ton à la palette pour une seconde d'animation serait un emploi de plus
+     pour une couleur de moins (D70).
+
+     Le fond n'a **pas** de `fill-mode` : il doit rendre la main à la règle qui
+     peint la ligne au repos. Avec `both`, son image finale — transparent —
+     resterait collée et effacerait pour de bon le fond de la ligne ouverte.
+     -------------------------------------------------------------------------- */
+  @keyframes arrivee-fond {
+    from {
+      background-color: var(--color-arrivee);
+    }
+    to {
+      background-color: transparent;
+    }
+  }
+
+  @keyframes arrivee-trait {
+    0% {
+      transform: scaleY(0);
+      opacity: 1;
+    }
+    35% {
+      transform: scaleY(1);
+      opacity: 1;
+    }
+    100% {
+      transform: scaleY(1);
+      opacity: 0;
+    }
+  }
+
+  .tableau tbody tr.ligne-arrivee > td {
+    animation: arrivee-fond 700ms var(--ease-sortie);
+  }
+
+  .tableau tbody tr.ligne-arrivee > td:first-child {
+    position: relative;
+  }
+
+  .tableau tbody tr.ligne-arrivee > td:first-child::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 3px;
+    transform-origin: top;
+    background: var(--color-encre);
+    animation: arrivee-trait 1000ms var(--ease-sortie) both;
+  }
+
+  .tableau tbody tr.ligne-arrivee.ligne-retard > td:first-child::before,
+  .tableau tbody tr.ligne-arrivee.ligne-active > td:first-child::before {
+    left: 3px;
+  }
+
+  /* Replié en cartes, le trait suit les deux autres filets : il passe de la
+     première cellule à la carte entière, faute de première colonne où
+     s'accrocher. */
+  @media (max-width: 767px) {
+    .tableau tbody tr.ligne-arrivee > td:first-child::before {
+      content: none;
+    }
+
+    .tableau tbody tr.ligne-arrivee {
+      position: relative;
+    }
+
+    .tableau tbody tr.ligne-arrivee::before {
+      content: "";
+      position: absolute;
+      top: 0;
+      bottom: 0;
+      left: 0;
+      width: 3px;
+      transform-origin: top;
+      background: var(--color-encre);
+      animation: arrivee-trait 1000ms var(--ease-sortie) both;
+    }
+
+    .tableau tbody tr.ligne-arrivee.ligne-retard::before,
+    .tableau tbody tr.ligne-arrivee.ligne-active::before {
+      left: 3px;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
+     2. LE CHIFFRE QUI CHANGE — la relève.
+
+     L'ancien caractère sort par le haut, le nouveau entre par le bas : le
+     mouvement dit le sens. Une file de choses à traiter ne descend presque
+     jamais toute seule, et un chiffre qui monte pendant qu'on regarde ailleurs
+     est exactement ce qu'on veut voir du coin de l'œil.
+
+     Elle sert la pastille de la colonne **et** les chiffres de tête des cartes,
+     par un seul composant — `components/patrons/Chiffre.tsx`, qui porte aussi
+     la raison de n'avoir pas pris le défilement depuis zéro. Sur une valeur
+     longue, chaque position se relève pour son compte : seuls les caractères
+     qui changent bougent.
+
+     Elle ne se déclenche **jamais au premier affichage** — c'est tenu côté
+     React, où la valeur sortante n'existe pas tant qu'il n'y a pas eu de
+     changement. Sans cette garantie, chaque navigation ferait clignoter l'écran
+     et le signal serait mort en deux jours.
+     -------------------------------------------------------------------------- */
+  @keyframes releve-sort {
+    to {
+      transform: translateY(-120%);
+      opacity: 0;
+    }
+  }
+
+  @keyframes releve-entre {
+    from {
+      transform: translateY(120%);
+      opacity: 0;
+    }
+  }
+
+  /* La case d'un caractère pendant qu'il se relève. Elle n'existe que le temps
+     du mouvement : `components/patrons/Chiffre.tsx` ne pose rien au repos. */
+  .releve {
+    position: relative;
+    display: inline-block;
+    overflow: hidden;
+    vertical-align: bottom;
+  }
+
+  .releve-entrant {
+    display: block;
+    animation: releve-entre var(--duree-apparition) var(--ease-sortie) both;
+  }
+
+  /* À l'arrivée sur l'écran, les caractères entrent l'un après l'autre : le
+     nombre se compose de gauche à droite au lieu de surgir d'un bloc. C'est ce
+     décalage, et non la durée, qui rend le mouvement visible — la première
+     version jouait tout en même temps et passait inaperçue.
+
+     `both` n'est pas un détail : sans lui, le caractère s'afficherait à sa place
+     pendant son retard, puis sauterait pour entrer. */
+  .releve-arrivee .releve-entrant {
+    animation-delay: calc(var(--rang) * 30ms);
+  }
+
+  /* Le sortant quitte le flux : c'est le nouveau caractère qui tient la
+     largeur, sinon la case se dilaterait le temps de la relève — et sur une
+     pastille ronde, elle se déformerait. */
+  .releve-sortant {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: releve-sort var(--duree-apparition) var(--ease-sortie) both;
+  }
+
+  /* --------------------------------------------------------------------------
+     3. LE REPLI.
+
+     `::details-content` est la boîte que le navigateur fabrique lui-même autour
+     du contenu d'un `<details>`. L'animer tient la promesse de la règle 1
+     d'`AGENTS.md` : le repli natif garde son clavier, son rôle et son état, et
+     gagne son mouvement sans une ligne de JavaScript. Là où le navigateur ne
+     connaît pas encore cette boîte, le repli s'ouvre d'un coup — il n'y a rien
+     à rattraper.
+
+     `0 → auto` demande `interpolate-size` (posé sur `html`), et ne demande rien
+     de la structure du contenu : autant d'enfants qu'on veut après le résumé.
+
+     `allow-discrete` sur `content-visibility` est ce qui rend la fermeture
+     visible : sans lui le navigateur masque le contenu dès le premier
+     millième, et on n'anime plus qu'une boîte vide.
+
+     Là où l'une des deux pièces manque, le repli s'ouvre d'un coup — soit
+     exactement ce qu'il faisait avant. Il n'y a aucun repli de secours à
+     écrire.
+     -------------------------------------------------------------------------- */
+  .repli > summary {
+    display: flex;
+    align-items: baseline;
+    gap: 0.375rem;
+    cursor: pointer;
+    list-style: none;
+  }
+
+  .repli > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .repli-chevron {
+    transition: transform var(--duree-reponse) var(--ease-sortie);
+  }
+
+  .repli[open] > summary .repli-chevron {
+    transform: rotate(90deg);
+  }
+
+  .repli::details-content {
+    block-size: 0;
+    overflow: hidden;
+    transition:
+      block-size var(--duree-apparition) var(--ease-sortie),
+      content-visibility var(--duree-apparition) allow-discrete;
+  }
+
+  .repli[open]::details-content {
+    block-size: auto;
+  }
+
+  /* --------------------------------------------------------------------------
+     4. LE PANNEAU D'ONGLET.
+
+     Quatre pixels de montée en plus du fondu : le panneau **se pose** au lieu
+     d'apparaître. Le fondu seul dit « voici autre chose » ; la montée dit d'où
+     ça vient, et c'est ce qui fait qu'on ne cherche pas où regarder après avoir
+     changé d'onglet.
+
+     160 ms — plus court que `--duree-apparition`, qui est la durée d'un
+     panneau qui s'ouvre. Ici rien ne s'ouvre : le contenu est déjà là, c'est
+     l'œil qu'on accompagne. Une bascule qu'on fait vingt fois de suite doit
+     être finie avant qu'on y pense.
+
+     Le mouvement rejoue à chaque bascule parce que `Onglets` remonte sa
+     `<section>` par une clé — une animation CSS ne rejoue pas toute seule sur
+     un élément conservé. Il joue donc aussi au premier affichage, et c'est
+     très bien : l'écran se pose, il ne clignote pas. C'est l'inverse du
+     compteur, où le premier affichage devait être muet.
+     -------------------------------------------------------------------------- */
+  @keyframes panneau-se-pose {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+  }
+
+  .panneau-onglet {
+    animation: panneau-se-pose 160ms var(--ease-sortie) both;
+  }
+
+  /* --------------------------------------------------------------------------
+     5. LA MARQUE QUI VIT — le reflet du monogramme.
+
+     La seule chose du produit qui bouge en permanence. Un reflet traverse le
+     monogramme toutes les 3,5 s, de gauche à droite : de la lumière sur du
+     métal poli, ce que raconte déjà le dégradé or → rouge.
+
+     **Pourquoi la marque et pas un décor.** Le premier essai posait une lueur
+     en tête de coquille ; le commanditaire ne l'a pas vue, et il avait raison —
+     deux pixels au bord de l'écran font un indicateur réseau, pas une identité.
+     Ce qui identifie SDI est le monogramme : il est dans le rail sur tous les
+     écrans, il porte les couleurs de la maison, et il n'est jamais dans la ligne
+     de lecture. Le faire vivre, c'est faire vivre la marque et rien d'autre
+     (arbitrage du commanditaire, S54).
+
+     **Le reflet voyage dans le glyphe.** Un calque en mode de fusion posé
+     par-dessus aurait débordé en rectangle sur le rail : le monogramme n'est pas
+     une boîte. Ici ce sont les arrêts du dégradé qui s'éclaircissent l'un après
+     l'autre, décalés de 130 ms — la lumière ne peut donc pas sortir de la
+     lettre, par construction.
+
+     Le relais d'arrêt en arrêt, plutôt qu'un point lumineux qui glisse : seul
+     `stop-color` est animable en CSS, `offset` est une géométrie et ne l'est
+     pas.
+
+     **Les cinq teintes de repos sont celles de `components/Monogramme.tsx`**,
+     lui-même transcrit de `design/marque/monogramme-se.svg`. Les deux listes
+     bougent ensemble ou pas du tout.
+
+     Ce que ça coûte : une repeinte du monogramme à chaque image, là où une
+     translation serait composée par le GPU. C'est le prix d'un reflet qui ne
+     déborde pas, et il se paie sur quarante pixels de côté. Sous « moins de
+     mouvement », le garde de `@layer base` le ramène à un seul passage de
+     0,01 ms : la marque reprend ses couleurs de repos et ne bouge plus.
+     -------------------------------------------------------------------------- */
+  .marque-metal stop:nth-child(1) {
+    animation: marque-reflet-1 3.5s ease-in-out infinite;
+  }
+
+  .marque-metal stop:nth-child(2) {
+    animation: marque-reflet-2 3.5s ease-in-out 0.13s infinite;
+  }
+
+  .marque-metal stop:nth-child(3) {
+    animation: marque-reflet-3 3.5s ease-in-out 0.26s infinite;
+  }
+
+  .marque-metal stop:nth-child(4) {
+    animation: marque-reflet-4 3.5s ease-in-out 0.39s infinite;
+  }
+
+  .marque-metal stop:nth-child(5) {
+    animation: marque-reflet-5 3.5s ease-in-out 0.52s infinite;
+  }
+
+  /* L'éclat ne dure qu'un dixième du cycle : le reste du temps, la marque est
+     exactement à ses couleurs de repos. */
+  @keyframes marque-reflet-1 {
+    0%,
+    26%,
+    100% {
+      stop-color: #e0a81a;
+    }
+    9% {
+      stop-color: #fff6df;
+    }
+  }
+
+  @keyframes marque-reflet-2 {
+    0%,
+    26%,
+    100% {
+      stop-color: #dfa01c;
+    }
+    9% {
+      stop-color: #fff6df;
+    }
+  }
+
+  @keyframes marque-reflet-3 {
+    0%,
+    26%,
+    100% {
+      stop-color: #dd7a28;
+    }
+    9% {
+      stop-color: #fff6df;
+    }
+  }
+
+  @keyframes marque-reflet-4 {
+    0%,
+    26%,
+    100% {
+      stop-color: #d3592c;
+    }
+    9% {
+      stop-color: #fff6df;
+    }
+  }
+
+  @keyframes marque-reflet-5 {
+    0%,
+    26%,
+    100% {
+      stop-color: #c93c2e;
+    }
+    9% {
+      stop-color: #fff6df;
     }
   }
 }

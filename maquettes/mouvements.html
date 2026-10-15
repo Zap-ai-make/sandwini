@@ -1,0 +1,400 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Banc d’essai des mouvements — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+<style>
+/* ---------------------------------------------------------------------------
+   Banc d'essai des micro-mouvements (S54).
+
+   On ne juge pas une animation sur une phrase : il faut la revoir trois fois.
+   Chaque variante se rejoue à la demande, et les trois durées du dépôt
+   (120 / 220 / 320 ms) et ses deux courbes sont les seules employées —
+   `DESIGN.md` §9 : le mouvement sert le sujet, il ne le décore pas.
+
+   Ce que la recherche a confirmé et qu'on applique : **ce sont les courbes qui
+   séparent le soigné du bon marché**, pas la durée ni le nombre d'effets. Tout
+   ce qui apparaît ici est en ease-out — l'objet part vite et s'arrête
+   doucement, comme une chose qui se pose.
+--------------------------------------------------------------------------- */
+
+.banc { background: #212125; color: #fff; padding: 24px 24px 72px; font-family: var(--f-corps); }
+.banc h1 { font-size: 22px; margin: 0 0 6px; }
+.banc > p.chapeau { max-width: 74ch; color: #cfcfd4; font-size: 14px; line-height: 1.55; margin: 0 0 28px; }
+
+.essai { margin-bottom: 36px; border-top: 1px solid rgba(255,255,255,.1); padding-top: 20px; }
+.essai > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 6px; }
+.essai h2 { font-size: 17px; margin: 0; }
+.essai .dit { font-size: 13px; color: #a9a9b2; }
+.essai > p.note { max-width: 78ch; color: #cfcfd4; font-size: 13.5px; line-height: 1.55; margin: 0 0 16px; }
+
+.variantes { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); }
+.variante { background: #18181b; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; padding: 12px; }
+.variante > h3 { font-size: 13.5px; margin: 0 0 2px; display: flex; align-items: baseline; gap: 8px; }
+.variante > h3 em { font-style: normal; font-family: var(--f-code); font-size: 10.5px; color: #8e8e98; }
+.variante > p { font-size: 12.5px; color: #a9a9b2; margin: 0 0 10px; line-height: 1.45; }
+.scene { background: var(--fond); border-radius: 6px; padding: 10px; color: var(--encre); }
+.rejouer {
+  margin-top: 10px; height: 30px; padding: 0 12px; font-family: inherit; font-size: 12.5px;
+  font-weight: 600; color: #fff; background: #2e2e34; border: 1px solid rgba(255,255,255,.18);
+  border-radius: 6px; cursor: pointer;
+}
+.rejouer:hover { background: #3a3a42; }
+.tout { margin-bottom: 20px; height: 34px; padding: 0 16px; font-family: inherit; font-size: 13px;
+  font-weight: 600; color: #121212; background: var(--plaque); border: 1px solid var(--plaque-bord);
+  border-radius: 6px; cursor: pointer; }
+
+/* --- Le tableau de la scène, aux classes réelles ------------------------- */
+/* `table-layout: fixed` : sans lui le tableau prend sa largeur naturelle et
+   la colonne du prix sort de la carte — vu sur capture. */
+.scene table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12px;
+  background: var(--papier); border: 1px solid var(--bord); border-radius: 6px; overflow: hidden; }
+.scene th { text-align: left; font-size: 9.5px; letter-spacing: .06em; text-transform: uppercase;
+  color: var(--encre-doux); padding: 6px 8px; border-bottom: 1px solid var(--bord); font-weight: 600; }
+.scene td { padding: 7px 8px; border-bottom: 1px solid var(--bord);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.scene th:nth-child(1), .scene td:nth-child(1) { width: 40%; }
+.scene th:nth-child(2), .scene td:nth-child(2) { width: 15%; }
+.scene th:nth-child(3), .scene td:nth-child(3) { width: 26%; }
+.scene th:nth-child(4), .scene td:nth-child(4) { width: 19%; text-align: right; }
+.scene tr:last-child td { border-bottom: 0; }
+.scene .code { font-family: var(--f-code); font-size: 10.5px; }
+.scene .plaque { display: inline-block; font-family: var(--f-code); font-size: 10.5px; font-weight: 600;
+  background: var(--plaque); color: var(--encre-fixe); border: 1px solid var(--plaque-bord);
+  border-radius: 3px; padding: 1px 5px; }
+
+/* =========================================================================
+   1. LA LIGNE QUI ARRIVE
+   La teinte est transitoire par construction : aucune ligne du produit n'a de
+   fond coloré en permanence, donc une seconde de teinte ne peut se confondre
+   avec aucun statut. Les statuts, eux, sont des pastilles écrites.
+   ========================================================================= */
+:root { --arrivee: #f6edd8; }
+
+/* A — Lavis : la teinte monte vite, redescend lentement. Le classique. */
+@keyframes arrivee-lavis {
+  0%   { background-color: var(--arrivee); }
+  40%  { background-color: var(--arrivee); }
+  100% { background-color: transparent; }
+}
+.joue .ligne-lavis { animation: arrivee-lavis 1100ms var(--sortie) both; }
+
+/* B — Balayage : la teinte traverse la ligne une fois, de gauche à droite,
+   comme l'encre qui prend sur le papier. C'est la seule des trois qui a une
+   direction, et la direction est celle de la lecture. */
+@keyframes arrivee-balayage {
+  0%   { background-position: 130% 0; opacity: 1; }
+  70%  { background-position: -30% 0; opacity: 1; }
+  100% { background-position: -30% 0; opacity: 0; }
+}
+.joue .ligne-balayage > td::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(100deg, transparent 0%, var(--arrivee) 45%, var(--arrivee) 55%, transparent 100%);
+  background-size: 260% 100%; background-repeat: no-repeat;
+  animation: arrivee-balayage 900ms var(--sortie) both;
+}
+.ligne-balayage > td { position: relative; }
+
+/* C — Filet : un trait à gauche, qui s'étire puis s'efface. Pas de teinte du
+   tout — le plus sobre, et celui qui marche aussi sur un fond déjà coloré. */
+@keyframes arrivee-filet-trait {
+  0%   { transform: scaleY(0); opacity: 1; }
+  35%  { transform: scaleY(1); opacity: 1; }
+  100% { transform: scaleY(1); opacity: 0; }
+}
+@keyframes arrivee-filet-fond {
+  0%   { background-color: var(--arrivee); }
+  100% { background-color: transparent; }
+}
+.joue .ligne-filet { animation: arrivee-filet-fond 700ms var(--sortie) both; }
+.joue .ligne-filet > td:first-child::before {
+  content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: var(--encre); transform-origin: top;
+  animation: arrivee-filet-trait 1000ms var(--sortie) both;
+}
+.ligne-filet > td:first-child { position: relative; }
+
+/* =========================================================================
+   2. LE COMPTEUR QUI CHANGE
+   Il ne se déclenche jamais au premier affichage : seulement quand le nombre
+   bouge sous les yeux, parce qu'une synchronisation vient d'arriver. Sinon
+   chaque chargement de page pulserait, et le signal mourrait.
+   ========================================================================= */
+.compteur-demo { display: flex; align-items: center; gap: 10px; padding: 8px 10px;
+  background: var(--papier); border: 1px solid var(--bord); border-radius: 6px; font-size: 13px; }
+.compteur-demo .titre { flex: 1; color: var(--encre); font-weight: 500; }
+.compte { display: inline-flex; min-width: 22px; height: 20px; align-items: center; justify-content: center;
+  padding: 0 6px; border-radius: 10px; background: var(--fond); color: var(--encre-doux);
+  font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* A — Pulsation : la pastille enfle d'un rien et revient. 220 ms. */
+@keyframes compte-pulse {
+  0%   { transform: scale(1); }
+  45%  { transform: scale(1.22); background: var(--arrivee); color: var(--encre); }
+  100% { transform: scale(1); }
+}
+.joue .compte-pulse { animation: compte-pulse 220ms var(--sortie) both; }
+
+/* B — Relève : l'ancien chiffre sort par le haut, le nouveau entre par le bas.
+   Le mouvement dit le sens — ça monte. Un compteur de choses à traiter ne
+   descend presque jamais tout seul. */
+/* Au repos, un seul chiffre. Les deux n'existent ensemble que le temps de la
+   relève — sinon la pastille affiche « 23 », ce qui est exactement ce qu'on a
+   vu sur la première capture. */
+.compte-releve { position: relative; overflow: hidden; }
+.compte-releve span { display: block; }
+.compte-releve .apres { display: none; }
+.joue .compte-releve .apres { display: flex; }
+@keyframes releve-sort { to { transform: translateY(-120%); opacity: 0; } }
+@keyframes releve-entre { from { transform: translateY(120%); opacity: 0; } }
+.joue .compte-releve .avant { animation: releve-sort 220ms var(--sortie) both; }
+.joue .compte-releve .apres { position: absolute; inset: 0; display: flex; align-items: center;
+  justify-content: center; animation: releve-entre 220ms var(--sortie) both; }
+
+/* =========================================================================
+   3. LES ONGLETS ET LES REPLIS
+   ========================================================================= */
+.onglets-demo { background: var(--papier); border: 1px solid var(--bord); border-radius: 6px; padding: 10px; }
+.onglets-barre { display: flex; gap: 6px; margin-bottom: 10px; }
+.onglets-barre button { flex: 1; height: 32px; font-family: inherit; font-size: 12.5px; font-weight: 600;
+  border: 1px solid var(--bord); background: var(--papier); color: var(--encre-doux);
+  border-radius: 5px; cursor: pointer; }
+.onglets-barre button[aria-selected="true"] { border: 2px solid var(--encre); color: var(--encre); }
+.panneau { font-size: 12.5px; color: var(--encre); min-height: 54px; }
+.panneau ul { margin: 0; padding-left: 18px; line-height: 1.7; }
+
+@keyframes panneau-fondu { from { opacity: 0; } }
+@keyframes panneau-monte { from { opacity: 0; transform: translateY(4px); } }
+.fondu .panneau { animation: panneau-fondu 120ms var(--sortie) both; }
+.monte .panneau { animation: panneau-monte 160ms var(--sortie) both; }
+
+.repli-demo { background: var(--papier); border: 1px solid var(--bord); border-radius: 6px; }
+.repli-tete { display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 10px;
+  font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--encre);
+  background: none; border: 0; cursor: pointer; text-align: left; }
+.chevron { width: 14px; height: 14px; flex: none; transition: transform var(--duree-reponse) var(--sortie); }
+.repli-demo[data-ouvert="oui"] .chevron { transform: rotate(90deg); }
+.repli-corps { overflow: hidden; display: grid; grid-template-rows: 0fr;
+  transition: grid-template-rows var(--duree-apparition) var(--sortie); }
+.repli-demo[data-ouvert="oui"] .repli-corps { grid-template-rows: 1fr; }
+.repli-corps > div { min-height: 0; }
+.repli-corps p { margin: 0; padding: 0 10px 10px 32px; font-size: 12.5px; color: var(--encre-doux); }
+</style>
+</head>
+<body class="banc">
+
+<h1>Banc d’essai des mouvements</h1>
+<p class="chapeau">
+  Trois moments, et seulement ceux-là. Chaque variante se rejoue&nbsp;: une animation ne se juge pas
+  au premier passage. Les durées et les courbes sont celles du dépôt — 120 / 220 / 320&nbsp;ms et
+  l’ease-out <span class="code">cubic-bezier(.32,.72,0,1)</span>, rien d’inventé pour l’occasion.
+  Tout ce qui est ici disparaît automatiquement si la machine demande moins de mouvement.
+</p>
+
+<button class="tout" type="button" data-tout>Tout rejouer</button>
+
+<!-- ================================================================== -->
+<section class="essai" id="essai-ligne">
+  <header>
+    <h2>1. La ligne qui vient d’arriver</h2>
+    <span class="dit">dit : « c’est celle-là, elle n’était pas là il y a une seconde »</span>
+  </header>
+  <p class="note">
+    C’est le mouvement qui porte la promesse du produit. On n’attend jamais le serveur&nbsp;: tu crées
+    une boutique, la modale se ferme, et la ligne apparaît derrière — <strong>c’est elle, la
+    confirmation</strong>. Aujourd’hui elle apparaît en silence. Le même mouvement sert quand une
+    vente faite dans une autre boutique arrive par la synchronisation.
+  </p>
+  <div class="variantes">
+    <div class="variante" data-scene>
+      <h3>A — Lavis <em>1100 ms</em></h3>
+      <p>La teinte monte vite et redescend lentement. Le plus sobre, le plus courant.</p>
+      <div class="scene" data-gabarit="tableau" data-ligne="ligne-lavis"></div>
+      <button class="rejouer" type="button" data-rejouer>Rejouer</button>
+    </div>
+    <div class="variante" data-scene>
+      <h3>B — Balayage <em>900 ms</em></h3>
+      <p>La teinte traverse la ligne une fois, dans le sens de la lecture. La seule des trois qui a une direction.</p>
+      <div class="scene" data-gabarit="tableau" data-ligne="ligne-balayage"></div>
+      <button class="rejouer" type="button" data-rejouer>Rejouer</button>
+    </div>
+    <div class="variante" data-scene>
+      <h3>C — Filet <em>1000 ms</em></h3>
+      <p>Un trait se déploie à gauche puis s’efface. Presque pas de teinte — tient même sur une ligne déjà colorée.</p>
+      <div class="scene" data-gabarit="tableau" data-ligne="ligne-filet"></div>
+      <button class="rejouer" type="button" data-rejouer>Rejouer</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section class="essai" id="essai-compteur">
+  <header>
+    <h2>2. Le compteur qui change</h2>
+    <span class="dit">dit : « il y a une chose de plus à traiter »</span>
+  </header>
+  <p class="note">
+    « Paiements&nbsp;2 », « Dossiers&nbsp;4 » dans la colonne de gauche. Le nombre monte parce qu’une
+    synchronisation vient d’arriver, et rien ne le signale&nbsp;: on le découvre au prochain coup
+    d’œil. <strong>Il ne se déclenche jamais au chargement de la page</strong> — sinon chaque
+    navigation pulserait et le signal mourrait en deux jours.
+  </p>
+  <div class="variantes">
+    <div class="variante" data-scene>
+      <h3>A — Pulsation <em>220 ms</em></h3>
+      <p>La pastille enfle d’un cinquième et revient, en se teintant au passage.</p>
+      <div class="scene" data-gabarit="compteur" data-variante="pulse"></div>
+      <button class="rejouer" type="button" data-rejouer>Rejouer</button>
+    </div>
+    <div class="variante" data-scene>
+      <h3>B — Relève <em>220 ms</em></h3>
+      <p>L’ancien chiffre sort par le haut, le nouveau entre par le bas. Le mouvement dit le sens&nbsp;: ça monte.</p>
+      <div class="scene" data-gabarit="compteur" data-variante="releve"></div>
+      <button class="rejouer" type="button" data-rejouer>Rejouer</button>
+    </div>
+  </div>
+</section>
+
+<!-- ================================================================== -->
+<section class="essai" id="essai-onglets">
+  <header>
+    <h2>3. Les onglets et les replis</h2>
+    <span class="dit">dit : « le contenu a changé, et voilà d’où il vient »</span>
+  </header>
+  <p class="note">
+    Le plus discret des trois, et c’est voulu&nbsp;: un panneau qui met du temps à arriver est un
+    panneau qui agace au bout de la trentième fois. Rien n’attend l’animation pour être
+    cliquable — seule l’opacité bouge, le contenu est là dès la première image.
+  </p>
+  <div class="variantes">
+    <div class="variante" data-scene>
+      <h3>A — Fondu <em>120 ms</em></h3>
+      <p>L’opacité seule. On remarque que ça a changé, sans savoir pourquoi.</p>
+      <div class="scene" data-gabarit="onglets" data-variante="fondu"></div>
+      <button class="rejouer" type="button" data-rejouer>Rejouer</button>
+    </div>
+    <div class="variante" data-scene>
+      <h3>B — Fondu et montée <em>160 ms</em></h3>
+      <p>Quatre pixels de montée en plus. Le panneau se pose au lieu d’apparaître.</p>
+      <div class="scene" data-gabarit="onglets" data-variante="monte"></div>
+      <button class="rejouer" type="button" data-rejouer>Rejouer</button>
+    </div>
+    <div class="variante" data-scene>
+      <h3>C — Le repli <em>220 ms + 120 ms</em></h3>
+      <p>« Répartition par marque », sur le stock. La hauteur s’ouvre, le chevron tourne.</p>
+      <div class="scene" data-gabarit="repli"></div>
+      <button class="rejouer" type="button" data-rejouer>Ouvrir / fermer</button>
+    </div>
+  </div>
+</section>
+
+<script>
+const LIGNES = [
+  ["LC6PTG0010000000", "PTG", "Yamaha Crux Rev", "545 000"],
+  ["LC6KDG0010000137", "KDG", "Yamaha YBR 125", "610 000"],
+  ["LC6PTG0010000274", "PTG", "Apsonic AP 125 X", "675 000"],
+];
+const NOUVELLE = ["LC6KDG0010000411", "KDG", "Haojue HJ 150-9A", "870 000"];
+
+function tableau(scene) {
+  const classe = scene.dataset.ligne;
+  const corps = [...LIGNES, NOUVELLE]
+    .map(([ch, b, m, p], i) => {
+      const cls = i === LIGNES.length ? ` class="${classe}"` : "";
+      return `<tr${cls}><td class="code">${ch}</td><td><span class="plaque">${b}</span></td>`
+        + `<td>${m}</td><td class="code">${p}</td></tr>`;
+    })
+    .join("");
+  scene.innerHTML = `<table><thead><tr><th>Châssis</th><th>Boutique</th><th>Marque et modèle</th>`
+    + `<th>Prix</th></tr></thead><tbody>${corps}</tbody></table>`;
+}
+
+function compteur(scene) {
+  const releve = scene.dataset.variante === "releve";
+  scene.innerHTML = `
+    <div class="compteur-demo">
+      <span class="titre">Paiements</span>
+      ${releve
+        ? `<span class="compte compte-releve"><span class="avant">2</span><span class="apres">3</span></span>`
+        : `<span class="compte compte-pulse" data-valeur>2</span>`}
+    </div>`;
+}
+
+function onglets(scene) {
+  scene.innerHTML = `
+    <div class="onglets-demo ${scene.dataset.variante}">
+      <div class="onglets-barre" role="tablist">
+        <button type="button" role="tab" aria-selected="true">Marques</button>
+        <button type="button" role="tab" aria-selected="false">Modèles</button>
+      </div>
+      <div class="panneau"><ul><li>Apsonic</li><li>Haojue</li><li>Yamaha</li></ul></div>
+    </div>`;
+  const panneau = scene.querySelector(".panneau");
+  scene.querySelectorAll("[role=tab]").forEach((onglet, i) => {
+    onglet.addEventListener("click", () => {
+      scene.querySelectorAll("[role=tab]").forEach((o) => o.setAttribute("aria-selected", "false"));
+      onglet.setAttribute("aria-selected", "true");
+      panneau.innerHTML = i === 0
+        ? "<ul><li>Apsonic</li><li>Haojue</li><li>Yamaha</li></ul>"
+        : "<ul><li>AP 125 X</li><li>HJ 150-9A</li><li>Crux Rev</li><li>YBR 125</li></ul>";
+      rejoue(panneau);
+    });
+  });
+}
+
+function repli(scene) {
+  scene.innerHTML = `
+    <div class="repli-demo" data-ouvert="non">
+      <button class="repli-tete" type="button">
+        <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+        Répartition par marque
+        <span style="font-weight:400;color:var(--encre-doux)">6 marques · 16 motos</span>
+      </button>
+      <div class="repli-corps"><div><p>Yamaha 4 · Apsonic 3 · Haojue 3 · Sanili 3 · Rato 2 · TVS 1</p></div></div>
+    </div>`;
+  const bloc = scene.querySelector(".repli-demo");
+  scene.querySelector(".repli-tete").addEventListener("click", () => {
+    bloc.dataset.ouvert = bloc.dataset.ouvert === "oui" ? "non" : "oui";
+  });
+}
+
+/** Redémarre une animation CSS : la retirer et la remettre ne suffit pas sans
+    un reflow forcé entre les deux — le navigateur regroupe les deux écritures
+    et ne voit aucun changement. */
+function rejoue(element) {
+  element.classList.remove("joue");
+  void element.offsetWidth;
+  element.classList.add("joue");
+}
+
+const GABARITS = { tableau, compteur, onglets, repli };
+document.querySelectorAll("[data-gabarit]").forEach((scene) => GABARITS[scene.dataset.gabarit](scene));
+
+document.querySelectorAll("[data-rejouer]").forEach((bouton) => {
+  bouton.addEventListener("click", () => {
+    const scene = bouton.closest("[data-scene]").querySelector("[data-gabarit]");
+    if (scene.dataset.gabarit === "repli") {
+      const bloc = scene.querySelector(".repli-demo");
+      bloc.dataset.ouvert = bloc.dataset.ouvert === "oui" ? "non" : "oui";
+      return;
+    }
+    if (scene.dataset.gabarit === "onglets") {
+      rejoue(scene.querySelector(".panneau"));
+      return;
+    }
+    rejoue(scene);
+  });
+});
+
+document.querySelector("[data-tout]").addEventListener("click", () => {
+  document.querySelectorAll('[data-gabarit="tableau"], [data-gabarit="compteur"]').forEach(rejoue);
+  document.querySelectorAll('[data-gabarit="onglets"] .panneau').forEach(rejoue);
+});
+</script>
+
+</body>
+</html>

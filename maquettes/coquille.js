@@ -84,10 +84,11 @@
   }
 
   /* --- 2. Le thème ---------------------------------------------------------
-     Hypothèse de la phase 1 : l'application suit le réglage du système, comme
-     aujourd'hui. Ce basculeur n'est pas une proposition de réglage
-     utilisateur — il existe pour que le client puisse *voir* le mode sombre
-     sans changer les préférences de son ordinateur. */
+     Le clair est le défaut depuis S54 : `data-theme` absent vaut clair, et le
+     sombre ne s'obtient qu'en appuyant ici. L'application ne suit plus le
+     réglage du système — on travaille au comptoir, souvent en plein jour, et
+     une machine réglée en sombre ouvrait l'application en sombre sans que
+     personne l'ait demandé. */
   var cle = "sdi-maquette-theme";
   function appliqueTheme(t) {
     if (t) document.documentElement.setAttribute("data-theme", t);

@@ -710,7 +710,7 @@ const PRISES = [
   { nom: "fournisseur-historique-bureau-clair", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "light", mobile: false },
   { nom: "fournisseur-historique-mobile-sombre", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "dark", mobile: true },
   { nom: "arrivages-fournisseur-lien", chemin: "/motos/arrivages", theme: "light", mobile: false },
-  /* Pas de prise sur `/supervision/chiffres`, et c'est volontaire : la campagne
+  /* Pas de prise sur `/motos/inventaire`, et c'est volontaire : la campagne
      y photographie « 0 boutique » et une lecture qui ne finit pas, alors qu'un
      script jetable rend le meme ecran en trois secondes contre la meme base.
      Le defaut est dans ce harnais et reste a trouver (S51, `specs/ROADMAP.md`).
@@ -741,8 +741,12 @@ const PRISES = [
      cassé ne se voit sur aucune capture ordinaire : sans cette prise, la revue
      visuelle regarderait un écran et croirait avoir vu le papier. */
   { nom: "recu-papier", chemin: "/motos/ventes", theme: "light", mobile: false, premierRecu: true, impression: true },
-  { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true, boutique: true },
-  { nom: "diagnostic-bureau-sombre", chemin: "/diagnostic", theme: "dark", mobile: false, boutique: true },
+  /* L'écran de diagnostic a disparu en S54 : ses deux captures photographiaient
+     la page « introuvable » depuis, sans que la campagne s'en plaigne. Les deux
+     écrans de S55 prennent leur place — c'est la même règle, une route de plus
+     est une ligne de plus. */
+  { nom: "inventaire-bureau-clair", chemin: "/motos/inventaire", theme: "light", mobile: false, boutique: true },
+  { nom: "depenses-mobile-clair", chemin: "/caisse/depenses", theme: "light", mobile: true, boutique: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },
   // Le bandeau en alerte : l’état signature du produit.
   { nom: "supervision-mobile-coupe", chemin: "/supervision", theme: "light", mobile: true, coupe: true },

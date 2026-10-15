@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  compter,
   depuisQuand,
   formaterAnciennete,
   formaterDate,
@@ -142,5 +143,28 @@ describe("memeJour", () => {
   it("n’attribue aucun jour à une date absente ou cassée", () => {
     expect(memeJour(null, reference)).toBe(false);
     expect(memeJour(new Date("pas une date"), reference)).toBe(false);
+  });
+});
+
+describe("compter", () => {
+  it("accorde le mot au nombre", () => {
+    expect(compter(1, "moto")).toBe("1 moto");
+    expect(compter(3, "moto")).toBe("3 motos");
+  });
+
+  /* Le zéro est singulier en français, et c'est l'accord que le produit écrit
+     partout ailleurs : « aucune vente », jamais « 0 ventes ». */
+  it("laisse le zéro au singulier", () => {
+    expect(compter(0, "vente")).toBe("0 vente");
+  });
+
+  it("accepte un pluriel irrégulier", () => {
+    expect(compter(2, "bocal", "bocaux")).toBe("2 bocaux");
+  });
+
+  /* Le nombre passe par `formaterNombre` : au-delà du millier, une répartition
+     écrirait « 1200 motos » là où tout l'écran écrit « 1 200 ». */
+  it("espace les milliers comme le reste du produit", () => {
+    expect(compter(1200, "moto")).toBe("1 200 motos");
   });
 });

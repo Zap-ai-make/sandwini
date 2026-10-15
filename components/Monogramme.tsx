@@ -76,8 +76,15 @@ export function Monogramme({
       {!monochrome && (
         <defs>
           {/* Les cinq arrêts du fichier de marque, dans l’ordre : l’or tient
-              toute la moitié gauche avant de virer, comme sur l’original. */}
-          <linearGradient id={metal} x1="0" y1="0" x2="1" y2="0">
+              toute la moitié gauche avant de virer, comme sur l’original.
+
+              **Ces cinq valeurs sont recopiées dans `globals.css`**, section
+              A10.5, qui les rallume une à une pour faire passer un reflet dans
+              la marque. Les deux listes bougent ensemble ou pas du tout : une
+              couleur changée ici et pas là-bas ferait clignoter le monogramme
+              vers une teinte qu’il n’a jamais eue. La source reste
+              `design/marque/monogramme-se.svg`. */}
+          <linearGradient id={metal} className="marque-metal" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stopColor="#E0A81A" />
             <stop offset="0.5" stopColor="#DFA01C" />
             <stop offset="0.63" stopColor="#DD7A28" />

@@ -53,30 +53,47 @@
 /* --- Jetons ---------------------------------------------------------------- */
 :root {
   /* Marque — relevés à la pipette sur design/marque/logo-se-fond-sombre.jpg,
-     remontés en clarté (un scan sous-exposé n'est pas une couleur de marque). */
-  --nuit: #14142b;              /* la coquille, et le fond du monogramme */
-  --nuit-2: #191a32;            /* la colonne des écrans, un cran au-dessus */
-  --nuit-3: #22243f;            /* l'élément actif dans la coquille */
-  --nuit-filet: #2b2d4a;        /* les séparations internes à la coquille */
+     remontés en clarté (un scan sous-exposé n'est pas une couleur de marque).
+
+     ACIER ET BRAISE (S54). La coquille était un bleu-violet #14142b et le fond
+     un gris bleuté #eef1f5 : à eux deux plus de 90 % de la surface, et ce sont
+     les deux couleurs les plus répandues du logiciel de gestion. Le
+     commanditaire : « c'est surtout les couleurs, manque d'identité, trop
+     standard ». Il avait raison, et la cause était écrite — voir l'amendement
+     de D70.
+
+     Le logo est du feu sur de la nuit ; l'interface était du gris froid sur du
+     bleu-violet. Elle ne ressemblait pas à sa propre marque. Tous les neutres
+     passent donc au chaud : l'acier huilé de l'atelier pour la coquille, le
+     sable de la cour pour le fond. Aucun dégradé n'est posé nulle part — c'est
+     la **température** des gris qui porte l'identité, et c'est pour ça qu'on la
+     remarque sans savoir la nommer. */
+  --nuit: #1b1a17;              /* acier huilé : la coquille */
+  --nuit-2: #22201c;            /* la colonne des écrans, un cran au-dessus */
+  --nuit-3: #2e2b25;            /* l'élément actif dans la coquille */
+  --nuit-filet: #3a362e;        /* les séparations internes à la coquille */
   --or: #e0a81a;
   --orange: #dd7a28;
   --rouge: #c93c2e;
   --cyan: #2e9bc4;
   --bleu: #1f52a8;
 
-  /* Surfaces et texte */
-  --encre: #0f1720;
-  --encre-doux: #5a6672;
+  /* Surfaces et texte. La feuille reste du blanc pur : l'application s'utilise
+     au comptoir, parfois dehors, sur un écran bon marché — un crème y perdrait
+     le contraste que le soleil mange déjà. C'est tout autour de la feuille que
+     la chaleur se joue. */
+  --encre: #16130f;
+  --encre-doux: #5c554b;        /* 7,35:1 sur la feuille */
   --papier: #ffffff;            /* la feuille : la zone de travail */
-  --fond: #eef1f5;              /* ce qui n'est pas la feuille */
-  --bord: #d5dae0;              /* filets et séparations */
-  --bord-fort: #7c8894;         /* bordure de champ — doit se voir : 3,6:1 */
-  --survol: #f4f6f9;
+  --fond: #efeae1;              /* sable : ce qui n'est pas la feuille */
+  --bord: #ddd5c8;              /* filets et séparations */
+  --bord-fort: #857c6d;         /* bordure de champ — doit se voir : 4,12:1 */
+  --survol: #f7f4ee;
 
   /* Texte dans la coquille sombre */
   --coquille-encre: #ffffff;
-  --coquille-doux: #c4c9e0;
-  --coquille-muet: #8289ad;
+  --coquille-doux: #cdc6b8;
+  --coquille-muet: #918979;     /* intitulés de groupe — 5,02:1 sur l'acier */
 
   /* SIGNAL — la plaque. Deux emplois, pas trois : la boutique, et le hors-ligne.
      Ses couleurs ne basculent pas avec le thème : une plaque réelle ne change
@@ -85,18 +102,39 @@
   --plaque-bord: #8a6d05;
   --encre-fixe: #0f1720;
 
-  /* Sémantiques — dérivées des deux dégradés du logo, un emploi chacune. */
-  --braise: #c2372a;            /* retard, erreur, irréversible */
-  --braise-surface: #fdecea;
+  /* Sémantiques — dérivées des deux dégradés du logo, un emploi chacune.
+
+     **La braise ne prend pas l'action principale**, et c'est un arbitrage de
+     S54 contre ma propre maquette. Elle y figurait en bouton plein, ce qui
+     réchauffait l'écran — mais dans ce produit la braise dit déjà « retard et
+     irréversible », et `.btn-destructif` est un rouge en contour. Un « Faire
+     entrer une moto » rouge plein posé à côté d'un « Supprimer » rouge en
+     contour, c'est la confusion qu'un logiciel d'argent ne peut pas se
+     permettre. Une couleur, un emploi (DESIGN.md §5). L'action reste donc
+     l'encre — chaude désormais, ce qui suffit.
+
+     Le vert, lui, ne venait d'aucune des deux rampes : c'était le vert de
+     succès universel, le troisième terme du trio rouge/bleu/vert qu'on trouve
+     partout. Il passe à l'olive, qui tient dans une palette chaude et ne
+     ressemble à personne. */
+  --braise: #a8392a;            /* retard, irréversible. Rien d'autre. */
+  --braise-surface: #fbeae6;
   --goutte: #1f52a8;            /* parti et pas revenu : chez le prestataire,
-                                   saisie en cours d'envoi */
+                                   saisie en cours d'envoi. Seul bleu de
+                                   l'écran, donc toujours un signal. */
   --goutte-surface: #eaf0fb;
-  --solde: #1b6b4a;             /* réglé */
-  --solde-surface: #e7f3ed;
+  --solde: #4f6b24;             /* réglé */
+  --solde-surface: #eff2e5;
+
+  /* La paille : ce qui vient d'arriver sous les yeux, et rien d'autre. Elle ne
+     se pose jamais au repos — une couleur d'animation, qui n'existe que le
+     temps d'une seconde. C'est pour ça qu'elle peut être chaude sans entrer en
+     concurrence avec la braise : on ne les voit jamais ensemble longtemps. */
+  --arrivee: #f6edd8;
 
   /* Anneau de focus : un trait et son halo, pour tenir sur le blanc, sur le
      nuit et sur la plaque jaune. Redéfini dans la coquille. */
-  --focus-trait: #0f1720;
+  --focus-trait: #16130f;
   --focus-halo: #ffffff;
 
   /* Typographie */
@@ -145,42 +183,40 @@
   color-scheme: light;
 }
 
-/* --- Mode sombre : un vrai mode, pas une inversion ---------------------------
+/* --- Mode sombre : un vrai mode, demandé, jamais imposé ----------------------
    La coquille ne bouge presque pas — elle est déjà nuit, c'est l'avantage de
    cette direction. Ce sont les surfaces de travail qui se réétagent, et les
    deux sémantiques qui s'éclaircissent pour tenir le contraste.
 
-   Trois écritures parce qu'un basculeur explicite doit gagner dans les deux
-   sens : le réglage système, puis le forçage clair, puis le forçage sombre. */
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="clair"]) {
-    color-scheme: dark;
-    --encre: #e8ecef;
-    --encre-doux: #97a3af;
-    --papier: #151c24;
-    --fond: #0b0f14;
-    --bord: #2a343f;
-    --bord-fort: #6a7783;
-    --survol: #1c242e;
-    --braise: #ff8a7a;      --braise-surface: #3a211e;
-    --goutte: #7fb2ec;      --goutte-surface: #16233a;
-    --solde: #56c08d;       --solde-surface: #12291f;
-    --focus-trait: #ffffff; --focus-halo: #0b0f14;
-  }
-}
+   **Le clair est le défaut, et le sombre ne s'obtient qu'en le demandant**
+   (S54, décision du commanditaire). Le produit suivait `prefers-color-scheme`,
+   ce qui ouvrait l'application en sombre sur toute machine réglée ainsi —
+   alors qu'on travaille au comptoir, souvent en plein jour, parfois dehors. Il
+   n'y a donc plus qu'une écriture : le forçage explicite. `data-theme`
+   absent vaut clair, et `color-scheme: light` sur `:root` empêche en plus les
+   contrôles natifs (date, liste, ascenseur) de sortir sombres sur un système
+   réglé ainsi.
+
+   Ce que cela retire : le suivi automatique du réglage système. C'est voulu —
+   le basculeur du pied de rail reste là pour qui veut le sombre, et son choix
+   survit au rechargement. */
 :root[data-theme="sombre"] {
   color-scheme: dark;
-  --encre: #e8ecef;
-  --encre-doux: #97a3af;
-  --papier: #151c24;
-  --fond: #0b0f14;
-  --bord: #2a343f;
-  --bord-fort: #6a7783;
-  --survol: #1c242e;
-  --braise: #ff8a7a;      --braise-surface: #3a211e;
+  /* Le sombre suit la même règle que le clair : des neutres chauds. Il était
+     bleuté lui aussi (#151c24, #0b0f14), ce qui le rendait aussi anonyme que
+     son jumeau clair. */
+  --encre: #ece7df;
+  --encre-doux: #a69d8f;
+  --papier: #1f1d1a;
+  --fond: #141310;
+  --bord: #363229;
+  --bord-fort: #847b6c;
+  --survol: #272420;
+  --braise: #ff9484;      --braise-surface: #3a211c;
   --goutte: #7fb2ec;      --goutte-surface: #16233a;
-  --solde: #56c08d;       --solde-surface: #12291f;
-  --focus-trait: #ffffff; --focus-halo: #0b0f14;
+  --solde: #a8c75f;       --solde-surface: #242a18;
+  --arrivee: #332c1e;
+  --focus-trait: #ffffff; --focus-halo: #141310;
 }
 
 /* --- Base ------------------------------------------------------------------ */
@@ -550,8 +586,7 @@ h3, .h3 { font-size: var(--t-base); font-weight: 700; }
   background: var(--encre); color: var(--papier); border-color: var(--encre);
 }
 .btn-principal:hover { background: #1d2a37; }
-:root[data-theme="sombre"] .btn-principal:hover,
-:root:not([data-theme="clair"]) .btn-principal:hover { background: #cfd6db; }
+:root[data-theme="sombre"] .btn-principal:hover { background: #d8d2c7; }
 
 .btn-discret { border-color: transparent; background: none; font-weight: 500; }
 .btn-discret:hover { background: var(--survol); border-color: var(--bord); }

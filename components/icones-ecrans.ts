@@ -1,6 +1,7 @@
 import {
   Activity,
   Bike,
+  Boxes,
   Building2,
   Coins,
   FolderCheck,
@@ -9,6 +10,7 @@ import {
   type LucideIcon,
   Plus,
   Receipt,
+  ReceiptText,
   Truck,
   Store,
   Tags,
@@ -39,9 +41,14 @@ export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/motos/ventes": Receipt,
   "/motos/paiements": Coins,
   "/motos/dossiers": FolderCheck,
+  "/motos/inventaire": Boxes,
   "/clients": Users,
   "/pieces": Wrench,
   "/caisse": Coins,
+  /* Sans ces deux lignes, les écrans de S55 retombaient sur `Activity` —
+     déjà pris par `/parametres/referentiels`, dans la même colonne repliée.
+     Deux entrées au même pictogramme, c'est une colonne qu'on ne lit plus. */
+  "/caisse/depenses": ReceiptText,
   "/parametres/entreprise": Building2,
   "/parametres/boutiques": Store,
   "/parametres/utilisateurs": UserCheck,

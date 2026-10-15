@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { seConnecterEtEntrer } from "./aide";
+import { preparerTerrain, seConnecterEtEntrer } from "./aide";
 
 /**
  * Une seule barre de défilement à la fois.
@@ -45,7 +45,10 @@ const ECRANS = [
   { chemin: "/motos/ventes", titre: "Ventes" },
   { chemin: "/motos", titre: "Stock motos" },
   { chemin: "/motos/paiements", titre: "Paiements" },
-  { chemin: "/caisse", titre: "Le bilan du jour" },
+  /* « Le bilan consolidé » depuis S55 : la caisse se lit sur une période, plus
+     sur la seule journée, et le responsable y arrive en périmètre entreprise.
+     Dans une boutique, le même écran s'intitule « Journal de caisse ». */
+  { chemin: "/caisse", titre: "Le bilan consolidé" },
 ];
 
 /**
@@ -111,4 +114,62 @@ test.describe("Le défilement de la coquille", () => {
       expect(barres.length, `${chemin} : ascenseurs trouvés — ${barres.join(", ")}`).toBeLessThanOrEqual(1);
     });
   }
+});
+
+/**
+ * **Les groupes de la colonne ne se peignent pas par-dessus son pied.**
+ *
+ * Le commanditaire l'a vu dans l'espace Motos : « regarde le bas, ça se
+ * chevauche ». « Réservé au responsable » et ses deux écrans passaient sur
+ * l'adresse du compte, illisibles tous les deux.
+ *
+ * La cause tenait à une classe : le bloc des groupes gardait un `min-h-0`
+ * laissé par le défilement interne retiré en S54. Un élément flex ainsi marqué
+ * a le droit de rétrécir **sous** la hauteur de son contenu — le contenu, lui,
+ * continue de se peindre, mais hors de la boîte, et la colonne ne sait même pas
+ * qu'elle déborde. Aucun ascenseur n'apparaît : c'est un chevauchement muet,
+ * que seule la géométrie dénonce.
+ *
+ * **La fenêtre est basse exprès.** À 860 px la colonne tient, et le défaut
+ * dort. Il ne se réveille que lorsque les quatre groupes du responsable
+ * dépassent la hauteur disponible — soit l'ordinateur portable du comptoir.
+ */
+test.describe("La colonne de navigation", () => {
+  test.use({ viewport: { width: 1280, height: 620 } });
+
+  test("l’espace Motos ne fait pas chevaucher ses groupes et le pied de colonne", async ({
+    page,
+  }) => {
+    await seConnecterEtEntrer(page);
+    /* **Ce témoin fabrique son décor.** Sans boutique déclarée, il n'existe pas
+       d'espace Motos du tout : la colonne reste celle de la supervision, et le
+       test mesurerait un écran qui n'est pas celui du défaut. Le reste de ce
+       fichier hérite encore du décor des autres suites — fragilité ancienne,
+       qui le fait échouer lancé seul. */
+    await preparerTerrain(page);
+    await page.goto("/motos");
+    await expect(page.getByRole("heading", { name: "Stock motos", level: 1 })).toBeVisible();
+
+    const colonne = page.getByRole("navigation", { name: /Écrans de l’espace/ });
+    const pied = colonne.getByRole("link", { name: /Responsable/ });
+    const dernier = colonne.getByRole("link", { name: /Provenances et frais/ });
+
+    await expect(pied).toBeVisible();
+    await expect(dernier).toBeVisible();
+
+    const boitePied = await pied.boundingBox();
+    const boiteDernier = await dernier.boundingBox();
+    /* Une boîte absente n'est pas un chevauchement : c'est un élément qui n'est
+       pas rendu, et l'assertion suivante n'aurait rien à mesurer. */
+    if (!boitePied || !boiteDernier) {
+      throw new Error("La colonne n’a pas de géométrie : il n’y a rien à mesurer.");
+    }
+
+    /* Le bas du dernier écran doit s'arrêter avant le haut du pied. Un pixel de
+       tolérance : les bordures se rendent en sous-pixels selon le zoom. */
+    expect(
+      boiteDernier.y + boiteDernier.height,
+      "« Provenances et frais » se peint par-dessus le pied de colonne",
+    ).toBeLessThanOrEqual(boitePied.y + 1);
+  });
 });

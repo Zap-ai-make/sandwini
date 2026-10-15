@@ -1,0 +1,404 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Trois directions de couleur — SDI</title>
+<link rel="icon" href="../design/marque/monogramme-se-favicon.svg">
+<link rel="stylesheet" href="socle.css">
+<style>
+/* ---------------------------------------------------------------------------
+   Trois directions de couleur, et rien d'autre.
+
+   Le commanditaire : « c'est surtout les couleurs, manque d'identité, trop
+   standard ». Cette page isole exactement cette variable. Les trois cadres
+   ci-dessous rendent le MEME écran, avec les MEMES espacements, la MEME typo,
+   les MEMES rayons — seuls les jetons de couleur changent. Ce qu'on compare
+   est donc la couleur, pas un dessin qu'on aurait aussi retouché au passage.
+
+   Chaque direction ne redéfinit que des variables déjà déclarées dans
+   `socle.css`. Aucune règle de mise en forme n'est réécrite ici.
+--------------------------------------------------------------------------- */
+
+/* === 0 — L'AVANT, figé ici pour mémoire =================================
+   Ces valeurs ne vivent plus nulle part ailleurs : `socle.css` porte
+   désormais la direction retenue. On les recopie en dur pour que cette page
+   garde sa valeur de preuve — sans elles, la comparaison montrerait quatre
+   fois la même chose, et plus personne ne saurait de quoi on est parti. */
+[data-direction="avant"] {
+  --nuit: #14142b;  --nuit-2: #191a32;  --nuit-3: #22243f;  --nuit-filet: #2b2d4a;
+  --coquille-encre: #ffffff; --coquille-doux: #c4c9e0; --coquille-muet: #8289ad;
+  --encre: #0f1720; --encre-doux: #5a6672;
+  --papier: #ffffff; --fond: #eef1f5; --bord: #d5dae0; --bord-fort: #7c8894; --survol: #f4f6f9;
+  --braise: #c2372a; --braise-surface: #fdecea;
+  --goutte: #1f52a8; --goutte-surface: #eaf0fb;
+  --solde: #1b6b4a;  --solde-surface: #e7f3ed;
+}
+[data-direction="avant"] .bouton-primaire { background: var(--encre); }
+/* Le bouton braise de la maquette n'a pas été retenu : voir la note de
+   `socle.css`. Il reste ici tel qu'il a été montré, pour que la page dise la
+   vérité sur ce qui a été comparé. */
+
+/* === 1 — ACIER ET BRAISE — RETENUE ======================================= */
+/* Plus aucune surcharge : c'est `socle.css` lui-même depuis que la direction
+   est arrêtée. Le bloc ci-dessous ne sert donc qu'au bouton d'action. */
+/* Le logo est du feu sur de la nuit. Le produit, lui, est du gris froid sur un
+   bleu-violet : il ne ressemble pas à sa propre marque. Ici les neutres
+   deviennent chauds — l'acier huilé de l'atelier, le sable de la cour — et
+   c'est la braise du dégradé qui prend l'action. */
+/* === 2 — NUIT ET OR ====================================================== */
+/* La plus proche de l'existante, et la moins risquée. On ne change pas
+   l'architecture : on retire le bleu-violet de la coquille (c'est lui, le
+   « standard »), on réchauffe les gris, et on sort enfin l'or du logo — non
+   pas en aplat, mais comme la marque de ce qui est actif. */
+[data-direction="or"] {
+  --nuit: #15161a;
+  --nuit-2: #1b1d22;
+  --nuit-3: #25282f;
+  --nuit-filet: #32363f;
+  --coquille-encre: #ffffff;
+  --coquille-doux: #c9c6bd;
+  --coquille-muet: #8a8780;
+
+  --encre: #15161a;
+  --encre-doux: #595a60;
+  --papier: #ffffff;
+  --fond: #f2f1ed;
+  --bord: #dcd9d2;
+  --bord-fort: #807c74;
+  --survol: #f8f7f4;
+
+  --solde: #2a6342;
+  --solde-surface: #e8f1ec;
+}
+/* L'or ne sert qu'ici : le trait de l'écran courant, dans la coquille. */
+[data-direction="or"] .colonne-lien[aria-current="page"] {
+  box-shadow: inset 3px 0 0 var(--or);
+}
+
+/* === 3 — ÉMAIL =========================================================== */
+/* La plus tranchée. On abandonne la coquille sombre : le rail devient un
+   panneau d'émail bleu, celui des enseignes peintes, et le jaune de plaque
+   chante dessus. Mur peint en guise de fond.
+   Le défaut est réel et il faut le dire : le bleu de la goutte — « parti et
+   pas revenu » — ne peut plus être un signal s'il est aussi la couleur du
+   rail. Il faudrait lui trouver autre chose. */
+[data-direction="email"] {
+  --nuit: #11356b;
+  --nuit-2: #143c78;
+  --nuit-3: #1d4e94;
+  --nuit-filet: #2a5ba3;
+  --coquille-encre: #ffffff;
+  --coquille-doux: #c3d3ea;
+  --coquille-muet: #8fa8cc;
+
+  --encre: #121212;
+  --encre-doux: #55524c;
+  --papier: #ffffff;
+  --fond: #f3f0e9;
+  --bord: #cfc9bd;
+  --bord-fort: #7b746a;
+  --survol: #faf8f3;
+
+  --braise: #c2372a;
+  --goutte: #0d2a55;
+  --goutte-surface: #e6ecf6;
+  --solde: #0f6b3f;
+}
+
+/* === La page de comparaison elle-même ==================================== */
+.comparatif { background: #2a2a2e; color: #fff; padding: 24px 24px 64px; font-family: var(--f-corps); }
+.comparatif h1 { font-size: 22px; margin: 0 0 4px; }
+.comparatif > p { max-width: 70ch; color: #cfcfd4; font-size: 14px; line-height: 1.5; margin: 0 0 24px; }
+
+.direction { margin-bottom: 40px; background: #212125; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; padding: 16px; }
+.direction > header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; margin-bottom: 10px; }
+.direction h2 { font-size: 17px; margin: 0; }
+.direction .verdict { font-size: 13px; color: #a9a9b2; }
+.direction > p.pourquoi { max-width: 78ch; color: #cfcfd4; font-size: 13.5px; line-height: 1.55; margin: 0 0 12px; }
+
+.nuancier { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.nuancier span { font-family: var(--f-code); font-size: 10.5px; padding: 5px 7px; border-radius: 3px; border: 1px solid rgba(255,255,255,.18); line-height: 1.25; }
+.nuancier span b { display: block; font-weight: 600; font-family: var(--f-corps); font-size: 10px; opacity: .85; }
+
+/* Le cadre qui contient la miniature. `zoom` plutôt que `transform` : il
+   réduit aussi la boîte, donc trois écrans tiennent sans marges fantômes. */
+.cadre-essai { border: 1px solid rgba(255,255,255,.2); border-radius: 8px; overflow: hidden; background: var(--fond); }
+.cadre-essai .faux-appli { zoom: .68; }
+
+/* La miniature réutilise les classes réelles de `socle.css`. Seule la grille
+   de la coquille est refaite, parce que l'originale occupe tout l'écran. */
+/* Deux rangees, et la coquille les traverse : sans `grid-row`, le rail
+   s'arretait au bandeau et laissait un trou de 500 px sous lui. */
+/* `socle.css` habille les memes classes pour un ecran plein : ses marges
+   verticales desserrent la miniature au point qu'on croirait juger une autre
+   mise en page. On les neutralise, puis chaque regle ci-dessous pose la sienne
+   — sinon la comparaison porterait sur deux variables au lieu d'une. */
+.faux-appli :where(h2, h3, p, dl, dt, dd, ul, li, table) { margin: 0; }
+.faux-appli :where(a, p, dt, dd, td, th) { line-height: 1.35; }
+
+.faux-appli { display: grid; grid-template-columns: 72px 200px 1fr; grid-template-rows: auto 1fr; min-height: 560px; background: var(--fond); color: var(--encre); font-family: var(--f-corps); font-size: var(--t-base); }
+.faux-rail { grid-row: 1 / 3; background: var(--nuit); display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 14px 0; }
+.faux-rail img { width: 30px; height: 30px; margin-bottom: 12px; }
+.faux-rail a { color: var(--coquille-muet); font-size: 10.5px; text-align: center; padding: 8px 4px; width: 56px; border-radius: 8px; text-decoration: none; }
+.faux-rail a[aria-current] { background: var(--nuit-3); color: var(--coquille-encre); font-weight: 600; }
+.faux-colonne { grid-row: 1 / 3; background: var(--nuit-2); border-right: 1px solid var(--nuit-filet); padding: 14px 10px; }
+.faux-colonne .colonne-espace { color: var(--coquille-encre); font-weight: 700; font-size: 15px; margin: 0 0 14px; padding-inline: 6px; }
+.faux-colonne h3 { color: var(--coquille-muet); font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; margin: 14px 0 6px; padding-inline: 6px; }
+.colonne-lien { display: block; color: var(--coquille-doux); text-decoration: none; font-size: 13px; padding: 7px 8px; border-radius: 6px; }
+.colonne-lien[aria-current="page"] { background: var(--nuit-3); color: var(--coquille-encre); font-weight: 600; }
+.faux-bandeau { grid-column: 3; display: flex; align-items: center; gap: 10px; height: 46px; padding: 0 14px; background: var(--papier); border-bottom: 1px solid var(--bord); }
+.faux-bandeau .recherche { margin-left: auto; border: 1px solid var(--bord); border-radius: 6px; padding: 5px 10px; color: var(--encre-doux); font-size: 12.5px; min-width: 200px; background: var(--fond); }
+.faux-page { grid-column: 3; padding: 18px; }
+.faux-page .sur-titre { font-size: 10.5px; letter-spacing: .09em; text-transform: uppercase; color: var(--encre-doux); font-weight: 700; margin: 0; }
+.faux-page h2.titre-ecran { font-size: 24px; margin: 2px 0 14px; color: var(--encre); }
+.faux-cartes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 18px; }
+.faux-carte { background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-2); padding: 14px; }
+.faux-carte h3 { margin: 8px 0 10px; font-size: 15px; }
+.faux-carte dl { display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; margin: 0; font-size: 13px; }
+.faux-carte dt { color: var(--encre-doux); }
+.faux-carte dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; }
+.faux-carte .montant { font-family: var(--f-code); }
+.faux-carte .carte-alerte { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--bord); color: var(--braise); font-size: 12.5px; font-weight: 600; }
+.faux-carte .carte-calme { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--bord); color: var(--encre-doux); font-size: 12.5px; }
+.faux-tableau { background: var(--papier); border: 1px solid var(--bord); border-radius: var(--r-2); overflow: hidden; }
+.faux-tableau table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.faux-tableau th { text-align: left; font-size: 10.5px; letter-spacing: .07em; text-transform: uppercase; color: var(--encre-doux); padding: 9px 12px; border-bottom: 1px solid var(--bord); }
+.faux-tableau td { padding: 10px 12px; border-bottom: 1px solid var(--bord); }
+.faux-tableau tr:last-child td { border-bottom: 0; }
+.faux-tableau .code { font-family: var(--f-code); font-size: 12.5px; }
+.faux-barre { display: flex; gap: 8px; align-items: center; margin-bottom: 14px; }
+.bouton-primaire { background: var(--encre); color: var(--papier); border: 0; border-radius: var(--r-1); padding: 8px 14px; font-weight: 600; font-size: 13px; font-family: inherit; }
+[data-direction="acier"] .bouton-primaire { background: var(--braise); }
+.bouton-neutre { background: var(--papier); color: var(--encre); border: 1px solid var(--bord-fort); border-radius: var(--r-1); padding: 8px 14px; font-weight: 500; font-size: 13px; font-family: inherit; }
+.plaque { display: inline-block; font-family: var(--f-code); font-size: 12px; font-weight: 600; background: var(--plaque); color: var(--encre-fixe); border: 1px solid var(--plaque-bord); border-radius: var(--r-plaque); padding: 2px 6px; letter-spacing: .04em; }
+.pastille { display: inline-block; font-size: 11.5px; font-weight: 600; border-radius: 4px; padding: 2px 7px; }
+.p-retard { background: var(--braise-surface); color: var(--braise); }
+.p-transit { background: var(--goutte-surface); color: var(--goutte); }
+.p-regle { background: var(--solde-surface); color: var(--solde); }
+</style>
+</head>
+<body class="comparatif">
+
+<h1>Trois directions de couleur — et celle qu’on a prise</h1>
+<p>
+  Le même écran, quatre fois. Les espacements, la typographie, les rayons et la disposition sont
+  rigoureusement identiques&nbsp;: seuls les jetons de couleur changent. Ce qui se compare ici est
+  donc la couleur, et rien d’autre — si une direction te paraît mieux rangée qu’une autre, c’est la
+  couleur qui te le fait croire.
+</p>
+
+<template id="modele">
+  <div class="faux-appli">
+    <nav class="faux-rail">
+      <img src="../design/marque/monogramme-se.svg" alt="">
+      <a href="#" aria-current="page">Supervision</a>
+      <a href="#">Motos</a>
+      <a href="#">Pièces</a>
+      <a href="#">Caisse</a>
+      <a href="#">Paramètres</a>
+    </nav>
+    <nav class="faux-colonne">
+      <p class="colonne-espace">Supervision</p>
+      <h3>Le commerce</h3>
+      <a class="colonne-lien" href="#" aria-current="page">Vue d’ensemble</a>
+      <h3>Les boutiques</h3>
+      <a class="colonne-lien" href="#">Pouytenga</a>
+      <a class="colonne-lien" href="#">Koudougou</a>
+      <a class="colonne-lien" href="#">Ouagadougou</a>
+    </nav>
+    <div class="faux-bandeau">
+      <span class="plaque">SDI</span>
+      <span>Toutes les boutiques</span>
+      <span class="recherche">Chercher un écran</span>
+    </div>
+    <main class="faux-page">
+      <p class="sur-titre">Toutes les boutiques · octobre 2026</p>
+      <h2 class="titre-ecran">Supervision</h2>
+
+      <div class="faux-barre">
+        <button class="bouton-primaire" type="button">Faire entrer une moto</button>
+        <button class="bouton-neutre" type="button">Exporter</button>
+      </div>
+
+      <div class="faux-cartes">
+        <div class="faux-carte">
+          <span class="plaque">PTG</span>
+          <h3>Pouytenga</h3>
+          <dl>
+            <dt>Motos en stock</dt><dd>96</dd>
+            <dt>Ventes ce mois</dt><dd>14</dd>
+            <dt>Reste dû</dt><dd class="montant">2 340 000</dd>
+          </dl>
+          <p class="carte-alerte">3 dossiers en retard</p>
+        </div>
+        <div class="faux-carte">
+          <span class="plaque">KDG</span>
+          <h3>Koudougou</h3>
+          <dl>
+            <dt>Motos en stock</dt><dd>58</dd>
+            <dt>Ventes ce mois</dt><dd>9</dd>
+            <dt>Reste dû</dt><dd class="montant">1 105 000</dd>
+          </dl>
+          <p class="carte-calme">Aucun dossier en retard</p>
+        </div>
+        <div class="faux-carte">
+          <span class="plaque">OUA</span>
+          <h3>Ouagadougou</h3>
+          <dl>
+            <dt>Motos en stock</dt><dd>134</dd>
+            <dt>Ventes ce mois</dt><dd>22</dd>
+            <dt>Reste dû</dt><dd class="montant">4 780 000</dd>
+          </dl>
+          <p class="carte-alerte">5 dossiers en retard</p>
+        </div>
+      </div>
+
+      <div class="faux-tableau">
+        <table>
+          <thead>
+            <tr><th>Pièce</th><th>Boutique</th><th>Client</th><th>Ce qui bloque</th><th>Montant</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="code">OUA-2610-0118</td>
+              <td><span class="plaque">OUA</span></td>
+              <td>Salifou Kaboré</td>
+              <td><span class="pastille p-retard">Carte grise en retard</span></td>
+              <td class="code">1 100 000</td>
+            </tr>
+            <tr>
+              <td class="code">PTG-2610-0091</td>
+              <td><span class="plaque">PTG</span></td>
+              <td>Hamadou Swabo</td>
+              <td><span class="pastille p-transit">Chez le prestataire</span></td>
+              <td class="code">875 000</td>
+            </tr>
+            <tr>
+              <td class="code">KDG-2610-0044</td>
+              <td><span class="plaque">KDG</span></td>
+              <td>Aminata Ouédraogo</td>
+              <td><span class="pastille p-regle">Réglée</span></td>
+              <td class="code">640 000</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </main>
+  </div>
+</template>
+
+<div id="essais"></div>
+
+<script>
+const DIRECTIONS = [
+  {
+    cle: "avant",
+    titre: "0 — L’avant",
+    verdict: "ce qui ne te satisfaisait pas",
+    pourquoi:
+      "Le bleu-violet #14142b de la coquille et le gris bleuté #eef1f5 du fond occupent à eux deux " +
+      "plus de 90 % de la surface. Ce sont les deux couleurs les plus répandues du logiciel de " +
+      "gestion depuis dix ans. Pendant ce temps, les couleurs de la marque — l’or, l’orange, le " +
+      "rouge — sont interdites d’interface : D70 les a enfermées dans le logo pour éviter le " +
+      "dégradé décoratif. La règle avait raison sur le dégradé, mais elle a privé le produit de " +
+      "tout ce qui lui appartenait en propre.",
+    jetons: [
+      ["coquille", "#14142b"], ["fond", "#eef1f5"], ["bord", "#d5dae0"],
+      ["retard", "#c2372a"], ["transit", "#1f52a8"], ["réglé", "#1b6b4a"], ["plaque", "#f5c518"],
+    ],
+  },
+  {
+    cle: "acier",
+    titre: "1 — Acier et braise",
+    verdict: "RETENUE — c’est la palette de socle.css depuis le 11 octobre 2026",
+    pourquoi:
+      "Le logo est du feu sur de la nuit. L’interface, elle, est du gris froid sur du bleu-violet : " +
+      "le produit ne ressemble pas à sa propre marque. Ici tous les neutres passent au chaud — " +
+      "l’acier huilé de l’atelier pour la coquille, le sable de la cour pour le fond — et la braise " +
+      "du dégradé prend l’action principale. Aucun dégradé n’est posé en fond : c’est la " +
+      "température des gris qui porte l’identité, et c’est elle qu’on remarque sans savoir pourquoi. " +
+      "La plaque jaune reste intacte, et chante enfin sur un fond qui la reçoit.",
+    jetons: [
+      ["coquille", "#1b1a17"], ["fond", "#efeae1"], ["bord", "#ddd5c8"],
+      ["braise · action", "#a8392a"], ["transit", "#1f52a8"], ["réglé", "#4f6b24"], ["plaque", "#f5c518"],
+    ],
+  },
+  {
+    cle: "or",
+    titre: "2 — Nuit et or",
+    verdict: "écartée — trop timide",
+    pourquoi:
+      "On ne touche à rien d’autre que la température : le bleu-violet sort de la coquille (c’est " +
+      "lui, le « standard »), les gris se réchauffent d’un cran, et l’or du logo sort enfin — non " +
+      "pas en aplat, mais comme la marque de l’écran où l’on se trouve. C’est peu de chose et ça " +
+      "se voit : la coquille cesse d’être un gabarit et devient un objet. Le bouton principal reste " +
+      "noir, donc rien ne bouge côté hiérarchie.",
+    jetons: [
+      ["coquille", "#15161a"], ["fond", "#f2f1ed"], ["bord", "#dcd9d2"],
+      ["or · actif", "#e0a81a"], ["retard", "#c2372a"], ["transit", "#1f52a8"], ["plaque", "#f5c518"],
+    ],
+  },
+  {
+    cle: "email",
+    titre: "3 — Émail",
+    verdict: "écartée — le bleu du rail tuait le signal « chez le prestataire »",
+    pourquoi:
+      "On abandonne la coquille sombre. Le rail devient un panneau d’émail bleu, celui des " +
+      "enseignes peintes des marchés, et le fond devient un mur blanchi. Le jaune de plaque y " +
+      "chante comme nulle part ailleurs. Personne ne confondra cet écran avec un logiciel de " +
+      "gestion générique. Le défaut, et il est réel : le bleu de la goutte dit « parti et pas " +
+      "revenu » — il ne peut plus être un signal s’il est aussi la couleur du rail. Il faudrait " +
+      "lui trouver un remplaçant, et c’est un vrai travail, pas un réglage.",
+    jetons: [
+      ["coquille", "#11356b"], ["fond", "#f3f0e9"], ["bord", "#cfc9bd"],
+      ["retard", "#c2372a"], ["transit", "#0d2a55"], ["réglé", "#0f6b3f"], ["plaque", "#f5c518"],
+    ],
+  },
+];
+
+const modele = document.getElementById("modele");
+const hote = document.getElementById("essais");
+
+for (const d of DIRECTIONS) {
+  const bloc = document.createElement("section");
+  bloc.className = "direction";
+
+  const tete = document.createElement("header");
+  const h2 = document.createElement("h2");
+  h2.textContent = d.titre;
+  const verdict = document.createElement("span");
+  verdict.className = "verdict";
+  verdict.textContent = d.verdict;
+  tete.append(h2, verdict);
+
+  const pourquoi = document.createElement("p");
+  pourquoi.className = "pourquoi";
+  pourquoi.textContent = d.pourquoi;
+
+  const nuancier = document.createElement("div");
+  nuancier.className = "nuancier";
+  for (const [role, hex] of d.jetons) {
+    const puce = document.createElement("span");
+    puce.style.background = hex;
+    /* Le texte de la pastille doit rester lisible sur sa propre couleur :
+       on bascule en noir au-dessus d'une luminance moyenne. */
+    const [r, v, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    puce.style.color = (r * 299 + v * 587 + b * 114) / 1000 > 140 ? "#121212" : "#ffffff";
+    puce.innerHTML = `<b></b>${hex}`;
+    puce.querySelector("b").textContent = role;
+    nuancier.append(puce);
+  }
+
+  const cadre = document.createElement("div");
+  cadre.className = "cadre-essai";
+  if (d.cle) cadre.dataset.direction = d.cle;
+  cadre.append(modele.content.cloneNode(true));
+
+  bloc.append(tete, pourquoi, nuancier, cadre);
+  hote.append(bloc);
+}
+</script>
+
+</body>
+</html>

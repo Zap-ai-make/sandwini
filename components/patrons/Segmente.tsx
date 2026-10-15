@@ -19,6 +19,7 @@ import { useId, type ReactNode } from "react";
  */
 export function Segmente<T extends string>({
   libelle,
+  libelleMasque = false,
   valeur,
   changer,
   options,
@@ -26,6 +27,16 @@ export function Segmente<T extends string>({
 }: {
   /** Le nom du groupe, annoncé avant les options. */
   libelle: string;
+  /**
+   * Le nom du groupe reste annoncé, mais ne s'affiche plus.
+   *
+   * Pour `Onglets` : « Marques | Modèles » n'a pas besoin d'un « Afficher&nbsp;: »
+   * au-dessus pour se comprendre, et cette ligne de chrome pousserait le
+   * contenu vers le bas sur tous les écrans qui s'en servent. Le nom ne
+   * disparaît pas pour autant — le `radiogroup` sans nom s'annonce « 1 sur 2 »
+   * sans dire de quoi.
+   */
+  libelleMasque?: boolean;
   valeur: T;
   changer: (valeur: T) => void;
   options: readonly { valeur: T; libelle: string; icone?: ReactNode }[];
@@ -36,7 +47,10 @@ export function Segmente<T extends string>({
 
   return (
     <div className={className}>
-      <span id={libelleId} className="block text-sm font-medium text-encre">
+      <span
+        id={libelleId}
+        className={libelleMasque ? "sr-only" : "block text-sm font-medium text-encre"}
+      >
         {libelle}
       </span>
       <div

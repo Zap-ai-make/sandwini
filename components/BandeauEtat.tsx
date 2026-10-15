@@ -176,6 +176,15 @@ export function BandeauEtat() {
       <span
         role="status"
         aria-live="polite"
+        /* **L'état reste lisible par une machine même quand il se tait.**
+           « À jour » était la seule chose, dans tout le produit, qui disait
+           « la file d'écritures Firestore est vide » — et la suite e2e s'en
+           servait pour savoir quand ouvrir un second navigateur ou couper le
+           réseau sans perdre ce qu'elle venait d'écrire (D97). En retirant la
+           phrase (S54), on a emporté le signal avec elle.
+           L'attribut le rend : invisible, non annoncé, et il ne réintroduit
+           pas le voyant toujours vert que D63 condamne. */
+        data-synchro={etat}
         className={[
           "flex shrink-0 items-center gap-1.5 text-sm",
           // Sur la plaque jaune, l’encre est fixe : elle ne suit pas le thème.
