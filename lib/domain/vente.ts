@@ -438,6 +438,26 @@ export function inclusionsDeVente(
   ];
 }
 
+/**
+ * Ce que le client a emporté, nommé une fois pour tous les écrans (S53).
+ *
+ * **Le reçu et la fiche de vente lisent cette fonction, et rien d'autre.** La
+ * spec l'exige — « le reçu dit la même chose que la fiche » — et une seule
+ * lecture est la seule façon de le garantir : deux parcours de `vente.emporte`
+ * écrits à deux endroits finiraient par nommer les papiers différemment, et un
+ * reçu qui contredit l'écran est un reçu qu'on ne peut pas opposer à un client.
+ *
+ * Dans l'ordre du cahier, celui de `TYPES_DOCUMENT` : la quittance accompagne
+ * la moto, le CMC s'obtient avec elle. La carte grise n'en est jamais — elle
+ * n'est pas disponible à l'achat.
+ */
+export function papiersEmportesDeVente(vente: Pick<Vente, "emporte">): string[] {
+  const noms: string[] = [];
+  if (vente.emporte.quittance) noms.push(LIBELLE_DOCUMENT.quittance);
+  if (vente.emporte.cmc) noms.push(LIBELLE_DOCUMENT.cmc);
+  return noms;
+}
+
 export type BilanVentes = {
   ventes: number;
   chiffreAffaires: number;

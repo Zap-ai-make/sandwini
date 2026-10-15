@@ -4,7 +4,13 @@ import { formaterDate, formaterHeure, formaterMontant } from "@/lib/domain/forma
 import type { Boutique } from "@/lib/domain/boutique";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_TYPE_RECU, type ContenuRecu } from "@/lib/domain/recu";
-import { LIBELLE_MODE, LIBELLE_MOYEN, inclusionsDeVente, type Vente } from "@/lib/domain/vente";
+import {
+  LIBELLE_MODE,
+  LIBELLE_MOYEN,
+  inclusionsDeVente,
+  papiersEmportesDeVente,
+  type Vente,
+} from "@/lib/domain/vente";
 import { Monogramme } from "@/components/Monogramme";
 
 /**
@@ -304,9 +310,27 @@ function Fait({
  */
 function CeQuiPart({ vente }: { vente: Vente }) {
   const inclusions = inclusionsDeVente(vente);
+  /* **Ce que le client a emporté, sur le reçu comme sur la fiche** (S53). Les
+     deux lisent `papiersEmportesDeVente` et rien d'autre : la spec exige qu'ils
+     disent la même chose, et une seule lecture est la seule façon de le
+     garantir.
+
+     Un reçu réimprimé montre donc l'état du jour de la réimpression, et non
+     celui de la vente. C'est juste ici, à l'inverse des deux listes de texte
+     libre juste en dessous : « ce que le client a pris » est un fait sur la
+     vente qui se complète dans les semaines qui suivent, pas une phrase écrite
+     une fois au comptoir. */
+  const emportes = papiersEmportesDeVente(vente);
+
+  const papiers = emportes.length > 0 && (
+    <p className="mt-2 text-sm text-encre">
+      Papiers emportés : <span className="font-medium">{emportes.join(", ")}</span>
+    </p>
+  );
 
   if (inclusions) {
     return (
+      <>
       <ul className="mt-5 flex flex-wrap gap-x-6 gap-y-1 text-sm">
         {inclusions.map(({ libelle, inclus }) => (
           <li key={libelle} className="flex items-center gap-2">
@@ -323,6 +347,8 @@ function CeQuiPart({ vente }: { vente: Vente }) {
           </li>
         ))}
       </ul>
+      {papiers}
+      </>
     );
   }
 

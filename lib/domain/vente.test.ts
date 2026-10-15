@@ -15,6 +15,7 @@ import {
   dettes,
   filtrerPaiements,
   inclusionsDeVente,
+  papiersEmportesDeVente,
   estEngagement,
   estInactive,
   estRenumerotee,
@@ -927,5 +928,29 @@ describe("lireEmporte", () => {
       quittance: true,
       cmc: false,
     });
+  });
+});
+
+describe("papiersEmportesDeVente", () => {
+  /* **Le reçu et la fiche lisent la MÊME fonction**, et c'est tout l'objet de
+     celle-ci : deux lectures séparées de `vente.emporte` finiraient par
+     divergerker — l'une dirait « Quittance » là où l'autre dirait « quittance
+     remise », et un reçu qui contredit l'écran est un reçu qu'on ne peut pas
+     opposer à un client (critère de S53). */
+  it("nomme ce que le client a emporté, dans l’ordre du cahier", () => {
+    expect(papiersEmportesDeVente({ emporte: { quittance: true, cmc: true } })).toEqual([
+      "Quittance",
+      "CMC",
+    ]);
+  });
+
+  it("ne nomme que ce qui est parti", () => {
+    expect(papiersEmportesDeVente({ emporte: { quittance: false, cmc: true } })).toEqual(["CMC"]);
+  });
+
+  /* Rien d'emporté rend une liste vide et non `null` : l'appelant affiche alors
+     une phrase, et n'a pas deux cas d'absence à distinguer. */
+  it("rend une liste vide quand le client n’a rien pris", () => {
+    expect(papiersEmportesDeVente({ emporte: { quittance: false, cmc: false } })).toEqual([]);
   });
 });

@@ -277,9 +277,20 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
             <Phone aria-hidden="true" className="size-3.5 shrink-0" />
             {prestataire.telephone}
           </span>
-          <span className="block text-sm text-encre-doux">
-            {libelleTypes(prestataire.typesDocuments)}
-          </span>
+          {/* **Un prestataire sans type est signale** (S53). Il n'apparaitra
+              dans aucune liste de depot, et « Aucun type de document » en gris
+              doux ne le disait pas : c'etait une phrase parmi d'autres, sur une
+              fiche qui a l'air complete. Le trou de S48 en a produit — des
+              fiches nees avec `plaque` seul, dont le type a cesse d'exister. */}
+          {prestataire.typesDocuments.length === 0 ? (
+            <span className="block text-sm font-medium text-alerte">
+              Aucun type de document : ce prestataire n’est propose nulle part.
+            </span>
+          ) : (
+            <span className="block text-sm text-encre-doux">
+              {libelleTypes(prestataire.typesDocuments)}
+            </span>
+          )}
         </span>
 
         <span className="flex shrink-0 gap-2">
