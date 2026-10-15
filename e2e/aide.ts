@@ -222,7 +222,14 @@ export async function creerBoutique(
      lit le serveur, elle : enchainer trop vite répond « Cette boutique
      n'existe pas ». Le bandeau dit quand la file d'écritures est vidée, et
      c'est le seul signal qui le dise. */
-  await attendreLaFileVide(page, 30_000);
+  /* **Le budget par défaut, et non 30 s.** `attendreLaFileVide` explique
+     elle-même pourquoi il est large : le SDK Firestore reste dans son cycle de
+     reconnexion à attente croissante (D50), et la file peut mettre près d'une
+     minute à repartir. Le raccourcir ici contredisait ce raisonnement — et
+     faisait échouer le décor sur un bandeau « Hors ligne » au premier geste,
+     alors que le même helper passait dans le fichier voisin. Un décor qui tombe
+     accuse le produit d'un défaut qu'il n'a pas. */
+  await attendreLaFileVide(page);
 }
 
 /** Ajoute une marque et l'un de ses modèles au catalogue, par l'écran de S39. */

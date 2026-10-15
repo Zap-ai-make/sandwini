@@ -3,6 +3,8 @@
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { ConfierPaquetModal } from "@/components/ConfierPaquetModal";
+import { PaquetsEnCours } from "@/components/PaquetsEnCours";
 import { RelaisDocument } from "@/components/RelaisDocument";
 import { Avis } from "@/components/patrons/Avis";
 import { ErreurDeLecture, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
@@ -21,7 +23,7 @@ import {
   type DossierEnAttente,
   type FiltreEtat,
 } from "@/lib/domain/dossier";
-import { formaterDateCourte } from "@/lib/domain/format";
+import { compter, formaterDateCourte } from "@/lib/domain/format";
 import {
   LIBELLE_DOCUMENT,
   TYPES_DOCUMENT,
@@ -33,7 +35,9 @@ import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import type { Moto } from "@/lib/domain/moto";
+import { cartesConfiables, type PaquetCartesGrises } from "@/lib/domain/paquet";
 import { ecouterStock } from "@/lib/repositories/motos";
+import { ecouterPaquets } from "@/lib/repositories/paquets";
 import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
 
 /**
@@ -107,6 +111,19 @@ export default function PageDossiers() {
     "Le stock n’a pas pu être lu.",
   );
 
+  /* Les paquets de la boutique. La liste est courte par construction — un
+     paquet vit quelques semaines — et le tri se fait en memoire : un `orderBy`
+     demanderait un index composite pour quelques dizaines de lignes. */
+  const souscrirePaquets = useCallback(
+    (auChangement: (paquets: PaquetCartesGrises[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterPaquets(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
+  );
+  const { valeur: paquets } = useAbonnement(
+    souscrirePaquets,
+    "Les paquets de cartes grises n\u2019ont pas pu \u00eatre lus.",
+  );
+
   const souscrireDossiers = useCallback(
     (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) =>
       ecouterDossiers(boutiqueId, auChangement, enErreur),
@@ -118,6 +135,31 @@ export default function PageDossiers() {
   );
 
   const parClient = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
+
+  /* **La selection est un ensemble d'identifiants de VENTE**, pas de documents :
+     un document se recharge a chaque ecriture du serveur, un identifiant non.
+     Cocher une ligne puis voir la selection se vider parce qu'une autre
+     boutique a ecrit serait incomprehensible. */
+  const [choisies, setChoisies] = useState<Set<string>>(new Set());
+  const [paquetOuvert, setPaquetOuvert] = useState(false);
+
+  const basculer = useCallback((venteId: string, choisi: boolean) => {
+    setChoisies((anciennes) => {
+      const suivantes = new Set(anciennes);
+      if (choisi) suivantes.add(venteId);
+      else suivantes.delete(venteId);
+      return suivantes;
+    });
+  }, []);
+
+  /* Ce qui peut partir, calcule UNE fois par `cartesConfiables` plutot que relu
+     case par case : c'est elle qui porte la regle — une carte deja dehors n'y
+     entre pas —, et la dupliquer dans le rendu la ferait diverger le jour ou un
+     statut s'ajouterait. */
+  const confiables = useMemo(
+    () => new Set(cartesConfiables(documents ?? []).map((carte) => carte.venteId)),
+    [documents],
+  );
 
   /* La date du jour est figée au rendu : recalculée à chaque ligne, deux
      documents de la même liste pourraient être jugés à des instants
@@ -188,13 +230,30 @@ export default function PageDossiers() {
            restait affiché « À faire » : la case du comptoir n'aurait rien fait
            bouger ici, et c'est précisément ce que la spec exige. */
         rendu: (dossier) => (
-          <CellulePapier
-            papier={dossier.papiers.find((papier) => papier.type === type) ?? null}
-            numero={dossier.numero}
-            type={type}
-            ouvert={cleDe(dossier.documents[type]) === documentOuvert}
-            ouvrir={setDocumentOuvert}
-          />
+          <span className="inline-flex items-center">
+            {/* **La case ne s'affiche que sur ce qui peut partir** (S53). Une
+                case grisee sur une carte deja dehors inviterait a verser une
+                seconde avance pour le meme travail — et la base refuserait le
+                lot entier, sans dire laquelle des dix a faute.
+                Et seulement en vue boutique : un paquet appartient a une
+                boutique, `confierPaquet` en exige une. */}
+            {type === "carte_grise" && boutiqueId !== null && confiables.has(dossier.venteId) && (
+              <input
+                type="checkbox"
+                checked={choisies.has(dossier.venteId)}
+                onChange={(evenement) => basculer(dossier.venteId, evenement.target.checked)}
+                aria-label={`Confier la carte grise de ${dossier.numero}`}
+                className="mr-2 size-4 accent-[var(--color-solde)]"
+              />
+            )}
+            <CellulePapier
+              papier={dossier.papiers.find((papier) => papier.type === type) ?? null}
+              numero={dossier.numero}
+              type={type}
+              ouvert={cleDe(dossier.documents[type]) === documentOuvert}
+              ouvrir={setDocumentOuvert}
+            />
+          </span>
         ),
       });
     }
@@ -212,7 +271,7 @@ export default function PageDossiers() {
        pour le responsable qui regarde toutes les boutiques. Le stock (A4) la
        garde : une moto n'a pas de numéro de pièce, donc rien ne la porte. */
     return liste;
-  }, [parClient, documentOuvert]);
+  }, [parClient, documentOuvert, boutiqueId, confiables, choisies, basculer]);
 
   const chargement = perimetreEnCours || ventes === null || documents === null;
   const enRetard = dossiers.filter((dossier) => dossier.enRetard);
@@ -271,6 +330,62 @@ export default function PageDossiers() {
           ))}
           {enRetard.length > 3 && <p>et {enRetard.length - 3} autres.</p>}
         </Avis>
+      )}
+
+      <PaquetsEnCours
+        paquets={paquets}
+        documents={documents}
+        /* Lu sur les VENTES et non sur les dossiers : un paquet survit a la
+           cloture de ses dossiers — une carte revenue sort de la file — et son
+           numero doit rester lisible dans le detail du paquet. */
+        numeroDe={(venteId) => ventes?.find((vente) => vente.id === venteId)?.numero ?? venteId}
+      />
+
+      {/* La barre n'existe que quand quelque chose est coche : un bandeau
+          permanent a zero occuperait la place de la file sans rien dire. */}
+      {choisies.size > 0 && boutiqueId !== null && (
+        <div className="mb-5 cadre flex flex-wrap items-center justify-between gap-3 p-3">
+          <p className="text-encre">
+            {compter(choisies.size, "carte grise", "cartes grises")} s\u00e9lectionn\u00e9e
+            {choisies.size > 1 ? "s" : ""}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setPaquetOuvert(true)}
+              className="bouton bouton-principal"
+            >
+              Confier {compter(choisies.size, "carte grise", "cartes grises")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setChoisies(new Set())}
+              className="bouton bouton-neutre"
+            >
+              Tout d\u00e9cocher
+            </button>
+          </div>
+        </div>
+      )}
+
+      {paquetOuvert && boutiqueId !== null && (
+        <ConfierPaquetModal
+          cartes={dossiers
+            .filter((dossier) => choisies.has(dossier.venteId))
+            .map((dossier) => dossier.documents.carte_grise)
+            .filter((document): document is DocumentDossier => document !== null)}
+          boutiqueId={boutiqueId}
+          numeroDe={(venteId) =>
+            dossiers.find((dossier) => dossier.venteId === venteId)?.numero ?? venteId
+          }
+          onFermer={() => setPaquetOuvert(false)}
+          onConfie={() => {
+            setPaquetOuvert(false);
+            /* La selection se vide apres le depot : les cartes ne sont plus
+               confiables, et les laisser cochees proposerait de les reconfier. */
+            setChoisies(new Set());
+          }}
+        />
       )}
 
       {rienNAttend ? (
