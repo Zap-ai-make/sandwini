@@ -232,12 +232,12 @@ function Stock() {
            `exigeBoutique` ; ici c'est la même décision, prise au même endroit
            que la lecture du périmètre. */
         actions={
-          dansUneBoutique ? (
-            <Link href="/motos/nouvelle" className="bouton bouton-principal">
-              <Plus aria-hidden="true" className="size-4" />
-              Faire entrer une moto
-            </Link>
-          ) : null
+          /* Le bouton ne disparaît plus hors d'une boutique : il mène à l'écran
+             de saisie, qui pose lui-même la question du lieu (S54). */
+          <Link href="/motos/nouvelle" className="bouton bouton-principal">
+            <Plus aria-hidden="true" className="size-4" />
+            Faire entrer une moto
+          </Link>
         }
       />
 
@@ -493,21 +493,20 @@ function StockVide({
     <EtatVide
       icone={<Bike aria-hidden="true" />}
       titre="Aucune moto en stock pour l’instant."
-      /* Même règle qu'en tête d'écran (S54) : sans boutique choisie, le geste
-         n'a pas de destination. Le vide dit alors quoi faire — choisir une
-         boutique — au lieu d'offrir un bouton qui s'excuserait derrière. */
+      /* Même règle qu'en tête d'écran : le bouton existe toujours, et c'est
+         l'écran de saisie qui demande la boutique quand elle manque (S54). Un
+         écran vide dont le seul bouton a disparu est précisément ce qui a fait
+         croire au commanditaire que la saisie était cassée. */
       action={
-        dansUneBoutique ? (
-          <Link href="/motos/nouvelle" className="bouton bouton-principal">
-            <Plus aria-hidden="true" className="size-4" />
-            Faire entrer une moto
-          </Link>
-        ) : undefined
+        <Link href="/motos/nouvelle" className="bouton bouton-principal">
+          <Plus aria-hidden="true" className="size-4" />
+          Faire entrer une moto
+        </Link>
       }
     >
       {dansUneBoutique
         ? "La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se déclarent dans les réglages."
-        : "Aucune des boutiques n’a de moto en stock. Choisissez-en une dans le bandeau pour y faire entrer la première."}
+        : "Aucune des boutiques n’a de moto en stock. La saisie vous demandera laquelle reçoit la première."}
     </EtatVide>
     </div>
   );

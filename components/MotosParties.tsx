@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import { useCallback } from "react";
 import { formaterDate } from "@/lib/domain/format";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -48,10 +49,16 @@ export function MotosParties({ boutiqueId }: { boutiqueId: string | null }) {
   if (!boutiqueId || departs === null || departs.length === 0) return null;
 
   return (
-    <details className="cadre mb-4 p-4 sm:p-5">
-      <summary className="cursor-pointer text-corps font-medium text-encre">
-        Motos parties d’ici{" "}
-        <span className="font-normal text-encre-doux">({departs.length})</span>
+    <details className="repli cadre mb-4 p-4 sm:p-5">
+      <summary className="text-corps font-medium text-encre">
+        <ChevronRight
+          aria-hidden="true"
+          className="repli-chevron size-4 shrink-0 translate-y-[0.15em] text-encre-doux"
+        />
+        <span>
+          Motos parties d’ici{" "}
+          <span className="font-normal text-encre-doux">({departs.length})</span>
+        </span>
       </summary>
 
       <ul className="mt-3 space-y-2">

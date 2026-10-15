@@ -3,6 +3,7 @@
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { ArrivageModal } from "@/components/ArrivageModal";
+import { ChoisirBoutique } from "@/components/ChoisirBoutique";
 import { BarreEcoulement } from "@/components/BarreEcoulement";
 import { BordereauLot } from "@/components/BordereauLot";
 import { CartesArrivages } from "@/components/CartesArrivages";
@@ -103,6 +104,7 @@ export default function PageArrivages() {
       ? { uid: session.utilisateur.uid, nom: session.utilisateur.nom }
       : null;
   const dansUneBoutique = perimetre.type === "boutique";
+  const [choixBoutique, setChoixBoutique] = useState(false);
 
   const nomFournisseur = useMemo(() => {
     const table = new Map<string, string>();
@@ -245,26 +247,27 @@ export default function PageArrivages() {
            où aller. Trois écrans faisaient trois choses différentes de la même
            règle — stock, ventes et arrivages la disent désormais pareil. */
         actions={
-          dansUneBoutique ? (
-            <button
-              type="button"
-              onClick={() => {
-                setDernierLot(null);
-                setModaleOuverte(true);
-              }}
-              className="bouton bouton-principal"
-            >
-              <Plus aria-hidden="true" className="size-4" />
-              Nouveau
-            </button>
-          ) : null
+          <button
+            type="button"
+            onClick={() => {
+              setDernierLot(null);
+              /* Hors d'une boutique, le bouton ne disparaît plus : il demande
+                 laquelle, puis reprend le geste (S54, `ChoisirBoutique`). */
+              if (dansUneBoutique) setModaleOuverte(true);
+              else setChoixBoutique(true);
+            }}
+            className="bouton bouton-principal"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Nouveau
+          </button>
         }
       />
 
       {!dansUneBoutique && (
         <p className="mb-4 text-corps text-encre-doux">
-          Vous voyez les arrivages de toutes les boutiques. Choisissez-en une, en haut de l’écran,
-          pour en enregistrer un nouveau.
+          Vous voyez les arrivages de toutes les boutiques. « Nouveau » vous demandera dans laquelle
+          enregistrer celui-ci.
         </p>
       )}
 
@@ -409,6 +412,17 @@ export default function PageArrivages() {
           )}
         </>
       )}
+
+      <ChoisirBoutique
+        ouvert={choixBoutique}
+        onFermer={() => setChoixBoutique(false)}
+        titre="Enregistrer un arrivage"
+        pourquoi="Un lot entre dans une boutique précise. Laquelle reçoit celui-ci ?"
+        onChoisie={() => {
+          setChoixBoutique(false);
+          setModaleOuverte(true);
+        }}
+      />
 
       {dansUneBoutique && boutiqueId && (
         <ArrivageModal

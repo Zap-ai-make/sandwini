@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Store } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ChoixOuNouveau } from "@/components/ChoixOuNouveau";
@@ -51,7 +51,8 @@ import { creerEntree, creerModele, type Auteur } from "@/lib/repositories/refere
  * cours. Un référentiel vide ne bloque plus un comptoir.
  */
 export default function PageNouvelleMoto() {
-  const { perimetre } = usePerimetre();
+  const { perimetre, boutiques, choisir } = usePerimetre();
+  const boutiquesOuvertes = boutiques.filter((boutique) => boutique.actif);
   const session = useSession();
   const catalogue = useCatalogue();
 
@@ -132,13 +133,44 @@ export default function PageNouvelleMoto() {
     setSaisie(SAISIE_VIDE);
   }
 
+  /* **La question, et non le refus (S54).** Cet écran se contentait d'une
+     phrase renvoyant vers la plaque du bandeau : le commanditaire, travaillant
+     en « toutes les boutiques », en a conclu que la saisie était cassée. Elle
+     ne l'était pas — elle ne disait pas assez fort ce qui lui manquait. Elle
+     pose donc la question elle-même, et le formulaire suit. */
   if (perimetre.type !== "boutique") {
     return (
       <Cadre>
-        <p className="max-w-prose text-encre-doux">
-          Une moto entre dans une boutique précise. Choisissez-en une dans le bandeau, en haut de
-          l’écran, avant de la saisir.
+        <h2 className="text-bloc font-semibold text-encre">Dans quelle boutique entre-t-elle ?</h2>
+        <p className="mt-1 max-w-prose text-corps text-encre-doux">
+          Une moto entre dans une boutique précise : celle qui la détient et qui la vendra.
         </p>
+        <ul className="mt-4 grid max-w-md gap-2">
+          {boutiquesOuvertes.length === 0 ? (
+            <li className="text-corps text-encre-doux">
+              Aucune boutique ouverte. Déclarez-en une dans les réglages avant de saisir une moto.
+            </li>
+          ) : (
+            boutiquesOuvertes.map((boutique) => (
+              <li key={boutique.id}>
+                <button
+                  type="button"
+                  onClick={() => choisir(boutique.id)}
+                  className="flex w-full items-center gap-3 rounded-plaque border border-bord px-3 py-3 text-left hover:bg-survol"
+                >
+                  <Store aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium text-encre">{boutique.nom}</span>
+                    {boutique.adresse && (
+                      <span className="block text-legende text-encre-doux">{boutique.adresse}</span>
+                    )}
+                  </span>
+                  <span className="plaque-code shrink-0 text-encre-doux">{boutique.code}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
       </Cadre>
     );
   }

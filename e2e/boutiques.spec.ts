@@ -18,11 +18,16 @@ import {
  * dans la mauvaise boutique fausse deux stocks et ne se voit pas tout de suite.
  */
 
-/** Le formulaire de création, isolé des formulaires d’édition de chaque ligne. */
-function formulaireCreation(page: Page) {
-  return page.locator("form").filter({
-    has: page.getByRole("button", { name: "Créer la boutique" }),
-  });
+/**
+ * Ouvre la modale de création et rend le dialogue (S54).
+ *
+ * Le formulaire occupait le haut de l'écran ; il s'ouvre maintenant par un
+ * bouton. Son envoi vit dans le pied du dialogue, hors du `<form>`, ce qui
+ * rend l'ancien filtre par bouton inopérant.
+ */
+async function formulaireCreation(page: Page) {
+  await page.getByRole("button", { name: "Ajouter une boutique" }).click();
+  return page.getByRole("dialog");
 }
 
 const ligne = ligneDeBoutique;
@@ -33,7 +38,7 @@ async function creerBoutique(
   nom: string,
   metier: "Motos" | "Pièces détachées" = "Motos",
 ) {
-  const formulaire = formulaireCreation(page);
+  const formulaire = await formulaireCreation(page);
   await formulaire.getByLabel("Nom de la boutique").fill(nom);
   await formulaire.getByLabel(/^Code/).fill(code);
   await formulaire.getByRole("checkbox", { name: metier, exact: true }).check();
@@ -55,16 +60,21 @@ test.describe("déclaration des boutiques", () => {
     const code = codeUnique();
     await creerBoutique(page, code, `Boutique ${code}`);
 
-    await expect(page.getByText(`Boutique ${code} créée, code ${code}.`)).toBeVisible();
+    /* **La ligne est la confirmation** (S54). La phrase verte « Boutique X
+       créée » a disparu avec le passage en modale : l'écriture est locale
+       d'abord (D76), la modale se ferme, et ce qui apparaît derrière dit la
+       même chose en montrant le résultat plutôt qu'en le racontant. */
+    await expect(page.getByRole("dialog")).toBeHidden();
     await expect(ligne(page, code)).toContainText(`Boutique ${code}`);
 
-    // Le formulaire se vide : la boutique suivante ne part pas avec le nom de
-    // la précédente.
-    await expect(formulaireCreation(page).getByLabel("Nom de la boutique")).toHaveValue("");
+    // Le formulaire repart vide : la boutique suivante ne part pas avec le nom
+    // de la précédente.
+    const suivant = await formulaireCreation(page);
+    await expect(suivant.getByLabel("Nom de la boutique")).toHaveValue("");
   });
 
   test("un code qui casserait un numéro de reçu est refusé avant l’envoi", async ({ page }) => {
-    const formulaire = formulaireCreation(page);
+    const formulaire = await formulaireCreation(page);
     await formulaire.getByLabel("Nom de la boutique").fill("Code trop court");
     await formulaire.getByLabel(/^Code/).fill("PT");
     await formulaire.getByRole("checkbox", { name: "Motos", exact: true }).check();
@@ -74,7 +84,7 @@ test.describe("déclaration des boutiques", () => {
   });
 
   test("une boutique sans métier est refusée : elle n’ouvrirait aucun espace", async ({ page }) => {
-    const formulaire = formulaireCreation(page);
+    const formulaire = await formulaireCreation(page);
     await formulaire.getByLabel("Nom de la boutique").fill("Sans métier");
     await formulaire.getByLabel(/^Code/).fill(codeUnique());
     await formulaire.getByRole("button", { name: "Créer la boutique" }).click();
@@ -100,8 +110,14 @@ test.describe("déclaration des boutiques", () => {
     await creerBoutique(page, code, `Première ${code}`);
     await expect(ligne(page, code)).toContainText(`Première ${code}`);
 
+    /* Le doublon est refusé avant l'écriture : la modale reste donc ouverte,
+       son alerte dessus. On la ferme avant de relire la liste — sinon on lit
+       la boutique à travers un calque. */
     await creerBoutique(page, code, `Doublon ${code}`);
-    await expect(formulaireCreation(page).getByRole("alert")).toContainText("déjà pris");
+    const refus = page.getByRole("dialog");
+    await expect(refus.getByRole("alert")).toContainText("déjà pris");
+    await refus.getByRole("button", { name: "Annuler" }).click();
+
     await expect(ligne(page, code)).toContainText(`Première ${code}`);
   });
 
@@ -184,9 +200,8 @@ test.describe("rattachement d’un gérant", () => {
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
     const email = emailUnique("rattache");
     const motDePasse = "gerant-rattache-01";
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation.getByLabel("Nom", { exact: true }).fill("Gérant rattaché");
     await creation.getByLabel("Adresse e-mail").fill(email);
     await creation.getByLabel("Mot de passe provisoire").fill(motDePasse);
@@ -240,7 +255,7 @@ test.describe("indicateur réseau", () => {
 
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/boutiques", { waitUntil: "load" });
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 20_000 });
+    await attendreLaFileVide(page, 20_000);
 
     /* Le wifi capte, mais rien ne passe : seules les requêtes Firestore sont
        coupées. On rouvre ensuite l'application, comme le gérant qui arrive au
@@ -256,6 +271,6 @@ test.describe("indicateur réseau", () => {
 
     await context.unroute("http://127.0.0.1:8181/**");
     await page.reload({ waitUntil: "load" });
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 40_000 });
+    await attendreLaFileVide(page, 40_000);
   });
 });

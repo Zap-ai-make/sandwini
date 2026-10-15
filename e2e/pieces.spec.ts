@@ -59,9 +59,8 @@ async function preparerComptoir(page: Page, options: { avecGerant?: boolean } = 
   if (options.avecGerant) {
     email = emailUnique("pieces");
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation.getByLabel("Nom", { exact: true }).fill("Gérant des pièces");
     await creation.getByLabel("Adresse e-mail").fill(email);
     await creation.getByLabel("Mot de passe provisoire").fill(MOT_DE_PASSE);
@@ -262,7 +261,7 @@ test.describe("hors ligne", () => {
     await expect(horsLigne).toContainText("que 14 en stock");
 
     await context.setOffline(false);
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 60_000 });
+    await attendreLaFileVide(page, 60_000);
     await expect(page.locator("tbody tr").filter({ hasText: reference })).toContainText("14");
   });
 });
