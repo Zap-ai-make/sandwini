@@ -819,7 +819,19 @@ function Recapitulatif({
     <section aria-label="Récapitulatif de la vente" className="cadre rounded-carte p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
         <h2 className="text-bloc font-bold tracking-tight text-encre">Ce qui sera enregistré</h2>
-        {numero && <span className="plaque-code text-legende text-encre-doux">{numero}</span>}
+        {/* `data-test` parce que ce numéro est le seul endroit du produit où se
+            voit la numérotation hors ligne de S7, depuis que l'écran de
+            diagnostic a disparu (S54). Rien d'autre ne le distingue d'une
+            plaque de code quelconque, et la suite bout en bout doit pouvoir le
+            viser sans dépendre de sa mise en forme. */}
+        {numero && (
+          <span
+            data-test="prochain-numero"
+            className="plaque-code text-legende text-encre-doux"
+          >
+            {numero}
+          </span>
+        )}
       </div>
 
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">

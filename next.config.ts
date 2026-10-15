@@ -169,6 +169,25 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_COMPILEE_LE: COMPILEE_LE,
     NEXT_PUBLIC_EMPREINTE: lireEmpreinte(),
   },
+  /**
+   * L'Inventaire a quitté `/supervision/` pour `/motos/inventaire` (S55).
+   *
+   * **Il n'était plus un écran de supervision.** Le commanditaire l'a voulu « à
+   * deux niveaux, pour chaque gérant et pour le superviseur » : un gérant s'en
+   * sert tous les jours, et le segment `/supervision/` porte une garde de
+   * capacité qu'il ne franchit pas. Cette garde est juste — c'est l'adresse qui
+   * mentait. L'affaiblir pour un seul enfant aurait laissé une garde à
+   * exception, c'est-à-dire une garde qu'on oublie.
+   *
+   * La redirection existe parce que l'écran a vécu six semaines à l'ancienne
+   * adresse : elle est dans les signets, dans `specs/S24`, et dans les liens
+   * déjà envoyés. Permanente, parce que ce déménagement-ci ne se rejoue pas.
+   */
+  async redirects() {
+    return [
+      { source: "/supervision/chiffres", destination: "/motos/inventaire", permanent: true },
+    ];
+  },
   async headers() {
     return [
       {
@@ -214,11 +233,19 @@ const ECRANS_HORS_LIGNE = [
   "/motos/dossiers",
   "/motos/ventes/nouvelle",
   "/motos/paiements",
+  /* **Jamais `/diagnostic` : la route a disparu en S54, la ligne est restée,
+     et le hors-ligne entier est tombé avec elle.** Serwist refuse l'installation
+     quand une entrée préchargée rend 404 — le service worker ne s'activait plus
+     du tout, donc plus aucun écran n'était disponible en coupure. Le défaut est
+     muet en ligne : l'application marche, et ne cesse de marcher qu'au moment
+     précis où elle devait tenir. Une route supprimée est une ligne à retirer
+     ici, au même titre qu'une route ajoutée est une ligne à poser. */
+  "/motos/inventaire",
   "/clients",
   "/pieces",
   "/pieces/nouvelle",
   "/caisse",
-  "/diagnostic",
+  "/caisse/depenses",
   "/parametres",
   "/parametres/boutiques",
   "/parametres/utilisateurs",

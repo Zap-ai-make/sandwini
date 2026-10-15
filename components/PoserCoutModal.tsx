@@ -83,14 +83,29 @@ export function PoserCoutModal({
     setEnvoi(true);
     setErreur(null);
     try {
-      /* `boutiqueId` recopié sur le coût : la règle Firestore compare ce
-         champ à celui de la moto, et c'est aussi lui qui rend le document
-         lisible par le périmètre (D2). */
-      await poserCoutMoto(moto.id, moto.boutiqueId, cout, {
+      /**
+       * **On n'attend pas le serveur, et c'est tout l'objet de D76.**
+       *
+       * Cette modale remplace l'écran `/supervision/couts`, qui tirait et
+       * oubliait. En reprenant le geste, l'attente est revenue — et hors ligne
+       * la promesse de Firestore ne se résout jamais : la modale restait figée
+       * sur « Enregistrement… », bouton grisé, pour une écriture pourtant déjà
+       * acquise dans le cache local. Le responsable ne pouvait plus poser le
+       * prix d'achat suivant.
+       *
+       * `boutiqueId` recopié sur le coût : la règle Firestore compare ce champ
+       * à celui de la moto, et c'est aussi lui qui rend le document lisible par
+       * le périmètre (D2).
+       */
+      const partie = poserCoutMoto(moto.id, moto.boutiqueId, cout, {
         uid: session.utilisateur.uid,
         nom: session.utilisateur.nom,
       });
       onFermer();
+      /* Le refus arrive après la fermeture : il ne peut plus s'afficher ici, et
+         c'est le bandeau d'état qui porte l'échec de synchronisation. Avaler la
+         promesse évite un rejet non capturé dans la console. */
+      partie.catch(() => undefined);
     } catch (cause) {
       setErreur(messageErreurMoto(cause));
       setEnvoi(false);

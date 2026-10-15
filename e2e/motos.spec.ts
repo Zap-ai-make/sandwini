@@ -168,9 +168,8 @@ test.describe("le coût est réservé au responsable", () => {
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
     const email = emailUnique("stock");
     const motDePasse = "gerant-stock-0001";
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation.getByLabel("Nom", { exact: true }).fill("Gérant du stock");
     await creation.getByLabel("Adresse e-mail").fill(email);
     await creation.getByLabel("Mot de passe provisoire").fill(motDePasse);
@@ -221,35 +220,43 @@ test.describe("le coût est réservé au responsable", () => {
 
     await contexteGerant.close();
 
-    /* La seconde moitié : le responsable trouve la moto dans la liste de ce
-       qui attend un prix d'achat, l'y saisit, et elle en sort. */
-    await page.goto("/supervision/couts", { waitUntil: "load" });
-    const ligne = page.locator("tbody tr").filter({ hasText: chassis });
-    await expect(ligne).toHaveCount(1, { timeout: 60_000 });
-    await expect(ligne).toContainText("À renseigner");
+    /**
+     * **La seconde moitié : le responsable saisit le prix sur la fiche de la
+     * moto.**
+     *
+     * Elle se faisait sur `/supervision/couts`, un écran qui listait les motos
+     * en attente de prix d'achat. Il a disparu en S54 — « le prix d'achat se
+     * saisit sur la moto, son écran disparaît » — et ce test a continué de
+     * l'ouvrir : seul `/supervision/chiffres` avait reçu une redirection, donc
+     * cette moitié-là tournait contre un 404. Trouvé par un audit, pas par une
+     * exécution.
+     *
+     * Ce qui est protégé ne change pas : le responsable pose un prix que le
+     * gérant ne peut pas saisir, et le montant se relit ensuite sur la fiche.
+     */
+    await page.goto("/motos", { waitUntil: "load" });
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
+    await page.getByRole("link", { name: chassis }).click();
+    await expect(contenu(page)).toContainText("Aucun prix d’achat n’est enregistré", {
+      timeout: 60_000,
+    });
 
-    await ligne.getByRole("button").first().click();
-    /* Une modale, et non plus un panneau sous le tableau : le formulaire de
-       coût est passé au patron `Modale`, qui lui donne le piège de focus, Échap
-       et un pied d'actions qui ne défile pas. Le cadre se vise donc par son
-       rôle `dialog` — il n'y en a jamais deux ouverts ici —, et le châssis se
-       lit dans sa description plutôt que dans son nom accessible. */
+    await page.getByRole("button", { name: "Renseigner le prix d’achat" }).click();
+    /* Une modale : le formulaire de coût est passé au patron `Modale`, qui lui
+       donne le piège de focus, Échap et un pied d'actions qui ne défile pas. Le
+       cadre se vise par son rôle `dialog` — il n'y en a jamais deux ouverts
+       ici —, et le châssis se lit dans sa description. */
     const pose = page.getByRole("dialog");
     await expect(pose).toContainText(chassis);
     await pose.getByLabel("Prix d’achat").fill("775000");
     await pose.getByRole("button", { name: "Enregistrer le prix d’achat" }).click();
 
-    /* Elle quitte « À renseigner » — c'est le filtre d'ouverture, donc aucune
-       manipulation n'est nécessaire pour le constater. */
-    await expect(page.locator("tbody tr").filter({ hasText: chassis })).toHaveCount(0, {
-      timeout: 30_000,
-    });
-
-    // Et le montant se relit sur la fiche, côté responsable.
-    await page.goto("/motos", { waitUntil: "load" });
-    await page.getByLabel("Chercher dans le stock").fill(chassis);
-    await page.getByRole("link", { name: chassis }).click();
-    await expect(contenu(page)).toContainText("775 000 FCFA", { timeout: 30_000 });
+    /* La modale se ferme sans attendre le serveur (D76), et la fiche affiche le
+       montant depuis l'écriture locale. L'espace insécable de `formaterMontant`
+       est une espace fine : on tolère les deux plutôt que de figer celle de la
+       machine qui écrit le test. */
+    await expect(pose).toHaveCount(0, { timeout: 30_000 });
+    await expect(contenu(page)).toContainText(/775\s*000\s*FCFA/, { timeout: 30_000 });
   });
 
   /* Le panneau « Il manque une marque ou une provenance » barrait cet écran
@@ -348,6 +355,6 @@ test.describe("hors ligne", () => {
        Ce que ce test vérifie, c'est que la saisie **part toute seule** — pas
        en combien de temps. La rapidité du réveil est une question de produit,
        ouverte au backlog (S27), pas une question de harnais. */
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 60_000 });
+    await attendreLaFileVide(page, 60_000);
   });
 });

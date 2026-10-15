@@ -115,6 +115,9 @@ test.describe("gestion des comptes", () => {
   test("le responsable crée un gérant, qui apparaît dans la liste", async ({ page }) => {
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/utilisateurs");
+    /* La création est passée en modale (S54) : l'écran s'ouvre sur la liste
+       des comptes, et le formulaire attend derrière un bouton. */
+    await page.getByRole("button", { name: "Créer un compte" }).click();
 
     const email = emailUnique("gerant");
     await page.getByLabel("Nom", { exact: true }).fill("Ouédraogo");
@@ -131,6 +134,9 @@ test.describe("gestion des comptes", () => {
   test("un mot de passe trop court est refusé par le serveur", async ({ page }) => {
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/utilisateurs");
+    /* La création est passée en modale (S54) : l'écran s'ouvre sur la liste
+       des comptes, et le formulaire attend derrière un bouton. */
+    await page.getByRole("button", { name: "Créer un compte" }).click();
 
     await page.getByLabel("Nom", { exact: true }).fill("Trop court");
     await page.getByLabel("Adresse e-mail").fill(emailUnique("court"));
@@ -143,6 +149,9 @@ test.describe("gestion des comptes", () => {
   test("un gérant n’atteint pas l’administration des comptes", async ({ page, browser }) => {
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/utilisateurs");
+    /* La création est passée en modale (S54) : l'écran s'ouvre sur la liste
+       des comptes, et le formulaire attend derrière un bouton. */
+    await page.getByRole("button", { name: "Créer un compte" }).click();
 
     const email = emailUnique("restreint");
     const motDePasse = "gerant-restreint-01";

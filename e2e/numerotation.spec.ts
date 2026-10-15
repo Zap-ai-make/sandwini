@@ -1,9 +1,9 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
+  attendreLaFileVide,
   bandeauEtat,
-  codeUnique,
-  creerBoutique,
   prendreLaMainEtMettreEnCache,
+  preparerTerrain,
   seConnecterEtEntrer,
   selecteurPerimetre,
 } from "./aide";
@@ -15,6 +15,16 @@ import {
  * **sans réseau**. Le reste du mécanisme — qui garde son numéro quand deux
  * appareils tombent d’accord sur le même — se vérifie côté serveur, où il vit
  * (`declencheurs/numerotation.test.ts`).
+ *
+ * **Ces tests pilotaient `/diagnostic`, supprimé en S54, et plus personne ne
+ * les regardait tomber.** L’écran affichait le prochain numéro dans un coin ;
+ * il a disparu avec la refonte, et la suite a continué de le viser. C’est le
+ * genre de test qui ne protège plus rien tout en ayant l’air d’exister — et un
+ * audit l’a trouvé orphelin, pas une exécution.
+ *
+ * Le numéro ne se voit plus que dans la modale de vente, au récapitulatif. Ce
+ * n’est pas un repli : c’est l’endroit juste. Un numéro de pièce intéresse
+ * celui qui s’apprête à en émettre une, pas celui qui inspecte son appareil.
  */
 
 const prochainNumero = (page: Page) => page.locator('[data-test="prochain-numero"]');
@@ -22,17 +32,25 @@ const prochainNumero = (page: Page) => page.locator('[data-test="prochain-numero
 test.describe("le numéro de la prochaine pièce", () => {
   test("un numéro appartient à une boutique, pas à l’entreprise", async ({ page }) => {
     await seConnecterEtEntrer(page);
-    const code = codeUnique();
-    await creerBoutique(page, code);
+    const terrain = await preparerTerrain(page);
 
-    await page.goto("/diagnostic", { waitUntil: "load" });
+    await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+    await expect(prochainNumero(page)).toHaveText(
+      new RegExp(`^${terrain.code}-\\d{4}-0001$`),
+      { timeout: 30_000 },
+    );
 
-    // Périmètre « toutes les boutiques » : rien à numéroter, et on le dit.
-    await expect(page.getByText(/Choisissez-en une dans le bandeau/)).toBeVisible();
-    await expect(prochainNumero(page)).toHaveCount(0);
+    /* **En vue entreprise, aucun numéro n'est promis.** C'est l'énoncé du
+       titre : le compteur appartient à un tiroir, et l'entreprise n'en est pas
+       un. L'assertion vient après celle du dessus, et c'est ce qui lui donne sa
+       valeur — on a vu le numéro exister, puis disparaître avec le périmètre.
+       Seule, une absence pourrait aussi bien signaler un mécanisme cassé.
 
-    await selecteurPerimetre(page).selectOption(code);
-    await expect(prochainNumero(page)).toHaveText(new RegExp(`^${code}-\\d{4}-0001$`));
+       Une seconde boutique aurait dit la même chose plus fort, mais au prix
+       d'un `creerBoutique` de plus : du décor, pas de la preuve. */
+    await selecteurPerimetre(page).selectOption("");
+    await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+    await expect(prochainNumero(page)).toHaveCount(0, { timeout: 30_000 });
   });
 
   test("le numéro reste disponible réseau coupé — c’est tout l’objet du mécanisme", async ({
@@ -40,24 +58,32 @@ test.describe("le numéro de la prochaine pièce", () => {
     context,
   }) => {
     await seConnecterEtEntrer(page);
-    const code = codeUnique();
-    await creerBoutique(page, code);
+    const terrain = await preparerTerrain(page);
 
-    await page.goto("/diagnostic", { waitUntil: "load" });
-    await selecteurPerimetre(page).selectOption(code);
-    await prendreLaMainEtMettreEnCache(page, "/diagnostic");
+    await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+    await expect(prochainNumero(page)).toHaveText(
+      new RegExp(`^${terrain.code}-\\d{4}-0001$`),
+      { timeout: 30_000 },
+    );
+    const enLigne = (await prochainNumero(page).textContent())!.trim();
 
-    const enLigne = await prochainNumero(page).textContent();
-    expect(enLigne).toMatch(new RegExp(`^${code}-\\d{4}-0001$`));
+    /* Le registre est mis en cache sans son paramètre : c'est la page que le
+       service worker garde, et la modale s'ouvre par-dessus. */
+    await page.goto("/motos/ventes", { waitUntil: "load" });
+    await prendreLaMainEtMettreEnCache(page, "/motos/ventes");
+    /* On ne coupe qu'une fois la file vide : ce test recharge la page, donc il
+       n'a le droit de le faire que lorsque plus rien n'attend d'être envoyé
+       (D97). */
+    await attendreLaFileVide(page);
 
     await context.setOffline(true);
-    await expect(bandeauEtat(page)).toContainText("Hors ligne");
+    await expect(bandeauEtat(page)).toContainText("Hors ligne", { timeout: 30_000 });
 
-    /* Le rechargement est le vrai test : un numéro calculé une fois en mémoire
-       ne prouverait rien. Ici la page repart du cache, relit le périmètre et
-       recalcule le numéro sans que rien ne soit joignable. */
-    await page.reload();
-    await expect(prochainNumero(page)).toHaveText(enLigne!);
+    /* Le vrai test : la page repart du cache, relit le périmètre et recalcule
+       le numéro sans que rien ne soit joignable. Un numéro gardé en mémoire ne
+       prouverait rien. */
+    await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+    await expect(prochainNumero(page)).toHaveText(enLigne, { timeout: 30_000 });
 
     await context.setOffline(false);
   });
