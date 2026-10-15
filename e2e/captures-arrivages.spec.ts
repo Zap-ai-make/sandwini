@@ -34,7 +34,7 @@ test("captures clair et sombre de l'espace arrivages", async ({ page }) => {
   await modalFournisseur.getByRole("button", { name: "Ajouter le fournisseur" }).click();
   await expect(modal.locator("#fournisseur")).not.toHaveValue("");
   await modal.getByLabel("Marque", { exact: true }).selectOption({ label: terrain.marque });
-  await modal.getByLabel("Modèle", { exact: true }).selectOption({ label: terrain.modele });
+  await modal.getByLabel(/^Modèle/).selectOption({ label: terrain.modele });
   await modal.getByLabel("Nombre de motos").fill("2");
   await modal.getByLabel("Numéro de châssis, moto 1").fill(chassis1);
   await modal.getByLabel("Numéro de châssis, moto 2").fill(chassis2);

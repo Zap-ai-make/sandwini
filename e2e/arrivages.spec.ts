@@ -32,8 +32,15 @@ async function ouvrirLeModal(page: Page, nom: string, terrain: Terrain, fourniss
   await modalFournisseur.getByRole("button", { name: "Ajouter le fournisseur" }).click();
   await expect(modal.locator("#fournisseur")).not.toHaveValue("");
 
+  /* **`/^Modèle/` et non « Modèle » exact.** Le champ porte « Modèle
+     (facultatif) » depuis S50, où le modèle a cessé d'être exigé dans un lot.
+     Ce fichier le visait encore à l'identique — et comme personne ne le
+     lançait, ses quatre tests tombaient depuis des semaines sur le décor, sans
+     jamais rien dire. Même famille que les deux fichiers orphelins trouvés par
+     l'audit du 15 octobre : un test qu'on n'exécute pas ne protège rien tout en
+     ayant l'air d'exister. */
   await modal.getByLabel("Marque", { exact: true }).selectOption({ label: terrain.marque });
-  await modal.getByLabel("Modèle", { exact: true }).selectOption({ label: terrain.modele });
+  await modal.getByLabel(/^Modèle/).selectOption({ label: terrain.modele });
   return modal;
 }
 
@@ -94,7 +101,7 @@ test("un lot mêle deux marques : chaque groupe entre avec la sienne", async ({ 
   await modal.getByRole("button", { name: "Ajouter une marque" }).click();
   const groupe2 = modal.locator("fieldset").filter({ hasText: "Groupe 2" });
   await groupe2.getByLabel("Marque", { exact: true }).selectOption({ label: marque2 });
-  await groupe2.getByLabel("Modèle", { exact: true }).selectOption({ label: modele2 });
+  await groupe2.getByLabel(/^Modèle/).selectOption({ label: modele2 });
   await modal.getByLabel("Numéro de châssis, moto 2").fill(chassisB);
 
   await modal.getByRole("button", { name: "Enregistrer le lot" }).click();
