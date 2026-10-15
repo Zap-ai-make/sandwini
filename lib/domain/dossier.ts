@@ -25,18 +25,21 @@ import {
 } from "./vente";
 
 /**
- * Ce qui arrive déjà fait : la **quittance** accompagne la moto, et le **CMC**
- * s'obtient au ministère avec elle — deux démarches qui se font hors de
- * l'entreprise. Le magasin reçoit le produit fini, puis le remet au client.
+ * Ce qui arrive avec la moto : la **quittance** et le **CMC**.
  *
- * `chez_prestataire` n'existe pas pour ces documents : aucun intervenant
- * externe n'en est jamais chargé, et le nom d'un prestataire inscrit en face
- * serait faux dans la liste des dossiers en attente (§7.3).
+ * **Ils n'ont plus d'étapes depuis S53.** Leur disponibilité vit sur la moto
+ * (`quittanceRecue`, `cmcRecu`) et leur remise sur la vente (`emporte`) : le
+ * dossier n'a plus rien à stocker pour eux, sinon le fait qu'ils soient
+ * écartés. Le seul passage qui subsiste est donc vers « sans objet ».
+ *
+ * Suivre deux fois le même papier était la contradiction B de la spec : une
+ * moto dont le CMC avait été coché à l'arrivage ouvrait quand même un document
+ * à `a_faire`, qu'il fallait repromener à la main jusqu'à `remis_client`.
  */
-const CHEMIN_ARRIVE_FAIT: Record<StatutDocument, readonly StatutDocument[]> = {
-  a_faire: ["revenu_magasin", "non_applicable"],
+const CHEMIN_SANS_ETAPE: Record<StatutDocument, readonly StatutDocument[]> = {
+  a_faire: ["non_applicable"],
   chez_prestataire: [],
-  revenu_magasin: ["remis_client"],
+  revenu_magasin: [],
   remis_client: [],
   non_applicable: [],
 };
@@ -55,14 +58,18 @@ const CHEMIN_ARRIVE_FAIT: Record<StatutDocument, readonly StatutDocument[]> = {
 const CHEMIN_PRESTATAIRE: Record<StatutDocument, readonly StatutDocument[]> = {
   a_faire: ["chez_prestataire", "non_applicable"],
   chez_prestataire: ["revenu_magasin"],
-  revenu_magasin: ["remis_client"],
+  /* **Le retour est le terme** (arbitrage 7 de la spec). La carte grise n'a que
+     deux gestes : partie chez le prestataire, revenue. Sa preuve de remise
+     n'est plus un troisième statut à promener, c'est le scan et la plaque
+     saisis sur la fiche de vente. */
+  revenu_magasin: [],
   remis_client: [],
   non_applicable: [],
 };
 
 const CHEMIN: Record<TypeDocument, Record<StatutDocument, readonly StatutDocument[]>> = {
-  quittance: CHEMIN_ARRIVE_FAIT,
-  cmc: CHEMIN_ARRIVE_FAIT,
+  quittance: CHEMIN_SANS_ETAPE,
+  cmc: CHEMIN_SANS_ETAPE,
   carte_grise: CHEMIN_PRESTATAIRE,
 };
 
@@ -88,6 +95,55 @@ export function statutsSuivants(type: TypeDocument, de: StatutDocument): readonl
 /** Un statut dont plus rien ne peut sortir : le document a fini sa vie. */
 export function estStatutTerminal(type: TypeDocument, statut: StatutDocument): boolean {
   return CHEMIN[type][statut].length === 0;
+}
+
+/** Ce qu'un papier montre à l'écran, tous faits réunis. */
+export type EtatPapier = "sans_objet" | "emporte" | "au_magasin" | "chez_prestataire" | "a_faire";
+
+export const LIBELLE_ETAT_PAPIER: Record<EtatPapier, string> = {
+  sans_objet: "Sans objet",
+  emporte: "Emporté par le client",
+  au_magasin: "Au magasin",
+  chez_prestataire: "Chez le prestataire",
+  a_faire: "À faire",
+};
+
+/**
+ * L'état affiché d'un papier, **calculé et jamais stocké** (D61).
+ *
+ * Trois sources, une réponse : le document dit s'il est écarté, la moto dit si
+ * le papier est en main, la vente dit si le client l'a emporté. Les recoller à
+ * la lecture rend la contradiction B *inexprimable* — un CMC coché trois jours
+ * après la vente fait bouger l'écran du dossier sans qu'une seule écriture ne
+ * touche le dossier.
+ *
+ * La carte grise échappe à la règle : elle a une vie chez quelqu'un, que ni la
+ * moto ni la vente ne connaissent. Son statut stocké fait foi.
+ */
+export function etatPapier(entree: {
+  type: TypeDocument;
+  statut: StatutDocument;
+  /** La moto porte-t-elle ce papier ? Ignoré pour la carte grise. */
+  enMain: boolean;
+  /** Le client l'a-t-il emporté ? Ignoré pour la carte grise. */
+  emporte: boolean;
+}): EtatPapier {
+  if (entree.statut === "non_applicable") return "sans_objet";
+
+  if (passeParUnPrestataire(entree.type)) {
+    if (entree.statut === "chez_prestataire") return "chez_prestataire";
+    /* `remis_client` n'est plus écrit, mais la préversion en porte : une carte
+       grise ainsi marquée est revenue au magasin, et c'est tout ce qu'on peut
+       en dire sans inventer. */
+    if (entree.statut === "revenu_magasin" || entree.statut === "remis_client") {
+      return "au_magasin";
+    }
+    return "a_faire";
+  }
+
+  if (entree.emporte) return "emporte";
+  if (entree.enMain) return "au_magasin";
+  return "a_faire";
 }
 
 /** Ce que la clôture regarde. Rien d'autre n'entre en compte (§7.1). */

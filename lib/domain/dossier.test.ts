@@ -10,6 +10,7 @@ import {
   dossierCloturable,
   estEnRetard,
   estStatutTerminal,
+  etatPapier,
   lireJour,
   passeParUnPrestataire,
   statutsSuivants,
@@ -47,14 +48,17 @@ describe("passeParUnPrestataire", () => {
   });
 });
 
-describe("la quittance et le CMC arrivent déjà faits", () => {
-  /* Le magasin reçoit le produit fini : la quittance accompagne la moto, et le
-     CMC s’obtient au ministère avec elle. Ni l’une ni l’autre n’est jamais
-     confiée à un prestataire. */
-  it("vont du « à faire » au magasin, sans passer par personne", () => {
+describe("la quittance et le CMC arrivent avec la moto", () => {
+  /* **Ils n’ont plus d’étapes depuis S53.** Leur disponibilité se coche sur la
+     moto et leur remise sur la vente : promener un statut de dossier en
+     parallèle était la contradiction B de la spec — deux endroits pour un même
+     fait, qui finissaient par se contredire. Le seul passage qui reste est
+     celui qui écarte le papier de la vente. */
+  it("n’ont plus qu’un passage : celui qui les écarte", () => {
     for (const type of ARRIVENT_FAITS) {
-      expect(transitionAutorisee(type, "a_faire", "revenu_magasin"), type).toBe(true);
-      expect(transitionAutorisee(type, "revenu_magasin", "remis_client"), type).toBe(true);
+      expect(statutsSuivants(type, "a_faire"), type).toEqual(["non_applicable"]);
+      expect(transitionAutorisee(type, "a_faire", "revenu_magasin"), type).toBe(false);
+      expect(transitionAutorisee(type, "revenu_magasin", "remis_client"), type).toBe(false);
     }
   });
 
@@ -67,11 +71,16 @@ describe("la quittance et le CMC arrivent déjà faits", () => {
 });
 
 describe("la carte grise passe par un prestataire", () => {
-  it("suivent le cycle complet du cahier", () => {
+  /* **Le retour est le terme depuis S53** (arbitrage 7). `remis_client`
+     existait pour dire que le client avait la carte en main ; la preuve est
+     désormais le scan et la plaque saisis sur la fiche de vente, qui disent la
+     même chose en laissant une trace. Un troisième statut à promener n’ajoutait
+     qu’un geste. */
+  it("partent chez le prestataire, reviennent, et s’arrêtent là", () => {
     for (const type of VIA_PRESTATAIRE) {
       expect(transitionAutorisee(type, "a_faire", "chez_prestataire"), type).toBe(true);
       expect(transitionAutorisee(type, "chez_prestataire", "revenu_magasin"), type).toBe(true);
-      expect(transitionAutorisee(type, "revenu_magasin", "remis_client"), type).toBe(true);
+      expect(estStatutTerminal(type, "revenu_magasin"), type).toBe(true);
     }
   });
 
@@ -694,5 +703,51 @@ describe("dossiersEnAttente", () => {
         expect(chercher("Ouedraogo")).toEqual([]);
       });
     });
+  });
+});
+
+describe("etatPapier", () => {
+  it("rend « sans objet » dès que le document est écarté, quoi que porte la moto", () => {
+    expect(
+      etatPapier({ type: "cmc", statut: "non_applicable", enMain: true, emporte: true }),
+    ).toBe("sans_objet");
+  });
+
+  it("rend « emporté » quand le client l’a pris", () => {
+    expect(
+      etatPapier({ type: "quittance", statut: "a_faire", enMain: true, emporte: true }),
+    ).toBe("emporte");
+  });
+
+  it("rend « au magasin » quand la moto porte le papier sans qu’il soit emporté", () => {
+    expect(etatPapier({ type: "cmc", statut: "a_faire", enMain: true, emporte: false })).toBe(
+      "au_magasin",
+    );
+  });
+
+  it("rend « à faire » quand la moto ne porte rien", () => {
+    expect(
+      etatPapier({ type: "quittance", statut: "a_faire", enMain: false, emporte: false }),
+    ).toBe("a_faire");
+  });
+
+  /* La carte grise ne lit ni la moto ni la vente : elle a une vie dehors que ni
+     l’une ni l’autre ne connaît. */
+  it("lit la carte grise sur son seul statut, en ignorant la moto", () => {
+    expect(
+      etatPapier({ type: "carte_grise", statut: "chez_prestataire", enMain: true, emporte: true }),
+    ).toBe("chez_prestataire");
+    expect(
+      etatPapier({ type: "carte_grise", statut: "revenu_magasin", enMain: false, emporte: false }),
+    ).toBe("au_magasin");
+  });
+
+  /* **Point de vigilance 1.** La préversion porte des cartes grises déjà passées
+     à `remis_client` par l’ancien modèle. Elles doivent se lire, pas faire
+     tomber l’écran. */
+  it("lit un « remis au client » hérité de l’ancien modèle comme étant au magasin", () => {
+    expect(
+      etatPapier({ type: "carte_grise", statut: "remis_client", enMain: false, emporte: false }),
+    ).toBe("au_magasin");
   });
 });
