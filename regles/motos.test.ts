@@ -232,6 +232,37 @@ describe("entrée en stock", () => {
     );
   });
 
+  /* S53 : les deux papiers en main et la plaque. Ils sont facultatifs — aucune
+     moto d'avant cette spec n'en porte — mais typés dès qu'ils sont là. */
+  it("le gérant fait entrer une moto avec sa quittance en main et sa plaque", async () => {
+    await assertSucceeds(
+      addDoc(
+        collection(gerant(), "motos"),
+        moto({ quittanceRecue: true, cmcRecu: true, plaque: "11 AA 1234" }),
+      ),
+    );
+  });
+
+  /* **Point de vigilance de la spec.** La plaque est une donnée de la moto :
+     elle suit le périmètre de la moto, et rien d'autre. */
+  it("le gérant ne pose pas de plaque sur une moto d’une autre boutique", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "motos"), moto({ boutiqueId: "KDG", plaque: "11 AA 1234" })),
+    );
+  });
+
+  /* La borne du domaine et celle des règles doivent dire le même nombre, sans
+     quoi `normaliserPlaque` laisserait passer ce que le serveur refuse. */
+  it("refuse une plaque plus longue que la borne", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "motos"), moto({ plaque: "A".repeat(21) })),
+    );
+  });
+
+  it("refuse une quittance en main qui ne soit pas un booléen", async () => {
+    await assertFails(addDoc(collection(gerant(), "motos"), moto({ quittanceRecue: "oui" })));
+  });
+
   it("le gérant n’entre pas une moto dans une autre boutique", async () => {
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ boutiqueId: "KDG" })));
   });

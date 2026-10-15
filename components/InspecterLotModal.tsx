@@ -11,7 +11,7 @@ import {
 } from "@/lib/domain/arrivage";
 import { formaterDate, formaterNombre } from "@/lib/domain/format";
 import { LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
-import { marquerCmcRecu, messageErreurMoto } from "@/lib/repositories/motos";
+import { marquerPapierRecu, messageErreurMoto } from "@/lib/repositories/motos";
 import type { Auteur } from "@/lib/repositories/referentiels";
 
 /**
@@ -62,7 +62,7 @@ export function InspecterLotModal({
   function basculerCmc(moto: Moto, recu: boolean) {
     if (!auteur) return;
     setErreur(null);
-    const { enregistre } = marquerCmcRecu(moto.id, recu, auteur);
+    const { enregistre } = marquerPapierRecu(moto.id, "cmc", recu, auteur);
     enregistre.catch((cause) => setErreur(messageErreurMoto(cause)));
   }
 

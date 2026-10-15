@@ -13,6 +13,8 @@ import {
   lireEntier,
   lirePapiers,
   normaliserChassis,
+  normaliserPlaque,
+  PLAQUE_LONGUEUR_MAX,
   validerChassis,
   validerCout,
   validerCoutPose,
@@ -53,6 +55,8 @@ const moto = (partie: Partial<Moto> = {}): Moto => ({
   statut: "en_stock",
   dateEntree: null,
   cmcRecu: false,
+  quittanceRecue: false,
+  plaque: null,
   ...partie,
 });
 
@@ -341,5 +345,26 @@ describe("validerChassis", () => {
 
   it("accepte un châssis normalisé", () => {
     expect(validerChassis("lc6pcj1a9k0000123")).toBeNull();
+  });
+});
+
+describe("normaliserPlaque", () => {
+  it("taille les espaces et met en capitales : une plaque se lit d’un coup d’œil", () => {
+    expect(normaliserPlaque("  11 aa 1234  ")).toBe("11 AA 1234");
+  });
+
+  it("réduit les espaces internes multiples à un seul", () => {
+    expect(normaliserPlaque("11   AA   1234")).toBe("11 AA 1234");
+  });
+
+  /* **Point de vigilance 5.** Un champ libre reçoit tôt ou tard un collage
+     malheureux ; la borne protège la règle Firestore d’un refus que le gérant
+     ne saurait pas lire. */
+  it("borne la longueur sans rien inventer au-delà", () => {
+    expect(normaliserPlaque("A".repeat(200))).toHaveLength(PLAQUE_LONGUEUR_MAX);
+  });
+
+  it("rend une chaîne vide sur une saisie vide, jamais null", () => {
+    expect(normaliserPlaque("   ")).toBe("");
   });
 });

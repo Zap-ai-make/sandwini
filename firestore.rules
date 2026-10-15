@@ -428,7 +428,8 @@ service cloud.firestore {
                                      'annee', 'numeroChassis', 'numeroMoteur',
                                      'prixVenteConseille', 'provenanceId', 'arrivageId', 'papiersFournis',
                                      'photos', 'statut', 'dateEntree',
-                                     'quittanceChemin', 'cmcChemin', 'cmcRecu'].concat(champsAudit()))
+                                     'quittanceChemin', 'cmcChemin', 'cmcRecu',
+                                     'quittanceRecue', 'plaque'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'etat', 'marqueId', 'modeleId',
                                        'numeroChassis', 'provenanceId', 'photos', 'statut',
                                        'dateEntree'].concat(champsAudit()))
@@ -481,6 +482,16 @@ service cloud.firestore {
              // facultatif — mais booléen dès qu'il est là. Le rendre obligatoire
              // casserait la mise à jour des motos déjà en base.
              && (!donnees.keys().hasAny(['cmcRecu']) || donnees.cmcRecu is bool)
+             // La quittance recue et la plaque (S53), au meme regime facultatif
+             // que `cmcRecu` ci-dessus : aucune moto d'avant cette spec n'en
+             // porte, et une moto neuve n'a pas de plaque avant le retour de sa
+             // carte grise. La plaque accepte `null` explicitement — c'est ce
+             // qu'ecrit `poserPlaque` quand on efface une saisie, et le nul doit
+             // pouvoir remplacer une valeur deja posee.
+             && (!donnees.keys().hasAny(['quittanceRecue']) || donnees.quittanceRecue is bool)
+             && (!donnees.keys().hasAny(['plaque'])
+                 || donnees.plaque == null
+                 || texteBorne(donnees.plaque, 20))
              // La date d'entrée vient de l'appareil (D38), on la borne seulement
              // contre une horloge déréglée.
              && donnees.dateEntree is timestamp

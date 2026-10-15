@@ -25,6 +25,8 @@ const moto = (p: Partial<Moto> = {}): Moto => ({
   statut: "en_stock",
   dateEntree: new Date(2026, 8, 1),
   cmcRecu: false,
+  quittanceRecue: false,
+  plaque: null,
   ...p,
 });
 

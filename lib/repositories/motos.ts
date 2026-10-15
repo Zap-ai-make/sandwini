@@ -20,6 +20,7 @@ import {
   lireEntier,
   lirePapiers,
   normaliserChassis,
+  normaliserPlaque,
   type CoutMoto,
   type EtatMoto,
   type Moto,
@@ -73,6 +74,11 @@ function lireMoto(instantane: DocumentSnapshot<DocumentData>): Moto {
     quittanceChemin: (donnees.quittanceChemin as string) ?? null,
     cmcChemin: (donnees.cmcChemin as string) ?? null,
     cmcRecu: donnees.cmcRecu === true,
+    /* Une absence se lit `false`, jamais `undefined` : aucune moto d'avant
+       S53 ne porte ces champs, et une case à cocher pilotée par `undefined`
+       part non contrôlée puis saute d'état au premier clic. */
+    quittanceRecue: donnees.quittanceRecue === true,
+    plaque: typeof donnees.plaque === "string" ? donnees.plaque : null,
   };
 }
 
@@ -401,22 +407,64 @@ export async function envoyerPapierMoto(
   return chemin;
 }
 
+/** Le champ qui porte « ce papier est en main » pour chaque papier. */
+const CHAMP_EN_MAIN: Record<PapierMoto, "quittanceRecue" | "cmcRecu"> = {
+  quittance: "quittanceRecue",
+  cmc: "cmcRecu",
+};
+
 /**
- * Marque (ou démarque) le CMC d'une moto comme reçu (S43).
+ * Coche (ou décoche) un papier comme étant en main.
+ *
+ * **Un seul champ, deux écrans** (S53) : la fiche de la moto et l'inspection
+ * d'un lot écrivent ici tous les deux. C'est ce qui remplace la
+ * « synchronisation » demandée par le commanditaire — deux champs qu'on
+ * synchronise finissent par diverger, un seul champ ne le peut pas.
  *
  * Une mise à jour partielle, comme l'attache d'un scan : on ne réécrit pas toute
  * la moto pour un booléen. Le cache local bascule aussitôt — la case suit le
  * doigt, hors ligne compris — et l'écriture part quand le réseau revient. Le
  * coût n'est jamais touché : il vit dans une sous-collection à part (D2).
  */
-export function marquerCmcRecu(
+export function marquerPapierRecu(
   motoId: string,
+  papier: PapierMoto,
   recu: boolean,
   auteur: Auteur,
 ): { enregistre: Promise<void> } {
   return {
     enregistre: suivreEcriture(
-      updateDoc(doc(db(), "motos", motoId), { cmcRecu: recu, ...traceModification(auteur) }),
+      updateDoc(doc(db(), "motos", motoId), {
+        [CHAMP_EN_MAIN[papier]]: recu,
+        ...traceModification(auteur),
+      }),
+    ),
+  };
+}
+
+/**
+ * Pose l'immatriculation au retour de la carte grise (S53).
+ *
+ * `normaliserPlaque` passe d'abord : une plaque se compare à l'œil avec celle
+ * qui est vissée sur la moto, et la borne évite un refus du serveur que le
+ * gérant ne saurait pas lire.
+ *
+ * Une saisie vide écrit `null` et non `""`. Le vide d'un champ texte veut dire
+ * « je ne sais pas encore », et c'est `null` qui porte ce sens dans tout ce
+ * dépôt (D82) — une chaîne vide ferait croire à une plaque connue et illisible.
+ */
+export function poserPlaque(
+  motoId: string,
+  plaque: string,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  const propre = normaliserPlaque(plaque);
+  return {
+    enregistre: suivreEcriture(
+      updateDoc(doc(db(), "motos", motoId), {
+        plaque: propre === "" ? null : propre,
+        ...traceModification(auteur),
+      }),
     ),
   };
 }

@@ -32,6 +32,8 @@ const moto = (marqueId: string, modeleId: string, i: number): Moto => ({
   statut: "en_stock",
   dateEntree: null,
   cmcRecu: false,
+  quittanceRecue: false,
+  plaque: null,
 });
 
 describe("repartirParMarque", () => {
