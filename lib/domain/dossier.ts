@@ -19,6 +19,7 @@ import {
   TYPES_DOCUMENT,
   type DocumentDossier,
   type MoyenPaiement,
+  type PapiersEmportes,
   type StatutDocument,
   type StatutDossier,
   type TypeDocument,
@@ -149,34 +150,66 @@ export function etatPapier(entree: {
 /** Ce que la clôture regarde. Rien d'autre n'entre en compte (§7.1). */
 export type EtatDossier = {
   documents: readonly { type: TypeDocument; statut: StatutDocument }[];
+  /**
+   * Ce que le client a emporté, tel que la vente le porte (S53).
+   *
+   * **La clôture ne lit jamais la moto**, et c'est une propriété à tenir : sans
+   * elle, il faudrait réveiller la clôture à chaque case cochée sur un arrivage,
+   * et une moto dont le CMC arrive clôturerait un dossier que personne n'a
+   * touché. La remise au client est un geste, donc un fait écrit sur la vente.
+   */
+  emporte: PapiersEmportes;
   /** `statutPaiement === 'solde'` : plus rien n'est dû. */
   soldee: boolean;
   /** La moto est chez le client. Fausse tant que des tranches ne sont pas soldées. */
   motoRemise: boolean;
 };
 
-/** Un document réglé : remis au client, ou écarté de la vente. */
+/**
+ * Un document réglé, du seul point de vue du DOSSIER.
+ *
+ * `dossierCloturable` ne s'en sert plus depuis S53 — un papier se clôt sur ce
+ * que la vente dit, pas sur un statut promené. Il ne reste utile qu'à l'écran
+ * des dossiers, qui ne lit pas encore les motos ; `etatPapier` le remplacera
+ * là-bas aussi.
+ */
 function estRegle(statut: StatutDocument): boolean {
   return statut === "remis_client" || statut === "non_applicable";
 }
 
 /**
- * Le dossier peut-il se clore ? (§7.1)
+ * Le dossier peut-il se clore ? (§7.1, révisé par S53)
  *
- * Tous les documents réglés, la vente soldée, la moto partie. Les trois à la
- * fois : une vente en tranches entièrement payée dont la moto dort encore au
- * magasin n'est pas un dossier fini, et c'est précisément la confusion que le
- * cahier interdit entre crédit et tranches (§13).
+ * | Papier | Fini quand |
+ * |--------|------------|
+ * | Quittance | sans objet, **ou** emportée par le client |
+ * | CMC | sans objet, **ou** emporté par le client |
+ * | Carte grise | sans objet, **ou** revenue du prestataire |
  *
- * On exige les **quatre** types, pas « au moins zéro » : un dossier dont les
- * documents ne sont pas encore chargés passerait sinon pour un dossier complet.
+ * Plus la vente soldée et la moto partie : une vente en tranches entièrement
+ * payée dont la moto dort encore au magasin n'est pas un dossier fini, et c'est
+ * précisément la confusion que le cahier interdit entre crédit et tranches
+ * (§13). S53 change ce qui finit un PAPIER, pas ce qui finit une vente.
+ *
+ * **Un papier ne se clôt plus en passant par `remis_client`** mais parce que la
+ * vente dit que le client est parti avec. Un seul fait, à un seul endroit.
+ *
+ * `remis_client` continue de clore une carte grise : le statut ne s'écrit plus,
+ * mais la préversion en porte, et l'ignorer laisserait les dossiers les plus
+ * anciens ouverts pour toujours.
+ *
+ * Un type absent compte `a_faire` : un dossier dont les documents ne sont pas
+ * encore lus ne doit pas passer pour un dossier complet.
  */
 export function dossierCloturable(etat: EtatDossier): boolean {
   if (!etat.soldee || !etat.motoRemise) return false;
 
   return TYPES_DOCUMENT.every((type) => {
     const document = etat.documents.find((candidat) => candidat.type === type);
-    return document !== undefined && estRegle(document.statut);
+    const statut = document?.statut ?? "a_faire";
+    if (statut === "non_applicable") return true;
+    if (type === "carte_grise") return statut === "revenu_magasin" || statut === "remis_client";
+    return etat.emporte[type];
   });
 }
 

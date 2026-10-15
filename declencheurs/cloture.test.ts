@@ -83,7 +83,15 @@ const audit = {
   updatedByName: "Test",
 };
 
-/** Écrit une vente et ses trois documents dans l'état demandé. */
+/**
+ * Écrit une vente et ses trois documents dans l'état demandé.
+ *
+ * **Le décor a changé avec S53.** Un papier ne se clôt plus en passant par
+ * `remis_client` sur le dossier : la quittance et le CMC se closent parce que
+ * la VENTE dit que le client est parti avec, et la carte grise parce qu'elle
+ * est revenue du prestataire. Écrire `remis_client` ici ne prouverait plus
+ * rien — c'est un statut que le produit n'écrit plus.
+ */
 async function poser(options: {
   soldee: boolean;
   motoRemise: boolean;
@@ -92,16 +100,22 @@ async function poser(options: {
   rang += 1;
   const venteId = `${BOUTIQUE}-cloture-${rang}-${Date.now()}`;
   const reference = base.doc(`ventesMotos/${venteId}`);
+  const complet = options.documents === "tous_regles";
 
   /* Les documents d'abord, la vente ensuite : chaque écriture réveille les
      déclencheurs, et on veut que la dernière trouve le dossier complet. */
   for (const type of TYPES) {
-    const regle = options.documents === "tous_regles" || type !== QUI_TRAINE;
+    /* La carte grise est celle qui traîne (voir `QUI_TRAINE`) : son retour est
+       le seul statut qui la clôt, donc son absence de retour est ce qui bloque. */
+    const statut = type === QUI_TRAINE && !complet ? "chez_prestataire" : "revenu_magasin";
     await reference.collection("documents").doc(type).set({
       boutiqueId: BOUTIQUE,
       venteId,
       type,
-      statut: regle ? "remis_client" : "a_faire",
+      /* La quittance et le CMC restent `a_faire` : ce n'est plus leur statut qui
+         les clôt, et un `revenu_magasin` sur eux serait un état que le produit
+         n'écrit plus depuis que `CHEMIN_SANS_ETAPE` l'interdit. */
+      statut: type === QUI_TRAINE ? statut : "a_faire",
       ...audit,
     });
   }
@@ -110,6 +124,12 @@ async function poser(options: {
     boutiqueId: BOUTIQUE,
     statutPaiement: options.soldee ? "solde" : "partiel",
     motoRemise: options.motoRemise,
+    /* Ce que le client a emporté : c'est lui qui clôt les deux papiers de main.
+       Un dossier dont le CMC n'est pas parti ne se clôt pas, même si tout le
+       reste est en ordre — et c'est ce que `un_en_cours` ne teste PAS, puisqu'il
+       bloque sur la carte grise. Les deux voies de blocage ont chacune son
+       test. */
+    emporte: { quittance: true, cmc: true },
     statutDossier: "ouvert",
     dateClotureDossier: null,
     ...audit,
@@ -154,7 +174,7 @@ async function attendreStatut(venteId: string, attendu: string, budget = 60_000)
 }
 
 describe("clôture automatique", () => {
-  it("clôt le dossier quand tout est remis, soldé et livré", async () => {
+  it("clôt le dossier quand tout est emporté, revenu, soldé et livré", async () => {
     const { venteId } = await poser({
       soldee: true,
       motoRemise: true,
@@ -179,6 +199,19 @@ describe("clôture automatique", () => {
     await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
   });
 
+  /* L'autre voie de blocage, et celle que S53 introduit : tout est en ordre,
+     mais le client n'est pas parti avec son CMC. Sans ce test, la moitié de la
+     nouvelle règle ne serait couverte nulle part. */
+  it("ne clôt pas tant qu’un papier disponible n’a pas été emporté", async () => {
+    const { venteId } = await poser({
+      soldee: true,
+      motoRemise: true,
+      documents: "tous_regles",
+    });
+    await base.doc(`ventesMotos/${venteId}`).update({ emporte: { quittance: true, cmc: false } });
+    await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
+  });
+
   it("ne clôt pas une vente qui reste due", async () => {
     const { venteId } = await poser({
       soldee: false,
@@ -188,7 +221,7 @@ describe("clôture automatique", () => {
     await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
   });
 
-  /* Le cas des tranches : tout est payé, tous les papiers sont remis, mais la
+  /* Le cas des tranches : tout est payé, tous les papiers ont fini, mais la
      moto dort encore au magasin. Le dossier n'est pas fini. */
   it("ne clôt pas une vente soldée dont la moto n’est pas partie", async () => {
     const { venteId } = await poser({

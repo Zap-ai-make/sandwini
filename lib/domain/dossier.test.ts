@@ -30,7 +30,8 @@ import {
 const doc = (type: TypeDocument, statut: StatutDocument) => ({ type, statut });
 
 const etat = (partie: Partial<EtatDossier> = {}): EtatDossier => ({
-  documents: TYPES_DOCUMENT.map((type) => doc(type, "remis_client")),
+  documents: [doc("quittance", "a_faire"), doc("cmc", "a_faire"), doc("carte_grise", "revenu_magasin")],
+  emporte: { quittance: true, cmc: true },
   soldee: true,
   motoRemise: true,
   ...partie,
@@ -168,39 +169,59 @@ describe("statutsSuivants et estStatutTerminal", () => {
 });
 
 describe("dossierCloturable", () => {
-  it("clôt un dossier dont tout est remis, payé et livré", () => {
+  it("clôt quand les deux papiers sont emportés et la carte grise revenue", () => {
     expect(dossierCloturable(etat())).toBe(true);
   });
 
-  it("compte un document écarté comme réglé", () => {
+  /* **C’est le changement de S53.** Un papier ne se clôt plus en passant par
+     `remis_client` sur le dossier : il se clôt parce que la VENTE dit que le
+     client est parti avec. Un seul fait, écrit à un seul endroit. */
+  it("ne clôt pas tant qu’un papier disponible n’a pas été emporté", () => {
+    expect(dossierCloturable(etat({ emporte: { quittance: true, cmc: false } }))).toBe(false);
+  });
+
+  it("clôt un dossier dont tout est sans objet, sans rien emporter", () => {
     expect(
       dossierCloturable(
         etat({
-          documents: [
-            doc("quittance", "remis_client"),
-            doc("cmc", "non_applicable"),
-            doc("carte_grise", "non_applicable"),
-          ],
+          documents: TYPES_DOCUMENT.map((type) => doc(type, "non_applicable")),
+          emporte: { quittance: false, cmc: false },
         }),
       ),
     ).toBe(true);
   });
 
-  it("ne clôt pas tant qu’un document traîne", () => {
-    for (const statut of ["a_faire", "chez_prestataire", "revenu_magasin"] as const) {
-      expect(
-        dossierCloturable(
-          etat({
-            documents: [
-              doc("quittance", "remis_client"),
-              doc("cmc", "remis_client"),
-              doc("carte_grise", statut),
-            ],
-          }),
-        ),
-        statut,
-      ).toBe(false);
-    }
+  it("ne clôt pas une carte grise encore chez le prestataire", () => {
+    expect(
+      dossierCloturable(
+        etat({
+          documents: [
+            doc("quittance", "non_applicable"),
+            doc("cmc", "non_applicable"),
+            doc("carte_grise", "chez_prestataire"),
+          ],
+          emporte: { quittance: false, cmc: false },
+        }),
+      ),
+    ).toBe(false);
+  });
+
+  /* La préversion porte des cartes grises déjà marquées `remis_client` par
+     l’ancien modèle. Le statut ne s’écrit plus, mais il doit encore clore —
+     sans quoi les dossiers les plus anciens resteraient ouverts pour toujours. */
+  it("clôt une carte grise héritée, marquée remise au client", () => {
+    expect(
+      dossierCloturable(
+        etat({
+          documents: [
+            doc("quittance", "non_applicable"),
+            doc("cmc", "non_applicable"),
+            doc("carte_grise", "remis_client"),
+          ],
+          emporte: { quittance: false, cmc: false },
+        }),
+      ),
+    ).toBe(true);
   });
 
   it("ne clôt pas une vente qui reste due", () => {
@@ -214,9 +235,18 @@ describe("dossierCloturable", () => {
     expect(dossierCloturable(etat({ motoRemise: false }))).toBe(false);
   });
 
+  /* Un dossier dont les documents ne sont pas encore lus ne doit pas passer
+     pour un dossier complet. Les types manquants comptent `a_faire`, et un
+     papier `a_faire` non emporté ne clôt pas. */
   it("ne clôt pas un dossier dont les documents manquent", () => {
-    expect(dossierCloturable(etat({ documents: [] }))).toBe(false);
-    expect(dossierCloturable(etat({ documents: [doc("quittance", "remis_client")] }))).toBe(false);
+    expect(dossierCloturable(etat({ documents: [], emporte: { quittance: false, cmc: false } }))).toBe(
+      false,
+    );
+    expect(
+      dossierCloturable(
+        etat({ documents: [doc("quittance", "a_faire")], emporte: { quittance: true, cmc: true } }),
+      ),
+    ).toBe(false);
   });
 });
 

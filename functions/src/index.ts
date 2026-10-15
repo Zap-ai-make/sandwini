@@ -967,11 +967,28 @@ async function dossierFini(
 ): Promise<boolean> {
   if (vente.statutPaiement !== "solde" || vente.motoRemise !== true) return false;
 
+  /* **La cloture lit la vente et les documents, jamais la moto** (S53). Sans
+     cette propriete il faudrait reveiller la cloture a chaque case cochee sur
+     un arrivage : une moto dont le CMC arrive clorait un dossier que personne
+     n'a touche. La remise au client est un GESTE, donc un fait ecrit sur la
+     vente, et c'est lui qui fait foi.
+
+     Aucun nouveau declencheur n'est necessaire : `cloturerSurVente` se
+     declenche sur toute ecriture de `ventesMotos/{venteId}`, donc sur
+     `emporte`. */
+  const emporte = (vente.emporte ?? {}) as Record<string, unknown>;
   const documents = await base.collection(`ventesMotos/${venteId}/documents`).get();
   const parType = new Map(documents.docs.map((doc) => [doc.get("type"), doc.get("statut")]));
+
   return TYPES_DOCUMENT.every((type) => {
-    const statut = parType.get(type);
-    return statut === "remis_client" || statut === "non_applicable";
+    /* Un type absent compte `a_faire` : un dossier dont les documents ne sont
+       pas encore ecrits ne doit pas passer pour un dossier complet. */
+    const statut = parType.get(type) ?? "a_faire";
+    if (statut === "non_applicable") return true;
+    /* `remis_client` ne s'ecrit plus, mais la preversion en porte : l'ignorer
+       laisserait les dossiers les plus anciens ouverts pour toujours. */
+    if (type === "carte_grise") return statut === "revenu_magasin" || statut === "remis_client";
+    return emporte[type] === true;
   });
 }
 
