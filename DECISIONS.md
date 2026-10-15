@@ -1551,6 +1551,59 @@ et non d'une bibliothèque de composants.
 rendu du produit qui devient un objet physique, et aucune capture d'écran ordinaire ne le
 montre (leçon de S10).
 
+### Amendement S54 — « Acier et braise » : la règle avait raison, sa conséquence non
+
+*Le commanditaire, après plusieurs mois d'usage : « le design actuel ne me satisfait pas…
+c'est surtout les couleurs, manque d'identité, trop standard ».*
+
+**Il avait raison, et la cause est au-dessus.** Deux couleurs couvraient plus de 90 % de la
+surface : le nuit `#14142b` de la coquille et le gris bleuté `#eef1f5` du fond. Ce sont les
+deux couleurs les plus répandues du logiciel de gestion depuis dix ans. Pendant ce temps, la
+règle « le dégradé reste enfermé dans le logo » avait un effet qu'on n'avait pas mesuré :
+**aucune couleur de la marque ne touchait l'interface.** Le logo est du feu sur de la nuit ;
+le produit était du gris froid sur un bleu-violet. Il ne ressemblait pas à sa propre marque.
+
+La règle reste juste — un dégradé or → rouge en fond de section est bien le tic que
+`DESIGN.md` §1 interdit, et on ne l'a pas fait. Ce qui change, c'est **par où la marque
+entre** : non par un aplat, mais par la **température des neutres**.
+
+**La décision.** Tous les neutres passent au chaud, des deux côtés de la feuille :
+
+| | avant | après | ce que c'est |
+|---|---|---|---|
+| coquille | `#14142b` | `#1b1a17` | l'acier huilé de l'atelier |
+| fond | `#eef1f5` | `#efeae1` | le sable de la cour |
+| encre | `#0f1720` | `#16130f` | |
+| bords | `#d5dae0` | `#ddd5c8` | |
+| « réglé » | `#1b6b4a` | `#4f6b24` | l'olive, et non le vert de succès universel |
+
+La feuille reste du blanc pur : l'application s'utilise dehors, sur un écran bon marché, et
+un crème y perdrait le contraste que le soleil mange déjà. C'est **autour** d'elle que la
+chaleur se joue. Le thème sombre suit la même règle — il était bleuté lui aussi, donc tout
+aussi anonyme. Les 34 paires texte/fond sont recalculées : aucune sous 4,5:1 en texte
+normal, 3:1 en élément d'interface.
+
+**Le vert est le détail qui disait le plus.** `#1b6b4a` ne venait d'aucune des deux rampes
+du logo : c'était le troisième terme du trio rouge/bleu/vert qu'on trouve dans tous les
+tableaux de bord du monde. L'olive tient dans une palette chaude et n'appartient à personne
+d'autre.
+
+**Ce qu'on a refusé en chemin.** La maquette comparative montrait le bouton principal en
+braise, et c'est en partie ce qui la rendait chaude. On ne l'a pas retenu : dans ce produit
+la braise dit « retard et irréversible », et `.btn-destructif` est déjà un rouge. Un « Faire
+entrer une moto » rouge plein à côté d'un « Supprimer » rouge en contour est la confusion
+qu'un logiciel d'argent ne peut pas se permettre. Une couleur, un emploi. L'action reste
+l'encre — chaude, désormais, ce qui suffit.
+
+Deux autres directions ont été comparées et écartées, et elles restent lisibles dans
+`maquettes/directions-couleur.html` : « Nuit et or » (trop timide — elle ne faisait que
+retirer le bleu-violet) et « Émail » (un rail bleu d'enseigne peinte, écartée parce que le
+bleu dit déjà « parti chez le prestataire » : le rail aurait tué le signal).
+
+**Ce qui ne change pas.** La plaque et son encre, qui ne basculent pas avec le thème. Les
+cinq arrêts du monogramme. La souche comme signature. Et le bloc `@media print` : un reçu
+sort en noir d'imprimante, une encre chaude n'y changerait rien.
+
 ---
 
 ## D71 — L'identité de l'entreprise est une constante, pas un réglage
