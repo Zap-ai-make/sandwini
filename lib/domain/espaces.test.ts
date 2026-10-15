@@ -103,10 +103,11 @@ describe("accueilDuRole", () => {
 
 describe("le second niveau de navigation", () => {
   /* Huit depuis S54 : les reçus n'ont plus d'entrée à eux — ils s'ouvrent
-     dans le panneau de l'écran des ventes, d'où ils sortent déjà. */
-  it("met les huit écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
+     dans le panneau de l'écran des ventes, d'où ils sortent déjà. Neuf depuis
+     S55 : l'Inventaire s'ouvre au gérant. */
+  it("met les neuf écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
     const ecrans = ecransVisibles("motos", "gerant");
-    expect(ecrans).toHaveLength(8);
+    expect(ecrans).toHaveLength(9);
     expect(ecrans.map((e) => e.href)).toEqual(
       expect.arrayContaining([
         "/motos",
@@ -116,6 +117,7 @@ describe("le second niveau de navigation", () => {
         "/motos/ventes?nouvelle=1",
         "/motos/paiements",
         "/motos/dossiers",
+        "/motos/inventaire",
       ]),
     );
     /* Les titres sont ceux de `maquettes/b1-rail-gerant.html`, et non les trois
@@ -394,16 +396,32 @@ describe("la portée du périmètre filtre les gestes", () => {
 describe("les écrans réservés descendent dans l’espace motos", () => {
   it("le responsable y trouve le prix d’achat et les chiffres", () => {
     const hrefs = ecransVisibles("motos", "responsable").map((e) => e.href);
-    expect(hrefs).toContain("/supervision/chiffres");
+    expect(hrefs).toContain("/motos/inventaire");
   });
 
-  /* La garde d'affichage, pas la garde de droit : les règles Firestore restent
-     seules à décider (D27), et le coût vit en sous-collection `prive/` (D2).
-     Ce test dit seulement que la colonne ne propose pas au gérant une porte
-     qui lui claquerait au nez. */
-  it("le gérant ne les voit pas, et son espace motos ne grossit pas", () => {
+  /**
+   * **L'Inventaire a changé de camp en S55, et ce témoin le fige.**
+   *
+   * Il affirmait l'inverse : le gérant ne devait pas voir l'Inventaire.
+   * La demande du commanditaire l'a renversé — « l'inventaire doit se faire à
+   * deux niveaux, pour chaque gérant et pour le superviseur qui agrège tout ».
+   * Un gérant range les motos dans la cour ; lui cacher ce qu'il détient et
+   * depuis quand privait d'information la seule personne en mesure d'agir
+   * dessus le jour même.
+   *
+   * **Ce qui reste fermé le reste**, et c'est ce que vérifie la seconde
+   * moitié : les référentiels du catalogue demandent toujours
+   * `gerer_referentiels`, donc le groupe « Réservé au responsable » n'apparaît
+   * pas chez le gérant. La garde d'affichage ne décide toujours de rien — les
+   * règles Firestore restent seules juges (D27) et les coûts vivent en
+   * sous-collection `prive/` (D2). Ce test dit seulement que la colonne ne
+   * propose aucune porte qui claquerait au nez.
+   */
+  it("le gérant voit l’inventaire, mais pas les référentiels du responsable", () => {
     const hrefs = ecransVisibles("motos", "gerant").map((e) => e.href);
-    expect(hrefs).not.toContain("/supervision/chiffres");
+    expect(hrefs).toContain("/motos/inventaire");
+    expect(hrefs).not.toContain("/parametres/catalogue");
+    expect(hrefs).not.toContain("/parametres/referentiels");
     expect(groupesVisibles("motos", "gerant").map((g) => g.titre)).toEqual([
       "Vendre",
       "Suivre",
@@ -429,13 +447,14 @@ describe("la destination après un changement de périmètre", () => {
     expect(destinationApresPerimetre("/supervision", "responsable", "boutique")).toBe("/dashboard");
   });
 
-  /* Les deux écrans réservés portent encore `/supervision` dans leur URL mais
-     vivent désormais dans l'espace motos : ils restent ouverts en mode
-     boutique, et c'est même là qu'ils servent le plus. Les renvoyer à
-     l'accueil fermerait l'écran qu'on vient d'ouvrir. */
-  it("ne chasse pas des écrans réservés, qui ont gardé leur URL de supervision", () => {
-    expect(destinationApresPerimetre("/supervision/chiffres", "responsable", "boutique")).toBeNull();
-    expect(destinationApresPerimetre("/supervision/chiffres", "responsable", "boutique")).toBeNull();
+  /* L'Inventaire a longtemps porté `/supervision/chiffres` tout en vivant dans
+     l'espace motos, ce qui obligeait à l'excepter de cette règle. Depuis S55 il
+     s'appelle `/motos/inventaire` et l'exception a disparu — mais le témoin
+     reste : c'est en mode boutique que cet écran sert le plus, et l'en chasser
+     fermerait celui qu'on vient d'ouvrir. */
+  it("ne chasse pas l’inventaire, qui sert surtout en mode boutique", () => {
+    expect(destinationApresPerimetre("/motos/inventaire", "responsable", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/parametres/catalogue", "responsable", "boutique")).toBeNull();
   });
 
   it("ramène à la supervision quand on revient à toutes les boutiques", () => {

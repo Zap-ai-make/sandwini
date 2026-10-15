@@ -1,4 +1,5 @@
 import type { BilanArrivages } from "@/lib/domain/arrivage";
+import { Chiffre } from "@/components/patrons/Chiffre";
 import { formaterNombre } from "@/lib/domain/format";
 
 /**
@@ -27,7 +28,7 @@ export function CartesArrivages({ bilan }: { bilan: BilanArrivages }) {
             className="mt-1 font-code text-chiffre leading-tight tabular-nums"
             style={{ color: carte.couleur }}
           >
-            {formaterNombre(carte.valeur)}
+            <Chiffre valeur={formaterNombre(carte.valeur)} />
           </p>
         </div>
       ))}

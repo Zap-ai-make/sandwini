@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronRight } from "lucide-react";
 import { repartirParMarque } from "@/lib/domain/repartition";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
@@ -43,14 +44,23 @@ export function RepartitionStock({
   const total = motos.length;
 
   return (
-    <details className="cadre mb-4 p-4 sm:p-5">
-      <summary className="cursor-pointer text-corps text-encre marker:text-encre-doux">
-        <span className="font-medium">Répartition par marque</span>{" "}
-        <span className="text-legende text-encre-doux">
-          {formaterNombre(marques.length)}{" "}
-          {marques.length > 1 ? "marques" : "marque"} · {formaterNombre(total)}{" "}
-          {total > 1 ? "motos" : "moto"}
-          {filtre ? " (sur la liste filtrée)" : ""}
+    /* `repli` remplace le triangle natif par un chevron qui pivote et donne au
+       contenu son mouvement d'ouverture (`globals.css`, A10) — le `<details>`
+       reste entier, c'est lui qui tient le clavier, le rôle et l'état. */
+    <details className="repli cadre mb-4 p-4 sm:p-5">
+      <summary className="text-corps text-encre">
+        <ChevronRight
+          aria-hidden="true"
+          className="repli-chevron size-4 shrink-0 translate-y-[0.15em] text-encre-doux"
+        />
+        <span>
+          <span className="font-medium">Répartition par marque</span>{" "}
+          <span className="text-legende text-encre-doux">
+            {formaterNombre(marques.length)}{" "}
+            {marques.length > 1 ? "marques" : "marque"} · {formaterNombre(total)}{" "}
+            {total > 1 ? "motos" : "moto"}
+            {filtre ? " (sur la liste filtrée)" : ""}
+          </span>
         </span>
       </summary>
 

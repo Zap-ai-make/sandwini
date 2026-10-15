@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Chiffre } from "@/components/patrons/Chiffre";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { chiffresDeLaPeriode } from "@/lib/domain/periode-chiffres";
@@ -46,6 +47,13 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
     [periode, maintenant, plage],
   );
   const chiffres = useMemo(() => chiffresDeLaPeriode(bornes, ventes), [bornes, ventes]);
+
+  /* Rapportées au total et non à la plus grande part : les deux termes
+     découpent une seule somme, et c'est leur poids dans cette somme qu'on lit.
+     Un total nul laisse la piste vide plutôt que de diviser par zéro. */
+  const dehors = chiffres.resteAPercevoir;
+  const partCredit = dehors === 0 ? 0 : (chiffres.creditDehors / dehors) * 100;
+  const partTranches = dehors === 0 ? 0 : (chiffres.resteSurTranches / dehors) * 100;
 
   const intitule = libellePeriode(periode, maintenant, plage);
   const inversee = plageInversee(periode, plage);
@@ -102,22 +110,56 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
           <h3 className="mt-6 mb-3 border-t border-bord pt-4 text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
             Ce qui reste à percevoir — l’argent dehors
           </h3>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Carte
-              nom="Total dehors"
-              valeur={formaterMontant(chiffres.resteAPercevoir)}
-              detail="Tout ce que les clients doivent encore"
-            />
-            <Carte
-              nom="Crédit dehors"
-              valeur={formaterMontant(chiffres.creditDehors)}
-              detail="La moto est partie, le client doit"
-            />
-            <Carte
-              nom="Reste sur tranches"
-              valeur={formaterMontant(chiffres.resteSurTranches)}
-              detail="La moto est au magasin, il manque encore ceci"
-            />
+          {/*
+            **Trois cartes identiques pour une somme et ses deux termes (S55).**
+
+            Le commanditaire : « la première carte est la somme des deux autres,
+            ça doit être compris au premier regard ». Ça ne l'était pas — les
+            trois `Carte` étaient le même composant dans une grille à trois
+            colonnes, et rien dans le dessin ne hiérarchisait quoi que ce soit.
+            L'œil voyait trois mesures voisines, pas un total et sa composition.
+
+            Le total passe donc seul au-dessus, en gros ; la barre montre d'un
+            coup le poids relatif des deux termes ; les termes se lisent dessous,
+            chacun repris par la pastille de son segment. Trois informations —
+            combien, de quoi, dans quelle proportion — en un regard.
+
+            La couleur ne porte jamais le sens seule (`DESIGN.md` §5) : chaque
+            segment est nommé juste en dessous. `goutte` dit « parti et pas
+            revenu », ce qu'est exactement un crédit ; l'or garde ce qui est
+            encore au magasin.
+          */}
+          <div className="cadre p-4 sm:p-5">
+            <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
+              Total dehors
+            </p>
+            <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
+              <Chiffre valeur={formaterMontant(chiffres.resteAPercevoir)} />
+            </p>
+            <p className="text-legende text-encre-doux">Tout ce que les clients doivent encore</p>
+
+            <div
+              aria-hidden="true"
+              className="mt-4 flex h-3 overflow-hidden rounded-full bg-fond"
+            >
+              <span className="block bg-goutte" style={{ width: `${partCredit}%` }} />
+              <span className="block bg-or" style={{ width: `${partTranches}%` }} />
+            </div>
+
+            <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+              <Terme
+                ton="bg-goutte"
+                nom="Crédit dehors"
+                valeur={formaterMontant(chiffres.creditDehors)}
+                detail="La moto est partie, le client doit"
+              />
+              <Terme
+                ton="bg-or"
+                nom="Reste sur tranches"
+                valeur={formaterMontant(chiffres.resteSurTranches)}
+                detail="La moto est au magasin, il manque encore ceci"
+              />
+            </dl>
           </div>
 
           <h3 className="mt-6 mb-3 border-t border-bord pt-4 text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
@@ -140,8 +182,43 @@ function Carte({ nom, valeur, detail }: { nom: string; valeur: string; detail: s
   return (
     <div className="cadre p-4 sm:p-5">
       <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">{nom}</p>
-      <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">{valeur}</p>
+      <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
+        <Chiffre valeur={valeur} />
+      </p>
       <p className="text-legende text-encre-doux">{detail}</p>
+    </div>
+  );
+}
+
+/**
+ * Un terme de la somme, repris par la pastille de son segment.
+ *
+ * La pastille n'est pas décorative : c'est elle qui rattache la ligne au
+ * morceau de barre du dessus. Sans elle, il faudrait deviner lequel des deux
+ * segments est lequel — et deviner une couleur est précisément ce que
+ * `DESIGN.md` §5 interdit de demander.
+ */
+function Terme({
+  ton,
+  nom,
+  valeur,
+  detail,
+}: {
+  ton: string;
+  nom: string;
+  valeur: string;
+  detail: string;
+}) {
+  return (
+    <div>
+      <dt className="flex items-center gap-2 text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
+        <span aria-hidden="true" className={`size-2.5 shrink-0 rounded-full ${ton}`} />
+        {nom}
+      </dt>
+      <dd className="mt-1 font-code text-bloc leading-tight tabular-nums text-encre">
+        <Chiffre valeur={valeur} />
+      </dd>
+      <dd className="text-legende text-encre-doux">{detail}</dd>
     </div>
   );
 }

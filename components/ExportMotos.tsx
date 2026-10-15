@@ -2,17 +2,22 @@
 
 import { Download } from "lucide-react";
 import { useState } from "react";
-import { BOM_UTF8, motosEnCsv, nomFichierExport } from "@/lib/domain/export";
+import { motosEnClasseur, nomFichierExport } from "@/lib/domain/export";
+import { TYPE_CLASSEUR } from "@/lib/domain/xlsx";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 
 /**
  * Le bouton qui emporte les motos cochées (S50).
  *
- * **Le fichier se fabrique sur l'appareil**, d'un bout à l'autre : le CSV est
- * du texte, `Blob` et `URL.createObjectURL` vivent dans le navigateur, et rien
- * ne part au serveur. L'export marche donc au comptoir coupure faite, comme le
- * reste (D66) — ce qu'un export rendu par une Cloud Function n'aurait pas fait.
+ * **Un classeur Excel, et non plus du CSV (S54).** Le commanditaire ouvre ces
+ * fichiers dans Excel : autant lui en donner un. Le format est monté à la main
+ * dans `lib/domain/xlsx.ts`, sans dépendance.
+ *
+ * **Le fichier se fabrique sur l'appareil**, d'un bout à l'autre : `Blob` et
+ * `URL.createObjectURL` vivent dans le navigateur, et rien ne part au serveur.
+ * L'export marche donc au comptoir coupure faite, comme le reste (D66) — ce
+ * qu'un export rendu par une Cloud Function n'aurait pas fait.
  *
  * **Aucun prix n'en sort**, et la raison est dans `lib/domain/export.ts` : ce
  * n'est pas une préférence de colonnes, c'est le mur D2 appliqué à un fichier
@@ -37,10 +42,11 @@ export function ExportMotos({
   function exporter() {
     setEchec(null);
     try {
-      /* L'indicateur d'ordre des octets en tête, sinon Excel lit le fichier en
-         codage local et rend « Côte d'Ivoire » en « CÃ´te d'Ivoire ». */
-      const blob = new Blob([BOM_UTF8 + motosEnCsv(motos, nomMarque, nomModele)], {
-        type: "text/csv;charset=utf-8",
+      /* Plus d'indicateur d'ordre des octets à poser : un classeur déclare son
+         codage dans son XML, là où un CSV sans marque sortait « Côte d'Ivoire »
+         en « CÃ´te d'Ivoire ». */
+      const blob = new Blob([motosEnClasseur(motos, nomMarque, nomModele)], {
+        type: TYPE_CLASSEUR,
       });
       const adresse = URL.createObjectURL(blob);
       const lien = document.createElement("a");
@@ -87,7 +93,7 @@ export function ExportMotos({
         className="bouton bouton-principal"
       >
         <Download aria-hidden="true" className="size-4" />
-        Exporter (CSV)
+        Exporter (Excel)
       </button>
 
       {echec && (

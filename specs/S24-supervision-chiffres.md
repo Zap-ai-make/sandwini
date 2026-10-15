@@ -283,7 +283,12 @@ cherche ce qui manque.
 **État : terminée.**
 
 L'écran `/supervision/chiffres`, atteint par « Voir les chiffres » depuis la
-supervision. Quatre cartes — motos vendues (avec le mois précédent en regard),
+supervision.
+
+> **Depuis S55, cet écran s'appelle `/motos/inventaire`** et s'ouvre aussi au
+> gérant, sur sa boutique. L'ancienne adresse redirige. La marge reste réservée
+> au responsable, et l'inventaire du stock — ce qu'on détient, depuis combien de
+> temps — s'est ajouté au-dessus de ce que décrit cette spec. Quatre cartes — motos vendues (avec le mois précédent en regard),
 encaissé, marge brute, et la carte à deux lignes créances / dépôts. Deux
 répartitions en barres, par boutique et par mode de paiement. Un sélecteur de
 douze mois. Une phrase à la place des cartes quand le mois est vide.

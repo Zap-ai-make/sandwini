@@ -1,3 +1,4 @@
+import { Chiffre } from "@/components/patrons/Chiffre";
 import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import type { BilanVentes } from "@/lib/domain/vente";
 
@@ -62,7 +63,7 @@ export function CartesVentes({ bilan, periode }: { bilan: BilanVentes; periode?:
             className="mt-1 font-code text-bloc leading-tight tabular-nums"
             style={{ color: carte.couleur }}
           >
-            {carte.valeur}
+            <Chiffre valeur={carte.valeur} />
           </p>
         </div>
       ))}

@@ -3,8 +3,8 @@
 import { TrendingUp } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { BilanPeriode } from "@/components/BilanPeriode";
+import { InventaireStock } from "@/components/InventaireStock";
 import { CartesDuMois, Repartition } from "@/components/ChiffresDuMois";
-import { GardeCapacite } from "@/components/GardeSession";
 import { ErreurDeLecture, EtatChargement, EtatVide } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
@@ -18,11 +18,15 @@ import {
   partsParMode,
   type Mois,
 } from "@/lib/domain/chiffres";
+import { formaterMontant } from "@/lib/domain/format";
 import { peut } from "@/lib/domain/roles";
+import type { Moto } from "@/lib/domain/moto";
 import type { Vente, Versement } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
+import { useCatalogue } from "@/lib/repositories/catalogue";
 import { useMarges } from "@/lib/repositories/marges";
+import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/ventes";
 
 /**
@@ -40,12 +44,24 @@ import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/
  * cesse d’être bon est écrit dans la spec, pour être connu d’avance plutôt
  * qu’improvisé.
  */
+/**
+ * **Plus de garde de capacité, et c'est la demande du commanditaire (S55) :**
+ * « l'inventaire doit se faire à deux niveaux, pour chaque gérant et pour le
+ * superviseur qui agrège tout ».
+ *
+ * L'écran était fermé par `acceder_supervision`, que seul le responsable
+ * possède. Un gérant ne pouvait donc pas savoir ce qu'il détenait ni depuis
+ * quand — alors que c'est lui qui range les motos dans la cour, et le seul à
+ * pouvoir agir le jour même sur celle qui dort depuis quatre mois.
+ *
+ * **Rien ne s'ouvre pour autant.** Le périmètre borne déjà les lectures : un
+ * gérant n'écoute que sa boutique, et les règles Firestore refuseraient le
+ * reste. Les marges et les coûts restent derrière `voir_marges` **dans**
+ * l'écran, document par document, comme avant — le mur de D2 n'a jamais été
+ * cette garde-ci, il est en sous-collection `prive/` (D2, D27).
+ */
 export default function PageChiffres() {
-  return (
-    <GardeCapacite capacite="acceder_supervision">
-      <Chiffres />
-    </GardeCapacite>
-  );
+  return <Chiffres />;
 }
 
 function Chiffres() {
@@ -78,6 +94,24 @@ function Chiffres() {
     "Les versements n’ont pas pu être lus.",
   );
 
+  /* L'inventaire lit les motos, pas les ventes : c'est la seule écoute de
+     l'écran qui réponde à « qu'est-ce que j'ai ». Elle suit le même périmètre
+     que les autres, donc les deux niveaux sortent du même code. */
+  const souscrireStock = useCallback(
+    (auChangement: (motos: Moto[]) => void, enErreur: (cause: unknown) => void) =>
+      sansPerimetre ? () => {} : ecouterStock(boutiqueId, auChangement, enErreur),
+    [boutiqueId, sansPerimetre],
+  );
+  const { valeur: motos, erreur: erreurStock } = useAbonnement(
+    souscrireStock,
+    "Le stock n’a pas pu être lu.",
+  );
+
+  const catalogue = useCatalogue();
+  /* Figé au montage : pris à chaque rendu, les âges bougeraient sous les yeux
+     et relanceraient les animations de chiffre sans qu'il se soit rien passé. */
+  const maintenant = useMemo(() => new Date(), []);
+
   /* Seules les ventes du mois affiché : la marge se lit document par document,
      et il n'y a aucune raison de demander celles qu'on ne montre pas. */
   const ventesDuMois = useMemo(
@@ -104,13 +138,27 @@ function Chiffres() {
   );
   const parMode = useMemo(() => partsParMode(mois, ventes ?? []), [mois, ventes]);
 
+  /* Le total se tire des parts affichées plutôt que d'un champ voisin : deux
+     sources pour un seul nombre finissent toujours par diverger d'un arrondi,
+     et c'est la phrase du chapeau qui aurait tort. */
+  const totalDesVentes = useMemo(
+    () => parBoutique.reduce((somme, part) => somme + part.montant, 0),
+    [parBoutique],
+  );
+
   const ou = perimetre.type === "boutique" ? perimetre.nom : "Toutes les boutiques";
+  /* Un gérant n'a pas de supervision où revenir : le renvoyer là-bas le
+     déposerait sur un refus. Il revient à son espace, d'où il vient. */
+  const retour =
+    role !== null && peut(role, "acceder_supervision")
+      ? { href: "/supervision", libelle: "Supervision" }
+      : { href: "/motos", libelle: "Motos" };
   const chargement = !sansPerimetre && (ventes === null || versements === null) && !erreur;
 
   return (
     <div>
       <TetePage
-        retour={{ href: "/supervision", libelle: "Supervision" }}
+        retour={retour}
         surTitre={`${ou} · ${libelleMois(mois)}`}
         titre="Inventaire"
         actions={<ChoixDuMois mois={mois} choisir={setMois} />}
@@ -129,6 +177,25 @@ function Chiffres() {
           qu'un échec de ce côté laisse la page en lecture pour toujours. Faire
           dépendre un bloc de données qu'il n'emploie pas, c'est hériter des
           pannes des autres. */}
+      {/* **L'inventaire vient en premier, et il ne dépend pas des ventes.**
+          L'onglet s'appelle « Inventaire » : ce qu'on détient doit être la
+          première chose lue. Et un magasin peut très bien n'avoir rien vendu du
+          mois tout en ayant trente motos dans la cour — accrocher ce bloc au
+          vide des ventes aurait caché le stock précisément les mois où il pèse
+          le plus lourd. */}
+      {!erreurStock && !sansPerimetre && motos !== null && (
+        <div className="mt-6 mb-8">
+          <InventaireStock
+            motos={motos}
+            maintenant={maintenant}
+            nomMarque={catalogue.nomMarque}
+            nomModele={catalogue.nomModele}
+            nomDeLaBoutique={nomDeLaBoutique}
+            agrege={perimetre.type === "toutes"}
+          />
+        </div>
+      )}
+
       {!erreur && !sansPerimetre && ventes !== null && <BilanPeriode ventes={ventes} />}
 
       {erreur ? (
@@ -136,7 +203,7 @@ function Chiffres() {
           titre="L’inventaire n’a pas pu être calculé"
           echec={echec}
           reessayer={reessayer}
-          sortie={{ href: "/supervision", libelle: "Retour à la supervision" }}
+          sortie={{ href: retour.href, libelle: `Retour à ${retour.libelle.toLowerCase()}` }}
         >
           {erreur} Les ventes et les paiements restent consultables depuis leurs écrans.
         </ErreurDeLecture>
@@ -157,25 +224,41 @@ function Chiffres() {
         <div className="mt-6 grid gap-8">
           <CartesDuMois chiffres={chiffres} mois={mois} avecMarge={avecMarge} />
 
-          <Repartition
-            id="titre-par-boutique"
-            titre="Par boutique"
-            parts={parBoutique}
-            unite="motos"
-          />
-
-          <Repartition
-            id="titre-par-mode"
-            titre="Par mode de paiement"
-            parts={parMode}
-            unite="ventes"
-          >
-            <p className="mt-4 max-w-prose text-corps text-encre-doux">
-              «&nbsp;Crédit&nbsp;» et «&nbsp;tranches&nbsp;» ne se totalisent pas ensemble&nbsp;:
-              dans un cas le client doit de l’argent au magasin, dans l’autre le magasin détient de
-              l’argent et retient la moto.
+          {/* **Le chapeau, et pourquoi il manquait (S55).** Les deux sections
+              affichent le même total, à quelques pixels l'une de l'autre, sans
+              rien qui le dise : le commanditaire a lu « 915 000 » deux fois et
+              n'a pas compris s'il devait les additionner. Ils ne s'additionnent
+              pas — c'est un seul mois, coupé deux fois. La phrase le pose avant
+              que la question se forme. */}
+          <div className="grid gap-8">
+            <p className="max-w-prose text-corps text-encre-doux">
+              Les deux découpages ci-dessous portent sur le <strong className="font-semibold text-encre">même
+              total</strong> — {formaterMontant(totalDesVentes)} vendus en {libelleMois(mois)}. Le premier dit
+              où, le second comment : ils ne s’additionnent pas.
             </p>
-          </Repartition>
+
+            <Repartition
+              id="titre-par-boutique"
+              titre="Par boutique"
+              parts={parBoutique}
+              unite="moto"
+              seule="Seule boutique à avoir vendu ce mois-ci."
+            />
+
+            <Repartition
+              id="titre-par-mode"
+              titre="Par mode de paiement"
+              parts={parMode}
+              unite="vente"
+              seule="Seul mode de paiement employé ce mois-ci."
+            >
+              <p className="mt-4 max-w-prose text-corps text-encre-doux">
+                «&nbsp;Crédit&nbsp;» et «&nbsp;tranches&nbsp;» ne se totalisent pas ensemble&nbsp;:
+                dans un cas le client doit de l’argent au magasin, dans l’autre le magasin détient
+                de l’argent et retient la moto.
+              </p>
+            </Repartition>
+          </div>
         </div>
       )}
     </div>

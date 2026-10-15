@@ -108,13 +108,14 @@ function surveille(role: Role, perimetre: PortéeDuPerimetre): boolean {
  * et donc sans moyen d'y revenir après l'avoir quittée. Un écran qu'aucune
  * navigation ne mentionne est un écran qu'on croit disparu.
  *
- * **L'écran réservé est l'exception, et elle n'est pas cosmétique.**
- * `/supervision/chiffres` — l'Inventaire — a gardé son URL en déménageant dans
- * l'espace motos. Le traiter comme « de la supervision » d'après son chemin le
- * fermerait au moment précis où l'on choisit la boutique dont on veut lire les
- * chiffres. C'est le rangement qui compte, pas l'orthographe de l'adresse.
- * (`/supervision/couts` était le second ; S54 l'a retiré, la saisie du prix
- * d'achat ayant rejoint la fiche de la moto.)
+ * **L'exception a disparu avec S55, et il faut dire pourquoi elle existait.**
+ * L'Inventaire vivait à `/supervision/chiffres` tout en étant rangé dans
+ * l'espace motos : il fallait donc le soustraire au traitement « écran de
+ * supervision » que son chemin lui valait, sans quoi choisir une boutique le
+ * fermait au moment précis où l'on voulait lire ses chiffres. En s'ouvrant au
+ * gérant, l'écran a pris l'adresse qui lui correspond — `/motos/inventaire` —
+ * et le cas particulier s'est effacé de lui-même. Une adresse exacte vaut mieux
+ * qu'une exception qui la corrige.
  */
 export function destinationApresPerimetre(
   chemin: string,
@@ -125,11 +126,8 @@ export function destinationApresPerimetre(
      écran légitime pour une transition qui ne le concerne pas. */
   if (!peut(role, "acceder_supervision")) return null;
 
-  const reserve = ECRANS_DE.motos.some((ecran) => ecran.href === chemin);
   if (perimetre === "boutique") {
-    return sousChemin(chemin, ESPACES.supervision.href) && !reserve
-      ? ESPACES.accueil.href
-      : null;
+    return sousChemin(chemin, ESPACES.supervision.href) ? ESPACES.accueil.href : null;
   }
   return chemin === ESPACES.accueil.href ? ESPACES.supervision.href : null;
 }
@@ -316,6 +314,29 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
         { href: "/motos/ventes", libelle: "Ventes" },
         { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
         { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },
+        /**
+         * **L'Inventaire s'ouvre au gérant (S55), et c'est une demande du
+         * commanditaire : « l'inventaire doit se faire à deux niveaux, pour
+         * chaque gérant et pour le superviseur qui agrège tout ».**
+         *
+         * Il était gardé par `voir_marges` et rangé chez le responsable. Un
+         * gérant ne pouvait donc pas savoir ce qu'il détenait ni depuis quand —
+         * alors que c'est la personne qui range les motos dans la cour, et la
+         * seule qui puisse agir sur une moto qui dort depuis quatre mois.
+         *
+         * **Aucun mur n'est percé, parce qu'un inventaire ne demande pas les
+         * prix.** Compter les motos et lire leur ancienneté se fait sur le
+         * document `motos/{id}`, que le gérant lit déjà pour tenir son stock.
+         * Les coûts restent en sous-collection `prive/`, où les règles les
+         * refusent (D2, D4) ; l'écran ne les demande que derrière
+         * `voir_marges`, et le serveur retrancherait de toute façon.
+         *
+         * **Les deux niveaux ne sont pas deux écrans.** Le périmètre les porte
+         * déjà : un gérant y est verrouillé sur sa boutique, le responsable
+         * bascule sur « Toutes les boutiques » et obtient l'agrégat. Deux
+         * écrans auraient fait diverger deux définitions du même inventaire.
+         */
+        { href: "/motos/inventaire", libelle: "Inventaire" },
       ],
     },
     {
@@ -336,19 +357,15 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
        *
        * **Leurs URL ne bougent pas.** Aucune redirection à écrire, aucun lien
        * existant cassé, aucun signet mort : seul leur rangement change. Et
-       * `/supervision/chiffres` y gagne au passage une entrée de navigation —
-       * il n'en avait aucune, et n'était atteignable que par un bouton de la
-       * vue d'ensemble.
+       * l'Inventaire y a gagné une entrée de navigation — il n'en avait
+       * aucune, et n'était atteignable que par un bouton de la vue d'ensemble.
+       * (Il est depuis passé dans « Suivre », ouvert au gérant : S55.)
        *
        * La garde d'affichage ne protège rien : le cloisonnement réel est en
        * sous-collection `prive/` et dans les règles Firestore (D2, D27).
        */
       titre: "Réservé au responsable",
       ecrans: [
-        /* « Inventaire » et non « Chiffres du mois » (S54) : l'écran ne parle
-           plus que du mois — son bilan de période couvre l'intervalle qu'on
-           veut, et c'est le mot qu'emploie le commanditaire. */
-        { href: "/supervision/chiffres", libelle: "Inventaire", capacite: "voir_marges" },
         /* Les deux référentiels du catalogue, descendus des paramètres (S54).
            Marques, modèles, provenances et frais sont les mots qu'on déclare
            en faisant entrer une moto : on y allait depuis le formulaire
@@ -386,7 +403,25 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       ],
     },
   ],
-  caisse: [{ titre: "Suivre", ecrans: [{ href: "/caisse", libelle: "Journal de caisse" }] }],
+  caisse: [
+    {
+      titre: "Suivre",
+      ecrans: [
+        { href: "/caisse", libelle: "Journal de caisse" },
+        /* **Les dépenses ont leur écran, et il est ouvert à tous (S55).** Le
+           commanditaire : « l'enregistrement de toutes les dépenses doit se
+           faire dans poste de dépenses, avec l'historique et tout ». C'est donc
+           un gérant qui y saisit, et aucune garde de capacité ne peut le
+           fermer. Ce qui reste au responsable vit **dans** l'écran : l'onglet
+           des postes, où l'on renomme un mot que des mois d'écritures citent. */
+        {
+          href: "/caisse/depenses",
+          libelle: "Dépenses",
+          quoi: "Ce qui sort du tiroir, et où ça part",
+        },
+      ],
+    },
+  ],
   reglages: [
     {
       titre: "L’entreprise",
