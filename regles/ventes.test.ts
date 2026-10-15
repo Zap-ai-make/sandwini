@@ -478,6 +478,88 @@ describe("ce qui part avec la moto (S44)", () => {
   });
 });
 
+describe("ce que le client a emporté (S53)", () => {
+  /* Les trois champs d'audit accompagnent tout geste : `seulsChangent` les
+     compte dans le geste, pas en plus de lui. */
+  const majDe = (champs: Record<string, unknown>, auteur = "ger-1") => ({
+    ...champs,
+    updatedAt: serverTimestamp(),
+    updatedBy: auteur,
+    updatedByName: "Auteur",
+  });
+
+  it("le gérant marque un papier emporté sur sa vente", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: true, cmc: false } }),
+      ),
+    );
+  });
+
+  /* **Point de vigilance 4 du plan.** On ne remet pas ce qu'on n'a pas — mais
+     une règle Firestore ne peut pas lire la moto pour le vérifier. Elle borne
+     donc la FORME, et l'écran tient la condition métier. Ce test fige la
+     frontière entre les deux : ce qui est refusé ici est refusé au serveur, le
+     reste est une affaire d'interface. */
+  it("refuse un emporté qui ne soit pas deux booléens", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: "oui", cmc: false } }),
+      ),
+    );
+  });
+
+  it("refuse une clé inconnue dans emporté — la carte grise n’y a pas sa place", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: true, cmc: true, carte_grise: true } }),
+      ),
+    );
+  });
+
+  it("le gérant ne marque rien d’emporté sur la vente d’une autre boutique", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-kdg"),
+        majDe({ emporte: { quittance: true, cmc: true } }),
+      ),
+    );
+  });
+
+  /* Le scan arrive au retour du prestataire, donc longtemps apres la vente :
+     il doit pouvoir s'ajouter seul, sans rien d'autre. */
+  it("le gérant dépose le scan de la carte grise au retour", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ carteGriseChemin: "ventes/vente-ptg/carte-grise.jpg" }),
+      ),
+    );
+  });
+
+  /* La porte d'`update` n'admettait que deux gestes — encaisser, remettre la
+     moto. Un troisieme geste ne doit pas devenir un passe-droit : rien d'autre
+     ne bouge dans la meme ecriture. */
+  /* Le defaut que ce prédicat a introduit, et que la suite S9 a trouvé : une
+     écriture qui ne touche que ses horodatages satisfait `seulsChangent`, et
+     ouvrait la porte à toute réécriture à l'identique. */
+  it("refuse une écriture qui ne change aucun des deux champs", async () => {
+    await assertFails(updateDoc(doc(gerant(), "ventesMotos/vente-ptg"), majDe({})));
+  });
+
+  it("refuse de changer le prix sous couvert de marquer un papier emporté", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: true, cmc: false }, prixConvenu: 1 }),
+      ),
+    );
+  });
+});
+
 describe("crédit et tranches ne se confondent pas", () => {
   it("une vente en tranches retient la moto : pas de remise, pas de date de remise", async () => {
     await assertSucceeds(addDoc(collection(gerant(), "ventesMotos"), venteTranches()));

@@ -38,6 +38,8 @@ const vente = (partie: Partial<Vente> = {}): Vente => ({
   modePaiement: "credit",
   carteGrise: true,
   casque: true,
+  emporte: { quittance: false, cmc: false },
+  carteGriseChemin: null,
   inclus: [],
   nonInclus: [],
   totalPaye: 0,

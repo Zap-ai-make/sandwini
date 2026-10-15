@@ -774,7 +774,8 @@ service cloud.firestore {
                                      'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
                                      'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
                                      'lienSuiviEnvoyeAt', 'statutDossier',
-                                     'dateClotureDossier'].concat(champsAudit()))
+                                     'dateClotureDossier',
+                                     'emporte', 'carteGriseChemin'].concat(champsAudit()))
              && donnees.keys().hasAll(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
                                        'date', 'prixConvenu', 'modePaiement', 'carteGrise', 'casque',
                                        'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
@@ -791,6 +792,7 @@ service cloud.firestore {
              && donnees.motoId.size() > 0
              && donnees.clientId is string
              && donnees.clientId.size() > 0
+             && emporteValide(donnees)
              && dateAppareil(donnees.date)
              && montantValide(donnees.prixConvenu)
              && donnees.prixConvenu > 0
@@ -879,6 +881,43 @@ service cloud.firestore {
     // sens : `totalPaye` n'additionne que des versements réels, donc il reste
     // inférieur ou égal à la vérité, donc `resteDu` reste supérieur ou égal.
     // Un reste dû nul l'est donc vraiment.
+    // Ce que le client a emporte, et le scan de la carte grise (S53).
+    //
+    // La forme seule est bornee ici. « On ne remet pas ce qu'on n'a pas » est
+    // une condition METIER qui demanderait de lire la moto : une regle ne joint
+    // pas, et recopier l'etat de la moto sur la vente serait la contradiction B
+    // de la spec. L'ecran tient la condition, les regles tiennent la forme.
+    function emporteValide(donnees) {
+      return (!donnees.keys().hasAny(['emporte'])
+              || (donnees.emporte.keys().hasOnly(['quittance', 'cmc'])
+                  && donnees.emporte.quittance is bool
+                  && donnees.emporte.cmc is bool))
+             && (!donnees.keys().hasAny(['carteGriseChemin'])
+                 || donnees.carteGriseChemin == null
+                 || texteBorne(donnees.carteGriseChemin, 400));
+    }
+
+    // Le troisieme geste de comptoir sur une vente, apres l'encaissement et la
+    // remise de la moto : dire ce que le client a emporte, et deposer le scan de
+    // la carte grise a son retour. Les deux arrivent LONGTEMPS apres la vente,
+    // donc ils doivent pouvoir s'ecrire seuls.
+    //
+    // `seulsChangent` est ce qui empeche ce geste de devenir un passe-droit :
+    // rien d'autre ne bouge dans la meme ecriture, et le prix reste intouchable.
+    //
+    // Le `hasAny` n'est pas une ceinture de plus : sans lui, une ecriture qui ne
+    // change RIEN d'autre que ses horodatages satisfait `seulsChangent`, et la
+    // porte s'ouvre a toute reecriture a l'identique. Quatre tests
+    // d'immuabilite de S9 sont tombes la-dessus — un total paye qui stagne, une
+    // remise de moto rejouee. `hasOnly` borne ce qui PEUT changer ; `hasAny`
+    // exige qu'un geste ait bien eu lieu.
+    function papiersEmportesValide(donnees) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['emporte', 'carteGriseChemin'])
+             && seulsChangent(['emporte', 'carteGriseChemin'])
+             && emporteValide(donnees);
+    }
+
     function remiseMotoValide(donnees, ancien) {
       return seulsChangent(['motoRemise', 'dateRemiseMoto'])
              && ancien.modePaiement == 'tranches'
@@ -898,7 +937,8 @@ service cloud.firestore {
       allow update: if peutVendrePour(resource.data.boutiqueId)
                     && traceModification(request.resource.data, resource.data)
                     && (encaissementValideSurVente(request.resource.data, resource.data)
-                        || remiseMotoValide(request.resource.data, resource.data));
+                        || remiseMotoValide(request.resource.data, resource.data)
+                        || papiersEmportesValide(request.resource.data));
 
       // Une vente ne se supprime pas : elle s'annule, et l'annulation laisse
       // une trace. S25.

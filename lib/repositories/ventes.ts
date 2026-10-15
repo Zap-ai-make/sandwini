@@ -6,6 +6,7 @@ import {
   onSnapshot,
   query,
   Timestamp,
+  updateDoc,
   where,
   writeBatch,
   type DocumentData,
@@ -18,6 +19,7 @@ import {
   TYPES_DOCUMENT,
   agregatsPaiement,
   estEngagement,
+  lireEmporte,
   lireMontant,
   lireMontantEncaisse,
   motoRemiseA,
@@ -35,6 +37,7 @@ import {
   type Vente,
   type Versement,
 } from "@/lib/domain/vente";
+import { type PapierMoto } from "@/lib/domain/moto";
 import { reserverNumero, type Numeroteur } from "@/lib/numerotation/compteur";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
@@ -90,6 +93,11 @@ function lireVente(instantane: DocumentSnapshot<DocumentData>): Vente {
        ce que le gérant avait réellement écrit. */
     carteGrise: typeof donnees.carteGrise === "boolean" ? donnees.carteGrise : null,
     casque: typeof donnees.casque === "boolean" ? donnees.casque : null,
+    /* `lireEmporte` comble les ventes d'avant S53, qui sont la majorité : elles
+       se lisent « rien d'emporté » et non `undefined`. */
+    emporte: lireEmporte(donnees.emporte),
+    carteGriseChemin:
+      typeof donnees.carteGriseChemin === "string" ? donnees.carteGriseChemin : null,
     inclus: Array.isArray(donnees.inclus) ? donnees.inclus : [],
     nonInclus: Array.isArray(donnees.nonInclus) ? donnees.nonInclus : [],
     totalPaye: typeof donnees.totalPaye === "number" ? donnees.totalPaye : 0,
@@ -616,4 +624,55 @@ export function messageErreurVersement(cause: unknown): string {
   if (code.includes("not-found")) return "Cette vente n’existe plus.";
   if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
   return "L’enregistrement du versement n’a pas abouti.";
+}
+
+/**
+ * Dit que le client a emporté un papier — ou qu'il ne l'a plus (S53).
+ *
+ * **C'est le seul geste de comptoir qui reste** pour la quittance et le CMC :
+ * leur disponibilité se coche sur la moto, souvent bien avant la vente. Le
+ * dossier n'a plus de statut à promener pour eux.
+ *
+ * Une écriture par chemin pointé (`emporte.quittance`) et non l'objet entier :
+ * deux appareils qui cochent chacun un papier au même moment ne s'effacent pas
+ * l'un l'autre, là où deux écritures de l'objet complet le feraient (D66).
+ *
+ * On n'attend pas le serveur (D76) : l'appelant reçoit la promesse et rend la
+ * main tout de suite.
+ */
+export function marquerEmporte(
+  venteId: string,
+  papier: PapierMoto,
+  emporte: boolean,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  return {
+    enregistre: suivreEcriture(
+      updateDoc(doc(db(), "ventesMotos", venteId), {
+        [`emporte.${papier}`]: emporte,
+        ...traceModification(auteur),
+      }),
+    ),
+  };
+}
+
+/**
+ * Dépose le scan de la carte grise au retour du prestataire (S53).
+ *
+ * Le chemin Storage, pas l'URL : une URL de téléchargement se redemande à
+ * chaque lecture et finit par expirer. Même montage que les scans de la moto.
+ */
+export function poserScanCarteGrise(
+  venteId: string,
+  chemin: string | null,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  return {
+    enregistre: suivreEcriture(
+      updateDoc(doc(db(), "ventesMotos", venteId), {
+        carteGriseChemin: chemin,
+        ...traceModification(auteur),
+      }),
+    ),
+  };
 }

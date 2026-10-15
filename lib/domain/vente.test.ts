@@ -44,6 +44,7 @@ import {
   type Vente,
   type VenteCherchable,
   type Versement,
+  lireEmporte,
 } from "./vente";
 
 /**
@@ -304,6 +305,8 @@ describe("recherche d’une vente", () => {
     modePaiement: "comptant",
     carteGrise: true,
     casque: true,
+    emporte: { quittance: false, cmc: false },
+    carteGriseChemin: null,
     inclus: [],
     nonInclus: [],
     totalPaye: 1_200_000,
@@ -503,6 +506,8 @@ const venteS9 = (partie: Partial<Vente> = {}): Vente => ({
   modePaiement: "credit",
   carteGrise: true,
   casque: true,
+  emporte: { quittance: false, cmc: false },
+  carteGriseChemin: null,
   inclus: [],
   nonInclus: [],
   totalPaye: 0,
@@ -906,5 +911,21 @@ describe("ventesDuClient", () => {
     /* Un client vide ne rassemble pas toutes les ventes qui n'en ont pas : ce
        serait montrer le fichier entier sur la fiche de personne. */
     expect(ventesDuClient([vente({ id: "a", clientId: "" })], "")).toEqual([]);
+  });
+});
+
+describe("lireEmporte", () => {
+  /* **Point de vigilance 2.** Aucune vente d’avant S53 ne porte le champ. Elles
+     doivent se lire « rien d’emporté », jamais `undefined` — sinon l’écran du
+     dossier affiche un vide là où il doit afficher « à faire ». */
+  it("lit une vente d’avant S53 comme n’ayant rien fait emporter", () => {
+    expect(lireEmporte(undefined)).toEqual({ quittance: false, cmc: false });
+  });
+
+  it("lit ce que la vente porte, et ignore une clé inconnue", () => {
+    expect(lireEmporte({ quittance: true, cmc: false, carte_grise: true })).toEqual({
+      quittance: true,
+      cmc: false,
+    });
   });
 });

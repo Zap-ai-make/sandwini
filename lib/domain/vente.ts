@@ -103,6 +103,35 @@ export const LIBELLE_STATUT_DOCUMENT: Record<StatutDocument, string> = {
 export const STATUTS_DOSSIER = ["ouvert", "clos"] as const;
 export type StatutDossier = (typeof STATUTS_DOSSIER)[number];
 
+/**
+ * Ce que le client a emporté à l'achat.
+ *
+ * **La carte grise n'y figure pas**, et c'est une règle du métier, pas un
+ * oubli : « la carte grise n'est jamais disponible à l'achat » — elle est
+ * encore chez le prestataire le jour de la vente. Lui faire une case serait
+ * promettre un geste que personne ne peut faire.
+ */
+export type PapiersEmportes = { quittance: boolean; cmc: boolean };
+
+export const PAPIERS_EMPORTES_VIDES: PapiersEmportes = { quittance: false, cmc: false };
+
+/**
+ * Lit le champ d'une vente, y compris quand il n'existe pas.
+ *
+ * Aucune vente d'avant S53 ne le porte, et elles sont la majorité : une
+ * lecture qui rendrait `undefined` ferait afficher un vide là où l'écran doit
+ * dire « à faire » (D82 — une absence n'est pas une inconnue).
+ *
+ * Une clé inconnue est ignorée plutôt que recopiée : ce lecteur est la
+ * frontière du modèle, et ce qui le traverse doit avoir exactement la forme
+ * attendue.
+ */
+export function lireEmporte(brut: unknown): PapiersEmportes {
+  if (brut === null || typeof brut !== "object") return PAPIERS_EMPORTES_VIDES;
+  const valeurs = brut as Record<string, unknown>;
+  return { quittance: valeurs.quittance === true, cmc: valeurs.cmc === true };
+}
+
 export type Vente = {
   id: string;
   /** Le numéro qu'on imprime. Le serveur peut le corriger en cas de collision (D44). */
@@ -121,6 +150,24 @@ export type Vente = {
    */
   carteGrise: boolean | null;
   casque: boolean | null;
+  /**
+   * Ce que le client a emporté à l'achat (S53).
+   *
+   * **À ne pas confondre avec `carteGrise` ci-dessus**, qui dit si le papier
+   * fait partie de ce qu'on a vendu. Celui-ci dit si le client est parti avec,
+   * ce qui est une autre question : un papier peut être inclus dans l'achat et
+   * rester au magasin parce qu'il n'est pas encore arrivé.
+   *
+   * Jamais `null` : `lireEmporte` comble les ventes d'avant cette spec.
+   */
+  emporte: PapiersEmportes;
+  /**
+   * Le scan de la carte grise, déposé au retour du prestataire.
+   *
+   * Chemin Storage et non URL, comme les scans de la moto : une URL de
+   * téléchargement se redemande à chaque lecture et finit par expirer.
+   */
+  carteGriseChemin: string | null;
   /**
    * Les deux listes d'avant S44 — **lues, jamais écrites**.
    *
