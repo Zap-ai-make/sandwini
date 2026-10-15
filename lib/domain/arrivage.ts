@@ -165,16 +165,30 @@ export function ecoulement(motos: Pick<Moto, "arrivageId" | "statut">[], arrivag
   return { total: duLot.length, vendues, restant: duLot.length - vendues };
 }
 
-export type CompletudeCmc = { total: number; recus: number; manquants: number };
+export type CompletudePapiers = {
+  total: number;
+  cmcManquants: number;
+  quittancesManquantes: number;
+};
 
-/** Combien de motos d'un lot ont leur CMC en main, combien l'attendent (S43). */
-export function completudeCmc(
-  motos: Pick<Moto, "arrivageId" | "cmcRecu">[],
+/**
+ * Ce qui manque à un lot, papier par papier (S53).
+ *
+ * Le compteur d'avant ne regardait que le CMC. La quittance a la même nature et
+ * se perd de la même façon ; n'en compter qu'un était ce qui faisait croire que
+ * le produit « ne suit pas le vrai circuit ». Un compteur laissé derrière
+ * redirait la moitié de la vérité.
+ */
+export function completudePapiers(
+  motos: readonly Pick<Moto, "arrivageId" | "cmcRecu" | "quittanceRecue">[],
   arrivageId: string,
-): CompletudeCmc {
+): CompletudePapiers {
   const duLot = motos.filter((m) => m.arrivageId === arrivageId);
-  const recus = duLot.filter((m) => m.cmcRecu).length;
-  return { total: duLot.length, recus, manquants: duLot.length - recus };
+  return {
+    total: duLot.length,
+    cmcManquants: duLot.filter((m) => !m.cmcRecu).length,
+    quittancesManquantes: duLot.filter((m) => !m.quittanceRecue).length,
+  };
 }
 
 /** Un lot est écoulé quand il a des motos et que toutes sont vendues. */
@@ -189,6 +203,7 @@ export type BilanArrivages = {
   enStock: number;
   vendues: number;
   cmcManquants: number;
+  quittancesManquantes: number;
 };
 
 /**
@@ -198,7 +213,7 @@ export type BilanArrivages = {
  */
 export function bilanArrivages(
   arrivages: Pick<Arrivage, "id" | "annule">[],
-  motos: Pick<Moto, "arrivageId" | "statut" | "cmcRecu">[],
+  motos: Pick<Moto, "arrivageId" | "statut" | "cmcRecu" | "quittanceRecue">[],
 ): BilanArrivages {
   const actifs = arrivages.filter((a) => !a.annule);
   const ids = new Set(actifs.map((a) => a.id));
@@ -209,6 +224,7 @@ export function bilanArrivages(
     enStock: duLot.filter((m) => (m.statut as StatutMoto) === "en_stock").length,
     vendues: duLot.filter((m) => (m.statut as StatutMoto) === "vendue").length,
     cmcManquants: duLot.filter((m) => !m.cmcRecu).length,
+    quittancesManquantes: duLot.filter((m) => !m.quittanceRecue).length,
   };
 }
 
@@ -265,7 +281,16 @@ export type FiltreArrivage = "tous" | "cmc-incomplets" | "ecoules";
 /** Les lots actifs (jamais les annulés), restreints selon l'onglet choisi. */
 export function filtrerArrivages(arrivages: Arrivage[], motos: Moto[], filtre: FiltreArrivage): Arrivage[] {
   const actifs = arrivages.filter((a) => !a.annule);
-  if (filtre === "cmc-incomplets") return actifs.filter((a) => completudeCmc(motos, a.id).manquants > 0);
+  /* Le filtre garde son nom d'URL — « cmc-incomplets » est dans les signets du
+     commanditaire — mais compte les DEUX papiers depuis S53 : un lot dont les
+     quittances manquent est tout aussi incomplet. Le libellé affiché, lui, dit
+     « Papiers incomplets ». */
+  if (filtre === "cmc-incomplets") {
+    return actifs.filter((a) => {
+      const papiers = completudePapiers(motos, a.id);
+      return papiers.cmcManquants > 0 || papiers.quittancesManquantes > 0;
+    });
+  }
   if (filtre === "ecoules") return actifs.filter((a) => estEcoule(motos, a.id));
   return actifs;
 }

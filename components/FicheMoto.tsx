@@ -4,6 +4,7 @@ import { ArrowLeft, Lock, LoaderCircle, Truck, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { DeplacerMotoModal } from "@/components/DeplacerMotoModal";
+import { PapiersEnMain } from "@/components/PapiersEnMain";
 import { PapiersMoto } from "@/components/PapiersMoto";
 import { PoserCoutModal } from "@/components/PoserCoutModal";
 import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
@@ -109,6 +110,8 @@ export function FicheMoto({ id }: { id: string }) {
               </ul>
             </section>
           )}
+
+          <PapiersEnMain moto={moto} />
 
           <PapiersMoto moto={moto} />
 

@@ -9,7 +9,7 @@ import {
   ajusterNombreDeLignes,
   bilanArrivages,
   chercherMotoParChassis,
-  completudeCmc,
+  completudePapiers,
   ecoulement,
   estEcoule,
   filtrerArrivages,
@@ -31,6 +31,7 @@ const motoLot = (p: Partial<Moto> = {}): Moto =>
     arrivageId: "a1",
     statut: "en_stock",
     cmcRecu: false,
+    quittanceRecue: false,
     numeroChassis: "LC6PCJ1A9K0000123",
     ...p,
   }) as unknown as Moto;
@@ -278,18 +279,30 @@ describe("preparerLot", () => {
   });
 });
 
-describe("completudeCmc", () => {
-  it("compte les CMC reçus et manquants du lot", () => {
+describe("completudePapiers", () => {
+  /* **S53 compte les deux.** `completudeCmc` ne comptait qu'un des deux papiers
+     alors que la quittance a la même nature et se perd de la même façon — et un
+     seul des deux compté était ce qui faisait croire que le produit « ne suit
+     pas le vrai circuit ». */
+  it("compte les quittances manquantes d’un lot comme il compte les CMC", () => {
     const motos = [
-      motoLot({ arrivageId: "a1", cmcRecu: true }),
-      motoLot({ arrivageId: "a1", cmcRecu: false }),
-      motoLot({ arrivageId: "a2", cmcRecu: false }),
+      motoLot({ arrivageId: "a1", cmcRecu: true, quittanceRecue: false }),
+      motoLot({ arrivageId: "a1", cmcRecu: false, quittanceRecue: true }),
+      motoLot({ arrivageId: "a2", cmcRecu: false, quittanceRecue: false }),
     ];
-    expect(completudeCmc(motos, "a1")).toEqual({ total: 2, recus: 1, manquants: 1 });
+    expect(completudePapiers(motos, "a1")).toEqual({
+      total: 2,
+      cmcManquants: 1,
+      quittancesManquantes: 1,
+    });
   });
 
   it("un lot sans moto n'a rien à réclamer", () => {
-    expect(completudeCmc([], "a1")).toEqual({ total: 0, recus: 0, manquants: 0 });
+    expect(completudePapiers([], "a1")).toEqual({
+      total: 0,
+      cmcManquants: 0,
+      quittancesManquantes: 0,
+    });
   });
 });
 
@@ -310,14 +323,16 @@ describe("estEcoule", () => {
 });
 
 describe("bilanArrivages", () => {
-  it("totalise les lots actifs et leurs motos par statut et par CMC", () => {
+  it("totalise les lots actifs et leurs motos par statut et par papier manquant", () => {
     const arrivages = [arr("a1"), arr("a2"), arr("a3", { annule: true })];
     const motos = [
-      motoLot({ arrivageId: "a1", statut: "en_stock", cmcRecu: false }),
-      motoLot({ arrivageId: "a1", statut: "vendue", cmcRecu: true }),
-      motoLot({ arrivageId: "a2", statut: "en_stock", cmcRecu: true }),
-      motoLot({ arrivageId: "a3", statut: "en_stock", cmcRecu: false }), // lot annulé : ignoré
-      motoLot({ arrivageId: null, statut: "en_stock", cmcRecu: false }), // unitaire : ignoré
+      motoLot({ arrivageId: "a1", statut: "en_stock", cmcRecu: false, quittanceRecue: true }),
+      motoLot({ arrivageId: "a1", statut: "vendue", cmcRecu: true, quittanceRecue: false }),
+      motoLot({ arrivageId: "a2", statut: "en_stock", cmcRecu: true, quittanceRecue: true }),
+      // lot annulé : ignoré
+      motoLot({ arrivageId: "a3", statut: "en_stock", cmcRecu: false, quittanceRecue: false }),
+      // unitaire : ignoré
+      motoLot({ arrivageId: null, statut: "en_stock", cmcRecu: false, quittanceRecue: false }),
     ];
     expect(bilanArrivages(arrivages, motos)).toEqual({
       arrivages: 2,
@@ -325,25 +340,46 @@ describe("bilanArrivages", () => {
       enStock: 2,
       vendues: 1,
       cmcManquants: 1,
+      quittancesManquantes: 1,
     });
   });
 });
 
 describe("filtrerArrivages", () => {
-  const arrivages = [arr("a1"), arr("a2"), arr("ecoule"), arr("annule", { annule: true })];
+  const arrivages = [
+    arr("a1"),
+    arr("a2"),
+    arr("quittance"),
+    arr("ecoule"),
+    arr("annule", { annule: true }),
+  ];
   const motos = [
-    motoLot({ arrivageId: "a1", statut: "en_stock", cmcRecu: false }), // CMC incomplet
-    motoLot({ arrivageId: "a2", statut: "en_stock", cmcRecu: true }), // complet, pas écoulé
-    motoLot({ arrivageId: "ecoule", statut: "vendue", cmcRecu: true }), // écoulé
-    motoLot({ arrivageId: "annule", statut: "en_stock", cmcRecu: false }),
+    // CMC manquant
+    motoLot({ arrivageId: "a1", statut: "en_stock", cmcRecu: false, quittanceRecue: true }),
+    // les deux papiers en main, pas écoulé
+    motoLot({ arrivageId: "a2", statut: "en_stock", cmcRecu: true, quittanceRecue: true }),
+    /* **Le lot que S53 fait apparaître dans ce filtre.** Son CMC est là, sa
+       quittance non : il était invisible tant que le filtre ne comptait qu'un
+       des deux papiers. */
+    motoLot({ arrivageId: "quittance", statut: "en_stock", cmcRecu: true, quittanceRecue: false }),
+    motoLot({ arrivageId: "ecoule", statut: "vendue", cmcRecu: true, quittanceRecue: true }),
+    motoLot({ arrivageId: "annule", statut: "en_stock", cmcRecu: false, quittanceRecue: false }),
   ];
 
   it("« tous » montre les lots actifs, jamais les annulés", () => {
-    expect(filtrerArrivages(arrivages, motos, "tous").map((a) => a.id)).toEqual(["a1", "a2", "ecoule"]);
+    expect(filtrerArrivages(arrivages, motos, "tous").map((a) => a.id)).toEqual([
+      "a1",
+      "a2",
+      "quittance",
+      "ecoule",
+    ]);
   });
 
-  it("« cmc-incomplets » ne garde que les lots à CMC manquant", () => {
-    expect(filtrerArrivages(arrivages, motos, "cmc-incomplets").map((a) => a.id)).toEqual(["a1"]);
+  it("« cmc-incomplets » garde les lots dont l’un des deux papiers manque", () => {
+    expect(filtrerArrivages(arrivages, motos, "cmc-incomplets").map((a) => a.id)).toEqual([
+      "a1",
+      "quittance",
+    ]);
   });
 
   it("« ecoules » ne garde que les lots tout vendus", () => {

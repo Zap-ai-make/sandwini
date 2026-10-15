@@ -154,6 +154,19 @@ export function InventaireStock({
                   >
                     <Link href={`/motos?moto=${moto.id}`} className="lien">
                       {nomMarque(moto.marqueId)} {nomModele(moto.modeleId)}{" "}
+                      {/* **La plaque s'ajoute au châssis, elle ne le remplace
+                          pas** (S53). C'est ce qui justifie de l'avoir rangée
+                          sur la moto plutôt que sur la vente : l'inventaire la
+                          relit sans rouvrir un dossier. Et les deux servent :
+                          la plaque désigne la moto de loin, le châssis se
+                          vérifie accroupi devant le cadre. Un identifiant qui
+                          change de nature selon qu'un champ est rempli se
+                          parcourt moins bien qu'une colonne stable. */}
+                      {moto.plaque !== null && (
+                        <span className="plaque-code text-legende text-encre-doux">
+                          {moto.plaque}{" "}
+                        </span>
+                      )}
                       <span className="font-code text-legende text-encre-doux">
                         {moto.numeroChassis}
                       </span>

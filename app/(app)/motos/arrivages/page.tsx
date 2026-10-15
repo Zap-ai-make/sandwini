@@ -17,7 +17,7 @@ import { useSession } from "@/lib/auth/session";
 import {
   bilanArrivages,
   chercherMotoParChassis,
-  completudeCmc,
+  completudePapiers,
   ecoulement,
   filtrerArrivages,
   type Arrivage,
@@ -201,20 +201,29 @@ export default function PageArrivages() {
         rendu: (arrivage) => <BarreEcoulement compte={ecoulement(stock ?? [], arrivage.id)} />,
       },
       {
+        /* La clé reste « cmc » — elle sert d'identifiant de colonne, pas de
+           libellé — mais la colonne compte les DEUX papiers depuis S53. Un lot
+           dont les quittances manquaient s'affichait « Complet ». */
         cle: "cmc",
-        titre: "Documents CMC",
+        titre: "Papiers",
         rendu: (arrivage) => {
-          const c = completudeCmc(stock ?? [], arrivage.id);
-          if (c.total === 0) return <span className="text-encre-doux">—</span>;
+          const p = completudePapiers(stock ?? [], arrivage.id);
+          if (p.total === 0) return <span className="text-encre-doux">—</span>;
+          const manquants = p.quittancesManquantes + p.cmcManquants;
           return (
             <div>
-              {c.manquants === 0 ? (
+              {manquants === 0 ? (
                 <span className="pastille pastille-solde">Complet</span>
               ) : (
-                <span className="pastille pastille-retard">{c.manquants} manquants</span>
+                <span className="pastille pastille-retard">{manquants} manquants</span>
               )}
+              {/* Le détail par papier : « 2 manquants » ne dit pas lequel aller
+                  chercher, et les deux ne se réclament pas au même endroit. */}
               <span className="mt-1 block text-legende text-encre-doux">
-                {c.recus} / {c.total}
+                {p.quittancesManquantes > 0 && `${p.quittancesManquantes} quittance(s)`}
+                {p.quittancesManquantes > 0 && p.cmcManquants > 0 && " · "}
+                {p.cmcManquants > 0 && `${p.cmcManquants} CMC`}
+                {manquants === 0 && `${p.total} / ${p.total}`}
               </span>
             </div>
           );

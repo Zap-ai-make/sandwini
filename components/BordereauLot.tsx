@@ -1,4 +1,4 @@
-import { completudeCmc, ecoulement, type Arrivage } from "@/lib/domain/arrivage";
+import { completudePapiers, ecoulement, type Arrivage } from "@/lib/domain/arrivage";
 import { formaterDate } from "@/lib/domain/format";
 import { LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
 
@@ -25,7 +25,7 @@ export function BordereauLot({
   nomModele: (id: string) => string;
 }) {
   const compte = ecoulement(motos, arrivage.id);
-  const cmc = completudeCmc(motos, arrivage.id);
+  const papiers = completudePapiers(motos, arrivage.id);
   const filet = "1px solid #bbb";
 
   return (
@@ -37,14 +37,15 @@ export function BordereauLot({
       </p>
       {arrivage.description && <p style={{ marginTop: "0.25rem" }}>{arrivage.description}</p>}
       <p style={{ marginTop: "0.5rem", fontWeight: 600 }}>
-        Motos : {compte.total} · En stock : {compte.restant} · Vendues : {compte.vendues} · CMC
-        manquants : {cmc.manquants}
+        Motos : {compte.total} · En stock : {compte.restant} · Vendues : {compte.vendues} ·
+        Quittances manquantes : {papiers.quittancesManquantes} · CMC manquants :{" "}
+        {papiers.cmcManquants}
       </p>
 
       <table style={{ marginTop: "0.75rem", width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
         <thead>
           <tr>
-            {["#", "N° de cadre", "Marque", "Statut", "CMC"].map((titre) => (
+            {["#", "N° de cadre", "Marque", "Statut", "Quittance", "CMC"].map((titre) => (
               <th
                 key={titre}
                 style={{ textAlign: "left", borderBottom: "2px solid #000", padding: "0.25rem 0.4rem" }}
@@ -67,6 +68,9 @@ export function BordereauLot({
               </td>
               <td style={{ borderBottom: filet, padding: "0.25rem 0.4rem" }}>
                 {LIBELLE_STATUT[moto.statut]}
+              </td>
+              <td style={{ borderBottom: filet, padding: "0.25rem 0.4rem" }}>
+                {moto.quittanceRecue ? "Reçue" : "Manquante"}
               </td>
               <td style={{ borderBottom: filet, padding: "0.25rem 0.4rem" }}>
                 {moto.cmcRecu ? "Reçu" : "Manquant"}

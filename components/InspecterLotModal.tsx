@@ -4,13 +4,9 @@ import { Ban, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
-import {
-  completudeCmc,
-  ecoulement,
-  type Arrivage,
-} from "@/lib/domain/arrivage";
+import { completudePapiers, ecoulement, type Arrivage } from "@/lib/domain/arrivage";
 import { formaterDate, formaterNombre } from "@/lib/domain/format";
-import { LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
+import { LIBELLE_PAPIER, PAPIERS_MOTO, LIBELLE_STATUT, type PapierMoto, type Moto } from "@/lib/domain/moto";
 import { marquerPapierRecu, messageErreurMoto } from "@/lib/repositories/motos";
 import type { Auteur } from "@/lib/repositories/referentiels";
 
@@ -18,8 +14,8 @@ import type { Auteur } from "@/lib/repositories/referentiels";
  * Inspecter un lot (S43) — l'entête, ses compteurs, et la table de ses motos.
  *
  * Un modal large plutôt que le panneau latéral étroit : ce qu'on montre ici est
- * un tableau (cadre, marque, statut, CMC), pas huit faits. La case « CMC reçu »
- * écrit aussitôt (cache local), sans toucher au coût (D2). Les actions du lot —
+ * un tableau (cadre, marque, statut, papiers), pas huit faits. Les cases
+ * écrivent aussitôt (cache local), sans toucher au coût (D2). Les actions du lot —
  * corriger, annuler, effacer — vivent au pied, pas dans un menu par ligne.
  *
  * Monté seulement à l'ouverture. Le calque, le focus, Échap et le verrou de
@@ -56,21 +52,32 @@ export function InspecterLotModal({
 }) {
   const [erreur, setErreur] = useState<string | null>(null);
   const compte = ecoulement(motosDuLot, arrivage.id);
-  const cmc = completudeCmc(motosDuLot, arrivage.id);
+  const papiers = completudePapiers(motosDuLot, arrivage.id);
   const vide = motosDuLot.length === 0;
 
-  function basculerCmc(moto: Moto, recu: boolean) {
+  /* **Un seul geste pour les deux papiers** (S53). La quittance se cochait
+     nulle part alors qu'elle arrive avec la moto, exactement comme le CMC :
+     c'était le « on comprend rien » du commanditaire. */
+  function basculerPapier(moto: Moto, papier: PapierMoto, recu: boolean) {
     if (!auteur) return;
     setErreur(null);
-    const { enregistre } = marquerPapierRecu(moto.id, "cmc", recu, auteur);
+    const { enregistre } = marquerPapierRecu(moto.id, papier, recu, auteur);
     enregistre.catch((cause) => setErreur(messageErreurMoto(cause)));
   }
+
+  const estEnMain = (moto: Moto, papier: PapierMoto) =>
+    papier === "quittance" ? moto.quittanceRecue : moto.cmcRecu;
 
   const stats: { nom: string; valeur: number; couleur?: string }[] = [
     { nom: "Motos du lot", valeur: compte.total },
     { nom: "En stock", valeur: compte.restant },
     { nom: "Vendues", valeur: compte.vendues, couleur: "var(--color-solde)" },
-    { nom: "CMC manquants", valeur: cmc.manquants, couleur: "var(--color-alerte)" },
+    {
+      nom: "Quittances manquantes",
+      valeur: papiers.quittancesManquantes,
+      couleur: "var(--color-alerte)",
+    },
+    { nom: "CMC manquants", valeur: papiers.cmcManquants, couleur: "var(--color-alerte)" },
   ];
 
   return (
@@ -170,7 +177,11 @@ export function InspecterLotModal({
                     <th className="p-2 font-medium">N° de cadre</th>
                     <th className="p-2 font-medium">Marque</th>
                     <th className="p-2 font-medium">Statut</th>
-                    <th className="p-2 font-medium">CMC</th>
+                    {PAPIERS_MOTO.map((papier) => (
+                      <th key={papier} className="p-2 font-medium">
+                        {LIBELLE_PAPIER[papier]}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
@@ -192,25 +203,33 @@ export function InspecterLotModal({
                           {LIBELLE_STATUT[moto.statut]}
                         </span>
                       </td>
-                      <td className="p-2">
-                        <label className="inline-flex cursor-pointer items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={moto.cmcRecu}
-                            disabled={!auteur}
-                            onChange={(evenement) => basculerCmc(moto, evenement.target.checked)}
-                            className="size-4 accent-[var(--color-solde)]"
-                            aria-label={`CMC reçu, moto ${moto.numeroChassis}`}
-                          />
-                          <span
-                            className={
-                              moto.cmcRecu ? "pastille pastille-solde" : "pastille pastille-retard"
-                            }
-                          >
-                            {moto.cmcRecu ? "CMC reçu" : "CMC manquant"}
-                          </span>
-                        </label>
-                      </td>
+                      {PAPIERS_MOTO.map((papier) => {
+                        const enMain = estEnMain(moto, papier);
+                        const nom = LIBELLE_PAPIER[papier];
+                        return (
+                          <td key={papier} className="p-2">
+                            <label className="inline-flex cursor-pointer items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={enMain}
+                                disabled={!auteur}
+                                onChange={(evenement) =>
+                                  basculerPapier(moto, papier, evenement.target.checked)
+                                }
+                                className="size-4 accent-[var(--color-solde)]"
+                                aria-label={`${nom} reçu, moto ${moto.numeroChassis}`}
+                              />
+                              <span
+                                className={
+                                  enMain ? "pastille pastille-solde" : "pastille pastille-retard"
+                                }
+                              >
+                                {enMain ? `${nom} reçu` : `${nom} manquant`}
+                              </span>
+                            </label>
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

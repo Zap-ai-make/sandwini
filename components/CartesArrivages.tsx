@@ -15,10 +15,15 @@ export function CartesArrivages({ bilan }: { bilan: BilanArrivages }) {
     { nom: "Motos reçues", valeur: bilan.motosRecues, couleur: "var(--color-encre)" },
     { nom: "En stock", valeur: bilan.enStock, couleur: "var(--color-encre)" },
     { nom: "Vendues", valeur: bilan.vendues, couleur: "var(--color-solde)" },
+    {
+      nom: "Quittances manquantes",
+      valeur: bilan.quittancesManquantes,
+      couleur: "var(--color-alerte)",
+    },
     { nom: "CMC manquants", valeur: bilan.cmcManquants, couleur: "var(--color-alerte)" },
   ];
   return (
-    <div className="mb-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
+    <div className="mb-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
       {cartes.map((carte) => (
         <div key={carte.nom} className="cadre p-4">
           <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
