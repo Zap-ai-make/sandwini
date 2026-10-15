@@ -606,6 +606,59 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // --- Paquets de cartes grises (S53) -------------------------------------
+    // « On tend dix cartes grises. » Le paquet GROUPE un depot, il ne le
+    // remplace pas : chaque document `carte_grise` continue de porter son
+    // prestataire, sa date et son avance, parce que les regles evaluent chaque
+    // ecriture d'un lot contre l'etat d'AVANT le lot — un document valide
+    // contre un paquet cree dans le meme lot serait refuse (lecon de S5,
+    // redite en S17). `depotRenseigne` reste donc vrai mot pour mot.
+    //
+    // Une trace de premier niveau, comme `transfertsMotos` : elle se liste par
+    // boutique sans requete de groupe de collections.
+    //
+    // **Aucun champ d'etat.** Un paquet est solde quand aucune de ses cartes
+    // n'est plus dehors, ce qui se calcule (`lib/domain/paquet.ts`). Un champ
+    // « rendu » dirait un jour le contraire de ses propres documents, et il
+    // faudrait un geste pour les raccorder. Le `hasOnly` ci-dessous est ce qui
+    // empeche de le reintroduire par inadvertance.
+    function paquetCartesGrisesValide(donnees) {
+      return donnees.keys().hasOnly(['boutiqueId', 'prestataireId', 'prestataireNom',
+                                     'deposeLe', 'disponibleLe', 'avance',
+                                     'venteIds'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'prestataireId', 'prestataireNom',
+                                       'deposeLe', 'disponibleLe', 'avance',
+                                       'venteIds'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.prestataireId is string
+             && donnees.prestataireId.size() > 0
+             && texteBorne(donnees.prestataireNom, 80)
+             && dateAppareil(donnees.deposeLe)
+             && (donnees.disponibleLe == null || dateAppareil(donnees.disponibleLe))
+             // Strictement positive, comme au depot unitaire : une avance a
+             // zero n'est pas une avance, c'est un travail confie a credit.
+             && montantValide(donnees.avance)
+             && donnees.avance > 0
+             && donnees.venteIds is list
+             // Un paquet vide ferait sortir l'avance sans contrepartie.
+             && donnees.venteIds.size() > 0
+             // La borne redit `CARTES_PAR_PAQUET_MAX` du domaine, et cette
+             // repetition est voulue (D27) : le domaine decide de ce qu'il
+             // PROPOSE, la base de ce qu'elle ACCEPTE. 249 vient de la limite
+             // de 500 ecritures par lot — un paquet en fait `2N + 2`.
+             && donnees.venteIds.size() <= 249;
+    }
+
+    match /lotsCartesGrises/{paquetId} {
+      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+      allow create: if paquetCartesGrisesValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+      // Un paquet est un fait. On le corrige en faisant revenir les cartes, ce
+      // qui laisse les deux traces.
+      allow update, delete: if false;
+    }
+
     // Le coût. Le `boutiqueId` y est répété : au sein d'un même lot d'écriture,
     // les règles évaluent chaque document contre l'état d'avant, donc la moto
     // parente n'existe pas encore quand son coût est validé. On vérifie donc le
