@@ -1,23 +1,35 @@
 "use client";
 
 import { Wallet } from "lucide-react";
-import { useCallback, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useMemo, useState } from "react";
+import Link from "next/link";
 import { JournalCaisse } from "@/components/JournalCaisse";
-import { ErreurDeLecture, EtatChargement, EtatErreurSaisie, SansBoutique } from "@/components/patrons/Etats";
+import { ResumeCaisse } from "@/components/ResumeCaisse";
+import { ErreurDeLecture, EtatChargement, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
-import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
+import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
+import {
+  PLAGE_VIDE,
+  bornesPeriode,
+  libellePeriode,
+  type Periode,
+  type PlagePeriode,
+} from "@/lib/domain/periode";
 import {
   bilanParBoutique,
-  mouvementsDuJour,
+  mouvementsDeLaPeriode,
   totalDuBilan,
-  type LigneBilan,
   type Mouvement,
 } from "@/lib/domain/caisse";
-import { formaterDate, formaterMontant, jourLocal } from "@/lib/domain/format";
+import {
+  compter,
+  formaterMontant,
+} from "@/lib/domain/format";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import { ecouterMouvements, enregistrerSortieEspeces } from "@/lib/repositories/caisse";
+import { ecouterMouvements } from "@/lib/repositories/caisse";
+import { usePostesDepense } from "@/lib/repositories/catalogue";
 
 /**
  * La caisse — le journal du jour (S22, `c2-caisse.html`).
@@ -73,8 +85,28 @@ export default function EspaceCaisse() {
  */
 function BilanDesBoutiques() {
   const { boutiques } = usePerimetre();
-  const aujourdhui = useMemo(() => jourLocal(new Date()), []);
-  const [jour, setJour] = useState(aujourdhui);
+  /**
+   * **Le consolidé se lit au mois, pas au jour (S55).**
+   *
+   * Il portait un sélecteur de journée, comme le journal d'une boutique. Mais
+   * les deux écrans ne répondent pas à la même question : le journal dit ce qui
+   * s'est passé aujourd'hui au comptoir, le consolidé est l'écran du
+   * superviseur, et « combien de carburant ce mois-ci » est la seule échelle à
+   * laquelle cette question veut dire quelque chose. Le commanditaire tient
+   * cette caisse pour « une mini comptabilité » : une comptabilité ne se lit
+   * pas une journée à la fois.
+   *
+   * « Ce mois-ci » à l'ouverture, et non « tout » : un total depuis l'origine
+   * ne se compare à rien.
+   */
+  const [periode, setPeriode] = useState<Periode>("ce-mois");
+  const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
+  const maintenant = useMemo(() => new Date(), []);
+  const bornes = useMemo(
+    () => bornesPeriode(periode, maintenant, plage),
+    [periode, maintenant, plage],
+  );
+  const intitule = libellePeriode(periode, maintenant, plage);
 
   /* `null` : les mouvements de toutes les boutiques du périmètre. C'est la même
      écoute que la caisse d'une boutique, sans son filtre. */
@@ -90,9 +122,13 @@ function BilanDesBoutiques() {
     reessayer,
   } = useAbonnement(souscrireMouvements, "Les mouvements de caisse n’ont pas pu être lus.");
 
+  const deLaPeriode = useMemo(
+    () => mouvementsDeLaPeriode(mouvements ?? [], bornes),
+    [mouvements, bornes],
+  );
   const lignes = useMemo(
-    () => bilanParBoutique(mouvements ?? [], boutiques, jour),
-    [mouvements, boutiques, jour],
+    () => bilanParBoutique(deLaPeriode, boutiques),
+    [deLaPeriode, boutiques],
   );
   const total = useMemo(() => totalDuBilan(lignes), [lignes]);
   const chargement = mouvements === null && !erreur;
@@ -101,23 +137,16 @@ function BilanDesBoutiques() {
     <div>
       <TetePage
         surTitre="Caisse · Toutes les boutiques"
-        titre={jour === aujourdhui ? "Le bilan du jour" : "Le bilan d’une journée passée"}
-        sousTitre={formaterDate(new Date(`${jour}T12:00:00`))}
-        actions={
-          <div className="champ">
-            <label htmlFor="jour-bilan" className="sr-only">
-              Journée affichée
-            </label>
-            <input
-              id="jour-bilan"
-              className="saisie h-11 w-auto lg:h-9"
-              type="date"
-              value={jour}
-              max={aujourdhui}
-              onChange={(evenement) => setJour(evenement.target.value || aujourdhui)}
-            />
-          </div>
-        }
+        titre="Le bilan consolidé"
+        sousTitre={intitule ?? "Toutes périodes"}
+      />
+
+      <FiltrePeriode
+        periode={periode}
+        changer={setPeriode}
+        plage={plage}
+        changerPlage={setPlage}
+        className="mt-4"
       />
 
       {erreur ? (
@@ -132,90 +161,138 @@ function BilanDesBoutiques() {
       ) : chargement ? (
         <EtatChargement>Lecture des mouvements…</EtatChargement>
       ) : lignes.length === 0 ? (
-        /* Aucune ligne n'est pas « tout à zéro » : aucun tiroir n'a bougé ce
-           jour-là, ce qui est une information et non un bilan vide (D63). */
+        /* Aucune ligne n'est pas « tout à zéro » : aucun tiroir n'a bougé sur
+           cet intervalle, ce qui est une information et non un bilan vide (D63). */
         <div className="bloc-etat mt-6">
           <Wallet aria-hidden="true" className="size-10" />
           <h2 className="mt-3 text-bloc font-bold tracking-tight text-encre">
-            Aucun mouvement ce jour-là
+            Aucun mouvement sur cette période
           </h2>
           <p className="mt-1 max-w-prose text-corps text-encre-doux">
-            Aucune boutique n’a encaissé ni sorti d’argent. Choisissez une autre journée, ou une
+            Aucune boutique n’a encaissé ni sorti d’argent. Choisissez un autre intervalle, ou une
             boutique dans le bandeau pour ouvrir son journal.
           </p>
         </div>
       ) : (
-        <div className="min-w-0 max-w-4xl">
-          <Tableau
-            legende="Ce que chaque boutique a encaissé et sorti ce jour-là"
-            colonnes={COLONNES_BILAN}
-            lignes={lignes}
-            cleDe={(ligne) => ligne.boutiqueId}
-          />
-          {/* Le total est une somme de lignes lisibles juste au-dessus, jamais
-              un solde qu'on irait compter dans un meuble : trois tiroirs ne se
-              comptent pas ensemble. */}
-          <p className="mt-3 flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-t border-bord pt-3">
-            <span className="text-sm font-medium text-encre">
-              Total · {lignes.length === 1 ? "1 boutique" : `${lignes.length} boutiques`}
-            </span>
-            <span className="text-corps text-encre-doux">
-              {formaterMontant(total.entrees)} encaissés · {formaterMontant(total.sorties)} sortis
-              {" · "}
-              <strong className="text-lg font-semibold text-encre">
-                {formaterMontant(total.solde)}
-              </strong>
-            </span>
-          </p>
+        <div className="mt-6 min-w-0 max-w-4xl">
+          {/* **Le consolidé lit le même bloc que le gérant (S55).** Il portait
+              un tableau de cinq colonnes et, dessous, une ligne « Total » qui
+              répétait mot pour mot ces mêmes chiffres. À une boutique — le cas
+              courant tant que les deux autres n'encaissent pas — le tableau et
+              son total disaient deux fois la même chose, en deux mises en page
+              différentes. Le commanditaire a tranché : « l'espace du gérant est
+              très joli, celui du superviseur doit être pareil ». */}
+          <ResumeCaisse mouvements={deLaPeriode} intitule={intitule ?? "toutes périodes"} agrege />
+
+          {/* **Le détail par boutique ne paraît qu'à plusieurs.** Avec une seule
+              qui a bougé, chaque ligne redirait le bloc du dessus : c'est
+              exactement la répétition qu'on vient de retirer. D63 vaut ici
+              comme ailleurs. */}
+          {lignes.length > 1 && (
+            <section aria-labelledby="titre-par-boutique" className="mt-6">
+              <h2
+                id="titre-par-boutique"
+                className="mb-3 text-bloc font-bold tracking-tight text-encre"
+              >
+                Boutique par boutique
+              </h2>
+              <div className="cadre p-4 sm:p-5">
+                <dl className="grid gap-4">
+                  {lignes.map((ligne) => (
+                    <div key={ligne.boutiqueId} className="grid gap-0.5">
+                      <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+                        <dt className="flex min-w-0 items-center gap-2 text-corps text-encre">
+                          <span className="plaque-code">{ligne.code}</span>
+                          <span className="min-w-0 truncate font-medium">{ligne.nom}</span>
+                        </dt>
+                        <dd className="font-code text-corps font-semibold tabular-nums text-encre">
+                          {formaterMontant(ligne.solde)}
+                        </dd>
+                      </div>
+                      {/* Le détail en sous-ligne, et non en colonnes : quatre
+                          montants alignés obligeaient à relire l'en-tête pour
+                          savoir lequel était lequel.
+
+                          **« Dont X en espèces » était faux.** `especes` est le
+                          *net* du tiroir — entrées moins sorties en espèces —,
+                          pas une part des encaissements. Annoncé comme une part
+                          d'un brut, il pouvait afficher « dont −50 000 » le jour
+                          où une boutique sort plus d'espèces qu'elle n'en
+                          encaisse. Le mot « mouvement » le dit pour ce qu'il
+                          est, et c'est déjà le vocabulaire du bloc au-dessus. */}
+                      <p className="text-legende text-encre-doux">
+                        {formaterMontant(ligne.entrees)} encaissés
+                        {ligne.sorties > 0 && ` · ${formaterMontant(ligne.sorties)} sortis`}
+                        {` · mouvement du tiroir ${formaterMontant(ligne.especes)}`}
+                      </p>
+                    </div>
+                  ))}
+                </dl>
+                <p className="mt-4 border-t border-bord pt-3 text-legende text-encre-doux">
+                  {compter(lignes.length, "boutique")} ont bougé sur cette période.
+                </p>
+              </div>
+            </section>
+          )}
+
+          {/* **Le détail des dépenses a quitté la caisse (S55).** « Dans la
+              caisse c'est juste le montant total qui doit figurer » : la ligne
+              « Sorti des tiroirs » le dit, et « Où l'argent est parti » se lit
+              dans l'écran des dépenses, qui porte aussi la saisie et
+              l'historique. */}
+          {total.sorties > 0 && (
+            <p className="mt-6 text-corps text-encre-doux">
+              {formaterMontant(total.sorties)} sont sortis des tiroirs sur cette période.{" "}
+              <Link href="/caisse/depenses" className="lien">
+                Voir où l’argent est parti
+              </Link>
+              .
+            </p>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-const COLONNES_BILAN: Colonne<LigneBilan>[] = [
-  {
-    cle: "boutique",
-    titre: "Boutique",
-    principal: true,
-    rendu: (ligne) => (
-      <span className="flex items-center gap-2">
-        <span className="plaque-code">{ligne.code}</span>
-        <span className="min-w-0 truncate">{ligne.nom}</span>
-      </span>
-    ),
-  },
-  {
-    cle: "entrees",
-    titre: "Entrées",
-    chiffre: true,
-    rendu: (ligne) => formaterMontant(ligne.entrees),
-  },
-  {
-    cle: "sorties",
-    titre: "Sorties",
-    chiffre: true,
-    rendu: (ligne) => (ligne.sorties > 0 ? formaterMontant(ligne.sorties) : "—"),
-  },
-  {
-    cle: "solde",
-    titre: "Solde",
-    chiffre: true,
-    rendu: (ligne) => <strong className="font-semibold">{formaterMontant(ligne.solde)}</strong>,
-  },
-];
-
 function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: string }) {
   const session = useSession();
   const utilisateur = session.statut === "connecte" ? session.utilisateur : null;
-  /* Le gérant de cette boutique-là, et lui seul, clôture (arbitrage 3). Le
-     responsable lit — et la fermeture automatique étant une écriture, elle ne
-     part que sous ses mains à lui. */
+  /**
+   * **Le responsable peut sortir des espèces depuis S55, et c'était un trou.**
+   *
+   * L'écran réservait le geste au gérant de la boutique. Les règles Firestore,
+   * elles, l'autorisent depuis toujours : `encaissements` crée sous
+   * `peutVendrePour`, qui vaut responsable **ou** gérant de la boutique. Un
+   * responsable travaillant dans une de ses boutiques prenait donc un billet
+   * pour du carburant sans qu'aucun écran ne le lui laisse écrire — et le
+   * mouvement devenait un trou que rien n'expliquait.
+   *
+   * Le commanditaire a tranché la question en une phrase : « ce qui compte est
+   * de rendre tout traçable ». Un geste permis par les règles mais refusé par
+   * l'écran ne protège rien ; il empêche seulement la trace.
+   *
+   * La boutique reste la borne. On sort l'argent d'un tiroir précis, celui du
+   * périmètre affiché — jamais de trois à la fois, ce que la vue consolidée
+   * refuse déjà par construction.
+   */
   const peutSortirDesEspeces =
-    utilisateur?.role === "gerant" && utilisateur.boutiqueId === boutiqueId;
+    utilisateur !== null &&
+    (utilisateur.role === "responsable" ||
+      (utilisateur.role === "gerant" && utilisateur.boutiqueId === boutiqueId));
 
-  const aujourdhui = useMemo(() => jourLocal(new Date()), []);
-  const [jour, setJour] = useState(aujourdhui);
+  const [periode, setPeriode] = useState<Periode>("ce-mois");
+  const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
+  const maintenant = useMemo(() => new Date(), []);
+  const bornes = useMemo(
+    () => bornesPeriode(periode, maintenant, plage),
+    [periode, maintenant, plage],
+  );
+  const intitule = libellePeriode(periode, maintenant, plage);
+
+  /* Pour la colonne « Objet » seulement : une dépense dont le détail est resté
+     vide porte son poste à la place (S55). */
+  const { nomDuPoste } = usePostesDepense();
 
   const souscrireMouvements = useCallback(
     (auChangement: (m: Mouvement[]) => void, enErreur: (cause: unknown) => void) =>
@@ -232,32 +309,30 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
   const chargement = mouvements === null && !erreur;
   const tousLesMouvements = useMemo(() => mouvements ?? [], [mouvements]);
 
-  const duJour = useMemo(
-    () => mouvementsDuJour(tousLesMouvements, jour),
-    [tousLesMouvements, jour],
+  const deLaPeriode = useMemo(
+    () => mouvementsDeLaPeriode(tousLesMouvements, bornes),
+    [tousLesMouvements, bornes],
   );
 
   return (
     <div>
       <TetePage
         surTitre={`Caisse · ${nomBoutique}`}
-        titre={jour === aujourdhui ? "Journal du jour" : "Journal d’une journée passée"}
-        sousTitre={formaterDate(new Date(`${jour}T12:00:00`))}
-        actions={
-          <div className="champ">
-            <label htmlFor="jour-caisse" className="sr-only">
-              Journée affichée
-            </label>
-            <input
-              id="jour-caisse"
-              className="saisie h-11 w-auto lg:h-9"
-              type="date"
-              value={jour}
-              max={aujourdhui}
-              onChange={(evenement) => setJour(evenement.target.value || aujourdhui)}
-            />
-          </div>
-        }
+        titre="Journal de caisse"
+        sousTitre={intitule ?? "Toutes périodes"}
+      />
+
+      {/* **Mensuel à l'ouverture, « Aujourd'hui » à un clic (S55).** Le
+          commanditaire veut des calculs mensuels ; le comptoir, lui, ouvre la
+          caisse pour voir sa journée. Remplacer le jour par le mois aurait
+          réglé la comptabilité en cassant l'usage — les deux tiennent dans le
+          même filtre, et « Du… au… » couvre le reste. */}
+      <FiltrePeriode
+        periode={periode}
+        changer={setPeriode}
+        plage={plage}
+        changerPlage={setPlage}
+        className="mt-4"
       />
 
       {erreur ? (
@@ -271,118 +346,37 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
         </ErreurDeLecture>
       ) : (
         <div className="min-w-0 max-w-4xl">
+          {/* Le compte avant le détail : on ouvre la caisse pour savoir combien,
+              puis seulement pour savoir d'où. Il ne paraît pas pendant la
+              lecture — un total qui s'affiche à moitié est pire qu'un total
+              qui attend. */}
+          {!chargement && (
+            <ResumeCaisse mouvements={deLaPeriode} intitule={intitule ?? "toutes périodes"} />
+          )}
+
           <JournalCaisse
-            mouvements={duJour}
+            mouvements={deLaPeriode}
             chargement={chargement}
-            jourEstPasse={jour !== aujourdhui}
+            jourEstPasse={periode !== "aujourd-hui"}
+            avecDate={periode !== "aujourd-hui"}
+            nomDuPoste={nomDuPoste}
           />
-          {peutSortirDesEspeces && jour === aujourdhui && (
-            <SortieEspeces
-              enregistrer={(saisie) =>
-                enregistrerSortieEspeces(boutiqueId, saisie, {
-                  uid: utilisateur!.uid,
-                  nom: utilisateur!.nom,
-                })
-              }
-            />
+          {peutSortirDesEspeces && (
+            /* **La saisie a quitté cet écran (S55).** Elle vit dans
+               « Dépenses », avec son historique et ses postes — « dans la
+               caisse c'est juste le montant total qui doit figurer ». Le
+               renvoi reste, parce qu'un geste déplacé sans panneau est un
+               geste perdu. */
+            <p className="mt-6 text-corps text-encre-doux">
+              Une dépense à enregistrer&nbsp;?{" "}
+              <Link href="/caisse/depenses" className="lien">
+                Ouvrir les dépenses
+              </Link>
+              .
+            </p>
           )}
         </div>
       )}
     </div>
-  );
-}
-
-/**
- * La sortie d’espèces — arbitrage 2 du commanditaire.
- *
- * Le seul mouvement que quelqu’un saisit à la main : tous les autres sont la
- * conséquence d’un geste métier. Sans lui, chaque billet sorti du tiroir pour
- * du carburant devient un écart inexpliqué le soir — et un écart qu’on
- * s’habitue à voir est un écart qu’on ne regarde plus.
- *
- * Sur la journée en cours seulement : une sortie se saisit quand elle a lieu,
- * pas trois jours après, et l’antidater fausserait une clôture déjà faite.
- */
-function SortieEspeces({
-  enregistrer,
-}: {
-  enregistrer: (saisie: { montant: string; libelle: string }) => Promise<void>;
-}) {
-  const [montant, setMontant] = useState("");
-  const [libelle, setLibelle] = useState("");
-  const [erreur, setErreur] = useState<string | null>(null);
-
-  /**
-   * **On n'attend pas l'accusé de réception du serveur** (D76).
-   *
-   * Ce formulaire le faisait — `await enregistrer(…)`, bouton désactivé le
-   * temps du trajet — et c'était le seul geste du comptoir qui s'y risquait
-   * encore. Hors ligne, la promesse de Firestore ne se résout **jamais** : le
-   * bouton serait resté désactivé et les champs pleins, indéfiniment, pour une
-   * écriture pourtant déjà acquise dans le cache local. Sur une connexion
-   * seulement lente, le même mécanisme rendait la main au bout d'une minute.
-   *
-   * La validation, elle, reste immédiate : `enregistrerSortieEspeces` lève de
-   * façon synchrone sur un montant absurde ou un libellé vide, avant même de
-   * toucher à Firestore. Ce qui part en différé, c'est le seul refus qu'on ne
-   * peut pas connaître d'avance — celui du serveur.
-   */
-  function soumettre(evenement: FormEvent) {
-    evenement.preventDefault();
-    setErreur(null);
-    try {
-      const partie = enregistrer({ montant, libelle });
-      setMontant("");
-      setLibelle("");
-      partie.catch((cause) =>
-        setErreur(
-          cause instanceof Error ? cause.message : "La sortie n’a pas pu être enregistrée.",
-        ),
-      );
-    } catch (cause) {
-      setErreur(cause instanceof Error ? cause.message : "La sortie n’a pas pu être enregistrée.");
-    }
-  }
-
-  return (
-    <form onSubmit={soumettre} className="cadre mt-6 p-4 sm:p-5">
-      <h2 className="text-bloc font-bold tracking-tight text-encre">Sortir des espèces</h2>
-      <p className="mt-1 max-w-prose text-corps text-encre-doux">
-        L’argent qui quitte le tiroir pour autre chose qu’un client&nbsp;: carburant, course,
-        avance. Saisi ici, il ne se retrouve pas en écart ce soir.
-      </p>
-
-      <div className="mt-4 grid gap-4 sm:grid-cols-[10rem_minmax(0,1fr)_auto] sm:items-end">
-        <div className="champ">
-          <label htmlFor="sortie-montant">Montant</label>
-          <input
-            id="sortie-montant"
-            className="saisie"
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            value={montant}
-            onChange={(evenement) => setMontant(evenement.target.value)}
-          />
-        </div>
-        <div className="champ">
-          <label htmlFor="sortie-libelle">À quoi</label>
-          <input
-            id="sortie-libelle"
-            className="saisie"
-            type="text"
-            maxLength={120}
-            autoComplete="off"
-            value={libelle}
-            onChange={(evenement) => setLibelle(evenement.target.value)}
-          />
-        </div>
-        <button type="submit" className="bouton bouton-neutre h-11">
-          Enregistrer la sortie
-        </button>
-      </div>
-
-      <EtatErreurSaisie message={erreur} className="mt-2" />
-    </form>
   );
 }

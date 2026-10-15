@@ -53,6 +53,10 @@ function lireMouvement(instantane: QueryDocumentSnapshot<DocumentData>): Mouveme
     origineRefId: donnees.origineRefId ?? "",
     libelle: donnees.libelle ?? "",
     categorieTranches: donnees.categorieTranches === true,
+    /* Absent sur toutes les sorties d'avant S55, et sur les entrées, qui n'ont
+       pas de poste par nature. La chaîne vide est l'état « non classé », que
+       `depensesParPoste` range sous « Sans poste » plutôt que de l'écarter. */
+    posteId: typeof donnees.posteId === "string" ? donnees.posteId : "",
     /* Le nom de qui a saisi, recopié depuis la trace d'audit : le journal
        nomme une personne, et `createdBy` n'est qu'un identifiant de compte. */
     operateur: donnees.createdByName ?? "",
@@ -143,16 +147,40 @@ export function ecouterClotures(
  */
 export function enregistrerSortieEspeces(
   boutiqueId: string,
-  saisie: { montant: string; libelle: string },
+  saisie: { montant: string; libelle: string; posteId: string },
   auteur: Auteur,
 ): Promise<void> {
   const montant = lireMontantCaisse(saisie.montant);
   if (montant === null || montant <= 0) {
     throw new Error("Le montant de la sortie doit être un nombre de francs supérieur à zéro.");
   }
+  /**
+   * **Le détail est facultatif depuis S55, et c'est le poste qui a pris sa
+   * place.**
+   *
+   * Il était exigé du temps où il portait seul la raison de la sortie : sans
+   * lui, le journal n'affichait qu'un montant sans cause. Les postes ont changé
+   * cela — c'est désormais le poste qui dit *où* l'argent est parti, et qui
+   * s'additionne. Le détail ne répond plus qu'à « laquelle de ces sorties-là ».
+   *
+   * Le commanditaire a buté sur la différence entre les deux champs, et
+   * l'obligation en était la cause : pour un loyer mensuel il n'y a rien à
+   * ajouter, alors on retapait « loyer » sous un poste nommé « Loyer ». L'écho
+   * était fabriqué par la contrainte elle-même.
+   *
+   * Les règles Firestore l'acceptaient déjà vide — `texteBorne` borne la
+   * longueur, jamais le minimum — donc rien n'a eu à être redéployé.
+   */
   const libelle = saisie.libelle.trim();
-  if (libelle.length === 0) {
-    throw new Error("Dites en quelques mots à quoi cet argent a servi.");
+  /* **Le poste est exigé ici, et pas dans les règles (S55).** Les règles le
+     laissent facultatif parce que trois écrivains sur quatre produisent des
+     entrées, qui n'en ont pas. Mais la sortie manuelle est le seul mouvement
+     que quelqu'un compose de ses mains, et c'est précisément celui qu'il faut
+     classer : sans poste, « combien de carburant ce mois-ci » reste sans
+     réponse, et le livre analytique retombe au rang de journal. */
+  const posteId = saisie.posteId.trim();
+  if (posteId.length === 0) {
+    throw new Error("Choisissez le poste de dépense : c’est lui qui range la sortie.");
   }
 
   return suivreEcriture(
@@ -165,6 +193,7 @@ export function enregistrerSortieEspeces(
       origine: "depense" as OrigineMouvement,
       origineRefId: "",
       libelle,
+      posteId,
       /* Une sortie de caisse n'est jamais un engagement de tranches : ce
          drapeau ne concerne que l'argent qui entre (§6.2). Même raison qu'au
          dépôt chez un prestataire. */

@@ -14,11 +14,28 @@ import { formaterDateCourte, formaterMois } from "./format";
  * dernière milliseconde du dernier jour, celle qu'on croit attraper avec
  * `23:59:59` et qui laisse passer `23:59:59.500`.
  */
-export const PERIODES = ["tout", "ce-mois", "mois-dernier", "cette-annee", "personnalise"] as const;
+/**
+ * `aujourd-hui` est entré en S55, avec la caisse.
+ *
+ * La caisse lisait la journée et ne savait rien faire d'autre ; le
+ * commanditaire l'a voulue mensuelle — « les calculs doivent être mensuels ».
+ * Mais le geste du comptoir reste quotidien : on ouvre la caisse pour voir ce
+ * qui s'est passé depuis ce matin. Remplacer le jour par le mois aurait réglé
+ * la comptabilité en cassant l'usage. Les deux tiennent dans le même filtre.
+ */
+export const PERIODES = [
+  "aujourd-hui",
+  "ce-mois",
+  "mois-dernier",
+  "cette-annee",
+  "tout",
+  "personnalise",
+] as const;
 
 export type Periode = (typeof PERIODES)[number];
 
 export const LIBELLE_PERIODE: Record<Periode, string> = {
+  "aujourd-hui": "Aujourd’hui",
   tout: "Tout",
   "ce-mois": "Ce mois-ci",
   "mois-dernier": "Mois dernier",
@@ -79,6 +96,12 @@ export function bornesPeriode(
   switch (periode) {
     case "tout":
       return null;
+    case "aujourd-hui": {
+      /* Minuit à minuit, sur l'horloge de l'appareil : « aujourd'hui » veut
+         dire aujourd'hui pour qui est au comptoir, pas à l'heure UTC. */
+      const jour = maintenant.getDate();
+      return { debut: new Date(annee, mois, jour), fin: new Date(annee, mois, jour + 1) };
+    }
     case "ce-mois":
       return { debut: new Date(annee, mois, 1), fin: new Date(annee, mois + 1, 1) };
     case "mois-dernier":
@@ -146,6 +169,8 @@ export function libellePeriode(
   switch (periode) {
     case "tout":
       return null;
+    case "aujourd-hui":
+      return formaterDateCourte(maintenant);
     case "ce-mois":
       return formaterMois(maintenant);
     case "mois-dernier":

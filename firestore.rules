@@ -250,6 +250,24 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Les postes de dépense (S55) : carburant, loyer, transport — les mots dans
+    // lesquels une sortie de caisse se range. Ils se créent comme les marques,
+    // par n'importe quel compte connecté : un gérant qui sort un billet pour
+    // une course que personne n'avait prévue doit pouvoir nommer le poste sans
+    // attendre le responsable, sinon la sortie part sans classement et le livre
+    // de caisse perd son intérêt. Le renommage, lui, reste au responsable — un
+    // poste cité par des mois d'écritures ne se rebaptise pas à la légère.
+    match /postesDepense/{id} {
+      allow read: if connecte();
+      allow create: if connecte()
+                    && referentielValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && referentielValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
     match /typesFrais/{id} {
       allow read: if connecte();
       allow create: if estResponsable()
@@ -1097,7 +1115,7 @@ service cloud.firestore {
     function encaissementValide(donnees) {
       return donnees.keys().hasOnly(['boutiqueId', 'date', 'sens', 'montant', 'moyenPaiement',
                                      'origine', 'origineRefId', 'libelle',
-                                     'categorieTranches'].concat(champsAudit()))
+                                     'categorieTranches', 'posteId'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'date', 'sens', 'montant', 'moyenPaiement',
                                        'origine', 'origineRefId', 'libelle',
                                        'categorieTranches'].concat(champsAudit()))
@@ -1114,7 +1132,20 @@ service cloud.firestore {
              // L'argent des tranches est un engagement, pas une recette, tant
              // que la moto dort au magasin (§6.2). Le drapeau se pose à
              // l'encaissement ; le retrouver après coup serait un cauchemar.
-             && donnees.categorieTranches is bool;
+             && donnees.categorieTranches is bool
+             // Le poste de dépense (S55) : facultatif, et il doit le rester.
+             // Les encaissements d'avant cette spec n'en ont pas, et trois
+             // écrivains sur quatre produisent des entrées, qui n'ont pas de
+             // poste par nature. Exiger la clé casserait la vente, le versement
+             // et la vente de pièces pour une colonne qui ne les concerne pas.
+             //
+             // Une entrée ne peut pas en porter : un poste de dépense sur une
+             // recette n'aurait aucun sens, et la règle le refuse plutôt que de
+             // laisser l'écran seul garant.
+             && (!donnees.keys().hasAny(['posteId'])
+                 || (donnees.posteId is string
+                     && (donnees.posteId == ''
+                         || (donnees.sens == 'sortie' && texteBorne(donnees.posteId, 200)))));
     }
 
     match /encaissements/{encaissementId} {

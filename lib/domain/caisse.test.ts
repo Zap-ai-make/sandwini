@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   bilanParBoutique,
+  depensesParPoste,
+  mouvementsDeLaPeriode,
   clotureDuJour,
   fondsOuverturePour,
   historiqueDesClotures,
@@ -62,6 +64,7 @@ function mouvement(
     origineRefId: "",
     libelle: "",
     categorieTranches: false,
+    posteId: "",
     operateur: "Ousmane Sawadogo",
     ...options,
   };
@@ -415,7 +418,7 @@ describe("le bilan de caisse par boutique", () => {
   ];
 
   it("rend une ligne par boutique qui a bougé, entrées et sorties séparées", () => {
-    const lignes = bilanParBoutique(mouvements, boutiques, LE_5);
+    const lignes = bilanParBoutique(mouvementsDuJour(mouvements, LE_5), boutiques);
     expect(lignes.map((l) => [l.code, l.entrees, l.sorties, l.solde])).toEqual([
       ["PTG", 400_000, 100_000, 300_000],
       ["KDG", 250_000, 0, 250_000],
@@ -426,25 +429,54 @@ describe("le bilan de caisse par boutique", () => {
      avec trois zéros alignés ferait croire à une journée vide alors que
      personne n'a encore ouvert le tiroir. C'est la règle de D63. */
   it("laisse dehors une boutique qui n’a rien eu ce jour-là", () => {
-    expect(bilanParBoutique(mouvements, boutiques, LE_5).map((l) => l.code)).not.toContain("OUA");
+    expect(bilanParBoutique(mouvementsDuJour(mouvements, LE_5), boutiques).map((l) => l.code)).not.toContain("OUA");
   });
 
   it("ne compte que le jour demandé", () => {
-    const lignes = bilanParBoutique(mouvements, boutiques, LE_4);
+    const lignes = bilanParBoutique(mouvementsDuJour(mouvements, LE_4), boutiques);
     expect(lignes.map((l) => [l.code, l.entrees])).toEqual([["KDG", 999_000]]);
   });
 
+  /**
+   * **Le consolidé additionnait des francs qui ne sont pas au même endroit.**
+   *
+   * Une ligne disait « Koudougou · 875 000 encaissés » alors que 275 000 de
+   * ces francs étaient sur Orange Money et Moov Money — jamais dans le tiroir.
+   * Le superviseur lisait donc un solde que personne ne pouvait aller compter,
+   * et le commanditaire tient cet écran pour « une mini comptabilité » : le
+   * premier devoir d'un livre de caisse est de dire où est l'argent.
+   *
+   * `especes` est le **net du tiroir** : entrées en espèces moins sorties en
+   * espèces. Les sorties sont toujours des espèces — on ne sort pas d'Orange
+   * Money d'un tiroir — mais la formule ne le suppose pas, pour que le jour où
+   * un remboursement mobile existera, la ligne reste juste.
+   */
+  it("sépare ce qui est dans le tiroir de ce qui n’y est pas", () => {
+    const melanges = [
+      mouvement({ boutiqueId: "b-kdg", montant: 450_000, date: a("08:40") }),
+      mouvement({ boutiqueId: "b-kdg", montant: 200_000, date: a("10:05"), moyenPaiement: "orange_money" }),
+      mouvement({ boutiqueId: "b-kdg", montant: 15_000, date: a("11:30"), sens: "sortie" }),
+    ];
+    const [ligne] = bilanParBoutique(mouvementsDuJour(melanges, LE_5), boutiques);
+    expect(ligne.entrees).toBe(650_000);
+    expect(ligne.sorties).toBe(15_000);
+    expect(ligne.solde).toBe(635_000);
+    /* 450 000 d'espèces moins 15 000 sortis : le reste est sur mobile. */
+    expect(ligne.especes).toBe(435_000);
+  });
+
   it("le total additionne les lignes, et rien d’autre", () => {
-    expect(totalDuBilan(bilanParBoutique(mouvements, boutiques, LE_5))).toEqual({
+    expect(totalDuBilan(bilanParBoutique(mouvementsDuJour(mouvements, LE_5), boutiques))).toEqual({
       entrees: 650_000,
       sorties: 100_000,
+      especes: 550_000,
       solde: 550_000,
     });
   });
 
   it("une journée sans aucun mouvement ne rend aucune ligne", () => {
-    expect(bilanParBoutique(mouvements, boutiques, LE_3)).toEqual([]);
-    expect(totalDuBilan([])).toEqual({ entrees: 0, sorties: 0, solde: 0 });
+    expect(bilanParBoutique(mouvementsDuJour(mouvements, LE_3), boutiques)).toEqual([]);
+    expect(totalDuBilan([])).toEqual({ entrees: 0, sorties: 0, solde: 0, especes: 0 });
   });
 
   /* Un mouvement dont la boutique a été supprimée du référentiel ne doit pas
@@ -452,8 +484,120 @@ describe("le bilan de caisse par boutique", () => {
      de sortir du bilan en silence. */
   it("n’efface pas l’argent d’une boutique inconnue du référentiel", () => {
     const orphelin = [mouvement({ boutiqueId: "b-disparue", montant: 70_000, date: a("08:00") })];
-    const lignes = bilanParBoutique(orphelin, boutiques, LE_5);
+    const lignes = bilanParBoutique(mouvementsDuJour(orphelin, LE_5), boutiques);
     expect(lignes).toHaveLength(1);
     expect(totalDuBilan(lignes).entrees).toBe(70_000);
+  });
+});
+
+describe("les dépenses par poste — le livre de caisse analytique (S55)", () => {
+  const nomDuPoste = (id: string) =>
+    ({ p1: "Carburant", p2: "Transport", p3: "Loyer" })[id] ?? id;
+
+  const journee = [
+    mouvement({ montant: 450_000, date: a("08:40") }),
+    mouvement({ montant: 15_000, date: a("09:00"), sens: "sortie", posteId: "p1" }),
+    mouvement({ montant: 5_000, date: a("11:00"), sens: "sortie", posteId: "p1" }),
+    mouvement({ montant: 30_000, date: a("14:00"), sens: "sortie", posteId: "p3" }),
+    mouvement({ montant: 2_000, date: a("16:00"), sens: "sortie", posteId: "p2" }),
+  ];
+
+  it("additionne chaque poste et met le plus lourd en tête", () => {
+    expect(depensesParPoste(journee, nomDuPoste).map((d) => [d.libelle, d.montant])).toEqual([
+      ["Loyer", 30_000],
+      ["Carburant", 20_000],
+      ["Transport", 2_000],
+    ]);
+  });
+
+  /* Une entrée n'est pas une dépense : la compter ici ferait d'une recette une
+     sortie, et le total du bloc ne vaudrait plus rien. */
+  it("ignore les entrées", () => {
+    const total = depensesParPoste(journee, nomDuPoste).reduce((s, d) => s + d.montant, 0);
+    expect(total).toBe(52_000);
+  });
+
+  /**
+   * **Les sorties d'avant S55 n'ont pas de poste, et elles ne disparaissent
+   * pas.** Les ranger sous « Sans poste » plutôt que les écarter : une dépense
+   * qu'on ne sait pas classer reste une dépense, et un total de caisse qui
+   * perd de l'argent en silence est le seul défaut qu'un livre n'a pas le
+   * droit d'avoir. C'est la même règle que la boutique inconnue du bilan.
+   */
+  it("garde les sorties sans poste, sous un nom qui le dit", () => {
+    const anciennes = [
+      mouvement({ montant: 7_000, date: a("10:00"), sens: "sortie", origine: "depense" }),
+    ];
+    expect(depensesParPoste(anciennes, nomDuPoste)).toEqual([
+      { posteId: "", libelle: "Sans poste", montant: 7_000 },
+    ]);
+  });
+
+  /* Une avance prestataire porte déjà sa nature : elle est structurelle, et la
+     forcer dans un référentiel que la maison déclare lui inventerait un sens.
+     Elle se range donc sous son origine, pas sous « Sans poste ». */
+  it("range une sortie structurelle sous sa nature, pas sous « Sans poste »", () => {
+    const avance = [
+      mouvement({ montant: 40_000, date: a("10:00"), sens: "sortie", origine: "avance_prestataire" }),
+    ];
+    expect(depensesParPoste(avance, nomDuPoste)).toEqual([
+      { posteId: "", libelle: "Avance prestataire", montant: 40_000 },
+    ]);
+  });
+
+  it("ne rend rien quand rien n’est sorti", () => {
+    expect(depensesParPoste([mouvement({ montant: 1_000, date: a("09:00") })], nomDuPoste)).toEqual(
+      [],
+    );
+  });
+});
+
+describe("les mouvements d’une période — la lecture comptable (S55)", () => {
+  const trois = [
+    mouvement({ montant: 1_000, date: a("09:00", LE_3) }),
+    mouvement({ montant: 2_000, date: a("09:00", LE_4) }),
+    mouvement({ montant: 3_000, date: a("09:00", LE_5) }),
+  ];
+
+  it("ne garde que ce qui tombe entre les bornes", () => {
+    const bornes = { debut: a("00:00", LE_4), fin: a("23:59", LE_5) };
+    expect(mouvementsDeLaPeriode(trois, bornes).map((m) => m.montant)).toEqual([2_000, 3_000]);
+  });
+
+  /* `null` est l'état « toutes périodes » de `lib/domain/periode.ts`, pas une
+     absence de réponse : il ne borne rien et laisse tout passer. */
+  it("laisse tout passer sans bornes", () => {
+    expect(mouvementsDeLaPeriode(trois, null)).toHaveLength(3);
+  });
+
+  it("rend du plus ancien au plus récent, comme le journal", () => {
+    const bornes = { debut: a("00:00", LE_3), fin: a("23:59", LE_5) };
+    expect(mouvementsDeLaPeriode(trois, bornes).map((m) => m.montant)).toEqual([
+      1_000, 2_000, 3_000,
+    ]);
+  });
+
+  /**
+   * **Un mouvement sans date passe, et se range en dernier.**
+   *
+   * C'est la règle de `dansLaPeriode`, et elle vaut ici pour la raison de D66 :
+   * une sortie saisie hors ligne n'a pas encore l'horodatage du serveur, et la
+   * cacher du total au moment précis où l'on vérifie qu'elle est passée ferait
+   * douter d'une écriture pourtant acquise. Elle est de toute façon la plus
+   * récente de toutes.
+   */
+  it("garde un mouvement sans date, et le range en dernier", () => {
+    const avecOrphelin = [...trois, mouvement({ montant: 4_000, date: null as never })];
+    expect(mouvementsDeLaPeriode(avecOrphelin, null).map((m) => m.montant)).toEqual([
+      1_000, 2_000, 3_000, 4_000,
+    ]);
+  });
+
+  /* La borne de fin est **exclusive** : « ce mois-ci » finit au premier jour du
+     mois suivant, à minuit. Un `<= fin` écrit de mémoire ferait entrer ce
+     jour-là dans le total du mois d'avant. */
+  it("exclut la borne de fin, comme tout le reste du dépôt", () => {
+    const bornes = { debut: a("00:00", LE_3), fin: a("09:00", LE_5) };
+    expect(mouvementsDeLaPeriode(trois, bornes).map((m) => m.montant)).toEqual([1_000, 2_000]);
   });
 });

@@ -161,3 +161,25 @@ describe("libellePeriode", () => {
     );
   });
 });
+
+describe("aujourd’hui — le geste du comptoir dans un filtre devenu mensuel (S55)", () => {
+  const unJour = new Date(2026, 9, 13, 15, 30);
+
+  it("borne la journée de minuit à minuit, sur l’horloge de l’appareil", () => {
+    const bornes = bornesPeriode("aujourd-hui", unJour);
+    expect(bornes).toEqual({ debut: new Date(2026, 9, 13), fin: new Date(2026, 9, 14) });
+  });
+
+  /* La borne de fin est exclusive partout dans ce module : une écriture du 14 à
+     minuit pile appartient au 14, pas au 13. */
+  it("laisse le lendemain au lendemain", () => {
+    const bornes = bornesPeriode("aujourd-hui", unJour);
+    expect(dansLaPeriode(new Date(2026, 9, 13, 23, 59, 59, 999), bornes)).toBe(true);
+    expect(dansLaPeriode(new Date(2026, 9, 14), bornes)).toBe(false);
+    expect(dansLaPeriode(new Date(2026, 9, 12, 23, 59), bornes)).toBe(false);
+  });
+
+  it("se nomme par sa date", () => {
+    expect(libellePeriode("aujourd-hui", unJour)).toBe("13/10/26");
+  });
+});
