@@ -1,13 +1,10 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { estEnRetard } from "@/lib/domain/dossier";
+import { estEnRetard, etatPapier, LIBELLE_ETAT_PAPIER } from "@/lib/domain/dossier";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
-import {
-  LIBELLE_DOCUMENT,
-  LIBELLE_STATUT_DOCUMENT,
-  type DocumentDossier,
-} from "@/lib/domain/vente";
+import type { Moto } from "@/lib/domain/moto";
+import { LIBELLE_DOCUMENT, type DocumentDossier, type Vente } from "@/lib/domain/vente";
 import { GestesDocument } from "@/components/GestesDocument";
 
 /**
@@ -20,8 +17,23 @@ import { GestesDocument } from "@/components/GestesDocument";
  *
  * Les gestes viennent de `GestesDocument` : la machine à états est la même des
  * deux côtés, et ne peut donc pas diverger.
+ *
+ * **L'état affiché est calculé, pas stocké** (S53, D61). Il lisait
+ * `document.statut`, si bien qu'un CMC coché sur la moto restait écrit « À
+ * faire » ici pendant que l'écran des dossiers disait « Au magasin ». Deux
+ * lectures contradictoires du même dossier, à un clic l'une de l'autre : c'est
+ * la contradiction que cette spec vient fermer, et elle se refermait mal si
+ * cette fiche restait sur l'ancien mode.
  */
-export function DossierDocuments({ documents }: { documents: DocumentDossier[] | null }) {
+export function DossierDocuments({
+  documents,
+  vente,
+  moto,
+}: {
+  documents: DocumentDossier[] | null;
+  vente: Vente;
+  moto: Moto | null;
+}) {
   if (documents === null) {
     return <p className="px-4 py-3 text-sm text-encre-doux">Chargement du dossier…</p>;
   }
@@ -38,21 +50,41 @@ export function DossierDocuments({ documents }: { documents: DocumentDossier[] |
        avec la moto. Sans nom, rien ne les distingue pour qui n'a pas l'écran. */
     <ul aria-label="Documents du dossier" className="divide-y divide-bord">
       {documents.map((document) => (
-        <LigneDocument key={document.id} document={document} />
+        <LigneDocument key={document.id} document={document} vente={vente} moto={moto} />
       ))}
     </ul>
   );
 }
 
-function LigneDocument({ document }: { document: DocumentDossier }) {
+function LigneDocument({
+  document,
+  vente,
+  moto,
+}: {
+  document: DocumentDossier;
+  vente: Vente;
+  moto: Moto | null;
+}) {
   const enRetard =
     document.statut === "chez_prestataire" && estEnRetard(document.disponibleLe, new Date());
+
+  const etat = etatPapier({
+    type: document.type,
+    statut: document.statut,
+    enMain:
+      document.type === "quittance"
+        ? (moto?.quittanceRecue ?? false)
+        : document.type === "cmc"
+          ? (moto?.cmcRecu ?? false)
+          : false,
+    emporte: document.type === "carte_grise" ? false : vente.emporte[document.type],
+  });
 
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <span className="font-medium text-encre">{LIBELLE_DOCUMENT[document.type]}</span>
-        <span className="text-sm text-encre-doux">{LIBELLE_STATUT_DOCUMENT[document.statut]}</span>
+        <span className="text-sm text-encre-doux">{LIBELLE_ETAT_PAPIER[etat]}</span>
       </div>
 
       {document.statut === "chez_prestataire" && (
@@ -74,6 +106,9 @@ function LigneDocument({ document }: { document: DocumentDossier }) {
         </p>
       )}
 
+      {/* Les dossiers d'avant S53 portent une date de remise, et elle reste une
+          information utile : elle dit QUAND, ce que l'état calculé ne dit pas.
+          Le statut, lui, ne s'écrit plus. */}
       {document.statut === "remis_client" && document.remisLe && (
         <p className="mt-1 text-sm text-encre-doux">
           Remis au client le {formaterDateCourte(document.remisLe)}

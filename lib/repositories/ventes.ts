@@ -13,9 +13,10 @@ import {
   type DocumentSnapshot,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
+import { db, stockage } from "@/lib/firebase/client";
 import { engendrerToken } from "@/lib/domain/token";
 import {
+  PAPIERS_EMPORTES_VIDES,
   TYPES_DOCUMENT,
   agregatsPaiement,
   estEngagement,
@@ -37,7 +38,7 @@ import {
   type Vente,
   type Versement,
 } from "@/lib/domain/vente";
-import { type PapierMoto } from "@/lib/domain/moto";
+import { validerFichierPapier, type PapierMoto } from "@/lib/domain/moto";
 import { reserverNumero, type Numeroteur } from "@/lib/numerotation/compteur";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
@@ -408,6 +409,14 @@ export function enregistrerVente(
     lienSuiviEnvoyeAt: null,
     statutDossier: "ouvert",
     dateClotureDossier: null,
+    /* **La carte naît complète, et c'est une nécessité, pas une élégance.**
+       `marquerEmporte` écrit par chemin pointé (`emporte.cmc`) ; sur une vente
+       qui ne porterait pas le champ, cette écriture fabriquerait une carte à
+       une seule clé, et `emporteValide` la refuserait — elle exige les deux
+       booléens. Le geste du comptoir serait alors rejeté par le serveur sans
+       que l'écran sache dire pourquoi. Trouvé par le témoin e2e, pas déduit. */
+    emporte: PAPIERS_EMPORTES_VIDES,
+    carteGriseChemin: null,
     ...traceCreation(auteur),
   });
 
@@ -667,7 +676,43 @@ export function marquerEmporte(
 }
 
 /**
- * Dépose le scan de la carte grise au retour du prestataire (S53).
+ * Envoie le scan de la carte grise et l'attache à la vente (S53).
+ *
+ * **Le fichier se range sous la MOTO, le chemin s'écrit sur la VENTE**, et ce
+ * croisement est délibéré. Côté Storage, `motos/{id}/papiers/` a déjà sa règle,
+ * vérifiée en type réel et en taille : y ajouter un préfixe `ventes/` serait
+ * élargir une surface d'écriture publique pour un fichier de même nature. Et la
+ * carte grise appartient bien à l'engin — une revente plus tard en déposera une
+ * autre à côté, horodatée, sans écraser la première.
+ *
+ * Côté Firestore, le chemin vit sur la vente parce que c'est la vente qui sait
+ * à qui cette carte a été remise. La moto, elle, survit à plusieurs
+ * propriétaires.
+ *
+ * L'attache suit l'envoi, jamais l'inverse : un chemin écrit vers un fichier
+ * qui n'est pas arrivé donnerait une pièce jointe morte, visible et inouvrable.
+ */
+export async function envoyerScanCarteGrise(
+  venteId: string,
+  motoId: string,
+  fichier: File,
+  auteur: Auteur,
+): Promise<string> {
+  const probleme = validerFichierPapier(fichier);
+  if (probleme) throw new Error(probleme);
+
+  const extension = fichier.type === "application/pdf" ? "pdf" : fichier.type.split("/")[1];
+  const chemin = `motos/${motoId}/papiers/carte_grise-${Date.now()}.${extension}`;
+
+  const { ref, uploadBytes } = await import("firebase/storage");
+  await uploadBytes(ref(stockage(), chemin), fichier, { contentType: fichier.type });
+
+  await poserScanCarteGrise(venteId, chemin, auteur).enregistre;
+  return chemin;
+}
+
+/**
+ * Dépose le chemin du scan de la carte grise sur la vente (S53).
  *
  * Le chemin Storage, pas l'URL : une URL de téléchargement se redemande à
  * chaque lecture et finit par expirer. Même montage que les scans de la moto.

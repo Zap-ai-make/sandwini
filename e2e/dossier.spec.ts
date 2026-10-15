@@ -15,13 +15,17 @@ import {
  * que chaque document a le droit de suivre**, et il n’est pas le même pour les
  * quatre (`DECISIONS.md` D65).
  *
- * La quittance et le CMC arrivent déjà faits : le magasin reçoit le produit
- * fini. Personne ne les détient jamais, donc l’écran ne doit même pas proposer
- * de les confier à quelqu’un.
+ * **S53 a retiré leurs étapes à la quittance et au CMC.** Leur disponibilité se
+ * coche sur la moto, leur remise s’enregistre sur la vente : le dossier ne
+ * garde d’eux qu’un fait, celui d’être écartés. Le seul geste qu’il leur offre
+ * encore est donc « Non concerné par cette vente », et c’est ce que ces tests
+ * vérifient — un écran qui proposerait les anciennes étapes offrirait un geste
+ * dont la base refuserait l’écriture.
  *
  * La carte grise passe par un prestataire, et le dépôt ne se
  * saute pas : c’est lui qui dit qui détient le document en ce moment, la seule
- * chose que la liste des dossiers sert à répondre.
+ * chose que la liste des dossiers sert à répondre. Son retour est le TERME de
+ * son parcours (arbitrage 7) : il n’y a pas de troisième geste.
  *
  * Enfin l’avance versée n’est pas une formalité de saisie : c’est de l’argent
  * qui sort de la caisse dans le même lot que le dépôt. Un dépôt sans écriture
@@ -43,27 +47,27 @@ const ligne = (page: import("@playwright/test").Page, document: string) =>
   dossier(page).locator("li").filter({ hasText: document });
 
 test.describe("le chemin dépend du document", () => {
-  test("la quittance va au magasin sans passer par personne, puis au client", async ({ page }) => {
+  test("la quittance n’a plus qu’un geste : être écartée", async ({ page }) => {
     await seConnecterEtEntrer(page);
     await vendre(page, { mode: "Crédit", prix: "1200000", encaisse: "400000" });
 
     const quittance = ligne(page, "Quittance");
     await expect(quittance).toContainText("À faire");
 
-    /* Le cœur du test : ce bouton ne doit pas exister. Un document qui arrive
-       fini n’est confié à personne, et l’écran ne propose pas un geste dont la
-       base refuserait ensuite l’écriture. */
-    await expect(
-      quittance.getByRole("button", { name: "Déposer chez un prestataire" }),
-    ).toHaveCount(0);
+    /* Les trois boutons qui ne doivent PAS exister. Un document qui arrive avec
+       la moto n’est confié à personne, et depuis S53 son parcours ne se promène
+       plus sur le dossier : l’écran ne propose pas un geste dont la base
+       refuserait ensuite l’écriture. */
+    for (const geste of [
+      "Déposer chez un prestataire",
+      "Arrivé au magasin",
+      "Remettre au client",
+    ]) {
+      await expect(quittance.getByRole("button", { name: geste })).toHaveCount(0);
+    }
 
-    await quittance.getByRole("button", { name: "Arrivé au magasin" }).click();
-    await expect(quittance).toContainText("Revenu au magasin");
-
-    await quittance.getByRole("button", { name: "Remettre au client" }).click();
-    await expect(quittance).toContainText("Remis au client");
-
-    /* Un document remis est terminé : plus aucun geste ne doit rester offert. */
+    await quittance.getByRole("button", { name: "Non concerné par cette vente" }).click();
+    await expect(quittance).toContainText("Sans objet");
     await expect(quittance.getByRole("button")).toHaveCount(0);
   });
 
@@ -181,7 +185,7 @@ test.describe("confier un document à un prestataire", () => {
     await context.setOffline(false);
   });
 
-  test("le cycle complet : déposé, revenu, remis", async ({ page }) => {
+  test("le cycle complet : déposé, puis revenu — et c’est fini", async ({ page }) => {
     await seConnecterEtEntrer(page);
     const prestataire = nomUnique("Ouedraogo");
     await creerPrestataire(page, prestataire);
@@ -201,10 +205,13 @@ test.describe("confier un document à un prestataire", () => {
     ).toHaveCount(0);
 
     await carteGrise.getByRole("button", { name: "Arrivé au magasin" }).click();
-    await expect(carteGrise).toContainText("Revenu au magasin");
+    await expect(carteGrise).toContainText("Au magasin");
 
-    await carteGrise.getByRole("button", { name: "Remettre au client" }).click();
-    await expect(carteGrise).toContainText("Remis au client");
+    /* **Le retour est le terme** (arbitrage 7). Il n'y a pas de « Remettre au
+       client » : la preuve de la remise est le scan et la plaque saisis plus
+       bas sur cette même fiche. Un troisième statut à promener n'ajoutait
+       qu'un geste. */
+    await expect(carteGrise.getByRole("button")).toHaveCount(0);
   });
 });
 
@@ -247,49 +254,90 @@ test.describe("la file des dossiers en attente", () => {
     const ligne = contenu(page).locator("tbody tr").filter({ hasText: numero });
     await expect(ligne).toHaveCount(1);
 
-    /* Les trois documents ont chacun leur colonne, et le nom accessible de
-       chacun dit de quel papier et de quelle pièce il s'agit — replié en carte,
-       l'en-tête de colonne n'est plus là pour le dire. */
-    for (const document of ["Quittance", "CMC", "Carte grise"]) {
-      await expect(
-        ligne.getByRole("button", { name: `${document} de ${numero} : À faire`, exact: true }),
-      ).toBeVisible();
-    }
+    /* Les trois papiers ont chacun leur colonne, et tous les trois disent « À
+       faire » sur une vente fraîche : la moto ne porte rien, le client n'a rien
+       emporté, la carte grise n'est pas partie. */
+    await expect(ligne.locator("td", { hasText: "À faire" })).toHaveCount(3);
+
+    /* **Seule la carte grise ouvre un parcours** (S53). Les deux autres papiers
+       n'ont plus d'étapes : un bouton qui ouvrirait un panneau vide serait une
+       promesse non tenue, donc ils s'affichent en pastille muette. */
+    await expect(
+      ligne.getByRole("button", { name: `Quittance de ${numero} : À faire`, exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      ligne.getByRole("button", { name: `Carte grise de ${numero} : À faire`, exact: true }),
+    ).toBeVisible();
 
     /* Rien n'est encore parti : personne ne détient quoi que ce soit. */
     await contenu(page).getByRole("button", { name: "Chez un prestataire", exact: true }).click();
     await expect(contenu(page)).toContainText("Aucun dossier ne correspond");
     await contenu(page).getByRole("button", { name: "Ouverts", exact: true }).click();
 
-    /* Le relais s'ouvre sous la file et montre le chemin entier : la quittance
-       arrive faite, donc trois étapes et aucun passage chez un prestataire. */
+    /* Le relais s'ouvre sous la file et montre le chemin qui reste : deux
+       étapes, et le dépôt ne se saute pas. */
     await ligne
-      .getByRole("button", { name: `Quittance de ${numero} : À faire`, exact: true })
+      .getByRole("button", { name: `Carte grise de ${numero} : À faire`, exact: true })
       .click();
-    const relais = contenu(page).locator("section").filter({ hasText: "Quittance de" });
-    await expect(relais).toContainText("Revenu au magasin");
-    await expect(relais).toContainText("Remis au client");
-    await expect(relais.getByRole("button", { name: "Déposer chez un prestataire" })).toHaveCount(
-      0,
-    );
+    const relais = contenu(page).locator("section").filter({ hasText: "Carte grise de" });
+    await expect(relais.getByRole("button", { name: "Déposer chez un prestataire" })).toBeVisible();
+    /* Le troisième statut a disparu du chemin : le retour est le terme. */
+    await expect(relais).not.toContainText("Remis au client");
+  });
 
-    /* Le geste se fait là, et le relais avance : le bouton du pas suivant
-       remplace celui qu'on vient de faire. */
-    await relais.getByRole("button", { name: "Arrivé au magasin" }).click();
-    await expect(relais.getByRole("button", { name: "Remettre au client" })).toBeVisible();
+  /* **Le témoin de bout en bout de S53.** Il tient en une phrase : une case
+     cochée sur la MOTO fait bouger l'écran du dossier sans qu'aucune écriture
+     ne touche le dossier, et le seul geste qui reste au comptoir se fait sur la
+     vente. C'est la contradiction B rendue inexprimable, vue depuis le
+     navigateur. */
+  test("le papier coché sur la moto se lit au dossier, et s’emporte depuis la vente", async ({
+    page,
+  }) => {
+    await seConnecterEtEntrer(page);
+    const { chassis, numero } = await vendre(page, {
+      mode: "Crédit",
+      prix: "1200000",
+      encaisse: "400000",
+    });
 
-    /* Et la file l'a suivi, sans qu'on ait rechargé quoi que ce soit. */
-    await relais.getByRole("button", { name: "Fermer le suivi de quittance" }).click();
+    /* Le CMC se coche sur la moto, jamais sur le dossier. */
+    await page.goto("/motos", { waitUntil: "load" });
+    await page.getByLabel("Chercher dans le stock").fill(chassis);
+    await page.getByRole("link", { name: chassis }).click();
+    /* **`click` et non `check`**, comme le test des arrivages (S43). Ces cases
+       sont contrôlées par l'abonnement Firestore : le clic retourne la case
+       dans le DOM, React la remet aussitôt sur la valeur reçue, et `check`
+       vérifie l'état dans cet intervalle — il voit la case revenue à vide et
+       déclare l'échec alors que l'écriture est partie. La pastille, elle, dit
+       l'état une fois l'abonnement passé. */
+    await page.getByRole("checkbox", { name: "CMC", exact: true }).click();
+    await expect(contenu(page).getByText("Au magasin")).toBeVisible({ timeout: 30_000 });
+
+    /* Et le dossier bouge sans qu'on y ait touché. */
+    await page.goto("/motos/dossiers", { waitUntil: "load" });
+    const ligneDossier = contenu(page).locator("tbody tr").filter({ hasText: numero });
+    await expect(ligneDossier).toContainText("Au magasin", { timeout: 30_000 });
+
+    /* Sur la fiche de vente, la quittance n'est pas en main : on ne remet pas
+       ce qu'on n'a pas, et la case doit être fermée. */
+    await page.goto("/motos/ventes", { waitUntil: "load" });
+    await contenu(page).getByRole("link", { name: numero }).click();
+
     await expect(
-      contenu(page).getByRole("button", {
-        name: `Quittance de ${numero} : Revenu au magasin`,
-        exact: true,
-      }),
-    ).toBeVisible();
+      page.getByRole("checkbox", { name: /Quittance emportée/ }),
+    ).toBeDisabled();
 
-    /* Un papier revenu au magasin est un papier à remettre aujourd'hui : c'est
-       l'une des trois questions que la file sait poser. */
-    await contenu(page).getByRole("button", { name: "À remettre", exact: true }).click();
-    await expect(ligne).toHaveCount(1);
+    const caseCmc = page.getByRole("checkbox", { name: /CMC emporté/ });
+    await expect(caseCmc).toBeEnabled();
+    await caseCmc.click();
+    await expect(contenu(page)).toContainText("Emporté par le client", { timeout: 30_000 });
+
+    /* La plaque se saisit ici et se range sur la moto : `normaliserPlaque` la
+       met en capitales avant l'écriture. */
+    await page.getByLabel("Numéro de plaque").fill("11 aa 1234");
+    await page.getByRole("button", { name: "Enregistrer la plaque" }).click();
+    await expect(page.getByLabel("Numéro de plaque")).toHaveValue("11 AA 1234", {
+      timeout: 30_000,
+    });
   });
 });

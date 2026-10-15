@@ -352,20 +352,21 @@ describe("etapesRelais", () => {
   const noms = (type: TypeDocument, statut: StatutDocument) =>
     etapesRelais(type, statut).map((etape) => `${etape.statut}:${etape.etat}`);
 
-  /* Le parcours dessiné n'est pas le même pour les quatre : en montrer une
-     étape « chez le prestataire » sur une quittance ferait attendre un retour
-     que personne n'a promis (D65). */
-  it("ne dessine d’étape chez un prestataire que pour ce qui y passe", () => {
-    expect(etapesRelais("quittance", "a_faire").map((e) => e.statut)).toEqual([
-      "a_faire",
-      "revenu_magasin",
-      "remis_client",
-    ]);
+  /* **Le parcours s'est raccourci avec S53, et un témoin e2e l'a trouvé avant
+     ces tests.** `PARCOURS_*` est une seconde écriture de `CHEMIN` : retirer
+     `remis_client` du chemin ne le retirait pas d'ici, et le relais annonçait
+     encore un quatrième pas que plus aucun geste n'atteint. Un parcours qui
+     montre une étape inatteignable promet un retour que personne ne fera. */
+  it("ne dessine plus qu’une étape pour ce qui arrive avec la moto", () => {
+    expect(etapesRelais("quittance", "a_faire").map((e) => e.statut)).toEqual(["a_faire"]);
+    expect(etapesRelais("cmc", "a_faire").map((e) => e.statut)).toEqual(["a_faire"]);
+  });
+
+  it("dessine deux pas pour la carte grise, et s’arrête à son retour", () => {
     expect(etapesRelais("carte_grise", "a_faire").map((e) => e.statut)).toEqual([
       "a_faire",
       "chez_prestataire",
       "revenu_magasin",
-      "remis_client",
     ]);
   });
 
@@ -374,19 +375,25 @@ describe("etapesRelais", () => {
       "a_faire:fait",
       "chez_prestataire:cours",
       "revenu_magasin:attente",
-      "remis_client:attente",
     ]);
   });
 
   /* Le voyage est fini : un point « en cours » sur la dernière étape dirait que
      le document est encore en route. */
   it("ne laisse rien « en cours » sur une étape terminale", () => {
-    expect(noms("carte_grise", "remis_client")).toEqual([
+    expect(noms("carte_grise", "revenu_magasin")).toEqual([
       "a_faire:fait",
       "chez_prestataire:fait",
       "revenu_magasin:fait",
-      "remis_client:fait",
     ]);
+  });
+
+  /* `remis_client` n'est plus dans le parcours : une carte grise héritée de
+     l'ancien modèle n'y trouve pas son rang, et n'a donc pas de parcours à
+     dessiner. L'écran dit son état — « Au magasin » — sans tracer un chemin
+     dont elle serait sortie. */
+  it("ne donne aucun parcours à une carte grise héritée de l’ancien modèle", () => {
+    expect(etapesRelais("carte_grise", "remis_client")).toEqual([]);
   });
 
   it("ne donne aucun parcours à un document écarté", () => {

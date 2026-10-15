@@ -298,17 +298,19 @@ export type EtapeRelais = {
 
 /* Les deux parcours, mis à plat. Ce sont les mêmes chemins que `CHEMIN`, lus
    dans l'autre sens : `CHEMIN` dit ce qu'un statut a le droit de devenir,
-   ceux-ci disent dans quel ordre on les traverse. */
-const PARCOURS_ARRIVE_FAIT: readonly StatutDocument[] = [
-  "a_faire",
-  "revenu_magasin",
-  "remis_client",
-];
+   ceux-ci disent dans quel ordre on les traverse.
+
+   **S53 les a raccourcis, et il a fallu un témoin e2e pour s'en apercevoir.**
+   Ces deux listes sont une seconde écriture des mêmes chemins : les retirer de
+   `CHEMIN` ne les retirait pas d'ici, et le relais continuait d'annoncer un
+   quatrième pas, « Remis au client », que plus aucun geste n'atteint. Un
+   parcours qui montre une étape inatteignable promet un retour que personne ne
+   fera. */
+const PARCOURS_SANS_ETAPE: readonly StatutDocument[] = ["a_faire"];
 const PARCOURS_PRESTATAIRE: readonly StatutDocument[] = [
   "a_faire",
   "chez_prestataire",
   "revenu_magasin",
-  "remis_client",
 ];
 
 /**
@@ -320,15 +322,17 @@ const PARCOURS_PRESTATAIRE: readonly StatutDocument[] = [
  * l'écran, la seule du produit (`DESIGN.md` §6), et ce qui répond d'un coup
  * d'œil à « où est ce papier, et qu'est-ce qui vient après ».
  *
- * **Le parcours dépend du type.** La quittance et le CMC n'ont pas d'étape chez
- * un prestataire ; en dessiner une, vide, ferait attendre un retour que
- * personne n'a promis (D65).
+ * **Le parcours dépend du type.** La quittance et le CMC n'ont plus d'étapes du
+ * tout depuis S53 — leur disponibilité vit sur la moto, leur remise sur la
+ * vente —, et la carte grise s'arrête à son retour (arbitrage 7). Dessiner une
+ * étape que rien n'atteint ferait attendre un retour que personne n'a promis
+ * (D65).
  *
  * Un document écarté n'a pas de parcours : la liste est vide, et l'écran dit
  * « Sans objet » plutôt que de tracer un chemin que rien n'empruntera.
  */
 export function etapesRelais(type: TypeDocument, statut: StatutDocument): EtapeRelais[] {
-  const parcours = passeParUnPrestataire(type) ? PARCOURS_PRESTATAIRE : PARCOURS_ARRIVE_FAIT;
+  const parcours = passeParUnPrestataire(type) ? PARCOURS_PRESTATAIRE : PARCOURS_SANS_ETAPE;
   const rang = parcours.indexOf(statut);
   if (rang === -1) return [];
 

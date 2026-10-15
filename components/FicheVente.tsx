@@ -16,6 +16,7 @@ import {
 import { useSession } from "@/lib/auth/session";
 import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
+import { PapiersDeLaVente } from "@/components/PapiersDeLaVente";
 import type { Moto } from "@/lib/domain/moto";
 import { identifiantRecu, rangInscrit } from "@/lib/domain/recu";
 import {
@@ -208,6 +209,10 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
 
           {suivi && peutRemettreMoto(vente, suivi.resteDu) && <RemiseMoto vente={vente} />}
 
+          {/* Les papiers avant les versements : c'est le geste du jour quand le
+              client repasse, et l'argent est deja regle sur la ligne du haut. */}
+          <PapiersDeLaVente vente={vente} moto={moto} />
+
           <section>
             <TitrePanneau>Les versements</TitrePanneau>
             <ListeVersements versements={versements} base={base} />
@@ -228,7 +233,7 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
             {documents && documents.length > 0 && (
               <p className="mb-2 text-corps text-encre-doux">{resumerDossier(documents)}</p>
             )}
-            <DossierDocuments documents={documents} />
+            <DossierDocuments documents={documents} vente={vente} moto={moto} />
           </section>
 
           <CeQuiEtaitConvenu vente={vente} />
