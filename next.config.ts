@@ -254,6 +254,12 @@ const ECRANS_HORS_LIGNE = [
   "/pieces/nouvelle",
   "/caisse",
   "/caisse/depenses",
+  /* **Jamais `/suivi/[jeton]` non plus, et pour une raison de plus** (S56) :
+     une route à jeton variable n'a pas d'URL à précharger, et en inscrire une
+     ferait rendre 404 — le défaut de `/diagnostic`, qui fait tomber le
+     hors-ligne EN ENTIER. Le portail du prestataire est d'ailleurs en ligne
+     seulement, par décision : c'est une exception écrite à D40, parce qu'on le
+     consulte depuis chez soi et non depuis un comptoir en coupure. */
   "/parametres",
   "/parametres/boutiques",
   "/parametres/utilisateurs",
