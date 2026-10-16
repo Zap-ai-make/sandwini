@@ -1,9 +1,11 @@
+import { randomBytes } from "node:crypto";
 import { logger } from "firebase-functions";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-functions/v2/https";
 import { QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
 import { fermeLesSessions, lireModification } from "./gerants";
 import { resoudreCollision, type PieceNumerotee } from "./numerotation";
+import { construireSuivi } from "./suivi";
 
 /**
  * Les seules opérations du MVP qui passent par le serveur.
@@ -1030,4 +1032,190 @@ export const cloturerSurDocument = onDocumentWritten(
 export const cloturerSurVente = onDocumentWritten(
   { region: REGION, document: "ventesMotos/{venteId}" },
   async (evenement) => cloturerSiFini(evenement.params.venteId),
+);
+
+/* --- Le portail du prestataire (S56) -------------------------------------- */
+
+/**
+ * La taille de l'aléa d'un jeton de suivi.
+ *
+ * Même valeur que `OCTETS_JETON` dans `lib/domain/jeton-suivi.ts`, recopiée
+ * parce que `functions/` ne peut pas importer `lib/` — son `tsconfig` a
+ * `rootDir: "src"`, donc le paquet déployé ne compile rien d'extérieur. C'est la
+ * situation de `numerotation`, et la réponse est la même : les deux moitiés sont
+ * nouées par un test, pas par un import.
+ */
+const OCTETS_JETON = 32;
+
+/** La forme d'un jeton écrit : 32 octets en base64url, sans remplissage. */
+const FORME_JETON = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Le refus unique du portail.
+ *
+ * **Un jeton inconnu, révoqué ou malformé rend exactement ceci.** Les
+ * distinguer dirait à qui essaie des liens au hasard lequel a existé — et
+ * « ce prestataire n'a pas de lien » renseignerait déjà sur l'existence du
+ * prestataire. Du point de vue de celui qui consulte, les trois situations sont
+ * de toute façon la même : il n'y a rien à lire.
+ */
+const REFUS_PORTAIL = { erreur: "Ce lien n’est plus valide." };
+
+/**
+ * Émet le lien de suivi d'un prestataire, et révoque le précédent.
+ *
+ * **Un secret ne se fabrique pas dans un navigateur** (`SECURITY.md` §4), et
+ * c'est la seule raison pour laquelle cette fonction existe : `randomBytes` n'a
+ * pas d'équivalent de confiance côté client, et les règles Firestore interdisent
+ * d'écrire `jetonSuivi` depuis l'application.
+ *
+ * **La révocation est l'écrasement.** Il n'y a jamais deux liens valides pour un
+ * même prestataire parce qu'il n'y a jamais deux champs : réémettre efface. Rien
+ * à expirer, rien à balayer, aucune liste de jetons morts à tenir.
+ */
+export const emettreJetonSuivi = onCall({ region: REGION }, async (requete) => {
+  exigerResponsable(requete);
+
+  const prestataireId = String(requete.data?.prestataireId ?? "").trim();
+  if (!prestataireId) {
+    throw new HttpsError("invalid-argument", "Indiquez le prestataire.");
+  }
+
+  const { base, horodatage } = await admin();
+  const reference = base.doc(`prestataires/${prestataireId}`);
+  if (!(await reference.get()).exists) {
+    throw new HttpsError("not-found", "Ce prestataire n'existe pas.");
+  }
+
+  /* `base64url` : le jeton vit dans un segment d'URL, où `+`, `/` et `=` ne
+     survivent pas. Trente-deux octets rendent quarante-trois caractères. */
+  const jeton = randomBytes(OCTETS_JETON).toString("base64url");
+
+  await reference.update({
+    jetonSuivi: jeton,
+    jetonEmisLe: horodatage,
+    updatedAt: horodatage,
+    /* Le responsable a décidé d'ouvrir un lien, mais c'est le serveur qui a
+       fabriqué le secret. Lui attribuer l'écriture laisserait croire qu'il a
+       choisi la valeur. */
+    updatedBy: "systeme",
+    updatedByName: "Émission d'un lien de suivi",
+  });
+
+  logger.info("Lien de suivi émis", { prestataire: prestataireId });
+  return { jeton };
+});
+
+/** Un `Timestamp` Firestore en millisecondes. La préversion porte parfois des `Date` nues. */
+function horodatageEnMillisecondes(valeur: unknown): number | null {
+  if (valeur instanceof Timestamp) return valeur.toMillis();
+  if (valeur instanceof Date) return valeur.getTime();
+  return null;
+}
+
+/**
+ * Répond à un lien de suivi.
+ *
+ * **La seule porte du portail.** Aucune règle Firestore n'est assouplie par
+ * S56 : un visiteur non authentifié ne lit rien de la base, et un test de règles
+ * le prouve. Tout passe par ici, avec les droits du serveur, et ce qui sort est
+ * exactement la charge utile que `construireSuivi` fabrique.
+ *
+ * **Le jeton arrive dans le CORPS, jamais dans l'URL de la fonction.** Une URL
+ * se retrouve dans les journaux d'accès ; un corps non. Le lien du prestataire,
+ * lui, porte forcément le jeton dans son URL — mais cette URL est servie par le
+ * produit, et c'est justement le rendu côté serveur qui évite de le faire
+ * traverser une seconde fois.
+ *
+ * `cors: false`, comme `amorcerResponsable` : cette fonction n'est appelée que
+ * par le serveur Next, jamais par un navigateur. Lui ouvrir CORS serait ouvrir
+ * une porte dont personne n'a l'usage.
+ */
+export const suiviPrestataire = onRequest(
+  { region: REGION, cors: false },
+  async (requete, reponse) => {
+    if (requete.method !== "POST") {
+      reponse.status(405).json({ erreur: "Méthode non autorisée." });
+      return;
+    }
+
+    const jeton: unknown = requete.body?.jeton;
+
+    /* **La forme se vérifie AVANT toute lecture**, et ce n'est pas une
+       optimisation. Sans ce filtre, n'importe quelle valeur trouvée dans une URL
+       partirait en requête — une lecture offerte par essai à qui tape au hasard.
+       Et surtout : une fiche jamais émise n'a pas de `jetonSuivi`, donc
+       `where('jetonSuivi', '==', null)` rendrait TOUTES ces fiches. Un portail
+       devenu annuaire, par un appel sans argument. */
+    if (typeof jeton !== "string" || !FORME_JETON.test(jeton)) {
+      reponse.status(404).json(REFUS_PORTAIL);
+      return;
+    }
+
+    const { base } = await admin();
+    const fiches = await base
+      .collection("prestataires")
+      .where("jetonSuivi", "==", jeton)
+      .limit(1)
+      .get();
+
+    if (fiches.empty) {
+      reponse.status(404).json(REFUS_PORTAIL);
+      return;
+    }
+
+    const fiche = fiches.docs[0];
+
+    /* **Une seule requête pour les cartes, sur `prestataireId` seul.** Le type
+       n'est pas filtré : seule une carte grise part chez un prestataire, donc ce
+       champ ne vaut jamais rien d'autre. Ajouter `type` ferait deux égalités sur
+       un groupe de collections, c'est-à-dire un index composite de plus pour un
+       filtre qui ne retire aucune ligne.
+
+       Cette requête exige en revanche un index de portée « groupe de
+       collections » sur `prestataireId`, déclaré dans `firestore.indexes.json`.
+       L'émulateur crée ses index tout seul et ne l'aurait jamais signalé : c'est
+       en production que l'oubli se serait vu. */
+    const cartes = await base
+      .collectionGroup("documents")
+      .where("prestataireId", "==", fiche.id)
+      .get();
+
+    const lignes = await Promise.all(
+      cartes.docs.map(async (carte) => {
+        const venteId = carte.ref.parent.parent?.id ?? "";
+        const vente = venteId ? await base.doc(`ventesMotos/${venteId}`).get() : null;
+
+        const motoId = vente?.get("motoId");
+        const clientId = vente?.get("clientId");
+        /* Les deux lectures partent ensemble : une par ligne suffirait à rendre
+           un prestataire de deux cents cartes désagréable à consulter. */
+        const [moto, client] = await Promise.all([
+          motoId ? base.doc(`motos/${motoId}`).get() : null,
+          clientId ? base.doc(`clients/${clientId}`).get() : null,
+        ]);
+
+        /* Une vente, une moto ou un client devenu illisible ne fait pas tomber
+           le portail : la ligne se construit et dit ce qu'elle ne sait pas.
+           `construireSuivi` porte les replis de libellé. */
+        return {
+          venteId,
+          statut: String(carte.get("statut") ?? ""),
+          deposeLe: horodatageEnMillisecondes(carte.get("deposeLe")),
+          remisLe: horodatageEnMillisecondes(carte.get("remisLe")),
+          avance: typeof carte.get("avance") === "number" ? (carte.get("avance") as number) : null,
+          numeroVente: String(vente?.get("numero") ?? ""),
+          client: String(client?.get("nom") ?? ""),
+          moto: [moto?.get("marqueNom"), moto?.get("modeleNom")].filter(Boolean).join(" "),
+          chassis: String(moto?.get("chassis") ?? ""),
+        };
+      }),
+    );
+
+    /* **La vente n'est jamais lue au-delà de son numéro, et `prive/` n'est
+       jamais ouverte.** Ce n'est pas une précaution qu'il faudrait maintenir :
+       c'est l'absence de code pour le faire. Le mur de D2 tient par
+       construction, et un test de déclencheur sème un coût pour le prouver. */
+    reponse.status(200).json(construireSuivi(String(fiche.get("nom") ?? ""), lignes, Date.now()));
+  },
 );
