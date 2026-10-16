@@ -41,9 +41,9 @@ avant toute spec post-MVP.
 
 | ID  | Spec                                          | Dépend de   | Pourquoi ce rang |
 |-----|-----------------------------------------------|-------------|------------------|
-| S13 | Lien de suivi client — page `/suivi/[token]`  | S11         | Le différenciateur vis-à-vis du client ; inutile tant que les statuts documents ne vivent pas (S11). |
+| S13 | Lien de suivi client — page `/suivi/[token]`  | S11, S56    | Le différenciateur vis-à-vis du client. **S56 a construit toute la mécanique** : jeton de 32 octets émis par fonction, règle qui l'accepte sans laisser un navigateur l'écrire, fonction HTTP seule porte, page publique rendue côté serveur. Il reste à décider **ce qu'un client voit** — ce qui est une question de métier, pas d'architecture. |
 | S14 | Messages WhatsApp paramétrables               | S13         | Sans le lien de S13, il n'y a presque rien à envoyer. |
-| S15 | Prestataires — token et page `/prestataire`   | S11         | Décharge le gérant de la relance ; le circuit fonctionne sans, à la main. |
+| S15 | Prestataires — token et page `/prestataire`   | S11         | **Livrée le 16 octobre 2026 par S56**, sous le nom `/suivi/[jeton]`. Le token annoncé ici depuis le cahier des charges existe enfin, produit par une Cloud Function. |
 | S16 | CMC — stock, attribution, remise              | S11         | Le document `cmc` suit déjà son cycle sans gestion du stock physique de cartes. |
 | S17 | Transferts de motos entre boutiques           | S5          | **Livrée le 8 octobre 2026** — en un seul geste, Q7 renversée. Les pièces détachées restent à faire. |
 | S18 | Échanges / reprises                           | S8          | Cas de vente fréquent mais contournable (vente + entrée en stock séparées). |
@@ -245,7 +245,7 @@ c'est le voir revenir sous un autre nom.
 | S53 | Les papiers d'une moto : un seul endroit par papier, et le paquet de cartes grises | S11, S30, S43, S44, S48 | post-MVP | terminée le 15 oct. |
 | S54 | La supervision rend le travail aux espaces métier ; le prix d'achat se saisit sur la moto | S24, S39, S47 | post-MVP | terminée |
 | S55 | L'inventaire du stock, la caisse analytique et ses postes de dépense | S22, S24, S43, S46 | post-MVP | terminée |
-| S56 | Le portail du prestataire : un lien de suivi, et rien d'autre | S30, S53 | post-MVP | terminée le 16 oct. — **reste à déployer** (règles, index, fonctions) |
+| S56 | Le portail du prestataire : un lien de suivi, et rien d'autre | S30, S53 | post-MVP | terminée le 16 oct., **déployée** sur `sandwini` (règles, index, fonctions) |
 
 **S51, relevé le 8 octobre 2026.** Sur l'Inventaire (`/supervision/chiffres` alors,
 `/motos/inventaire` depuis S55), `scripts/captures.mjs`
