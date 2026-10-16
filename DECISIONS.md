@@ -3184,3 +3184,51 @@ un passage que le domaine venait de retirer, et `PARCOURS_*` dans
 n'atteint. Quand une règle est écrite deux fois — ici par nécessité, le serveur
 devant juger sans le client (D27) —, **la changer d'un côté ne la change pas de
 l'autre**, et seul un test qui traverse les deux le dit.
+
+### Amendement S53 — Un groupement n'a pas d'état : il se recompte
+
+Le **paquet de cartes grises** groupe un dépôt sans le remplacer. Quatre choses
+en découlent, et il faut les dire ensemble parce que c'est leur conjonction qui
+tient.
+
+**Chaque document garde ses champs de dépôt.** Les règles Firestore évaluent
+chaque écriture d'un lot contre l'état d'**avant** le lot : un document validé
+contre un paquet créé dans le même lot serait refusé. `depotRenseigne` reste
+donc vrai mot pour mot, et le paquet n'est qu'une **couche de regroupement**
+par-dessus un modèle qui tient déjà. Les écrans de dossier existants continuent
+de fonctionner sans rien savoir de lui.
+
+**Le paquet n'a pas d'état « rendu ».** Il est soldé quand aucune de ses cartes
+n'est plus dehors, ce qui se calcule. Lui donner un champ rouvrirait la
+contradiction B sous un autre nom — le champ dirait « rendu » pendant qu'une
+carte serait encore chez le prestataire, et il faudrait un geste pour les
+raccorder. C'est aussi ce qui rend le **retour partiel gratuit** : cinq cartes
+revenues sur dix ne demandent rien à personne, et c'est exactement l'arbitrage 9
+(« il peut partir avec 10 et ramener 5 »). Le `hasOnly` de la règle est ce qui
+empêche de réintroduire ce champ par bonne intention, et un test le fige.
+
+**L'avance sort une fois, et se répartit.** Un seul encaissement, dont
+l'`origineRefId` est le paquet : dix sorties de 15 000 feraient croire à dix
+décisions et rendraient le journal illisible. Mais chaque document porte sa
+**part**, pas le total — sans cela, dix documents à 150 000 feraient lire
+1 500 000 sortis de la caisse à qui ouvre les dossiers un par un. Le reste de la
+division entière va à la première carte.
+
+Elle se range dans un poste de dépense **sans `posteId`** : S55 replie
+`libelleDuPoste` sur l'origine quand aucun poste n'est posé, et
+`avance_prestataire` en est une. Inventer une ligne de référentiel ferait
+dépendre un dépôt de l'existence d'un poste.
+
+**La borne vient du calcul.** Un lot Firestore accepte 500 écritures ; un paquet
+en fait `2N + 2` — lui-même, puis par carte une mise à jour et une ligne
+d'historique, plus l'encaissement. `2N + 2 ≤ 500` donne **249**. C'est un
+plafond et non une cible — le geste réel en tend dix —, mais une borne choisie
+au hasard se révèle un jour fausse dans le mauvais sens, alors que celle-ci est
+la limite au-delà de laquelle l'écriture échouerait en bloc, sans message utile.
+
+**Ce que les règles ne peuvent pas prouver, et comment on le prouve quand même.**
+Aucune règle ne peut vérifier que les `venteIds` du paquet correspondent aux
+documents mis à jour dans le même lot : les règles ne savent pas joindre. Ce que
+la base garantit — et qui suffit — c'est qu'un lot est accepté ou refusé **en
+bloc**. Le test le prouve donc par la conséquence : après le refus d'une écriture
+du lot, le paquet, première écriture et valide à elle seule, **n'existe pas**.

@@ -137,16 +137,22 @@ pas.
   disparaît de l'écran : un choix à une seule option n'est pas un choix, c'est
   une saisie obligatoire déguisée.
 
-### Une question laissée ouverte à la relecture
+### La question laissée ouverte, et sa réponse
 
 L'arbitrage 7 donne **deux** gestes à la carte grise : partie, revenue. Il n'en
-donne pas un troisième pour sa remise au client. Cette spec en tire que **le
-retour au magasin est le terme du parcours** de la carte grise, et que la preuve
-de ce retour est le scan et la plaque saisis sur la fiche de vente.
+donnait pas un troisième pour sa remise au client, et cette spec en tirait que
+le retour au magasin est le terme du parcours.
 
-Si le commanditaire veut aussi tracer le moment où la carte grise **quitte** le
-magasin pour le client, c'est une case de plus à poser, et il faut le dire
-maintenant : l'ajouter plus tard rouvrirait la clôture.
+**Tranché à l'exécution, le 15 octobre 2026 : c'est bien le terme.** La preuve
+de la remise est le scan et la plaque saisis sur la fiche de vente — deux
+renseignements qui disent la même chose qu'une case en laissant une trace, là
+où un troisième statut n'aurait ajouté qu'un geste à promener. `remis_client` a
+donc quitté `CHEMIN_PRESTATAIRE`, et il reste **lisible sans être écrivable** :
+la préversion en porte, et `etatPapier` les rend « au magasin ».
+
+Si le commanditaire veut un jour tracer le moment où la carte grise **quitte**
+le magasin pour le client, c'est une case de plus à poser — et elle rouvrira la
+clôture, donc elle fera l'objet d'une spec et non d'une retouche.
 
 ---
 
@@ -252,60 +258,66 @@ regroupement** par-dessus un modèle qui tient déjà.
 
 ### Le CMC et la quittance
 
-- [ ] La fiche d'une moto dit si sa quittance et son CMC sont en main. Aujourd'hui elle ne le dit pas.
-- [ ] La case se coche depuis la fiche de la moto **et** depuis l'inspection d'un lot. Les deux écrivent le même champ — pas deux champs synchronisés.
-- [ ] Un arrivage compte ses quittances manquantes comme il compte déjà ses CMC manquants.
-- [ ] Sur une vente dont la moto porte son CMC, le dossier affiche « Au magasin » **sans qu'aucun geste n'ait été fait sur le dossier**.
-- [ ] Cocher le CMC d'une moto **déjà vendue** fait avancer l'affichage de son dossier, en direct, sans écriture sur le dossier.
-- [ ] Le seul geste restant au comptoir pour ces deux papiers est de dire que le client les a emportés — et il se fait **sur la vente**.
+- [x] La fiche d'une moto dit si sa quittance et son CMC sont en main. *(`PapiersEnMain`.)*
+- [x] La case se coche depuis la fiche de la moto **et** depuis l'inspection d'un lot. Les deux appellent `marquerPapierRecu`, donc écrivent le même champ — pas deux champs synchronisés.
+- [x] Un arrivage compte ses quittances manquantes comme ses CMC. `completudeCmc` a disparu entièrement : un compteur laissé derrière redirait la moitié de la vérité.
+- [x] Sur une vente dont la moto porte son CMC, le dossier affiche « Au magasin » **sans qu'aucun geste n'ait été fait sur le dossier**. *(Témoin `e2e/dossier.spec.ts`.)*
+- [x] Cocher le CMC d'une moto **déjà vendue** fait avancer l'affichage de son dossier, sans écriture sur le dossier. C'est exactement ce que le témoin fait : il vend, puis coche sur la moto.
+- [x] Le seul geste restant au comptoir pour ces deux papiers est de dire que le client les a emportés, et il se fait **sur la vente**. Leur chemin de dossier est réduit à `non_applicable` — côté domaine **et** côté règles.
 
 ### Ce que le client a emporté
 
-- [ ] La fiche de vente porte deux cases : quittance emportée, CMC emporté. La carte grise n'y figure pas.
-- [ ] Une case ne se coche pas tant que la moto ne porte pas le papier : on ne remet pas ce qu'on n'a pas.
-- [ ] Le reçu dit la même chose que la fiche. Un test le fige.
+- [x] La fiche de vente porte deux cases : quittance emportée, CMC emporté. La carte grise n'y figure pas — « elle n'est jamais disponible à l'achat ».
+- [x] Une case ne se coche pas tant que la moto ne porte pas le papier, et une phrase dit pourquoi elle est fermée. Les règles ne peuvent pas tenir cette condition — elles ne savent pas joindre la moto — donc c'est l'écran qui la tient. *(Témoin : la case quittance est `disabled`.)*
+- [x] Le reçu dit la même chose que la fiche. Les deux lisent `papiersEmportesDeVente`, et un test unitaire fige cette fonction : une seule lecture est la seule façon de garantir qu'ils ne divergent pas.
 
 ### La case du comptoir
 
-- [ ] Décocher « Carte grise » à la vente ouvre le document à « Sans objet ». Le dossier se clôt sans geste supplémentaire.
-- [ ] Le reçu et l'écran des dossiers disent la même chose sur la même vente. Un test le fige.
-- [ ] Les règles Firestore acceptent `non_applicable` à la création pour la carte grise, et **refusent** toujours tout autre statut initial.
+- [x] Décocher « Carte grise » à la vente ouvre le document à « Sans objet ». Le dossier se clôt sans geste supplémentaire : c'est la contradiction A fermée.
+- [x] Le reçu et l'écran des dossiers disent la même chose sur la même vente. Les deux dérivent de `vente.carteGrise` — le reçu par `inclusionsDeVente`, le dossier par le statut que cette case a posé à la création. Un test de règles fige la création à `non_applicable`.
+- [x] Les règles acceptent `non_applicable` à la création **pour la carte grise seule**, et refusent tout autre statut initial. La quittance et le CMC n'ont pas cette porte : leur disponibilité vient de la moto, pas d'une case de vente.
 
 ### La carte grise, son scan et sa plaque
 
-- [ ] La fiche de vente permet d'envoyer le scan de la carte grise, par le mécanisme des scans existants (D66 inchangé).
-- [ ] La fiche de vente porte un champ « Numéro de plaque », saisi au retour. Il écrit `motos.plaque`.
-- [ ] La plaque se relit sur la fiche de la moto et dans l'inventaire.
-- [ ] Un test de règles prouve qu'un gérant écrit la plaque d'une moto de sa boutique, et d'aucune autre.
+- [x] La fiche de vente envoie le scan de la carte grise par le mécanisme des scans existants. Le fichier se range sous `motos/{id}/papiers/`, qui a déjà sa règle vérifiée en type réel et en taille ; le chemin, lui, s'écrit sur la vente — c'est elle qui sait à qui cette carte a été remise. D66 inchangé : l'écran dit **avant** le geste qu'un envoi demande du réseau.
+- [x] La fiche de vente porte un champ « Numéro de plaque », saisi au retour. Il écrit `motos.plaque`, après `normaliserPlaque`.
+- [x] La plaque se relit sur la fiche de la moto et dans l'inventaire — **à côté** du châssis et non à sa place : les deux servent, la plaque de loin, le châssis accroupi devant le cadre.
+- [x] Un test de règles prouve qu'un gérant écrit la plaque d'une moto de sa boutique, et d'aucune autre.
 
 ### Le paquet de cartes grises
 
-- [ ] Depuis l'écran des dossiers, le gérant sélectionne plusieurs cartes grises à faire et les confie **en une fois** : un prestataire, une date, une avance, une date annoncée facultative.
-- [ ] Le paquet se voit en une ligne : « 10 cartes grises chez Ouédraogo, depuis 12 jours ». Il porte le détail des châssis.
-- [ ] **Le retour est partiel par défaut** : cinq revenues, cinq encore dehors, et le paquet reste ouvert sans qu'aucun geste ne le dise.
-- [ ] Un paquet dont toutes les cartes sont revenues est **soldé par calcul**, jamais par un champ.
-- [ ] L'avance sort de la caisse en **un seul** encaissement, pas en dix. Elle se range dans un poste de dépense (S55).
-- [ ] Le nombre de cartes par paquet est **borné**, la borne est nommée, et le dépassement est refusé par un message qui dit la borne.
-- [ ] Tout est atomique : ou le paquet et ses documents partent ensemble, ou rien ne part.
-- [ ] Un test de règles prouve qu'un gérant ne lit ni n'écrit le paquet d'une autre boutique.
+- [x] Depuis l'écran des dossiers, le gérant sélectionne plusieurs cartes grises à faire et les confie **en une fois** : un prestataire, une date, une avance, une date annoncée facultative. *(`ConfierPaquetModal`, témoin `e2e/paquet.spec.ts`.)*
+- [x] Le paquet se voit en une ligne — « Ouédraogo — 2 dehors sur 2, depuis 12 j » — et porte le détail des numéros, replié. *(`PaquetsEnCours`.)*
+- [x] **Le retour est partiel par défaut** : le témoin fait revenir une carte sur deux et vérifie que le paquet reste ouvert, sans qu'aucun geste ne le dise.
+- [x] Un paquet dont toutes les cartes sont revenues est **soldé par calcul**, jamais par un champ. Le `hasOnly` des règles refuse tout champ d'état, « rendu » compris, et un test le fige nommément.
+- [x] L'avance sort de la caisse en **un seul** encaissement, dont l'`origineRefId` est le paquet. Elle se range dans un poste par le repli de `libelleDuPoste` sur l'origine `avance_prestataire` (S55) : aucun poste n'est inventé, et un dépôt ne dépend pas de l'existence d'une ligne de référentiel.
+- [x] Le nombre de cartes est borné à **249**, nombre justifié par le calcul `2N + 2 <= 500` écritures par lot, et le message de refus dit la borne.
+- [x] Tout est atomique. Les règles ne sachant pas joindre, la preuve se fait par la conséquence : après le refus d'une écriture du lot, le paquet — première écriture, valide à elle seule — n'existe pas.
+- [x] Un test de règles prouve qu'un gérant ne lit ni n'écrit le paquet d'une autre boutique, dans les deux sens.
+
+**Une chose que le paquet n'ajoute pas, et c'est voulu :** l'avance est
+**répartie** sur les documents, pas répétée. Chaque carte porte sa part, le
+reste de la division entière allant à la première. Sans cela, dix documents à
+150 000 feraient lire 1 500 000 sortis de la caisse à qui ouvre les dossiers un
+par un.
 
 ### Le trou de S48
 
-- [ ] Les règles **refusent** `plaque` à la **création** d'un prestataire, et continuent de l'accepter en modification pour que les fiches anciennes restent corrigeables. Un test de règles fige les deux.
-- [ ] Un prestataire dont les types se lisent vides est **signalé** à l'écran au lieu d'afficher « Aucun type de document » sans conséquence visible.
-- [ ] Le groupe de cases « Types de documents » quitte le formulaire ; le type est posé implicitement.
+- [x] Les règles refusent `plaque` à la **création** d'un prestataire et l'acceptent encore en **modification** : les fiches d'avant S48 en portent, et les refuser les rendrait incorrigibles. `typesACreer` sépare les deux gestes, et un test fige chacun.
+- [x] Un prestataire sans type est **signalé** en ton d'alerte, avec la conséquence : « ce prestataire n'est proposé nulle part ». Le gris doux ne la disait pas.
+- [x] Le groupe de cases « Types de documents » quitte le formulaire ; le type est posé dans `VIDE`. Un choix à une seule option est une saisie obligatoire déguisée.
 
 ### Le vocabulaire
 
-- [ ] « Papiers fournis » change d'intitulé pour ne plus se confondre avec les documents du dossier.
-- [ ] Aucun exemple de test ne prend « Carte grise » comme valeur de texte libre.
-- [ ] Un paragraphe de `DECISIONS.md` nomme les sept emplois du mot et dit lequel survit. Sans lui, la confusion repousse.
+- [x] « Papiers fournis » devient « **Notes du vendeur** », sur la fiche de la moto et sur le formulaire d'entrée.
+- [x] Aucun exemple de test ne prend « Carte grise » comme texte libre : `lib/domain/moto.test.ts` dit « Double des clés ».
+- [x] **D107** nomme les sept emplois du mot et dit lequel survit — le document de dossier, réduit à un seul fait. Il nomme aussi le septième, qui n'est pas une donnée : la palette, née de la plaque jaune, et que toute suppression doit exclure explicitement.
 
 ### Ce qui ne doit pas casser
 
-- [ ] La suite ciblée reste verte : unitaires, règles, et les fichiers e2e des dossiers, des ventes et des arrivages. **Pas de passe complète** — elle dure plus d'une heure et rend des verdicts d'outillage.
-- [ ] Le rendu est regardé en clair, en sombre et sur Pixel 7, **des deux rôles** — responsable et gérant.
-- [ ] La palette et `.plaque-code` ne sont pas touchés. Un seul fichier CSS modifié serait un défaut de périmètre.
+- [x] La suite ciblée est verte : **817** unitaires, **412** règles, **28** déclencheurs, et les fichiers e2e des dossiers, des ventes, des arrivages et du paquet. Aucune passe complète.
+- [ ] **Le rendu n'a pas été regardé.** Clair, sombre, Pixel 7, les deux rôles : c'est le seul critère que l'exécution ne pouvait pas cocher, et il reste ouvert.
+- [x] La palette et `.plaque-code` ne sont pas touchés : aucun fichier CSS modifié par S53.
 
 ---
 

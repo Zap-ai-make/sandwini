@@ -242,10 +242,10 @@ c'est le voir revenir sous un autre nom.
 | S51 | La campagne de captures ne charge pas le périmètre sur les écrans de supervision | S24, S47 | post-MVP | **ouverte** |
 | S52 | Modifier, couper et supprimer un compte de gérant | S2, S3 | post-MVP | terminée |
 | S17 | Déplacer une moto d'une boutique à une autre, en l'historisant | S5, S3 | post-MVP | terminée |
-| S53 | Les papiers d'une moto : un seul endroit par papier | S11, S30, S43, S44, S48 | post-MVP | **spec réécrite le 15 oct., à valider** |
+| S53 | Les papiers d'une moto : un seul endroit par papier, et le paquet de cartes grises | S11, S30, S43, S44, S48 | post-MVP | terminée le 15 oct. |
 | S54 | La supervision rend le travail aux espaces métier ; le prix d'achat se saisit sur la moto | S24, S39, S47 | post-MVP | terminée |
 | S55 | L'inventaire du stock, la caisse analytique et ses postes de dépense | S22, S24, S43, S46 | post-MVP | terminée |
-| S56 | Le portail du prestataire : un lien de suivi, et rien d'autre | S30, S53 | post-MVP | **spec écrite, à valider** |
+| S56 | Le portail du prestataire : un lien de suivi, et rien d'autre | S30, S53 | post-MVP | **spec écrite, débloquée par S53 — à valider** |
 
 **S51, relevé le 8 octobre 2026.** Sur l'Inventaire (`/supervision/chiffres` alors,
 `/motos/inventaire` depuis S55), `scripts/captures.mjs`
