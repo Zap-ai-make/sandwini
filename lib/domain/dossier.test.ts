@@ -26,6 +26,7 @@ import {
   type SaisieDepot,
   type MotoDuDossier,
   type VenteDuDossier,
+  resumerDossier,
 } from "./dossier";
 
 const doc = (type: TypeDocument, statut: StatutDocument) => ({ type, statut });
@@ -915,5 +916,71 @@ describe("etatPapier", () => {
     expect(
       etatPapier({ type: "carte_grise", statut: "remis_client", enMain: false, emporte: false }),
     ).toBe("au_magasin");
+  });
+});
+
+/**
+ * Le résumé du dossier, sur la fiche de vente (S53, défaut vu à l'écran).
+ *
+ * **Il comptait les statuts STOCKÉS**, et disait donc « 2 à faire » juste
+ * au-dessus de deux lignes où le même écran affichait « Emporté par le
+ * client ». C'est mot pour mot la contradiction que cette spec existe pour
+ * fermer — elle avait survécu à un centimètre des lignes qu'elle contredit,
+ * parce que `resumerDossier` vivait dans `vente.ts` et que rien ne pointait
+ * vers lui.
+ *
+ * Aucun test ne pouvait le voir : les trois qui existaient vérifiaient
+ * fidèlement qu'il comptait bien les statuts stockés. Il a fallu regarder une
+ * capture d'écran.
+ */
+describe("resumerDossier", () => {
+  const papier = (type: TypeDocument, statut: StatutDocument): DocumentDossier => ({
+    id: type,
+    boutiqueId: "PTG",
+    venteId: "v1",
+    type,
+    statut,
+    prestataireId: null,
+    prestataireNom: "",
+    deposeLe: null,
+    avance: null,
+    disponibleLe: null,
+    remisLe: null,
+  });
+
+  const AUCUNE_MOTO: MotoDuDossier = { id: "m1", quittanceRecue: false, cmcRecu: false };
+  const RIEN_EMPORTE = { quittance: false, cmc: false };
+
+  it("dit « Dossier non chargé » tant qu'aucun document n'est parvenu", () => {
+    expect(resumerDossier([], { emporte: RIEN_EMPORTE }, AUCUNE_MOTO)).toBe("Dossier non chargé");
+  });
+
+  /* **Le défaut, en test.** La moto porte ses deux papiers et le client les a
+     emportés : le résumé doit le dire, et non réciter deux statuts que S53 a
+     vidés de leur sens. */
+  it("compte l’état CALCULÉ, pas le statut stocké", () => {
+    const resume = resumerDossier(
+      [papier("quittance", "a_faire"), papier("cmc", "a_faire"), papier("carte_grise", "a_faire")],
+      { emporte: { quittance: true, cmc: true } },
+      { id: "m1", quittanceRecue: true, cmcRecu: true },
+    );
+    expect(resume).toBe("1 à faire · 2 emportés par le client");
+  });
+
+  it("accorde le pluriel sur le compte, et pas seulement sur le libellé", () => {
+    const resume = resumerDossier(
+      [papier("quittance", "a_faire"), papier("carte_grise", "chez_prestataire")],
+      { emporte: { quittance: true, cmc: false } },
+      { id: "m1", quittanceRecue: true, cmcRecu: false },
+    );
+    expect(resume).toBe("1 chez le prestataire · 1 emporté par le client");
+  });
+
+  /* La moto peut n'être pas encore arrivée de son écoute : le papier se lit
+     alors « à faire », jamais `undefined`. */
+  it("tient sans moto connue", () => {
+    expect(
+      resumerDossier([papier("quittance", "a_faire")], { emporte: RIEN_EMPORTE }, null),
+    ).toBe("1 à faire");
   });
 });

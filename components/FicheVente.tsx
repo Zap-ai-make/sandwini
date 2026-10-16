@@ -17,6 +17,7 @@ import { useSession } from "@/lib/auth/session";
 import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
 import { PapiersDeLaVente } from "@/components/PapiersDeLaVente";
+import { resumerDossier } from "@/lib/domain/dossier";
 import type { Moto } from "@/lib/domain/moto";
 import { identifiantRecu, rangInscrit } from "@/lib/domain/recu";
 import {
@@ -29,7 +30,6 @@ import {
   inclusionsDeVente,
   lignePaiement,
   peutRemettreMoto,
-  resumerDossier,
   validerVersement,
   type DocumentDossier,
   type LignePaiement,
@@ -231,7 +231,7 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
           <section>
             <TitrePanneau>Le dossier</TitrePanneau>
             {documents && documents.length > 0 && (
-              <p className="mb-2 text-corps text-encre-doux">{resumerDossier(documents)}</p>
+              <p className="mb-2 text-corps text-encre-doux">{resumerDossier(documents, vente, moto)}</p>
             )}
             <DossierDocuments documents={documents} vente={vente} moto={moto} />
           </section>

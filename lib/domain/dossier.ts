@@ -147,6 +147,72 @@ export function etatPapier(entree: {
   return "a_faire";
 }
 
+/** Du reste à faire vers le fini : un résumé se lit comme une file se vide. */
+const ORDRE_ETAT_PAPIER: readonly EtatPapier[] = [
+  "a_faire",
+  "chez_prestataire",
+  "au_magasin",
+  "emporte",
+  "sans_objet",
+];
+
+/* Le pluriel ne se déduit pas d'une minuscule : « à faire » et « au magasin »
+   ne s'accordent pas, « emporté » si. Seule l'exception est écrite — le
+   singulier reste lu sur `LIBELLE_ETAT_PAPIER`, qui demeure la seule source. */
+const PLURIEL_ETAT_PAPIER: Partial<Record<EtatPapier, string>> = {
+  emporte: "emportés par le client",
+};
+
+/**
+ * Le dossier d'une vente en une ligne, pour sa fiche (S11, corrigé en S53).
+ *
+ * **Il comptait les statuts stockés**, et affichait donc « 2 à faire » au-dessus
+ * de deux lignes où le même écran disait « Emporté par le client ». La
+ * contradiction que S53 vient fermer avait survécu ici, à un centimètre des
+ * lignes qu'elle contredit — ce résumé vivait dans `vente.ts`, loin de l'état
+ * calculé, et rien ne pointait vers lui. Vu sur une capture d'écran, pas par un
+ * test : les trois qui existaient vérifiaient fidèlement qu'il comptait bien
+ * les statuts stockés.
+ *
+ * Il lit maintenant `etatPapier`, comme la file et comme la fiche.
+ */
+export function resumerDossier(
+  documents: readonly DocumentDossier[],
+  vente: Pick<VenteDuDossier, "emporte">,
+  /** `null` tant que l'écoute du stock n'a pas répondu : les papiers de la moto
+      se lisent alors « à faire », jamais `undefined`. */
+  moto: MotoDuDossier | null,
+): string {
+  if (documents.length === 0) return "Dossier non chargé";
+
+  const parEtat = new Map<EtatPapier, number>();
+  for (const document of documents) {
+    const etat = etatPapier({
+      type: document.type,
+      statut: document.statut,
+      enMain:
+        document.type === "quittance"
+          ? (moto?.quittanceRecue ?? false)
+          : document.type === "cmc"
+            ? (moto?.cmcRecu ?? false)
+            : false,
+      emporte: document.type === "carte_grise" ? false : vente.emporte[document.type],
+    });
+    parEtat.set(etat, (parEtat.get(etat) ?? 0) + 1);
+  }
+
+  return ORDRE_ETAT_PAPIER.filter((etat) => parEtat.has(etat))
+    .map((etat) => {
+      const combien = parEtat.get(etat)!;
+      const libelle =
+        combien > 1
+          ? (PLURIEL_ETAT_PAPIER[etat] ?? LIBELLE_ETAT_PAPIER[etat].toLowerCase())
+          : LIBELLE_ETAT_PAPIER[etat].toLowerCase();
+      return `${combien} ${libelle}`;
+    })
+    .join(" · ");
+}
+
 /** Ce que la clôture regarde. Rien d'autre n'entre en compte (§7.1). */
 export type EtatDossier = {
   documents: readonly { type: TypeDocument; statut: StatutDocument }[];

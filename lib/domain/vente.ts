@@ -542,18 +542,6 @@ export function comparerVentes(a: Vente, b: Vente): number {
   return (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0);
 }
 
-/** Le résumé du dossier affiché en liste : « 3 à faire », « 2 remis · 1 à faire »… */
-export function resumerDossier(documents: readonly DocumentDossier[]): string {
-  if (documents.length === 0) return "Dossier non chargé";
-  const parStatut = new Map<StatutDocument, number>();
-  for (const document of documents) {
-    parStatut.set(document.statut, (parStatut.get(document.statut) ?? 0) + 1);
-  }
-  return STATUTS_DOCUMENT.filter((statut) => parStatut.has(statut))
-    .map((statut) => `${parStatut.get(statut)} ${LIBELLE_STATUT_DOCUMENT[statut].toLowerCase()}`)
-    .join(" · ");
-}
-
 /* ---------------------------------------------------------------------------
    S9 — versements ultérieurs, suivi des dettes et des tranches
    ------------------------------------------------------------------------ */

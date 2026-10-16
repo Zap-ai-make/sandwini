@@ -28,7 +28,6 @@ import {
   paiementsDeLaPeriode,
   paiementsEchelonnes,
   peutRemettreMoto,
-  resumerDossier,
   ventesDuClient,
   statutMotoApresVente,
   statutPaiementDe,
@@ -445,38 +444,6 @@ describe("la saisie de vente, une fois le montant tapé à la main", () => {
   it("le zéro délibéré survit : c’est une vente à crédit sans acompte", () => {
     const credit = { ...tapee, modePaiement: "credit" as const, montantEncaisse: "0" };
     expect(appliquerSaisieVente(credit, { prixConvenu: "800000" }, true).montantEncaisse).toBe("0");
-  });
-});
-
-describe("résumé du dossier", () => {
-  const document = (type: string, statut: string) =>
-    ({ id: type, venteId: "v1", type, statut }) as never;
-
-  it("dit combien de documents sont à chaque étape, dans l’ordre du circuit", () => {
-    expect(
-      resumerDossier([
-        document("quittance", "remis_client"),
-        document("cmc", "a_faire"),
-        document("carte_grise", "chez_prestataire"),
-      ]),
-    ).toBe("1 à faire · 1 chez le prestataire · 1 remis au client");
-  });
-
-  /* Trois depuis S48 : la plaque a quitté le dossier, l'immatriculation étant
-     déjà portée par la carte grise. La fonction, elle, compte ce qu'on lui
-     donne — c'est l'appelant qui décide du circuit. */
-  it("un dossier tout neuf a tous ses documents à faire", () => {
-    expect(
-      resumerDossier([
-        document("quittance", "a_faire"),
-        document("cmc", "a_faire"),
-        document("carte_grise", "a_faire"),
-      ]),
-    ).toBe("3 à faire");
-  });
-
-  it("distingue « pas encore chargé » de « rien à faire »", () => {
-    expect(resumerDossier([])).toBe("Dossier non chargé");
   });
 });
 
