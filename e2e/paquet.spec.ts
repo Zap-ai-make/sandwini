@@ -1,17 +1,11 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import {
-  attendreLaFileVide,
-  chassisUnique,
-  choisirSegment,
   contenu,
-  creerClientDepuisLeFichier,
   creerPrestataire,
   nomUnique,
-  ouvrirLaVente,
   preparerTerrain,
-  saisirMoto,
   seConnecterEtEntrer,
-  type Terrain,
+  vendreDansLeTerrain,
 } from "./aide";
 
 /**
@@ -40,42 +34,14 @@ test.beforeEach(({}, informations) => {
   informations.setTimeout(420_000);
 });
 
-/** Une vente de plus dans le terrain déjà posé. Rend son numéro de pièce. */
-async function vendreDansLeTerrain(
-  page: Page,
-  terrain: Terrain,
-  marqueur: string,
-): Promise<string> {
-  const chassis = chassisUnique(marqueur);
-  await saisirMoto(page, terrain, chassis, { prixAchat: "700000", conseille: "1200000" });
-
-  const client = nomUnique("Zongo");
-  await creerClientDepuisLeFichier(page, client, `78${String(Date.now()).slice(-6)}`);
-
-  /* Même frontière que dans `vendre` : la modale cherche la moto puis le client
-     dans le cache, et la confirmation à l’écran est optimiste. */
-  await attendreLaFileVide(page);
-
-  await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
-  await ouvrirLaVente(page, { chassis, client });
-  await page.getByLabel("Prix convenu", { exact: true }).fill("1200000");
-  await choisirSegment(page, "Mode de paiement", "Crédit");
-  await page.getByLabel(/Montant reçu/).fill("400000");
-  await page.getByRole("button", { name: "Enregistrer la vente" }).click();
-
-  const confirmation = contenu(page).getByRole("status");
-  await expect(confirmation).toContainText("Vente enregistrée", { timeout: 20_000 });
-  return (await confirmation.locator(".plaque-code").textContent())!.trim();
-}
-
 test("deux cartes grises partent en un paquet, et reviennent une par une", async ({ page }) => {
   await seConnecterEtEntrer(page);
   const prestataire = nomUnique("Ouedraogo");
   await creerPrestataire(page, prestataire);
 
   const terrain = await preparerTerrain(page);
-  const premier = await vendreDansLeTerrain(page, terrain, "PQA");
-  const second = await vendreDansLeTerrain(page, terrain, "PQB");
+  const { numero: premier } = await vendreDansLeTerrain(page, terrain, "PQA");
+  const { numero: second } = await vendreDansLeTerrain(page, terrain, "PQB");
 
   await page.goto("/motos/dossiers", { waitUntil: "load" });
 

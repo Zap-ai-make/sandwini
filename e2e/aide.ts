@@ -469,3 +469,50 @@ export async function creerPrestataire(page: Page, nom: string) {
   await expect(page.getByRole("listitem").filter({ hasText: nom })).toBeVisible();
   await attendreLaFileVide(page, 30_000);
 }
+
+/**
+ * Une vente de plus **dans le terrain déjà posé**. Rend son numéro de pièce.
+ *
+ * `vendre` ne convient pas quand il en faut deux : il monte son propre
+ * terrain, donc sa propre boutique. Deux appels donnent deux boutiques, et un
+ * écran borné au périmètre courant ne montre alors qu'une des deux ventes —
+ * c'est ce qui a fait échouer le témoin du paquet trois fois en S53. Un paquet
+ * de cartes grises appartient à **une** boutique : les ventes doivent naître
+ * dans le même terrain.
+ *
+ * Partagé par le témoin du paquet et par ses captures : en tenir deux copies,
+ * c'était s'assurer qu'elles divergent.
+ */
+export async function vendreDansLeTerrain(
+  page: Page,
+  terrain: Terrain,
+  marqueur: string,
+  /* **Le mode décide si la moto reste au magasin**, et ce n'est pas un détail
+     de décor : « tranches » la laisse `reservee`, donc dans l'inventaire ;
+     « crédit » la livre et la met `vendue`, donc hors inventaire. Un test qui
+     veut relire une plaque dans l'inventaire doit vendre en tranches — faute
+     de quoi il cherche une moto que l'écran a raison de ne pas montrer. */
+  options: { mode?: "Crédit" | "Tranches" } = {},
+): Promise<{ chassis: string; client: string; numero: string }> {
+  const chassis = chassisUnique(marqueur);
+  await saisirMoto(page, terrain, chassis, { prixAchat: "700000", conseille: "1200000" });
+
+  const client = nomUnique("Zongo");
+  await creerClientDepuisLeFichier(page, client, `78${String(Date.now()).slice(-6)}`);
+
+  /* Même frontière que dans `vendre` : la modale cherche la moto puis le client
+     dans le cache, et la confirmation à l'écran est optimiste. */
+  await attendreLaFileVide(page);
+
+  await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+  await ouvrirLaVente(page, { chassis, client });
+  await page.getByLabel("Prix convenu", { exact: true }).fill("1200000");
+  await choisirSegment(page, "Mode de paiement", options.mode ?? "Crédit");
+  await page.getByLabel(/Montant reçu/).fill("400000");
+  await page.getByRole("button", { name: "Enregistrer la vente" }).click();
+
+  const confirmation = contenu(page).getByRole("status");
+  await expect(confirmation).toContainText("Vente enregistrée", { timeout: 20_000 });
+  const numero = (await confirmation.locator(".plaque-code").textContent())!.trim();
+  return { chassis, client, numero };
+}

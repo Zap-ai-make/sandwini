@@ -315,8 +315,19 @@ par un.
 
 ### Ce qui ne doit pas casser
 
-- [x] La suite ciblée est verte : **817** unitaires, **412** règles, **28** déclencheurs, et les fichiers e2e des dossiers, des ventes, des arrivages et du paquet. Aucune passe complète.
-- [ ] **Le rendu n'a pas été regardé.** Clair, sombre, Pixel 7, les deux rôles : c'est le seul critère que l'exécution ne pouvait pas cocher, et il reste ouvert.
+- [x] La suite ciblée est verte : **832** unitaires, **412** règles, **28** déclencheurs, et les fichiers e2e des dossiers, des ventes, des arrivages, du paquet et des captures. Aucune passe complète.
+- [x] **Le rendu a été regardé** — clair, sombre, Pixel 7 et bureau, des deux rôles, par `e2e/captures-s53.spec.ts`. Le décor traverse le trajet entier d'un papier : deux ventes dont une en **tranches** (la seule qui laisse la moto à l'inventaire, donc la seule où une plaque s'y relit), un paquet confié, un retour partiel, un reçu, et une fiche de prestataire d'avant S48 posée exprès pour voir son alerte.
+
+  **Il a trouvé quatre défauts qu'aucun test ne voyait**, tous corrigés :
+
+  1. la barre du dépôt groupé affichait ses accents en échappements — `2 cartes grises sélectionnées`, `Tout décocher`. Dans une chaîne JavaScript ils valent « é » ; dans du texte JSX ils ne valent rien. Un test les interdit désormais dans `app/` et `components/` ;
+  2. le résumé du dossier comptait les statuts **stockés** et affichait « 2 à faire » un centimètre au-dessus de deux lignes disant « Emporté par le client » — la contradiction même que cette spec ferme, survivante parce que `resumerDossier` vivait dans `vente.ts` ;
+  3. un papier déjà emporté se voyait encore proposer « Non concerné par cette vente » : un clic, et un papier en main chez le client se déclarait « Sans objet » ;
+  4. le bloc des paquets disait « depuis 0 j » quand la ligne du dessous disait « aujourd'hui ».
+
+  Les trois premiers ont la **même cause** — un endroit qui lisait encore le statut stocké. Les huit autres lectures du statut ont été vérifiées une par une : elles portent toutes sur la carte grise, où le statut fait foi.
+
+  **Deux points restent ouverts, et appartiennent au commanditaire :** le reçu aligne « ✓ Carte grise » (ce qui est promis avec la moto) au-dessus de « Papiers emportés : Quittance, CMC » (ce que le client a vraiment pris), sans intitulé sur la première liste — c'est la confusion que D107 nomme, sur un papier que le client emporte ; et l'aide de l'avance dit « Soit 75 000 FCFA par carte » alors qu'un montant qui ne tombe pas rond met le reste sur la première.
 - [x] La palette et `.plaque-code` ne sont pas touchés : aucun fichier CSS modifié par S53.
 
 ---
