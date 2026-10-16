@@ -26,6 +26,14 @@ export type Prestataire = {
   telephone: string;
   typesDocuments: TypeDocument[];
   actif: boolean;
+  /**
+   * Le jeton du lien de suivi (S56), ou `null` si aucun lien n'a ete emis.
+   *
+   * **Il ne se saisit pas** : c'est pourquoi il n'est pas dans
+   * `SaisiePrestataire`. Une Cloud Function le fabrique, les regles Firestore
+   * refusent qu'un navigateur l'ecrive, et l'ecran ne fait que l'afficher.
+   */
+  jetonSuivi: string | null;
 };
 
 export type SaisiePrestataire = {

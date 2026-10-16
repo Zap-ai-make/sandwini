@@ -3,6 +3,7 @@
 import { Phone, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { LienDeSuivi } from "@/components/LienDeSuivi";
 import {
   EtatChargement,
   EtatErreur,
@@ -319,6 +320,13 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
       </div>
 
       <EtatErreur message={erreur} className="mt-2" />
+
+      {/* **Le lien de suivi vit sur la fiche, pas derriere le bouton
+          « Modifier »** (S56). On ne vient pas ici pour corriger un
+          prestataire quand on veut lui envoyer son lien : on vient pour le
+          lien. Le cacher dans le formulaire d'edition en ferait une option
+          d'un geste qui n'a rien a voir. */}
+      <LienDeSuivi prestataire={prestataire} />
 
       {edition && (
         <form
