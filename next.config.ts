@@ -143,6 +143,14 @@ const nextConfig: NextConfig = {
    * sauvegarder le temps d'un build d'émulateurs suffit à ne pas troubler le
    * serveur d'à côté.
    *
+   * **Et depuis S53, `npm run verifier:sw` le dit.** Cette réserve était une
+   * phrase qu'il fallait avoir lue : un build d'émulateurs laissait derrière lui
+   * un service worker qui cite des fragments absents de `.next`, et **rien** ne
+   * le signalait. En ligne l'application marche ; elle ne cesse de marcher qu'au
+   * moment précis où elle devait tenir, sur un comptoir en coupure. Le contrôle
+   * échoue désormais, avec les deux causes connues dans son message. À lancer
+   * après tout build fait pour les émulateurs.
+   *
    * *Seconde réserve :* `next build` **réécrit `tsconfig.json`** quand il voit
    * un répertoire inhabituel — il y ajoute `.next-emulateurs/types/**` et, au
    * passage, reformate tous les tableaux du fichier à raison d'un élément par

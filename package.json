@@ -19,7 +19,8 @@
     "test:regles:isole": "firebase emulators:exec --only firestore \"vitest run --config vitest.regles.config.mts\"",
     "build:functions": "npm --prefix functions run build",
     "amorcer": "node scripts/amorcer.mjs",
-    "deployer": "node scripts/deployer.mjs"
+    "deployer": "node scripts/deployer.mjs",
+    "verifier:sw": "node scripts/verifier-sw.mjs"
   },
   "dependencies": {
     "firebase": "^12.18.0",
