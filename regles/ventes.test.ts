@@ -20,7 +20,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
  * Règles sur les ventes de motos (S8).
@@ -328,16 +328,48 @@ describe("le lot complet d’une vente", () => {
     const lot = writeBatch(base);
 
     lot.set(reference, vente());
-    /* Trois depuis S48 : la plaque a quitté le dossier. */
-    for (const type of ["quittance", "cmc", "carte_grise"]) {
-      lot.set(doc(reference, "documents", type), documentDossier({ type, venteId: reference.id }));
-    }
+    /* **Un seul document depuis le 16 octobre 2026** : trois en S8, deux après
+       S48 qui a sorti la plaque, et plus que la carte grise aujourd'hui —
+       depuis S53bis, rien ne lit une quittance ni un CMC de dossier. */
+    lot.set(
+      doc(reference, "documents", "carte_grise"),
+      documentDossier({ type: "carte_grise", venteId: reference.id }),
+    );
     lot.set(doc(collection(reference, "versements")), {
       ...versement({ venteId: reference.id, montant: 1_200_000, encaissementId: enc.id }),
     });
     lot.set(enc, encaissement({ montant: 1_200_000, origineRefId: reference.id }));
 
     await assertSucceeds(lot.commit());
+  });
+
+  /* **Le lot entier tombe si une quittance s'y glisse**, et c'est la propriété
+     qui compte : un appareil resté sur une version antérieure ne réussira pas
+     à moitié sa vente. Firestore accepte ou refuse un lot **en bloc** — le test
+     le prouve par la conséquence, en vérifiant que la vente, première écriture
+     et valide à elle seule, n'existe pas après le refus. */
+  it("un lot qui ouvre encore une quittance est refusé en entier", async () => {
+    const base = gerant();
+    const reference = doc(collection(base, "ventesMotos"));
+    const lot = writeBatch(base);
+
+    lot.set(reference, vente());
+    lot.set(
+      doc(reference, "documents", "carte_grise"),
+      documentDossier({ type: "carte_grise", venteId: reference.id }),
+    );
+    lot.set(
+      doc(reference, "documents", "quittance"),
+      documentDossier({ type: "quittance", venteId: reference.id }),
+    );
+
+    await assertFails(lot.commit());
+
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      const avecDroits = contexte.firestore();
+      const trace = await getDoc(doc(avecDroits, "ventesMotos", reference.id));
+      expect(trace.exists()).toBe(false);
+    });
   });
 
   it("le responsable vend dans n’importe quelle boutique", async () => {

@@ -3233,6 +3233,35 @@ la base garantit — et qui suffit — c'est qu'un lot est accepté ou refusé *
 bloc**. Le test le prouve donc par la conséquence : après le refus d'une écriture
 du lot, le paquet, première écriture et valide à elle seule, **n'existe pas**.
 
+### La dernière conséquence, tirée le 16 octobre 2026 : le dossier n'ouvre plus qu'un document
+
+S53bis a retiré la quittance et le CMC du dossier à la demande du
+commanditaire. Les documents, eux, continuaient d'être **créés à chaque
+vente** : deux par vente, que plus aucun lecteur n'ouvrait — les trois
+(`dossiersEnAttente`, `DossierDocuments`, l'écran des dossiers) filtrent par
+`passeParUnPrestataire`. De la donnée morte, qui s'accumule, et que la règle
+interdit d'effacer.
+
+`documentDossierValide` n'accepte donc plus que `carte_grise` **à la
+création**, et le lot de vente passe de six écritures à quatre.
+
+**L'asymétrie est la même que partout ailleurs dans ce dépôt** :
+`documentDossierMaj` ne revalide pas le type, donc les `plaque`, `quittance` et
+`cmc` déjà en base restent lisibles et corrigeables. On ferme la porte
+d'entrée, pas celle de la réparation — comme `typesACreer` pour les
+prestataires, et comme S48 l'avait fait pour `plaque`.
+
+**Ce qui ne bouge pas, et qu'il ne faut pas confondre.** `TypeDocument` garde
+ses trois valeurs : le mot « quittance » désigne encore un **papier** —
+`motos.quittanceRecue`, `ventesMotos.emporte.quittance`, la case du comptoir,
+la ligne du reçu. Seul le *document de dossier* disparaît. Les confondre
+casserait le reçu.
+
+**Les documents déjà écrits restent**, sur la préversion comme ailleurs :
+`allow delete: if false` est voulu — `non_applicable` est la façon d'écarter un
+papier, et elle laisse une trace. Les effacer serait une migration, qui se
+demande.
+
 ---
 
 ## D108 — Le portail du prestataire : une fonction est la seule porte, et il n'y a pas de solde

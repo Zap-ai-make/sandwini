@@ -103,12 +103,17 @@ beforeEach(async () => {
   });
 });
 
-describe("la quittance et le CMC, qui arrivent avec la moto", () => {
-  /* **S53 leur retire leurs étapes.** Leur disponibilité se coche sur la moto
-     et leur remise sur la vente : le dossier n'a plus rien à stocker pour eux,
-     sinon le fait qu'ils soient écartés. La règle doit le dire aussi fort que
-     le domaine, sans quoi un appareil modifié écrirait un statut que plus
-     personne ne lit (D27). */
+describe("la quittance et le CMC déjà en base, qui ne se créent plus", () => {
+  /* **S53 leur a retiré leurs étapes ; le 16 octobre 2026 leur retire leur
+     document.** Une vente neuve n'ouvre plus que la carte grise — la
+     création des deux autres est refusée par la règle, et c'est le dernier
+     `it` de ce bloc qui le fige.
+
+     Les trois premiers portent donc sur les documents **déjà écrits**, que
+     `poser` sème avec les droits du serveur : il y en a sur la préversion, ils
+     ne s'effacent pas (`allow delete: if false`), et ils doivent rester aussi
+     contraints qu'avant. Un appareil modifié ne doit pas pouvoir y écrire un
+     statut que plus personne ne lit (D27). */
   it("n’ont plus qu’un passage : celui qui les écarte", async () => {
     await poser({ quittance: {}, cmc: {} });
     const base = gerant();
@@ -217,22 +222,33 @@ describe("la case du comptoir ouvre la carte grise à « sans objet » (S53)", (
     );
   });
 
-  /* Les deux autres papiers n'ont pas cette porte : leur disponibilite vient de
-     la moto, pas d'une case de vente. */
-  it("refuse non_applicable à la création pour la quittance et le CMC", async () => {
-    const base = gerant();
-    for (const type of ["quittance", "cmc"]) {
-      await assertFails(
-        setDoc(doc(base, chemin(type)), {
-          boutiqueId: "PTG",
-          venteId: "vente-ptg",
-          type,
-          statut: "non_applicable",
-          ...traceCreation,
-        }),
-      );
-    }
-  });
+  /* **Et les deux autres ne se créent plus du tout** (16 octobre 2026). Depuis
+     S53bis, rien ne lit un document `quittance` ou `cmc` : les trois lecteurs
+     filtrent par `passeParUnPrestataire`. Les écrire à chaque vente, c'est
+     accumuler de la donnée morte — deux documents par vente que personne
+     n'ouvrira jamais.
+
+     On ferme la porte d'entrée, pas celle de la réparation :
+     `documentDossierMaj` ne revalide pas le type, donc les documents déjà en
+     base restent lisibles et corrigeables. Meme asymétrie que `typesACreer`
+     pour les prestataires, et que la note de S48 sur `plaque`. */
+  it.each(["a_faire", "non_applicable"])(
+    "refuse de CRÉER une quittance ou un CMC, même à %s",
+    async (statut) => {
+      const base = gerant();
+      for (const type of ["quittance", "cmc"]) {
+        await assertFails(
+          setDoc(doc(base, chemin(type)), {
+            boutiqueId: "PTG",
+            venteId: "vente-ptg",
+            type,
+            statut,
+            ...traceCreation,
+          }),
+        );
+      }
+    },
+  );
 
   it("refuse tout autre statut initial", async () => {
     const base = gerant();

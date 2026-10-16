@@ -53,9 +53,10 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * l'atomicité d'un `writeBatch` y compris hors ligne — il le garde entier dans
  * sa file et le rejoue tel quel au retour du réseau.
  *
- * Six documents au maximum voyagent ensemble : la vente, ses trois documents
- * de dossier, le versement du jour et son encaissement, plus la mise à jour du
- * statut de la moto.
+ * Quatre documents au maximum voyagent ensemble : la vente, **sa carte grise**,
+ * le versement du jour et son encaissement, plus la mise à jour du statut de la
+ * moto. Ils étaient six jusqu'au 16 octobre 2026, quand le dossier ouvrait
+ * aussi une quittance et un CMC que plus rien ne lisait.
  *
  * **Ce que ce lot n'écrit pas : le coût de la moto.** `coutMotoSnapshot` doit
  * être figé à la vente, mais il vit dans `motos/{id}/prive/cout` que le gérant
@@ -420,33 +421,37 @@ export function enregistrerVente(
     ...traceCreation(auteur),
   });
 
-  /* Le type du document est son identifiant : `documents/carte_grise`. C'est ce
-     qui rend l'écriture idempotente et interdit structurellement d'avoir deux
-     cartes grises dans un dossier — une contrainte que des règles ne sauraient
-     pas exprimer. */
-  for (const type of TYPES_DOCUMENT) {
-    /* **La case du comptoir pilote le dossier** (S53, arbitrage 5). Décocher
-       « Carte grise » laissait jusqu'ici un document « à faire » que personne
-       n'allait jamais faire, et qui bloquait la clôture : le reçu imprimait
-       « non inclus » pendant que le dossier la réclamait.
+  /* **Un seul document, et c'est la carte grise** (16 octobre 2026).
+     Cette boucle en ouvrait trois. Depuis S53bis, rien ne lit un document
+     `quittance` ou `cmc` : leur disponibilité se coche sur la MOTO, leur remise
+     sur la VENTE, et les trois lecteurs du dossier filtrent par
+     `passeParUnPrestataire`. Les écrire quand même, c'était fabriquer deux
+     documents morts à chaque vente — que personne n'ouvrirait jamais, et que la
+     règle interdit d'effacer. La règle refuse désormais leur création.
 
-       Les deux autres papiers ne suivent pas la case : leur disponibilité vient
-       de la moto, pas d'une case de vente. */
-    const statut: StatutDocument =
-      type === "carte_grise" && saisie.carteGrise === false ? "non_applicable" : "a_faire";
+     Le type du document reste son identifiant : `documents/carte_grise`. C'est
+     ce qui rend l'écriture idempotente et interdit structurellement d'avoir
+     deux cartes grises dans un dossier — une contrainte que des règles ne
+     sauraient pas exprimer.
 
-    lot.set(doc(reference, "documents", type), {
-      /* Répété ici pour la même raison qu'en S5 sur le coût : dans un lot, les
-         règles évaluent chaque document contre l'état d'AVANT, donc la vente
-         parente n'existe pas encore quand son dossier est validé. Ce champ est
-         aussi ce qui rend possible la lecture d'ensemble des dossiers. */
-      boutiqueId,
-      venteId: reference.id,
-      type,
-      statut,
-      ...traceCreation(auteur),
-    });
-  }
+     **La case du comptoir pilote le dossier** (S53, arbitrage 5). Décocher
+     « Carte grise » laissait jusqu'ici un document « à faire » que personne
+     n'allait jamais faire, et qui bloquait la clôture : le reçu imprimait
+     « non inclus » pendant que le dossier la réclamait. */
+  const statutCarteGrise: StatutDocument =
+    saisie.carteGrise === false ? "non_applicable" : "a_faire";
+
+  lot.set(doc(reference, "documents", "carte_grise"), {
+    /* Répété ici pour la même raison qu'en S5 sur le coût : dans un lot, les
+       règles évaluent chaque document contre l'état d'AVANT, donc la vente
+       parente n'existe pas encore quand son dossier est validé. Ce champ est
+       aussi ce qui rend possible la lecture d'ensemble des dossiers. */
+    boutiqueId,
+    venteId: reference.id,
+    type: "carte_grise",
+    statut: statutCarteGrise,
+    ...traceCreation(auteur),
+  });
 
   if (montantEncaisse > 0) {
     const versement = doc(collection(reference, "versements"));

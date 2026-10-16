@@ -1102,11 +1102,23 @@ service cloud.firestore {
              && donnees.boutiqueId is string
              && donnees.venteId == venteId
              && donnees.type == type
-             // Trois depuis S48 : la plaque a quitte le dossier. Seule la
-             // CREATION est resserree ; `documentDossierMaj` ne revalide pas le
-             // type, donc les documents `plaque` deja en base restent
-             // modifiables et un vieux dossier reste corrigeable.
-             && type in ['quittance', 'cmc', 'carte_grise']
+             // **UN SEUL type se cree depuis le 16 octobre 2026 : la carte
+             // grise.** Trois en S8, trois moins la plaque en S48, et plus
+             // qu'un aujourd'hui.
+             //
+             // Depuis S53bis, RIEN ne lit un document `quittance` ou `cmc` :
+             // les trois lecteurs du dossier filtrent par
+             // `passeParUnPrestataire`. Leur disponibilite se coche sur la
+             // moto, leur remise sur la vente. En ecrire deux a chaque vente,
+             // c'etait accumuler de la donnee morte que personne n'ouvrirait
+             // jamais.
+             //
+             // Seule la CREATION est resserree, et c'est tout l'objet de cette
+             // asymetrie : `documentDossierMaj` ne revalide pas le type, donc
+             // les `plaque`, `quittance` et `cmc` deja en base restent lisibles
+             // et corrigeables. On ferme la porte d'entree, pas celle de la
+             // reparation — comme `typesACreer` pour les prestataires.
+             && type == 'carte_grise'
              // S8 ouvre le dossier ; c'est S11 qui fait vivre les autres statuts.
              //
              // **Decochee au comptoir, la carte grise nait « sans objet »**
@@ -1114,13 +1126,7 @@ service cloud.firestore {
              // « a faire » que personne n'allait jamais faire, et qui bloquait
              // la cloture : le recu imprimait « non inclus » pendant que le
              // dossier la reclamait.
-             //
-             // Les deux autres papiers n'ont pas cette porte : leur
-             // disponibilite vient de la MOTO, pas d'une case de vente. Leur
-             // ouvrir le meme chemin inviterait a ecarter a la vente ce qui se
-             // coche a l'arrivage — deux endroits pour un fait, de nouveau.
-             && (donnees.statut == 'a_faire'
-                 || (type == 'carte_grise' && donnees.statut == 'non_applicable'));
+             && (donnees.statut == 'a_faire' || donnees.statut == 'non_applicable');
     }
 
     // La machine a etats, cote serveur. Elle repete `lib/domain/dossier.ts`, et
