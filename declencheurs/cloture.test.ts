@@ -180,7 +180,7 @@ async function attendreStatut(venteId: string, attendu: string, budget = 60_000)
 }
 
 describe("clôture automatique", () => {
-  it("clôt le dossier quand tout est emporté, revenu, soldé et livré", async () => {
+  it("clôt le dossier quand la carte grise est revenue, la vente soldée et la moto livrée", async () => {
     const { venteId } = await poser({
       soldee: true,
       motoRemise: true,
@@ -205,17 +205,21 @@ describe("clôture automatique", () => {
     await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
   });
 
-  /* L'autre voie de blocage, et celle que S53 introduit : tout est en ordre,
-     mais le client n'est pas parti avec son CMC. Sans ce test, la moitié de la
-     nouvelle règle ne serait couverte nulle part. */
-  it("ne clôt pas tant qu’un papier disponible n’a pas été emporté", async () => {
+  /* **Le changement du 16 octobre 2026, côté serveur.** Le client n'est pas
+     parti avec son CMC, et le dossier se clôt quand même : la quittance et le
+     CMC ont quitté le dossier, ils se cochent sur le lot à l'arrivée.
+
+     Ce test disait exactement le contraire jusqu'à cette date. Il est inversé
+     plutôt que supprimé : c'est la même question qui se pose, et la réponse a
+     changé — l'effacer aurait laissé la nouvelle règle sans témoin au serveur. */
+  it("clôt même si le client n’est pas parti avec son CMC", async () => {
     const { venteId } = await poser({
       soldee: true,
       motoRemise: true,
       documents: "tous_regles",
       emporte: { quittance: true, cmc: false },
     });
-    await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
+    await attendreStatut(venteId, "clos");
   });
 
   it("ne clôt pas une vente qui reste due", async () => {

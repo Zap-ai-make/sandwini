@@ -946,10 +946,10 @@ export const amorcerResponsable = onRequest({ region: REGION, cors: false }, asy
 
 /* --- Clôture automatique du dossier (§7.1) -------------------------------- */
 
-/* Trois depuis S48 : la plaque a quitte le dossier, l'immatriculation etant
-   obtenue avec la carte grise. Un dossier ancien qui porte encore un document
-   `plaque` a `a_faire` se cloture donc desormais — c'est l'effet voulu. */
-const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise"] as const;
+/* La liste des types a disparu d'ici le 16 octobre 2026 : la cloture ne regarde
+   plus qu'un seul document, la carte grise. Un dossier ancien qui porte encore
+   un `plaque` ou une quittance a `a_faire` se cloture donc desormais — c'est
+   l'effet voulu, et c'est ce que le commanditaire a demande. */
 
 /**
  * Le dossier est-il fini ?
@@ -967,29 +967,24 @@ async function dossierFini(
 ): Promise<boolean> {
   if (vente.statutPaiement !== "solde" || vente.motoRemise !== true) return false;
 
-  /* **La clôture lit la vente et les documents, jamais la moto** (S53). Sans
-     cette propriété il faudrait réveiller la clôture à chaque case cochée sur
-     un arrivage : une moto dont le CMC arrive clorait un dossier que personne
-     n'a touché. La remise au client est un GESTE, donc un fait écrit sur la
-     vente, et c'est lui qui fait foi.
+  /* **Le dossier, c'est la carte grise** (demande du 16 octobre 2026). La
+     quittance et le CMC se cochent sur le lot a l'arrivee, et cela suffit : ils
+     ont quitte le dossier. Ce que le client a emporte reste ecrit sur la vente
+     et s'imprime sur son recu, mais ne decide plus de la cloture.
 
-     Aucun nouveau déclencheur n'est nécessaire : `cloturerSurVente` se
-     déclenche sur toute écriture de `ventesMotos/{venteId}`, donc sur
-     `emporte`. */
-  const emporte = (vente.emporte ?? {}) as Record<string, unknown>;
+     **La cloture ne lit toujours jamais la moto**, et c'est la propriete qui
+     rend ce declencheur econome : rien a reveiller quand une case est cochee
+     sur un arrivage. */
   const documents = await base.collection(`ventesMotos/${venteId}/documents`).get();
-  const parType = new Map(documents.docs.map((doc) => [doc.get("type"), doc.get("statut")]));
+  const carteGrise = documents.docs.find((document) => document.get("type") === "carte_grise");
 
-  return TYPES_DOCUMENT.every((type) => {
-    /* Un type absent compte `a_faire` : un dossier dont les documents ne sont
-       pas encore ecrits ne doit pas passer pour un dossier complet. */
-    const statut = parType.get(type) ?? "a_faire";
-    if (statut === "non_applicable") return true;
-    /* `remis_client` ne s'ecrit plus, mais la preversion en porte : l'ignorer
-       laisserait les dossiers les plus anciens ouverts pour toujours. */
-    if (type === "carte_grise") return statut === "revenu_magasin" || statut === "remis_client";
-    return emporte[type] === true;
-  });
+  /* Une carte grise absente compte `a_faire` : un dossier dont les documents ne
+     sont pas encore ecrits ne doit pas passer pour un dossier complet. */
+  const statut = carteGrise?.get("statut") ?? "a_faire";
+  if (statut === "non_applicable") return true;
+  /* `remis_client` ne s'ecrit plus, mais la preversion en porte : l'ignorer
+     laisserait les dossiers les plus anciens ouverts pour toujours. */
+  return statut === "revenu_magasin" || statut === "remis_client";
 }
 
 /**

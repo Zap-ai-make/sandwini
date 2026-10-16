@@ -147,84 +147,14 @@ export function etatPapier(entree: {
   return "a_faire";
 }
 
-/** Du reste à faire vers le fini : un résumé se lit comme une file se vide. */
-const ORDRE_ETAT_PAPIER: readonly EtatPapier[] = [
-  "a_faire",
-  "chez_prestataire",
-  "au_magasin",
-  "emporte",
-  "sans_objet",
-];
-
-/* Le pluriel ne se déduit pas d'une minuscule : « à faire » et « au magasin »
-   ne s'accordent pas, « emporté » si. Seule l'exception est écrite — le
-   singulier reste lu sur `LIBELLE_ETAT_PAPIER`, qui demeure la seule source. */
-const PLURIEL_ETAT_PAPIER: Partial<Record<EtatPapier, string>> = {
-  emporte: "emportés par le client",
-};
-
-/**
- * Le dossier d'une vente en une ligne, pour sa fiche (S11, corrigé en S53).
- *
- * **Il comptait les statuts stockés**, et affichait donc « 2 à faire » au-dessus
- * de deux lignes où le même écran disait « Emporté par le client ». La
- * contradiction que S53 vient fermer avait survécu ici, à un centimètre des
- * lignes qu'elle contredit — ce résumé vivait dans `vente.ts`, loin de l'état
- * calculé, et rien ne pointait vers lui. Vu sur une capture d'écran, pas par un
- * test : les trois qui existaient vérifiaient fidèlement qu'il comptait bien
- * les statuts stockés.
- *
- * Il lit maintenant `etatPapier`, comme la file et comme la fiche.
- */
-export function resumerDossier(
-  documents: readonly DocumentDossier[],
-  vente: Pick<VenteDuDossier, "emporte">,
-  /** `null` tant que l'écoute du stock n'a pas répondu : les papiers de la moto
-      se lisent alors « à faire », jamais `undefined`. */
-  moto: MotoDuDossier | null,
-): string {
-  if (documents.length === 0) return "Dossier non chargé";
-
-  const parEtat = new Map<EtatPapier, number>();
-  for (const document of documents) {
-    const etat = etatPapier({
-      type: document.type,
-      statut: document.statut,
-      enMain:
-        document.type === "quittance"
-          ? (moto?.quittanceRecue ?? false)
-          : document.type === "cmc"
-            ? (moto?.cmcRecu ?? false)
-            : false,
-      emporte: document.type === "carte_grise" ? false : vente.emporte[document.type],
-    });
-    parEtat.set(etat, (parEtat.get(etat) ?? 0) + 1);
-  }
-
-  return ORDRE_ETAT_PAPIER.filter((etat) => parEtat.has(etat))
-    .map((etat) => {
-      const combien = parEtat.get(etat)!;
-      const libelle =
-        combien > 1
-          ? (PLURIEL_ETAT_PAPIER[etat] ?? LIBELLE_ETAT_PAPIER[etat].toLowerCase())
-          : LIBELLE_ETAT_PAPIER[etat].toLowerCase();
-      return `${combien} ${libelle}`;
-    })
-    .join(" · ");
-}
+/* `resumerDossier` a disparu le 16 octobre 2026, avec les deux papiers qu'il
+   comptait. Réduit à la seule carte grise, il n'aurait fait que répéter en
+   prose la ligne affichée juste en dessous — « 1 chez le prestataire »
+   au-dessus de « Carte grise — Chez le prestataire ». */
 
 /** Ce que la clôture regarde. Rien d'autre n'entre en compte (§7.1). */
 export type EtatDossier = {
   documents: readonly { type: TypeDocument; statut: StatutDocument }[];
-  /**
-   * Ce que le client a emporté, tel que la vente le porte (S53).
-   *
-   * **La clôture ne lit jamais la moto**, et c'est une propriété à tenir : sans
-   * elle, il faudrait réveiller la clôture à chaque case cochée sur un arrivage,
-   * et une moto dont le CMC arrive clôturerait un dossier que personne n'a
-   * touché. La remise au client est un geste, donc un fait écrit sur la vente.
-   */
-  emporte: PapiersEmportes;
   /** `statutPaiement === 'solde'` : plus rien n'est dû. */
   soldee: boolean;
   /** La moto est chez le client. Fausse tant que des tranches ne sont pas soldées. */
@@ -232,39 +162,45 @@ export type EtatDossier = {
 };
 
 /**
- * Le dossier peut-il se clore ? (§7.1, révisé par S53)
+ * Le dossier peut-il se clore ? (§7.1, révisé par S53 puis par la demande du
+ * 16 octobre 2026)
  *
- * | Papier | Fini quand |
- * |--------|------------|
- * | Quittance | sans objet, **ou** emportée par le client |
- * | CMC | sans objet, **ou** emporté par le client |
- * | Carte grise | sans objet, **ou** revenue du prestataire |
+ * **Le dossier, c'est la carte grise.** Elle seule part chez quelqu'un, revient
+ * à une date qu'on annonce au client, et se fait attendre : c'est la seule
+ * d'entre les trois qui ait une file d'attente à vider.
  *
- * Plus la vente soldée et la moto partie : une vente en tranches entièrement
- * payée dont la moto dort encore au magasin n'est pas un dossier fini, et c'est
- * précisément la confusion que le cahier interdit entre crédit et tranches
- * (§13). S53 change ce qui finit un PAPIER, pas ce qui finit une vente.
+ * La quittance et le CMC se cochent sur le lot à l'arrivée, et le commanditaire
+ * a tranché que cela suffit. Les garder dans la clôture aurait produit
+ * exactement l'écran que sa demande vient supprimer : un dossier dont la carte
+ * grise est revenue, affichée verte, et qui reste pourtant « ouvert » sans
+ * qu'une seule colonne ne dise pourquoi.
  *
- * **Un papier ne se clôt plus en passant par `remis_client`** mais parce que la
- * vente dit que le client est parti avec. Un seul fait, à un seul endroit.
+ * Ils ne disparaissent pas du produit pour autant — ce que le client a emporté
+ * reste écrit sur la vente et s'imprime sur son reçu. C'est un fait sur la
+ * remise, pas une étape de dossier.
+ *
+ * | Condition | Pourquoi |
+ * |-----------|----------|
+ * | Vente soldée | plus rien n'est dû |
+ * | Moto remise | une vente en tranches entièrement payée dont la moto dort au magasin n'est pas finie (§13) |
+ * | Carte grise revenue, **ou** sans objet | le seul papier que le dossier suit |
  *
  * `remis_client` continue de clore une carte grise : le statut ne s'écrit plus,
  * mais la préversion en porte, et l'ignorer laisserait les dossiers les plus
  * anciens ouverts pour toujours.
- *
- * Un type absent compte `a_faire` : un dossier dont les documents ne sont pas
- * encore lus ne doit pas passer pour un dossier complet.
  */
 export function dossierCloturable(etat: EtatDossier): boolean {
   if (!etat.soldee || !etat.motoRemise) return false;
 
-  return TYPES_DOCUMENT.every((type) => {
-    const document = etat.documents.find((candidat) => candidat.type === type);
-    const statut = document?.statut ?? "a_faire";
-    if (statut === "non_applicable") return true;
-    if (type === "carte_grise") return statut === "revenu_magasin" || statut === "remis_client";
-    return etat.emporte[type];
-  });
+  const carteGrise = etat.documents.find((document) => document.type === "carte_grise");
+  /* Une carte grise absente compte `a_faire` : un dossier dont les documents ne
+     sont pas encore lus ne doit pas passer pour un dossier complet. */
+  const statut = carteGrise?.statut ?? "a_faire";
+
+  if (statut === "non_applicable") return true;
+  /* `remis_client` ne s'écrit plus, mais la préversion en porte : l'ignorer
+     laisserait les dossiers les plus anciens ouverts pour toujours. */
+  return statut === "revenu_magasin" || statut === "remis_client";
 }
 
 /**
@@ -438,7 +374,7 @@ export function joursEcoules(depuis: Date | null, aujourdhui: Date): number | nu
  * les documents sont tous à faire, et il n'y a personne à relancer.
  */
 export type Detention =
-  { chez: "prestataire"; nom: string; depuisJours: number | null } | { chez: "magasin" } | null;
+  { chez: "prestataire"; nom: string; depuisJours: number | null } | null;
 
 /** Un papier du dossier, avec son état recollé des trois sources (S53). */
 export type PapierDuDossier = {
@@ -526,13 +462,16 @@ export type MotoDuDossier = { id: string; quittanceRecue: boolean; cmcRecu: bool
  * annoncée est à relancer, ce qui est chez un prestataire est à aller chercher,
  * ce qui est revenu au magasin est à remettre à son client aujourd'hui.
  */
-export const FILTRES_ETAT = ["en_retard", "chez_prestataire", "a_remettre"] as const;
+/* « A remettre » a disparu le 16 octobre 2026 : il designait un papier dans le
+   tiroir que le client n'avait pas encore pris, c'est-a-dire une quittance ou un
+   CMC. Ceux-ci ayant quitte le dossier, ce filtre n'avait plus rien a trouver et
+   aurait rendu « 0 dossier » quoi qu'on fasse. */
+export const FILTRES_ETAT = ["en_retard", "chez_prestataire"] as const;
 export type FiltreEtat = (typeof FILTRES_ETAT)[number];
 
 export const LIBELLE_FILTRE_ETAT: Record<FiltreEtat, string> = {
   en_retard: "En retard",
   chez_prestataire: "Chez un prestataire",
-  a_remettre: "À remettre",
 };
 
 export type FiltresDossiers = {
@@ -614,7 +553,11 @@ export function dossiersEnAttente(
           return false;
         };
 
-        const papiers: PapierDuDossier[] = TYPES_DOCUMENT.map((type) => ({
+        /* **Seuls les papiers qui passent par un prestataire** (16 octobre
+           2026). La quittance et le CMC se cochent sur le lot a l'arrivee ; ils
+           n'attendent personne, et le commanditaire a tranche qu'ils n'avaient
+           plus rien a faire dans une file d'attente. */
+        const papiers: PapierDuDossier[] = TYPES_DOCUMENT.filter(passeParUnPrestataire).map((type) => ({
           type,
           document: parType[type],
           etat: etatPapier({
@@ -657,9 +600,16 @@ export function dossiersEnAttente(
        Le filtre porte sur `papiers` et non sur `enCours` : un papier « à
        faire » dont le document n'est pas encore lu doit retenir le dossier,
        alors qu'il n'a aucun document à mettre dans `enCours`. */
-      .filter((dossier) =>
-        dossier.papiers.some((papier) => !papierFini(papier.type, papier.etat)),
-      )
+      /* **Plus d'exclusion sur les papiers** (16 octobre 2026). Le dossier
+         sortait de la file des que tous ses papiers etaient finis. Reduit a la
+         seule carte grise, ce filtre aurait fait disparaitre la ligne a
+         l'instant meme ou elle revient du prestataire — et le vert que le
+         commanditaire demande pour ce retour n'aurait jamais ete visible.
+
+         La file montre donc les dossiers OUVERTS, et c'est la cloture qui les
+         en sort : carte grise revenue, vente soldee, moto remise. Un dossier a
+         carte grise verte qui s'attarde attend l'argent ou la livraison, ce qui
+         est une information et non du bruit. */
       .filter((dossier) => correspondALEtat(dossier, filtres.etat))
       .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0))
   );
@@ -691,20 +641,13 @@ function detentionDe(
     };
   }
 
-  /* Au magasin, donc détenu par le magasin : c'est ce qui se remet au client
-     aujourd'hui, sans attendre personne.
+  /* **Plus de « au magasin » ici** (16 octobre 2026). Cette valeur désignait
+     une quittance ou un CMC dans le tiroir, que le client n'avait pas encore
+     pris ; ces deux papiers ont quitté le dossier. La carte grise, elle, est
+     finie dès son retour — elle n'attend plus personne.
 
-     Lu sur les papiers et non sur les statuts depuis S53 : un CMC coché sur la
-     moto est au magasin alors que son document est resté « à faire ». La carte
-     grise, elle, ne compte plus ici — son retour est le terme de son parcours,
-     donc elle a déjà quitté les papiers non finis. */
-  if (
-    papiers.some(
-      (papier) => papier.etat === "au_magasin" && !papierFini(papier.type, papier.etat),
-    )
-  ) {
-    return { chez: "magasin" };
-  }
+     La colonne répond donc à « qui la détient » par un prestataire, ou par
+     personne. C'est exactement la question qu'elle pose. */
   return null;
 }
 
@@ -716,13 +659,6 @@ function correspondALEtat(dossier: DossierEnAttente, etat: FiltreEtat | ""): boo
       return dossier.enRetard;
     case "chez_prestataire":
       return dossier.papiers.some((papier) => papier.etat === "chez_prestataire");
-    /* « À remettre » veut dire : le papier est dans le tiroir et le client ne
-       l'a pas encore pris. Lu sur l'état et non sur le statut stocké — depuis
-       S53, un CMC au magasin ne laisse aucune trace dans son document. */
-    case "a_remettre":
-      return dossier.papiers.some(
-        (papier) => papier.etat === "au_magasin" && !papierFini(papier.type, papier.etat),
-      );
   }
 }
 

@@ -7,23 +7,26 @@ import { LIBELLE_PAPIER, PAPIERS_MOTO, type Moto, type PapierMoto } from "@/lib/
 import { marquerPapierRecu, messageErreurMoto } from "@/lib/repositories/motos";
 
 /**
- * Les papiers que la moto porte, et sa plaque (S53).
+ * La quittance et le CMC d'une moto, **pour les motos sans lot seulement**
+ * (S53, restreint le 16 octobre 2026).
  *
- * **La fiche ne disait pas si le CMC était au magasin**, alors que la donnée
- * existait depuis S43 : elle ne se voyait que dans l'inspection d'un lot.
- * Ouvrir une moto pour savoir où en sont ses papiers est pourtant le premier
- * réflexe, et la quittance ne se cochait, elle, nulle part.
+ * Ces deux papiers se cochent normalement sur le lot, à l'arrivée : c'est le
+ * geste réel, dix motos d'un coup devant le camion, et le commanditaire a
+ * demandé que ce soit le seul endroit. Ce bloc a donc quitté la fiche de la
+ * moto.
  *
- * **À ne pas confondre avec `PapiersMoto`, juste en dessous.** Celui-là porte
- * les scans — des fichiers, qui exigent du réseau. Celui-ci porte un fait :
- * le papier est dans le tiroir, ou il ne l'est pas. On peut avoir reçu le CMC
- * sans l'avoir photographié, et inversement ; les deux blocs disent deux choses
- * et c'est pourquoi ils ne fusionnent pas.
+ * **Sauf qu'une moto peut n'avoir aucun lot** : celles entrées à l'unité par
+ * « Faire entrer en stock » ont `arrivageId` nul et n'apparaissent dans aucune
+ * inspection. Sans ce bloc, leurs papiers ne pourraient plus être cochés nulle
+ * part — et, par ricochet, leur reçu ne pourrait jamais dire que le client les
+ * a emportés, puisque la case de la vente ne s'ouvre que sur un papier en main.
  *
- * La case écrit aussitôt, coupure comprise : `marquerPapierRecu` fait une mise
- * à jour partielle que le cache local applique sur-le-champ, et qui part au
- * retour du réseau (D65, D76). Le coût n'est jamais touché — il vit dans une
- * sous-collection à part (D2).
+ * Il ne paraît donc que là où le lot ne peut pas faire le travail. C'est
+ * `FicheMoto` qui tient cette condition : un bloc qui déciderait lui-même de ne
+ * pas s'afficher serait invisible à la lecture de la fiche.
+ *
+ * La plaque a quitté ce bloc le même jour : elle se lit à côté du châssis, où
+ * elle sert à identifier la moto, et non parmi des papiers à cocher.
  */
 export function PapiersEnMain({ moto }: { moto: Moto }) {
   const session = useSession();
@@ -69,17 +72,6 @@ export function PapiersEnMain({ moto }: { moto: Moto }) {
           );
         })}
 
-        {/* La plaque n'apparaît qu'une fois connue. Une ligne « Plaque — » sur
-            chaque moto neuve du parc ferait croire à un renseignement oublié,
-            alors qu'elle n'arrive qu'au retour de la carte grise, des semaines
-            après l'entrée en stock. Sa SAISIE est sur la fiche de vente, là où
-            se trouve le gérant à ce moment-là. */}
-        {moto.plaque !== null && (
-          <li className="flex items-center justify-between gap-3 px-4 py-3">
-            <span className="text-encre-doux">Plaque</span>
-            <span className="plaque-code text-encre">{moto.plaque}</span>
-          </li>
-        )}
       </ul>
     </section>
   );

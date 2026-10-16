@@ -62,8 +62,11 @@ export function FicheMoto({ id }: { id: string }) {
         <EtatChargement className="mt-6">Chargement de la fiche…</EtatChargement>
       ) : (
         <>
-          {/* Le chassis n'est pas un code boutique : il perd la plaque, comme il
-              l'a perdue dans le tableau du stock en S29 (D70).
+          {/* Le chassis n'est pas un code boutique : il perd le fond jaune,
+              comme il l'avait perdu dans le tableau du stock en S29 (D70). Ici
+              « plaque » désigne la palette, pas l'immatriculation — c'est le
+              septième emploi du mot que D107 nomme, et il vit juste à côté du
+              vrai.
 
               **`block` et non `inline-block`** : inline, il se collait au lien
               « Stock » juste au-dessus et l'écran affichait « StockLC6TRA… ».
@@ -71,6 +74,19 @@ export function FicheMoto({ id }: { id: string }) {
               l'écran en regardant S17, corrigé au passage. */}
           <span className="plaque-code mt-3 block text-sm text-encre-doux">
             {moto.numeroChassis}
+            {/* **La plaque à côté du châssis, et non à sa place.** Les deux
+                servent : la plaque désigne la moto de loin, le châssis se lit
+                accroupi devant le cadre. C'est déjà le traitement de
+                l'inventaire. Elle a quitté le bloc « Papiers en main » le
+                16 octobre 2026 : celui-ci ne paraît plus que sur les motos sans
+                lot, alors qu'une plaque se lit sur toutes.
+
+                Elle n'apparaît qu'une fois connue : sur chaque moto neuve du
+                parc, une mention vide ferait croire à un renseignement oublié,
+                alors qu'elle n'arrive qu'au retour de la carte grise. */}
+            {moto.plaque !== null && (
+              <span className="ml-3 text-encre">{moto.plaque}</span>
+            )}
           </span>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-encre">
             {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
@@ -117,7 +133,13 @@ export function FicheMoto({ id }: { id: string }) {
             </section>
           )}
 
-          <PapiersEnMain moto={moto} />
+          {/* **Seulement si la moto n'a pas de lot** (16 octobre 2026). La
+              quittance et le CMC se cochent sur l'inspection du lot, qui est le
+              geste réel. Une moto entrée à l'unité n'apparaît dans aucune
+              inspection : sans ce bloc, ses papiers n'auraient plus aucun
+              endroit où se cocher, et son reçu ne pourrait jamais dire que le
+              client les a emportés. */}
+          {moto.arrivageId === null && <PapiersEnMain moto={moto} />}
 
           <PapiersMoto moto={moto} />
 

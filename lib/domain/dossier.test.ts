@@ -26,14 +26,15 @@ import {
   type SaisieDepot,
   type MotoDuDossier,
   type VenteDuDossier,
-  resumerDossier,
 } from "./dossier";
 
 const doc = (type: TypeDocument, statut: StatutDocument) => ({ type, statut });
 
+/* **La quittance et le CMC sont à faire exprès dans ce décor.** Depuis S53bis
+   ils ne concernent plus le dossier : le défaut doit donc se clôturer malgré
+   eux, et tout test qui dirait le contraire se verrait tout de suite. */
 const etat = (partie: Partial<EtatDossier> = {}): EtatDossier => ({
   documents: [doc("quittance", "a_faire"), doc("cmc", "a_faire"), doc("carte_grise", "revenu_magasin")],
-  emporte: { quittance: true, cmc: true },
   soldee: true,
   motoRemise: true,
   ...partie,
@@ -171,23 +172,35 @@ describe("statutsSuivants et estStatutTerminal", () => {
 });
 
 describe("dossierCloturable", () => {
-  it("clôt quand les deux papiers sont emportés et la carte grise revenue", () => {
+  /**
+   * **Le dossier, c'est la carte grise** (demande du commanditaire, 16 octobre
+   * 2026).
+   *
+   * La quittance et le CMC se cochent sur le lot à l'arrivée, et cela suffit :
+   * ils ont quitté le dossier. Les laisser dans la clôture aurait produit
+   * l'écran que cette demande vient supprimer — un dossier dont la carte grise
+   * est revenue, affichée verte, et qui reste pourtant « ouvert » sans qu'une
+   * seule colonne ne dise pourquoi.
+   *
+   * Ce qu'ils ne quittent pas : le reçu. Ce que le client a emporté reste écrit
+   * sur la vente et s'imprime — c'est un fait sur la remise, pas une étape de
+   * dossier.
+   */
+  it("clôt dès que la carte grise est revenue, sans regarder les autres papiers", () => {
     expect(dossierCloturable(etat())).toBe(true);
   });
 
-  /* **C’est le changement de S53.** Un papier ne se clôt plus en passant par
-     `remis_client` sur le dossier : il se clôt parce que la VENTE dit que le
-     client est parti avec. Un seul fait, écrit à un seul endroit. */
-  it("ne clôt pas tant qu’un papier disponible n’a pas été emporté", () => {
-    expect(dossierCloturable(etat({ emporte: { quittance: true, cmc: false } }))).toBe(false);
-  });
-
-  it("clôt un dossier dont tout est sans objet, sans rien emporter", () => {
+  /* Le test qui fige le changement : même décor, papiers de moto explicitement
+     non faits. Avant, ceci rendait `false`. */
+  it("ne regarde plus ni la quittance ni le CMC", () => {
     expect(
       dossierCloturable(
         etat({
-          documents: TYPES_DOCUMENT.map((type) => doc(type, "non_applicable")),
-          emporte: { quittance: false, cmc: false },
+          documents: [
+            doc("quittance", "a_faire"),
+            doc("cmc", "a_faire"),
+            doc("carte_grise", "revenu_magasin"),
+          ],
         }),
       ),
     ).toBe(true);
@@ -195,34 +208,26 @@ describe("dossierCloturable", () => {
 
   it("ne clôt pas une carte grise encore chez le prestataire", () => {
     expect(
-      dossierCloturable(
-        etat({
-          documents: [
-            doc("quittance", "non_applicable"),
-            doc("cmc", "non_applicable"),
-            doc("carte_grise", "chez_prestataire"),
-          ],
-          emporte: { quittance: false, cmc: false },
-        }),
-      ),
+      dossierCloturable(etat({ documents: [doc("carte_grise", "chez_prestataire")] })),
     ).toBe(false);
   });
 
+  it("ne clôt pas une carte grise qui n'est pas encore partie", () => {
+    expect(dossierCloturable(etat({ documents: [doc("carte_grise", "a_faire")] }))).toBe(false);
+  });
+
+  it("clôt une carte grise déclarée sans objet", () => {
+    expect(
+      dossierCloturable(etat({ documents: [doc("carte_grise", "non_applicable")] })),
+    ).toBe(true);
+  });
+
   /* La préversion porte des cartes grises déjà marquées `remis_client` par
-     l’ancien modèle. Le statut ne s’écrit plus, mais il doit encore clore —
+     l'ancien modèle. Le statut ne s'écrit plus, mais il doit encore clore —
      sans quoi les dossiers les plus anciens resteraient ouverts pour toujours. */
   it("clôt une carte grise héritée, marquée remise au client", () => {
     expect(
-      dossierCloturable(
-        etat({
-          documents: [
-            doc("quittance", "non_applicable"),
-            doc("cmc", "non_applicable"),
-            doc("carte_grise", "remis_client"),
-          ],
-          emporte: { quittance: false, cmc: false },
-        }),
-      ),
+      dossierCloturable(etat({ documents: [doc("carte_grise", "remis_client")] })),
     ).toBe(true);
   });
 
@@ -230,25 +235,17 @@ describe("dossierCloturable", () => {
     expect(dossierCloturable(etat({ soldee: false }))).toBe(false);
   });
 
-  /* Le cas des tranches : tout est payé, tous les papiers sont remis, mais la
-     moto dort encore au magasin. Le dossier n’est pas fini — c’est justement la
+  /* Le cas des tranches : tout est payé, la carte grise est revenue, mais la
+     moto dort encore au magasin. Le dossier n'est pas fini — c'est justement la
      confusion que le cahier interdit entre crédit et tranches (§13). */
-  it("ne clôt pas une vente soldée dont la moto n’est pas partie", () => {
+  it("ne clôt pas une vente soldée dont la moto n'est pas partie", () => {
     expect(dossierCloturable(etat({ motoRemise: false }))).toBe(false);
   });
 
-  /* Un dossier dont les documents ne sont pas encore lus ne doit pas passer
-     pour un dossier complet. Les types manquants comptent `a_faire`, et un
-     papier `a_faire` non emporté ne clôt pas. */
-  it("ne clôt pas un dossier dont les documents manquent", () => {
-    expect(dossierCloturable(etat({ documents: [], emporte: { quittance: false, cmc: false } }))).toBe(
-      false,
-    );
-    expect(
-      dossierCloturable(
-        etat({ documents: [doc("quittance", "a_faire")], emporte: { quittance: true, cmc: true } }),
-      ),
-    ).toBe(false);
+  /* Une carte grise absente compte `a_faire` : un dossier dont les documents ne
+     sont pas encore lus ne doit pas passer pour un dossier complet. */
+  it("ne clôt pas un dossier dont la carte grise manque", () => {
+    expect(dossierCloturable(etat({ documents: [] }))).toBe(false);
   });
 });
 
@@ -472,35 +469,26 @@ describe("dossiersEnAttente", () => {
       AUJOURDHUI,
     );
 
-  /* **Le critère d'acceptation central de S53.** Aucun geste n'a été fait sur
-     le dossier : c'est la case cochée sur la MOTO qui fait bouger l'écran. La
-     contradiction B n'est pas réparée, elle est devenue inexprimable. */
-  it("affiche « au magasin » pour une vente dont la moto porte son CMC, sans geste sur le dossier", () => {
-    const liste = lister(
-      [vente()],
-      [document({ id: "cmc", type: "cmc", statut: "a_faire" })],
-      {},
-      [moto({ cmcRecu: true })],
-    );
-    expect(liste[0].papiers.find((p) => p.type === "cmc")?.etat).toBe("au_magasin");
-  });
+  /* **La file ne suit plus qu'un papier** (16 octobre 2026). La quittance et le
+     CMC se cochent sur le lot à l'arrivée : ils n'attendent personne, et le
+     commanditaire a tranché qu'ils n'avaient plus rien à faire dans une file
+     d'attente. Deux colonnes qui répétaient « À faire » noyaient la seule
+     qu'on venait lire.
 
-  it("affiche « emporté » quand la vente dit que le client est parti avec", () => {
+     Leur état n'a pas disparu du domaine : `etatPapier` le calcule toujours, et
+     la fiche de vente l'affiche sous « Les papiers du client ». */
+  it("ne rend que les papiers qui passent par un prestataire", () => {
     const liste = lister(
       [vente({ emporte: { quittance: true, cmc: false } })],
-      [document({ id: "quittance", type: "quittance", statut: "a_faire" })],
+      [
+        document({ id: "quittance", type: "quittance", statut: "a_faire" }),
+        document({ id: "cmc", type: "cmc", statut: "a_faire" }),
+        document({ id: "carte_grise", type: "carte_grise", statut: "chez_prestataire" }),
+      ],
       {},
-      [moto({ quittanceRecue: true })],
+      [moto({ quittanceRecue: true, cmcRecu: true })],
     );
-    expect(liste[0].papiers.find((p) => p.type === "quittance")?.etat).toBe("emporte");
-  });
-
-  /* Une vente dont la moto n'est pas dans la liste passée : l'écoute du stock
-     peut n'avoir pas encore répondu, ou la moto être hors périmètre. Le papier
-     se lit « à faire », jamais `undefined`. */
-  it("lit « à faire » quand la moto est inconnue de la liste", () => {
-    const liste = lister([vente()], [document({ id: "cmc", type: "cmc" })], {}, []);
-    expect(liste[0].papiers.find((p) => p.type === "cmc")?.etat).toBe("a_faire");
+    expect(liste[0].papiers.map((papier) => papier.type)).toEqual(["carte_grise"]);
   });
 
   it("ne garde que les dossiers ouverts", () => {
@@ -524,72 +512,41 @@ describe("dossiersEnAttente", () => {
     expect(liste.map((d) => d.venteId)).toEqual(["ancien", "recent"]);
   });
 
-  /* **Ce qui règle un papier a changé avec S53.** La quittance est réglée parce
-     que la vente dit que le client l'a emportée, le CMC parce qu'il est écarté,
-     et la carte grise parce qu'elle est revenue. Aucun `remis_client` dans ce
-     test : c'est un statut que le produit n'écrit plus. */
-  it("écarte un dossier dont les trois papiers ont fini", () => {
+  /* **La file garde les dossiers OUVERTS** (16 octobre 2026), et c'est la
+     clôture qui les en sort. Elle excluait auparavant ceux dont tous les papiers
+     avaient fini ; réduite à la seule carte grise, cette exclusion aurait fait
+     disparaître la ligne à l'instant même où la carte revient — et le vert que
+     ce retour doit afficher n'aurait jamais été visible.
+
+     Un dossier à carte grise revenue qui s'attarde attend l'argent ou la
+     livraison : c'est une information, pas du bruit. */
+  it("garde un dossier ouvert dont la carte grise est revenue", () => {
     const liste = lister(
-      [vente({ emporte: { quittance: true, cmc: false } })],
-      [
-        document({ id: "quittance", type: "quittance", statut: "a_faire" }),
-        document({ id: "cmc", type: "cmc", statut: "non_applicable" }),
-        document({ id: "carte_grise", type: "carte_grise", statut: "revenu_magasin" }),
-      ],
-      {},
-      [moto({ quittanceRecue: true })],
+      [vente()],
+      [document({ id: "carte_grise", type: "carte_grise", statut: "revenu_magasin" })],
     );
-    expect(liste).toEqual([]);
+    expect(liste.map((d) => d.venteId)).toEqual(["v1"]);
+    expect(liste[0].papiers[0].etat).toBe("au_magasin");
   });
 
-  /* Le cas voisin, et celui qui compte : un papier en main que le client n'a
-     pas pris retient le dossier. C'est le sens du filtre « À remettre ». */
-  it("garde un dossier dont un papier est au magasin sans être emporté", () => {
+  it("ne garde en cours que la carte grise qui reste à traiter", () => {
     const liste = lister(
       [vente()],
       [
+        document({ id: "carte_grise", type: "carte_grise", statut: "a_faire" }),
         document({ id: "quittance", type: "quittance", statut: "a_faire" }),
-        document({ id: "cmc", type: "cmc", statut: "non_applicable" }),
-        document({ id: "carte_grise", type: "carte_grise", statut: "revenu_magasin" }),
       ],
-      {},
-      [moto({ quittanceRecue: true })],
     );
-    expect(liste.map((d) => d.venteId)).toEqual(["v1"]);
-    expect(liste[0].detention).toEqual({ chez: "magasin" });
+    expect(liste[0].enCours.map((d) => d.type)).toEqual(["carte_grise"]);
   });
 
-  it("ne garde en cours que ce qui reste à traiter, dans l’ordre du cahier", () => {
+  /* Un papier fini doit se voir fini : la colonne reste, avec son état. */
+  it("rend la carte grise avec son état", () => {
     const liste = lister(
-      [vente({ emporte: { quittance: true, cmc: false } })],
-      [
-        document({ id: "carte_grise", type: "carte_grise" }),
-        document({ id: "quittance", type: "quittance", statut: "a_faire" }),
-        document({ id: "cmc", type: "cmc" }),
-      ],
-      {},
-      [moto({ quittanceRecue: true })],
-    );
-    expect(liste[0].enCours.map((d) => d.type)).toEqual(["cmc", "carte_grise"]);
-  });
-
-  /* Les trois papiers sortent toujours, dans l'ordre du cahier, quel que soit
-     leur état : c'est une colonne par papier à l'écran, et un papier fini doit
-     se voir fini. */
-  it("rend les trois papiers avec leur état, dans l’ordre du cahier", () => {
-    const liste = lister(
-      [vente({ emporte: { quittance: true, cmc: false } })],
-      [
-        document({ id: "quittance", type: "quittance", statut: "a_faire" }),
-        document({ id: "cmc", type: "cmc", statut: "non_applicable" }),
-        document({ id: "carte_grise", type: "carte_grise", statut: "chez_prestataire" }),
-      ],
-      {},
-      [moto({ quittanceRecue: true })],
+      [vente()],
+      [document({ id: "carte_grise", type: "carte_grise", statut: "chez_prestataire" })],
     );
     expect(liste[0].papiers.map((papier) => [papier.type, papier.etat])).toEqual([
-      ["quittance", "emporte"],
-      ["cmc", "sans_objet"],
       ["carte_grise", "chez_prestataire"],
     ]);
   });
@@ -640,10 +597,12 @@ describe("dossiersEnAttente", () => {
       {},
       [moto({ quittanceRecue: true, cmcRecu: true })],
     );
-    /* Le dossier quitte la file : ses trois papiers ont fini. Avant S48, la
-       plaque l'y aurait retenu — chez un prestataire, avec une date dépassée —
-       pendant que le serveur, lui, venait de le clore. */
-    expect(liste).toEqual([]);
+    /* Le dossier reste dans la file — il est ouvert — mais le document d'un
+       type retiré ne le fait pas paraître détenu : avant S48, la plaque
+       l'aurait montré « chez un prestataire », avec une date dépassée, pendant
+       que le serveur venait de le clore. */
+    expect(liste[0].papiers.map((papier) => papier.type)).toEqual(["carte_grise"]);
+    expect(liste[0].detention).toBeNull();
   });
 
   it("ne laisse pas un type retiré retenir un dossier qui attend encore", () => {
@@ -755,14 +714,18 @@ describe("dossiersEnAttente", () => {
        Ce qui est détenu par le magasin, c'est un papier de main dans le tiroir
        que le client n'a pas encore pris — et il n'a aucun statut stocké pour le
        dire, seulement la case de la moto. */
-    it("dit « au magasin » pour un papier en main que le client n’a pas pris", () => {
-      const auMagasin = lister(
+    /* « Au magasin » a disparu de cette colonne le 16 octobre 2026 : il
+       désignait une quittance ou un CMC dans le tiroir, et ces deux papiers ont
+       quitté le dossier. Un CMC coché sur la moto ne fait donc plus paraître le
+       dossier détenu par qui que ce soit. */
+    it("ne détient rien parce qu’un CMC est en main : il ne concerne plus le dossier", () => {
+      const liste = lister(
         [vente()],
         [document({ id: "cmc", type: "cmc", statut: "a_faire" })],
         {},
         [moto({ cmcRecu: true })],
       );
-      expect(auMagasin[0].detention).toEqual({ chez: "magasin" });
+      expect(liste[0].detention).toBeNull();
     });
 
     it("ne détient rien quand rien n’est parti et que la moto ne porte rien", () => {
@@ -784,7 +747,8 @@ describe("dossiersEnAttente", () => {
         {},
         [moto({ quittanceRecue: true, cmcRecu: true })],
       );
-      expect(liste).toEqual([]);
+      expect(liste.map((d) => d.venteId)).toEqual(["v1"]);
+      expect(liste[0].detention).toBeNull();
     });
   });
 
@@ -826,12 +790,6 @@ describe("dossiersEnAttente", () => {
       expect(
         lister(ventes, documents, { etat: "chez_prestataire" }, motos).map((d) => d.venteId),
       ).toEqual(["v1", "v2"]);
-    });
-
-    it("ce qui peut se remettre aujourd’hui", () => {
-      expect(
-        lister(ventes, documents, { etat: "a_remettre" }, motos).map((d) => d.venteId),
-      ).toEqual(["v3"]);
     });
 
     /* Les trois façons dont un dossier revient à l'esprit au comptoir : le
@@ -919,68 +877,3 @@ describe("etatPapier", () => {
   });
 });
 
-/**
- * Le résumé du dossier, sur la fiche de vente (S53, défaut vu à l'écran).
- *
- * **Il comptait les statuts STOCKÉS**, et disait donc « 2 à faire » juste
- * au-dessus de deux lignes où le même écran affichait « Emporté par le
- * client ». C'est mot pour mot la contradiction que cette spec existe pour
- * fermer — elle avait survécu à un centimètre des lignes qu'elle contredit,
- * parce que `resumerDossier` vivait dans `vente.ts` et que rien ne pointait
- * vers lui.
- *
- * Aucun test ne pouvait le voir : les trois qui existaient vérifiaient
- * fidèlement qu'il comptait bien les statuts stockés. Il a fallu regarder une
- * capture d'écran.
- */
-describe("resumerDossier", () => {
-  const papier = (type: TypeDocument, statut: StatutDocument): DocumentDossier => ({
-    id: type,
-    boutiqueId: "PTG",
-    venteId: "v1",
-    type,
-    statut,
-    prestataireId: null,
-    prestataireNom: "",
-    deposeLe: null,
-    avance: null,
-    disponibleLe: null,
-    remisLe: null,
-  });
-
-  const AUCUNE_MOTO: MotoDuDossier = { id: "m1", quittanceRecue: false, cmcRecu: false };
-  const RIEN_EMPORTE = { quittance: false, cmc: false };
-
-  it("dit « Dossier non chargé » tant qu'aucun document n'est parvenu", () => {
-    expect(resumerDossier([], { emporte: RIEN_EMPORTE }, AUCUNE_MOTO)).toBe("Dossier non chargé");
-  });
-
-  /* **Le défaut, en test.** La moto porte ses deux papiers et le client les a
-     emportés : le résumé doit le dire, et non réciter deux statuts que S53 a
-     vidés de leur sens. */
-  it("compte l’état CALCULÉ, pas le statut stocké", () => {
-    const resume = resumerDossier(
-      [papier("quittance", "a_faire"), papier("cmc", "a_faire"), papier("carte_grise", "a_faire")],
-      { emporte: { quittance: true, cmc: true } },
-      { id: "m1", quittanceRecue: true, cmcRecu: true },
-    );
-    expect(resume).toBe("1 à faire · 2 emportés par le client");
-  });
-
-  it("accorde le pluriel sur le compte, et pas seulement sur le libellé", () => {
-    const resume = resumerDossier(
-      [papier("quittance", "a_faire"), papier("carte_grise", "chez_prestataire")],
-      { emporte: { quittance: true, cmc: false } },
-      { id: "m1", quittanceRecue: true, cmcRecu: false },
-    );
-    expect(resume).toBe("1 chez le prestataire · 1 emporté par le client");
-  });
-
-  /* La moto peut n'être pas encore arrivée de son écoute : le papier se lit
-     alors « à faire », jamais `undefined`. */
-  it("tient sans moto connue", () => {
-    expect(
-      resumerDossier([papier("quittance", "a_faire")], { emporte: RIEN_EMPORTE }, null),
-    ).toBe("1 à faire");
-  });
-});

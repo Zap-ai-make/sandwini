@@ -48,18 +48,23 @@ import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
  * `lib/domain/dossier.ts`, en fonctions pures testées — l’écran ne fait que les
  * nourrir et les rendre.
  *
- * **Une colonne par document.** L’écran empilait des cartes qui listaient, en
- * petites lignes grises, les documents encore en cours d’une vente. La question
- * qu’on lui pose est « qui détient quel papier » : elle se compare d’un dossier
- * à l’autre, donc elle se range en colonnes. Tous les documents y sont
- * toujours, réglés compris — c’est en voyant les premiers remis qu’on comprend
- * lequel manque encore.
+ * **Une seule colonne de papier : la carte grise** (16 octobre 2026). La
+ * question que cet écran pose est « qui détient quel papier, et depuis quand ».
+ * Or un seul des trois part chez quelqu'un. La quittance et le CMC arrivent
+ * avec la moto et se cochent sur le lot à l'arrivée : ils n'attendent personne,
+ * et deux colonnes qui répétaient « À faire » sur chaque ligne noyaient la
+ * seule qu'on venait lire.
  *
- * **Ils sont trois depuis S48**, et non plus quatre : la plaque a quitté le
- * dossier, l’immatriculation étant obtenue avec la carte grise et chez le même
- * prestataire. La suivre à part laissait une ligne « à faire » sur des dossiers
- * en réalité terminés. Les colonnes se dérivent de `TYPES_DOCUMENT` — retirer
- * un type suffit donc à retirer sa colonne.
+ * Le commanditaire l'a tranché ainsi : « comme la quittance et le CMC sont
+ * directement cochables dans la liste du lot, on peut se contenter de cela ».
+ * La clôture a suivi dans le même mouvement (`dossierCloturable`) — sans quoi
+ * cette file aurait montré des dossiers à carte grise verte, toujours
+ * « ouverts », sans qu'une seule colonne ne dise pourquoi.
+ *
+ * Les colonnes ne se dérivent donc plus de `TYPES_DOCUMENT` mais des types qui
+ * **passent par un prestataire**. Ce n'est pas un cas particulier écrit à la
+ * main : la prochaine pièce confiée à l'extérieur reprendra cette colonne telle
+ * quelle, comme la plaque l'avait fait jusqu'à S48.
  *
  * **Et le papier avance sans quitter l’écran.** Cliquer un document ouvre son
  * relais sous le tableau : le chemin entier, et le geste suivant. Il fallait
@@ -221,7 +226,17 @@ export default function PageDossiers() {
       },
     ];
 
-    for (const type of TYPES_DOCUMENT) {
+    /* **Une seule colonne : la carte grise** (demande du commanditaire,
+       16 octobre 2026). La quittance et le CMC se cochent sur le lot à
+       l'arrivée, et cela suffit : ils ont quitté le dossier, et la clôture ne
+       les regarde plus non plus. Cette file ne montre désormais que ce qui est
+       VRAIMENT en attente de quelqu'un — un papier parti chez un prestataire.
+
+       Les colonnes se dérivaient de `TYPES_DOCUMENT` ; elles se dérivent
+       maintenant du seul type qui passe par un prestataire, ce qui n'est pas
+       un cas particulier écrit à la main : la prochaine pièce confiée à
+       l'extérieur reprendra cette colonne telle quelle. */
+    for (const type of TYPES_DOCUMENT.filter(passeParUnPrestataire)) {
       liste.push({
         cle: type,
         titre: LIBELLE_DOCUMENT[type],
@@ -580,10 +595,22 @@ function CellulePapier({
    doubler. Le vert dit fini, le bleu de la goutte dit parti et pas revenu, le
    gris dit qu’il n’y a rien encore. Le retard, lui, n’est pas un état : il se
    lit sur la colonne « Chez qui, depuis » et sur l’avis de tête. */
+/**
+ * Le ton de chaque état.
+ *
+ * **« Au magasin » est VERT** (demande du commanditaire, 16 octobre 2026).
+ * Depuis que cette file ne suit plus que la carte grise, son retour au magasin
+ * n'est pas une étape de transit : c'est la fin du parcours, le moment où le
+ * dossier se clot. Le bleu disait « ça bouge encore » d'un papier qui ne bouge
+ * plus. Le vert dit « c'est fait », et c'est ce qu'on vient chercher d'un coup
+ * d'œil sur une file qu'on vide.
+ *
+ * `chez_prestataire` garde le bleu : lui est bien en transit, chez quelqu'un.
+ */
 const TON_PAPIER: Record<EtatPapier, string> = {
   a_faire: "",
   chez_prestataire: "pastille-transit",
-  au_magasin: "pastille-transit",
+  au_magasin: "pastille-solde",
   emporte: "pastille-solde",
   sans_objet: "",
 };
@@ -594,7 +621,11 @@ function Detenteur({ dossier }: { dossier: DossierEnAttente }) {
   /* Rien n’est encore parti : les papiers restent à faire, et il n’y a
      personne à relancer. C’est une réponse à « chez qui », pas un blanc. */
   if (!detention) return <span className="text-encre-doux">personne</span>;
-  if (detention.chez === "magasin") return <span className="text-encre-doux">au magasin</span>;
+  /* **« au magasin » a quitté cette colonne** (16 octobre 2026). Elle désignait
+     une quittance ou un CMC dans le tiroir ; ces deux papiers ont quitté le
+     dossier, et la carte grise est finie dès son retour. La colonne répond
+     désormais par un prestataire, ou par personne — ce qui est exactement la
+     question qu'elle pose. */
 
   return (
     <span className={dossier.enRetard ? "font-semibold text-alerte" : undefined}>

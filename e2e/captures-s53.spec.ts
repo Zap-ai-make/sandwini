@@ -120,15 +120,17 @@ test("les papiers d’une moto, en clair et en sombre, des deux rôles", async (
   await forcerTheme(page, "sombre");
   await photo(page, "prestataires-mobile-sombre");
 
-  // ── 2. « Papiers en main » sur la fiche de la moto ─────────────────────────
+  // ── 2. La fiche d'une moto SANS LOT : elle garde ses cases ────────────
+  /* Le bloc « Papiers en main » ne paraît plus que là (16 octobre 2026) : les
+     motos d'un lot se cochent à l'inspection de ce lot. `vendreDansLeTerrain`
+     fait entrer ses motos à l'unité, donc sans arrivage — c'est exactement le
+     cas que ce bloc existe pour couvrir. */
   await page.goto("/motos", { waitUntil: "load" });
   await contenu(page).getByRole("link", { name: premiere.chassis }).click();
   await expect(contenu(page).getByText("Papiers en main")).toBeVisible({ timeout: 30_000 });
   await forcerTheme(page, "clair");
   await photo(page, "moto-papiers-manquants-mobile-clair");
 
-  /* On coche les deux papiers **sur la moto** : c'est le geste de l'arrivage,
-     et c'est lui qui doit faire bouger le dossier sans qu'on y touche. */
   await page.getByLabel("Quittance", { exact: true }).click();
   await page.getByLabel("CMC", { exact: true }).click();
   await expect(contenu(page).getByText("Au magasin").first()).toBeVisible({ timeout: 30_000 });

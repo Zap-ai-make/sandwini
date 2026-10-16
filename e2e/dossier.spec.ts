@@ -47,28 +47,23 @@ const ligne = (page: import("@playwright/test").Page, document: string) =>
   dossier(page).locator("li").filter({ hasText: document });
 
 test.describe("le chemin dépend du document", () => {
-  test("la quittance n’a plus qu’un geste : être écartée", async ({ page }) => {
+  /* **La quittance et le CMC ont quitté le dossier** (16 octobre 2026). Ils se
+     cochent sur le lot à l'arrivée, et le commanditaire a tranché que cela
+     suffisait : le dossier ne suit plus que la carte grise.
+
+     Ce qu'ils n'ont pas quitté, et que ce test vérifie aussi : la fiche de
+     vente dit toujours ce que le client a emporté, sous « Les papiers du
+     client ». C'est un fait sur la remise, pas une étape de dossier. */
+  test("le dossier ne suit que la carte grise", async ({ page }) => {
     await seConnecterEtEntrer(page);
     await vendre(page, { mode: "Crédit", prix: "1200000", encaisse: "400000" });
 
-    const quittance = ligne(page, "Quittance");
-    await expect(quittance).toContainText("À faire");
+    await expect(ligne(page, "Carte grise")).toHaveCount(1);
+    await expect(ligne(page, "Quittance")).toHaveCount(0);
+    await expect(ligne(page, "CMC")).toHaveCount(0);
 
-    /* Les trois boutons qui ne doivent PAS exister. Un document qui arrive avec
-       la moto n’est confié à personne, et depuis S53 son parcours ne se promène
-       plus sur le dossier : l’écran ne propose pas un geste dont la base
-       refuserait ensuite l’écriture. */
-    for (const geste of [
-      "Déposer chez un prestataire",
-      "Arrivé au magasin",
-      "Remettre au client",
-    ]) {
-      await expect(quittance.getByRole("button", { name: geste })).toHaveCount(0);
-    }
-
-    await quittance.getByRole("button", { name: "Non concerné par cette vente" }).click();
-    await expect(quittance).toContainText("Sans objet");
-    await expect(quittance.getByRole("button")).toHaveCount(0);
+    /* Ce qui reste du côté du client, et qui n'est pas le dossier. */
+    await expect(contenu(page).getByLabel("Quittance emportée")).toBeVisible();
   });
 
   test("la carte grise ne saute pas le dépôt chez le prestataire", async ({ page }) => {
@@ -222,10 +217,12 @@ test.describe("écarter un document", () => {
     await seConnecterEtEntrer(page);
     await vendre(page, { mode: "Crédit", prix: "1200000", encaisse: "400000" });
 
-    const cmc = ligne(page, "CMC");
-    await cmc.getByRole("button", { name: "Non concerné par cette vente" }).click();
-    await expect(cmc).toContainText("Sans objet");
-    await expect(cmc.getByRole("button")).toHaveCount(0);
+    /* La carte grise depuis le 16 octobre 2026 : c'est le seul document du
+       dossier, donc le seul qu'on puisse écarter. */
+    const carteGrise = ligne(page, "Carte grise");
+    await carteGrise.getByRole("button", { name: "Non concerné par cette vente" }).click();
+    await expect(carteGrise).toContainText("Sans objet");
+    await expect(carteGrise.getByRole("button")).toHaveCount(0);
   });
 });
 
@@ -239,7 +236,7 @@ test.describe("écarter un document", () => {
  * documents, et le geste qu’on y fait s’y voit tout de suite.
  */
 test.describe("la file des dossiers en attente", () => {
-  test("dit où en sont les trois documents, et fait avancer le papier sans quitter l’écran", async ({
+  test("dit où en est la carte grise, et la fait avancer sans quitter l’écran", async ({
     page,
   }) => {
     await seConnecterEtEntrer(page);
@@ -249,19 +246,15 @@ test.describe("la file des dossiers en attente", () => {
       encaisse: "400000",
     });
 
-    /* Une vente fraîche ouvre trois documents : le dossier attend forcément. */
+    /* Une vente fraîche ouvre son dossier : il attend forcément sa carte grise. */
     await page.goto("/motos/dossiers", { waitUntil: "load" });
     const ligne = contenu(page).locator("tbody tr").filter({ hasText: numero });
     await expect(ligne).toHaveCount(1);
 
-    /* Les trois papiers ont chacun leur colonne, et tous les trois disent « À
-       faire » sur une vente fraîche : la moto ne porte rien, le client n'a rien
-       emporté, la carte grise n'est pas partie. */
-    await expect(ligne.locator("td", { hasText: "À faire" })).toHaveCount(3);
-
-    /* **Seule la carte grise ouvre un parcours** (S53). Les deux autres papiers
-       n'ont plus d'étapes : un bouton qui ouvrirait un panneau vide serait une
-       promesse non tenue, donc ils s'affichent en pastille muette. */
+    /* **Une seule colonne de papier** (16 octobre 2026) : la quittance et le CMC
+       se cochent sur le lot à l'arrivée, et deux colonnes qui répétaient
+       « À faire » noyaient la seule qu'on venait lire. */
+    await expect(ligne.locator("td", { hasText: "À faire" })).toHaveCount(1);
     await expect(
       ligne.getByRole("button", { name: `Quittance de ${numero} : À faire`, exact: true }),
     ).toHaveCount(0);
@@ -285,12 +278,20 @@ test.describe("la file des dossiers en attente", () => {
     await expect(relais).not.toContainText("Remis au client");
   });
 
-  /* **Le témoin de bout en bout de S53.** Il tient en une phrase : une case
-     cochée sur la MOTO fait bouger l'écran du dossier sans qu'aucune écriture
-     ne touche le dossier, et le seul geste qui reste au comptoir se fait sur la
-     vente. C'est la contradiction B rendue inexprimable, vue depuis le
-     navigateur. */
-  test("le papier coché sur la moto se lit au dossier, et s’emporte depuis la vente", async ({
+  /**
+   * **Le trajet entier d'un papier sur une moto SANS LOT** (16 octobre 2026).
+   *
+   * La quittance et le CMC se cochent normalement sur le lot à l'arrivée, et
+   * c'est pour cela qu'ils ont quitté le dossier. Mais une moto entrée à
+   * l'unité par `/motos/nouvelle` n'appartient à aucun lot : sa fiche garde
+   * donc le bloc « Papiers en main », et c'est le seul endroit où ses papiers
+   * peuvent se cocher.
+   *
+   * Sans cette exception, la case « CMC emporté » de la vente ne se serait
+   * jamais ouverte — on ne remet pas ce qu'on n'a pas — et le reçu de cette
+   * moto n'aurait jamais pu dire ce que le client avait emporté.
+   */
+  test("une moto sans lot garde ses cases sur sa fiche, et le client emporte depuis la vente", async ({
     page,
   }) => {
     await seConnecterEtEntrer(page);
@@ -300,32 +301,30 @@ test.describe("la file des dossiers en attente", () => {
       encaisse: "400000",
     });
 
-    /* Le CMC se coche sur la moto, jamais sur le dossier. */
+    /* Cette moto n'a pas de lot : sa fiche garde donc le bloc. */
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher dans le stock").fill(chassis);
     await page.getByRole("link", { name: chassis }).click();
     /* **`click` et non `check`**, comme le test des arrivages (S43). Ces cases
        sont contrôlées par l'abonnement Firestore : le clic retourne la case
        dans le DOM, React la remet aussitôt sur la valeur reçue, et `check`
-       vérifie l'état dans cet intervalle — il voit la case revenue à vide et
-       déclare l'échec alors que l'écriture est partie. La pastille, elle, dit
-       l'état une fois l'abonnement passé. */
+       vérifie l'état dans cet intervalle. */
     await page.getByRole("checkbox", { name: "CMC", exact: true }).click();
     await expect(contenu(page).getByText("Au magasin")).toBeVisible({ timeout: 30_000 });
 
-    /* Et le dossier bouge sans qu'on y ait touché. */
+    /* La file ne montre plus qu'une colonne de papier, et c'est la carte grise :
+       cocher le CMC n'y change donc plus rien, et c'est voulu. */
     await page.goto("/motos/dossiers", { waitUntil: "load" });
     const ligneDossier = contenu(page).locator("tbody tr").filter({ hasText: numero });
-    await expect(ligneDossier).toContainText("Au magasin", { timeout: 30_000 });
+    await expect(ligneDossier).toHaveCount(1, { timeout: 30_000 });
+    await expect(ligneDossier.locator("td", { hasText: "À faire" })).toHaveCount(1);
 
     /* Sur la fiche de vente, la quittance n'est pas en main : on ne remet pas
-       ce qu'on n'a pas, et la case doit être fermée. */
+       ce qu'on n'a pas, et la case doit être fermée. Le CMC, lui, s'ouvre. */
     await page.goto("/motos/ventes", { waitUntil: "load" });
     await contenu(page).getByRole("link", { name: numero }).click();
 
-    await expect(
-      page.getByRole("checkbox", { name: /Quittance emportée/ }),
-    ).toBeDisabled();
+    await expect(page.getByRole("checkbox", { name: /Quittance emportée/ })).toBeDisabled();
 
     const caseCmc = page.getByRole("checkbox", { name: /CMC emporté/ });
     await expect(caseCmc).toBeEnabled();

@@ -1,7 +1,13 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { estEnRetard, etatPapier, LIBELLE_ETAT_PAPIER, papierFini } from "@/lib/domain/dossier";
+import {
+  estEnRetard,
+  etatPapier,
+  LIBELLE_ETAT_PAPIER,
+  papierFini,
+  passeParUnPrestataire,
+} from "@/lib/domain/dossier";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_DOCUMENT, type DocumentDossier, type Vente } from "@/lib/domain/vente";
@@ -49,9 +55,19 @@ export function DossierDocuments({
        y figure à deux titres depuis S44 — le papier à obtenir, et ce qui part
        avec la moto. Sans nom, rien ne les distingue pour qui n'a pas l'écran. */
     <ul aria-label="Documents du dossier" className="divide-y divide-bord">
-      {documents.map((document) => (
-        <LigneDocument key={document.id} document={document} vente={vente} moto={moto} />
-      ))}
+      {/* **Le dossier, c'est la carte grise** (16 octobre 2026). La quittance et
+          le CMC se cochent sur le lot à l'arrivée, et le commanditaire a tranché
+          que cela suffisait : ils ont quitté le dossier, ici comme dans la file
+          et comme dans la clôture.
+
+          Ils n'ont pas quitté la fiche pour autant — « Les papiers du client »,
+          juste au-dessus, dit toujours ce que le client a emporté, et le reçu
+          l'imprime. C'est un fait sur la remise, pas une étape de dossier. */}
+      {documents
+        .filter((document) => passeParUnPrestataire(document.type))
+        .map((document) => (
+          <LigneDocument key={document.id} document={document} vente={vente} moto={moto} />
+        ))}
     </ul>
   );
 }
