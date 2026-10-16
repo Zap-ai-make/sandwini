@@ -3232,3 +3232,93 @@ documents mis à jour dans le même lot : les règles ne savent pas joindre. Ce 
 la base garantit — et qui suffit — c'est qu'un lot est accepté ou refusé **en
 bloc**. Le test le prouve donc par la conséquence : après le refus d'une écriture
 du lot, le paquet, première écriture et valide à elle seule, **n'existe pas**.
+
+---
+
+## D108 — Le portail du prestataire : une fonction est la seule porte, et il n'y a pas de solde
+
+*S56, 16 octobre 2026. Le commanditaire, le 15 octobre : « chaque prestataire
+doit avoir un lien de suivi de tous les dossiers pris avec l'entreprise,
+l'historique, en cours. Et limité à ça uniquement, les avances prises,
+soldes… »*
+
+**Trois décisions ont été prises sans arbitrage humain, et les voici.**
+
+### 1. Aucune lecture publique de Firestore
+
+Le chemin court existait : une collection `suiviPrestataire/{jeton}` en
+`allow read: if true`. Il est refusé, pour deux raisons qui se cumulent.
+
+Les **règles Firestore ne savent pas joindre**. Montrer les cartes d'un
+prestataire demande de lire `ventesMotos/*/documents`, les ventes, les motos et
+les clients ; aucune règle ne peut autoriser « ces documents-là, parce que ce
+jeton-ci ». Il faudrait donc **recopier** le suivi dans un document public et
+tenir cette copie à jour par des déclencheurs — la contradiction B de S53,
+réintroduite à l'extérieur. Et une copie publique est un endroit où un champ de
+coût se glisse un jour par inadvertance : **le mur de D2 redeviendrait une
+affaire de vigilance.**
+
+La porte est donc une **fonction HTTP**, appelée depuis le serveur Next. Trois
+propriétés en découlent, et aucune ne demande d'entretien :
+
+- Firestore reste fermé. Un test de règles prouve qu'un visiteur non
+  authentifié ne lit rien.
+- La fonction **n'ouvre jamais `prive/`**. Ce n'est pas une précaution, c'est
+  l'absence de code pour le faire — et un test de déclencheur sème un coût pour
+  le vérifier par ce qui sort.
+- Ce que le prestataire voit est un **type**, relu par un contrôleur qui refuse
+  tout champ de trop. La non-fuite est un test, plus une intention.
+
+### 2. Pas de solde : « Avances reçues », et c'est tout
+
+Le commanditaire avait demandé « les avances prises, soldes… ». Le portail ne
+montre que la première moitié.
+
+**Le produit ne sait pas ce qu'un travail coûte.** `lotsCartesGrises` et les
+documents de dossier portent une **avance**, et rien d'autre : aucun prix
+convenu avec le prestataire, aucun règlement final. Le solde n'est pas difficile
+à calculer — **les deux termes de la soustraction n'existent pas.**
+
+Le mot n'apparaît pas non plus à zéro, et un test le fige : un fournisseur qui
+lit « solde : 0 » comprend « on ne me doit rien », ce que le produit n'est pas
+en mesure d'affirmer. Afficher un solde faux à un fournisseur est pire que ne
+pas l'afficher.
+
+Le prix convenu et le règlement sont une **spec à part**, qui touche la caisse
+et les postes de dépense de S55.
+
+### 3. Le portail est en ligne seulement — exception nommée à D40
+
+Pas de cache, pas de service worker, pas de lecture hors réseau. Le prestataire
+consulte depuis chez lui, pas depuis un comptoir en coupure. La route n'entre
+donc pas dans `ECRANS_HORS_LIGNE` — et elle ne le **peut** pas : une route à
+jeton variable n'a pas d'URL à précharger, et une entrée qui rend 404 empêche le
+service worker de s'installer, ce qui fait tomber le hors-ligne **en entier**
+(le défaut de `/diagnostic`, S54).
+
+Quand le réseau manque, la page le **dit**. Elle ne reste pas blanche, et elle
+ne se déguise pas en « lien invalide » — sinon le prestataire jetterait un lien
+parfaitement valable.
+
+### Ce que ces décisions coûtent, écrit noir sur blanc
+
+**Le lien est le mot de passe.** Qui l'a entre. Le jeton fait 32 octets tirés au
+hasard par le serveur, il ne donne accès qu'à un prestataire, régénérer révoque
+l'ancien immédiatement, et la page porte `noindex`. Mais il n'identifie pas une
+personne : il n'y a aucune trace de *qui* a regardé, et c'est assumé.
+
+**Le jeton est lisible par tout compte connecté.** Il vit sur
+`prestataires/{id}`, dont la règle est `allow read: if connecte()`. Un gérant ne
+voit pas l'écran qui l'affiche — il est derrière `gerer_referentiels`, réservé
+au responsable — mais rien ne l'empêche de lire le document. Ce qu'il y
+gagnerait est un lien vers des données qu'il voit déjà dans l'application. **Le
+jour où ce ne serait plus vrai, ce champ doit descendre dans une sous-collection
+`prive/`, comme les coûts (D2).**
+
+**Un piège a été trouvé avant d'être payé.** `prestataireValide` impose son
+`hasOnly` en modification aussi : dès qu'une fonction pose `jetonSuivi` sur une
+fiche, le document porte un champ de trop et **plus personne ne peut y corriger
+un numéro de téléphone**. Le refus se lirait comme un défaut de droits — le
+blocage vécu sur `sandwini` le matin même. La règle accepte donc les deux champs
+du jeton **et interdit au client d'y toucher** : on ouvre la serrure sans ouvrir
+la porte, comme `typesACreer`.

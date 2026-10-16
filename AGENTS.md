@@ -33,6 +33,11 @@ PARTICULARITÉS :
     **dit** au lieu d'échouer en silence, et la spec reste terminée. Ne pas faire tourner une
     architecture entière autour de ce point (D66).
   - Interface entièrement en français, montants en FCFA entiers.
+  - **Une seule page est accessible sans compte** : `app/suivi/[jeton]` (S56), le portail du
+    prestataire. Elle est rendue côté serveur et lit par une Cloud Function — aucune règle
+    Firestore n'est assouplie. Elle n'entre **jamais** dans `ECRANS_HORS_LIGNE` : une route à
+    jeton variable n'a pas d'URL à précharger, et une entrée qui rend 404 fait tomber le
+    hors-ligne en entier. Le portail est en ligne seulement, exception nommée à D40 (voir D108).
   - Coûts et marges cloisonnés hors de portée des gérants via des sous-collections `prive/` (D2) —
     Firestore ne masque pas un champ, c'est le seul moyen. Chaque cloisonnement est prouvé par un
     test de règles, sinon il n'existe pas.

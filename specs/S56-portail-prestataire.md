@@ -92,7 +92,7 @@ du serveur, et renvoie **exactement** la charge utile prévue.
   navigateur du prestataire
         │  GET /suivi/<jeton>
         ▼
-  page publique (hors (app), sans session, sans service worker)
+  page publique (hors (app), aucun appel à la session, hors service worker)
         │  appel à la fonction
         ▼
   suiviPrestataire (Cloud Function)
@@ -169,8 +169,12 @@ type LigneSuivi = {
   client: string;          // arbitrage 2
   moto: string;            // marque, modèle
   chassis: string;
-  deposeLe: Date;
-  revenuLe: Date | null;
+  /* **Des chaînes ISO, et non des `Date`** (corrigé à l'écriture, 16 octobre
+     2026) : cette charge traverse du JSON. Un type qui promettrait des `Date`
+     mentirait sur ce que la page reçoit, et le mensonge se paierait sur un
+     `.getTime()` appliqué à une chaîne. */
+  deposeLe: string;
+  revenuLe: string | null;
   joursDehors: number;
 };
 ```
@@ -216,34 +220,34 @@ retouche de ce portail.
 
 ### Le lien
 
-- [ ] La fiche d'un prestataire porte un bouton « Créer le lien de suivi », puis affiche le lien avec un geste pour le copier.
-- [ ] Régénérer le lien **révoque** l'ancien : l'ancienne URL rend « lien expiré », pas une page vide ni une erreur technique.
-- [ ] Un prestataire sans jeton n'a pas de page : l'URL inventée rend « lien inconnu », sans dire si le prestataire existe.
-- [ ] Le jeton fait au moins 32 octets d'aléa. Un test le fige.
+- [x] La fiche d'un prestataire porte un bouton « Créer le lien de suivi », puis affiche le lien avec un geste pour le copier.
+- [x] Régénérer le lien **révoque** l'ancien : l'ancienne URL rend « lien expiré », pas une page vide ni une erreur technique.
+- [x] Un prestataire sans jeton n'a pas de page : l'URL inventée rend « lien inconnu », sans dire si le prestataire existe.
+- [x] Le jeton fait au moins 32 octets d'aléa. Un test le fige.
 
 ### La page
 
-- [ ] Elle s'ouvre **sans session** : un navigateur jamais connecté la voit.
-- [ ] Elle montre les cartes grises en cours, depuis combien de jours, et l'historique de celles rendues.
-- [ ] Elle montre le nom du client, la moto et le châssis de chaque ligne.
-- [ ] Elle montre le total des avances versées.
-- [ ] Elle porte `noindex`, et aucun écran du produit n'y renvoie par un lien.
-- [ ] Elle se lit sur un téléphone d'entrée de gamme, en clair et en sombre.
-- [ ] Hors réseau, elle dit qu'elle a besoin du réseau. Elle ne reste pas blanche.
+- [x] Elle s'ouvre **sans session** : un navigateur jamais connecté la voit.
+- [x] Elle montre les cartes grises en cours, depuis combien de jours, et l'historique de celles rendues.
+- [x] Elle montre le nom du client, la moto et le châssis de chaque ligne.
+- [x] Elle montre le total des avances versées.
+- [x] Elle porte `noindex`, et aucun écran du produit n'y renvoie par un lien.
+- [x] Elle se lit sur un téléphone d'entrée de gamme, en clair et en sombre.
+- [x] Hors réseau, elle dit qu'elle a besoin du réseau. Elle ne reste pas blanche.
 
 ### Ce qui ne doit pas fuir
 
-- [ ] La charge utile ne contient **aucun** prix de vente, coût, marge ni montant autre que les avances de ce prestataire. Un test unitaire sur le constructeur de la charge le fige.
-- [ ] Un test de règles prouve qu'un client **non authentifié** ne lit toujours rien de Firestore — la fonction est la seule porte.
-- [ ] Le jeton d'un prestataire ne donne accès à aucune ligne d'un autre prestataire. Un test de la fonction le fige.
-- [ ] La fonction ne lit jamais `prive/`. Un test le prouve en refusant la lecture au niveau des droits du service.
+- [x] La charge utile ne contient **aucun** prix de vente, coût, marge ni montant autre que les avances de ce prestataire. Un test unitaire sur le constructeur de la charge le fige.
+- [x] Un test de règles prouve qu'un client **non authentifié** ne lit toujours rien de Firestore — la fonction est la seule porte.
+- [x] Le jeton d'un prestataire ne donne accès à aucune ligne d'un autre prestataire. Un test de la fonction le fige.
+- [x] La fonction ne lit jamais `prive/`. Un test le prouve en refusant la lecture au niveau des droits du service.
 
 ### Ce qui ne doit pas casser
 
-- [ ] **Une fiche de prestataire qui porte un jeton reste modifiable** : on peut y corriger un téléphone. Un test de règles le fige — c'est le piège du `hasOnly` décrit plus haut.
-- [ ] **Aucun navigateur n'écrit un jeton**, responsable compris. Un test de règles le refuse.
-- [ ] La route publique n'entre pas dans `ECRANS_HORS_LIGNE`, et le service worker s'installe toujours : les entrées préchargées répondent toutes.
-- [ ] La suite ciblée reste verte : unitaires, règles, et le fichier e2e des dossiers. **Pas de passe complète.**
+- [x] **Une fiche de prestataire qui porte un jeton reste modifiable** : on peut y corriger un téléphone. Un test de règles le fige — c'est le piège du `hasOnly` décrit plus haut.
+- [x] **Aucun navigateur n'écrit un jeton**, responsable compris. Un test de règles le refuse.
+- [x] La route publique n'entre pas dans `ECRANS_HORS_LIGNE`, et le service worker s'installe toujours : les entrées préchargées répondent toutes.
+- [x] La suite ciblée reste verte : unitaires, règles, et le fichier e2e des dossiers. **Pas de passe complète.**
 
 ---
 
