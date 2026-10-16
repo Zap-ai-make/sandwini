@@ -1,10 +1,10 @@
 # S56 — Le portail du prestataire : un lien, et rien d'autre
 
 ```
-Statut     : à valider
+Statut     : validée le 16 octobre 2026
 Périmètre  : post-MVP
 Dépend de  : S30 (dépôt prestataire), S53 (les papiers d'une moto)
-Bloquée par: S53 — ce portail ne lit que ce que S53 écrit
+Débloquée  : S53 et S53bis sont livrés et déployés — ce portail lit ce qu'ils écrivent
 ```
 
 ---
@@ -31,7 +31,7 @@ Tranchés le 15 octobre 2026.
 | # | Question | Réponse |
 |---|----------|---------|
 | 1 | Comment le prestataire entre-t-il ? | **Un lien secret, sans compte.** Pas de mot de passe à créer ni à faire retenir à quelqu'un qui n'est pas de la maison. |
-| 2 | Que voit-il ? | **Ses dossiers en cours et leur historique**, **les avances versées et le solde dû**, **le nom du client**, **la moto et son châssis**. |
+| 2 | Que voit-il ? | **Ses dossiers en cours et leur historique**, **les avances versées et le solde dû**, **le nom du client**, **la moto et son châssis**. *(Le solde est reporté — voir « Les avances et le solde ».)* |
 | 3 | Que ne voit-il pas ? | Tout le reste. « Limité à ça uniquement. » |
 
 ### Ce que l'arbitrage 1 coûte, et qu'il faut dire
@@ -135,6 +135,18 @@ prestataires/{id}
 Le jeton vit sur la fiche du prestataire. Le régénérer écrase l'ancien : il n'y
 a jamais deux liens valides pour un même prestataire.
 
+**Le piège à ouvrir avant d'écrire le premier jeton** (trouvé le 16 octobre
+2026). `prestataireValide`, dans `firestore.rules`, impose un `hasOnly` sur
+quatre champs plus l'audit — **en création comme en modification**. Dès qu'une
+Cloud Function pose `jetonSuivi` sur une fiche, le document résultant porte un
+champ de trop : **plus personne ne peut corriger un numéro de téléphone**, et le
+refus se lirait comme un défaut de droits. La règle doit donc accepter les deux
+champs du jeton **et interdire au client d'y toucher** : présents ou absents,
+mais toujours identiques à ce qu'ils étaient. C'est la même asymétrie que
+`typesACreer` — on ouvre la serrure sans ouvrir la porte. Un test de règles
+prend les deux sens : la correction du téléphone passe, l'écriture du jeton
+depuis un navigateur est refusée, responsable compris.
+
 **Le jeton n'est pas un secret côté serveur** — il est dans l'URL, donc dans
 l'historique du navigateur du prestataire. Il n'est donc pas haché : le hacher
 donnerait l'illusion d'une protection que le canal n'offre pas.
@@ -146,7 +158,10 @@ type SuiviPrestataire = {
   prestataire: { nom: string };
   enCours: LigneSuivi[];
   historique: LigneSuivi[];
-  argent: { avances: number; solde: number };
+  /* Pas de `solde` : la possibilité (a) est retenue, voir plus bas. Le champ
+     est absent plutôt que mis à zéro — un zéro se lit « je ne te dois rien »,
+     ce que le produit n'est pas en mesure d'affirmer. */
+  argent: { avances: number };
 };
 
 type LigneSuivi = {
@@ -182,6 +197,19 @@ Cette spec retient **(a)** par défaut : afficher un solde faux à un fournisseu
 est pire que ne pas l'afficher. **(b)** est une spec à part, et elle touche la
 caisse.
 
+**Tranché le 16 octobre 2026 : (a).** Le commanditaire avait écrit « les avances
+prises, soldes… » ; le portail ne montrera donc qu'une moitié de ce qu'il a
+demandé, et il faut le dire plutôt que de combler. Le mot « solde » n'apparaît
+nulle part à l'écran — ni en libellé, ni à zéro —, parce qu'un fournisseur qui
+lit « solde : 0 » comprend « on ne me doit rien ». Le portail affichera donc
+« Avances reçues », qui est exactement ce que le produit sait.
+
+**Ce qui manque pour (b), précisément** : `lotsCartesGrises` et les documents
+portent une `avance`, et rien d'autre. Aucun **prix convenu** par carte, aucun
+**règlement final**. Le solde n'est donc pas « difficile à calculer » : les deux
+termes de la soustraction n'existent pas. (b) est une spec de caisse, pas une
+retouche de ce portail.
+
 ---
 
 ## Critères d'acceptation
@@ -212,6 +240,8 @@ caisse.
 
 ### Ce qui ne doit pas casser
 
+- [ ] **Une fiche de prestataire qui porte un jeton reste modifiable** : on peut y corriger un téléphone. Un test de règles le fige — c'est le piège du `hasOnly` décrit plus haut.
+- [ ] **Aucun navigateur n'écrit un jeton**, responsable compris. Un test de règles le refuse.
 - [ ] La route publique n'entre pas dans `ECRANS_HORS_LIGNE`, et le service worker s'installe toujours : les entrées préchargées répondent toutes.
 - [ ] La suite ciblée reste verte : unitaires, règles, et le fichier e2e des dossiers. **Pas de passe complète.**
 
@@ -234,9 +264,18 @@ caisse.
 ### La route
 
 `app/suivi/[jeton]/page.tsx`, **hors du groupe `(app)`** : pas de coquille, pas
-de navigation, pas de `FournisseurSession`, pas de périmètre. C'est la même
-famille que `app/hors-ligne` et `app/(auth)/login`, et elle doit le rester — un
-import de `usePerimetre` dans ce sous-arbre serait un défaut de périmètre.
+de navigation, pas de périmètre. C'est la même famille que `app/hors-ligne` et
+`app/(auth)/login`, et elle doit le rester — un import de `usePerimetre` dans ce
+sous-arbre serait un défaut de périmètre.
+
+**Correction après lecture du code, 16 octobre 2026 : « pas de
+`FournisseurSession` » était faux, et irréalisable sans démolition.** Ce
+fournisseur est posé dans `app/layout.tsx`, c'est-à-dire la racine : `/login` et
+`/hors-ligne` l'ont déjà. L'en sortir demanderait de descendre la racine d'un
+cran et de réécrire la coquille de toute l'application pour une page de
+consultation. Ce qui est tenable, et suffit, c'est qu'il n'y ait **aucun appel**
+à la session depuis ce sous-arbre : le fournisseur résout « personne », et la
+page n'en lit rien. Un test de rendu le fige.
 
 ### La fonction
 
