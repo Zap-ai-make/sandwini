@@ -2,7 +2,7 @@
 
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
-import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
+import { formaterAnciennete, formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import { etatPaquet, type PaquetCartesGrises } from "@/lib/domain/paquet";
 import type { DocumentDossier } from "@/lib/domain/vente";
 
@@ -10,7 +10,7 @@ import type { DocumentDossier } from "@/lib/domain/vente";
  * Les paquets de cartes grises encore dehors (S53).
  *
  * **Une ligne par paquet, et le détail replié.** « Ouédraogo — 2 dehors sur 2,
- * depuis 12 j » répond à la question qu'on se pose en ouvrant l'écran ; les dix
+ * il y a 12 jours » répond à la question qu'on se pose en ouvrant l'écran ; les dix
  * numéros répondent à celle d'après, et seulement si on la pose. Dix lignes
  * dépliées d'office auraient noyé la file des dossiers, qui est l'objet
  * principal de cet écran.
@@ -76,7 +76,12 @@ export function PaquetsEnCours({
                 {/* Le nombre dehors d'abord : c'est ce qu'on va chercher. Le
                     total vient après, pour savoir où on en est. */}
                 {etat.dehors} dehors sur {etat.total}
-                {etat.joursDehors !== null && ` · depuis ${etat.joursDehors} j`}
+                {/* **Pas « depuis 0 j »** : un paquet confié ce matin se dit
+                    « aujourd'hui », comme la ligne du dossier deux centimètres
+                    plus bas le dit déjà. `formaterAnciennete` porte ces mots
+                    depuis S30 — les réécrire ici, c'était en obtenir une
+                    troisième version, et c'est celle qui se lisait mal. */}
+                {etat.joursDehors !== null && ` · ${formaterAnciennete(etat.joursDehors)}`}
                 {etat.enRetard && " · en retard"}
               </span>
             </div>
