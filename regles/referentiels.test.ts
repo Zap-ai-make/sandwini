@@ -109,6 +109,19 @@ beforeEach(async () => {
       actif: true,
       ...creationFigee,
     });
+    /* Une fiche qui PORTE un jeton de suivi (S56), posée ici par les droits du
+       serveur — comme la Cloud Function le fera. Elle existe pour le test le
+       plus important de ce bloc : celui qui prouve qu'une fiche à jeton reste
+       corrigeable. */
+    await setDoc(doc(base, "prestataires/sawadogo"), {
+      nom: "Sawadogo",
+      telephone: "70 11 11 11",
+      typesDocuments: ["carte_grise"],
+      actif: true,
+      jetonSuivi: "a".repeat(43),
+      jetonEmisLe: new Date("2026-10-16T08:00:00Z"),
+      ...creationFigee,
+    });
     await setDoc(doc(base, "entreprise/profil"), {
       seuilInactiviteTranches: 30,
       updatedAt: new Date("2026-01-01T08:00:00Z"),
@@ -416,6 +429,72 @@ describe("prestataires", () => {
     await assertFails(
       updateDoc(doc(responsable(), "prestataires/kabore"), modification({ token: "jeton-choisi" })),
     );
+  });
+
+  /* **Le piège du `hasOnly`, pris à l'envers** (S56, 16 octobre 2026).
+     `prestataireValide` impose sa liste de champs en MODIFICATION aussi. Dès
+     qu'une Cloud Function pose `jetonSuivi` sur une fiche, le document résultant
+     porte un champ de plus — et plus personne ne peut y corriger un numéro de
+     téléphone. Le refus se lirait comme un défaut de droits sur un geste
+     parfaitement légitime : c'est mot pour mot le blocage vécu sur `sandwini` le
+     matin même, où S53 avait ajouté des champs que les règles déployées
+     n'acceptaient pas. */
+  it("une fiche qui porte un jeton reste modifiable : on y corrige un téléphone", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(responsable(), "prestataires/sawadogo"),
+        modification({
+          nom: "Sawadogo",
+          telephone: "70 11 11 12",
+          typesDocuments: ["carte_grise"],
+          actif: true,
+        }),
+      ),
+    );
+  });
+
+  /* Un navigateur ne fabrique pas de secret (`SECURITY.md` §4), et le
+     responsable n'y fait pas exception : sa prérogative est de décider, pas
+     d'inventer de l'aléa. Le jeton n'arrive que par la fonction. */
+  it("personne n’écrit un jetonSuivi depuis un navigateur, responsable compris", async () => {
+    await assertFails(
+      updateDoc(
+        doc(responsable(), "prestataires/kabore"),
+        modification({ jetonSuivi: "z".repeat(43) }),
+      ),
+    );
+  });
+
+  /* Et il ne s'efface pas davantage. Révoquer un lien se fait en le
+     RÉGÉNÉRANT, par la fonction : un `null` posé depuis l'écran laisserait
+     croire à une révocation sans qu'aucune trace serveur ne l'enregistre. */
+  it("un jetonSuivi ne s’efface pas depuis un navigateur", async () => {
+    await assertFails(
+      updateDoc(doc(responsable(), "prestataires/sawadogo"), modification({ jetonSuivi: null })),
+    );
+  });
+
+  /* Une fiche ne NAÎT jamais avec un jeton : il s'émet ensuite, sur une fiche
+     qui existe. Sans ce refus, un navigateur contournerait la fonction en
+     posant son propre aléa à la création. */
+  it("une fiche ne naît pas avec un jeton", async () => {
+    await assertFails(
+      addDoc(
+        collection(responsable(), "prestataires"),
+        prestataire({ jetonSuivi: "y".repeat(43) }),
+      ),
+    );
+  });
+
+  /* **Le critère central de S56 : la fonction est la seule porte.** Aucune
+     règle n'est assouplie par ce portail, et ce test est ce qui le prouve. Il
+     est posé ici, au plus près du jeton, pour que quiconque serait tenté
+     d'ouvrir une lecture publique « puisque le jeton protège » le trouve sur
+     son chemin. */
+  it("un visiteur non authentifié ne lit rien, jeton ou pas", async () => {
+    const anonyme = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonyme, "prestataires/sawadogo")));
+    await assertFails(getDocs(collection(anonyme, "prestataires")));
   });
 
   it("le gérant lit mais ne modifie pas", async () => {

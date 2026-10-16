@@ -306,11 +306,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Le champ « token » du cahier des charges n'est pas au contrat : il donne
-    // accès à une page publique, et un secret ne se fabrique pas dans un
-    // navigateur. Il viendra d'une Cloud Function en S15.
+    // Le champ « token » du cahier des charges existe enfin, sous le nom
+    // `jetonSuivi` (S56). Il donne accès à une page publique, et un secret ne se
+    // fabrique pas dans un navigateur : c'est une Cloud Function qui l'emet.
+    //
+    // Trois choses tiennent ensemble ici, et il faut les trois :
+    //
+    // 1. les deux champs du jeton sont ACCEPTES par le `hasOnly`. Sans cela,
+    //    une fiche a qui la fonction a pose un jeton deviendrait
+    //    incorrigible — on ne pourrait plus y changer un numero de telephone,
+    //    et le refus parlerait de droits. C'est mot pour mot le blocage vecu
+    //    sur sandwini le 16 octobre 2026, quand des champs ajoutes par S53
+    //    n'etaient pas dans les regles deployees.
+    // 2. ils ne sont PAS dans le `hasAll` : les fiches posees avant S56 n'en
+    //    portent pas, et les leur exiger les rendrait tout aussi
+    //    incorrigibles.
+    // 3. aucun navigateur ne les ECRIT (`jetonIntact`, plus bas), responsable
+    //    compris : sa prerogative est de decider, pas d'inventer de l'alea.
+    //
+    // C'est la meme asymetrie que `typesACreer` : on ouvre la serrure sans
+    // ouvrir la porte. Aucun controle de type n'est necessaire sur ces deux
+    // champs — un client ne peut jamais y mettre une valeur, seulement
+    // reconduire celle du serveur.
     function prestataireValide(donnees) {
-      return donnees.keys().hasOnly(['nom', 'telephone', 'typesDocuments', 'actif'].concat(champsAudit()))
+      return donnees.keys().hasOnly(['nom', 'telephone', 'typesDocuments', 'actif',
+                                     'jetonSuivi', 'jetonEmisLe'].concat(champsAudit()))
              && donnees.keys().hasAll(['nom', 'telephone', 'typesDocuments', 'actif'].concat(champsAudit()))
              && nomBorne(donnees.nom)
              && donnees.telephone is string
@@ -341,14 +361,29 @@ service cloud.firestore {
       return donnees.typesDocuments.hasOnly(['carte_grise']);
     }
 
+    // Le jeton de suivi est reconduit tel quel, ou il n'existe pas. Un `null`
+    // pose depuis l'ecran serait une fausse revocation : le lien cesserait de
+    // resoudre sans qu'aucune trace serveur ne dise qui l'a ferme ni quand.
+    // Revoquer se fait en REGENERANT, par la fonction, qui ecrase l'ancien.
+    function jetonIntact(apres, avant) {
+      return apres.get('jetonSuivi', null) == avant.get('jetonSuivi', null)
+             && apres.get('jetonEmisLe', null) == avant.get('jetonEmisLe', null);
+    }
+
     match /prestataires/{id} {
       allow read: if connecte();
       allow create: if estResponsable()
                     && prestataireValide(request.resource.data)
                     && typesACreer(request.resource.data)
+                    // Une fiche ne NAIT jamais avec un jeton : il s'emet
+                    // ensuite, sur une fiche qui existe. Sans ce refus, un
+                    // navigateur contournerait la fonction en posant son
+                    // propre alea a la creation.
+                    && !request.resource.data.keys().hasAny(['jetonSuivi', 'jetonEmisLe'])
                     && traceCreation(request.resource.data);
       allow update: if estResponsable()
                     && prestataireValide(request.resource.data)
+                    && jetonIntact(request.resource.data, resource.data)
                     && traceModification(request.resource.data, resource.data);
       allow delete: if false;
     }
