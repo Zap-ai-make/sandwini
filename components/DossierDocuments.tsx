@@ -1,7 +1,7 @@
 "use client";
 
 import { CircleAlert } from "lucide-react";
-import { estEnRetard, etatPapier, LIBELLE_ETAT_PAPIER } from "@/lib/domain/dossier";
+import { estEnRetard, etatPapier, LIBELLE_ETAT_PAPIER, papierFini } from "@/lib/domain/dossier";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_DOCUMENT, type DocumentDossier, type Vente } from "@/lib/domain/vente";
@@ -115,7 +115,7 @@ function LigneDocument({
         </p>
       )}
 
-      <GestesDocument document={document} className="mt-2" />
+      <GestesDocument document={document} fini={papierFini(document.type, etat)} className="mt-2" />
     </li>
   );
 }

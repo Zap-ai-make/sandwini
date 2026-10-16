@@ -461,7 +461,7 @@ export type PapierDuDossier = {
  * plus un statut à promener, c'est le scan et la plaque saisis sur la fiche de
  * vente.
  */
-function papierFini(type: TypeDocument, etat: EtatPapier): boolean {
+export function papierFini(type: TypeDocument, etat: EtatPapier): boolean {
   if (etat === "sans_objet") return true;
   if (type === "carte_grise") return etat === "au_magasin";
   return etat === "emporte";
