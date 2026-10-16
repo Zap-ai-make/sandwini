@@ -471,9 +471,9 @@ describe("dossiersEnAttente", () => {
       AUJOURDHUI,
     );
 
-  /* **Le critere d'acceptation central de S53.** Aucun geste n'a ete fait sur
-     le dossier : c'est la case cochee sur la MOTO qui fait bouger l'ecran. La
-     contradiction B n'est pas reparee, elle est devenue inexprimable. */
+  /* **Le critère d'acceptation central de S53.** Aucun geste n'a été fait sur
+     le dossier : c'est la case cochée sur la MOTO qui fait bouger l'écran. La
+     contradiction B n'est pas réparée, elle est devenue inexprimable. */
   it("affiche « au magasin » pour une vente dont la moto porte son CMC, sans geste sur le dossier", () => {
     const liste = lister(
       [vente()],
@@ -494,9 +494,9 @@ describe("dossiersEnAttente", () => {
     expect(liste[0].papiers.find((p) => p.type === "quittance")?.etat).toBe("emporte");
   });
 
-  /* Une vente dont la moto n'est pas dans la liste passee : l'ecoute du stock
-     peut n'avoir pas encore repondu, ou la moto etre hors perimetre. Le papier
-     se lit « a faire », jamais `undefined`. */
+  /* Une vente dont la moto n'est pas dans la liste passée : l'écoute du stock
+     peut n'avoir pas encore répondu, ou la moto être hors périmètre. Le papier
+     se lit « à faire », jamais `undefined`. */
   it("lit « à faire » quand la moto est inconnue de la liste", () => {
     const liste = lister([vente()], [document({ id: "cmc", type: "cmc" })], {}, []);
     expect(liste[0].papiers.find((p) => p.type === "cmc")?.etat).toBe("a_faire");

@@ -95,12 +95,12 @@ export default function PageDossiers() {
     "Les ventes n’ont pas pu être chargées.",
   );
 
-  /* **L'ecoute du stock est le cout de S53, et il est assume.** L'etat affiche
+  /* **L'écoute du stock est le coût de S53, et il est assumé.** L'état affiché
      d'un papier se calcule sur trois sources dont la MOTO (`quittanceRecue`,
-     `cmcRecu`), que cet ecran ne chargeait pas. C'est la meme ecoute que celle
-     de l'ecran des motos — une requete de plus sur une collection deja lue
+     `cmcRecu`), que cet écran ne chargeait pas. C'est la même écoute que celle
+     de l'écran des motos — une requête de plus sur une collection déjà lue
      ailleurs, pas une collection de plus — et c'est ce qui fait qu'une case
-     cochee a l'arrivage avance le dossier sans qu'on y touche. */
+     cochée à l'arrivage avance le dossier sans qu'on y touche. */
   const souscrireStock = useCallback(
     (auChangement: (motos: Moto[]) => void, enErreur: (cause: unknown) => void) =>
       ecouterStock(boutiqueId, auChangement, enErreur),
@@ -136,10 +136,10 @@ export default function PageDossiers() {
 
   const parClient = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
 
-  /* **La selection est un ensemble d'identifiants de VENTE**, pas de documents :
-     un document se recharge a chaque ecriture du serveur, un identifiant non.
-     Cocher une ligne puis voir la selection se vider parce qu'une autre
-     boutique a ecrit serait incomprehensible. */
+  /* **La sélection est un ensemble d'identifiants de VENTE**, pas de documents :
+     un document se recharge à chaque écriture du serveur, un identifiant non.
+     Cocher une ligne puis voir la sélection se vider parce qu'une autre
+     boutique a écrit serait incompréhensible. */
   const [choisies, setChoisies] = useState<Set<string>>(new Set());
   const [paquetOuvert, setPaquetOuvert] = useState(false);
 
@@ -152,9 +152,9 @@ export default function PageDossiers() {
     });
   }, []);
 
-  /* Ce qui peut partir, calcule UNE fois par `cartesConfiables` plutot que relu
-     case par case : c'est elle qui porte la regle — une carte deja dehors n'y
-     entre pas —, et la dupliquer dans le rendu la ferait diverger le jour ou un
+  /* Ce qui peut partir, calculé UNE fois par `cartesConfiables` plutôt que relu
+     case par case : c'est elle qui porte la règle — une carte déjà dehors n'y
+     entre pas —, et la dupliquer dans le rendu la ferait diverger le jour où un
      statut s'ajouterait. */
   const confiables = useMemo(
     () => new Set(cartesConfiables(documents ?? []).map((carte) => carte.venteId)),
@@ -232,10 +232,10 @@ export default function PageDossiers() {
         rendu: (dossier) => (
           <span className="inline-flex items-center">
             {/* **La case ne s'affiche que sur ce qui peut partir** (S53). Une
-                case grisee sur une carte deja dehors inviterait a verser une
-                seconde avance pour le meme travail — et la base refuserait le
-                lot entier, sans dire laquelle des dix a faute.
-                Et seulement en vue boutique : un paquet appartient a une
+                case grisée sur une carte déjà dehors inviterait à verser une
+                seconde avance pour le même travail — et la base refuserait le
+                lot entier, sans dire laquelle des dix a fauté.
+                Et seulement en vue boutique : un paquet appartient à une
                 boutique, `confierPaquet` en exige une. */}
             {type === "carte_grise" && boutiqueId !== null && confiables.has(dossier.venteId) && (
               <input
@@ -335,9 +335,9 @@ export default function PageDossiers() {
       <PaquetsEnCours
         paquets={paquets}
         documents={documents}
-        /* Lu sur les VENTES et non sur les dossiers : un paquet survit a la
-           cloture de ses dossiers — une carte revenue sort de la file — et son
-           numero doit rester lisible dans le detail du paquet. */
+        /* Lu sur les VENTES et non sur les dossiers : un paquet survit à la
+           clôture de ses dossiers — une carte revenue sort de la file — et son
+           numéro doit rester lisible dans le détail du paquet. */
         numeroDe={(venteId) => ventes?.find((vente) => vente.id === venteId)?.numero ?? venteId}
       />
 
@@ -381,8 +381,8 @@ export default function PageDossiers() {
           onFermer={() => setPaquetOuvert(false)}
           onConfie={() => {
             setPaquetOuvert(false);
-            /* La selection se vide apres le depot : les cartes ne sont plus
-               confiables, et les laisser cochees proposerait de les reconfier. */
+            /* La sélection se vide après le dépôt : les cartes ne sont plus
+               confiables, et les laisser cochées proposerait de les reconfier. */
             setChoisies(new Set());
           }}
         />

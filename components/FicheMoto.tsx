@@ -66,9 +66,9 @@ export function FicheMoto({ id }: { id: string }) {
               l'a perdue dans le tableau du stock en S29 (D70).
 
               **`block` et non `inline-block`** : inline, il se collait au lien
-              « Stock » juste au-dessus et l'ecran affichait « StockLC6TRA… ».
-              Le `mt-3` disait pourtant qu'il etait cense occuper sa ligne. Vu a
-              l'ecran en regardant S17, corrige au passage. */}
+              « Stock » juste au-dessus et l'écran affichait « StockLC6TRA… ».
+              Le `mt-3` disait pourtant qu'il était censé occuper sa ligne. Vu à
+              l'écran en regardant S17, corrigé au passage. */}
           <span className="plaque-code mt-3 block text-sm text-encre-doux">
             {moto.numeroChassis}
           </span>

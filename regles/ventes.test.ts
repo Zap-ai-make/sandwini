@@ -529,7 +529,7 @@ describe("ce que le client a emporté (S53)", () => {
     );
   });
 
-  /* Le scan arrive au retour du prestataire, donc longtemps apres la vente :
+  /* Le scan arrive au retour du prestataire, donc longtemps après la vente :
      il doit pouvoir s'ajouter seul, sans rien d'autre. */
   it("le gérant dépose le scan de la carte grise au retour", async () => {
     await assertSucceeds(
@@ -541,8 +541,8 @@ describe("ce que le client a emporté (S53)", () => {
   });
 
   /* La porte d'`update` n'admettait que deux gestes — encaisser, remettre la
-     moto. Un troisieme geste ne doit pas devenir un passe-droit : rien d'autre
-     ne bouge dans la meme ecriture. */
+     moto. Un troisième geste ne doit pas devenir un passe-droit : rien d'autre
+     ne bouge dans la même écriture. */
   /* Le defaut que ce prédicat a introduit, et que la suite S9 a trouvé : une
      écriture qui ne touche que ses horodatages satisfait `seulsChangent`, et
      ouvrait la porte à toute réécriture à l'identique. */

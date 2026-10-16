@@ -104,10 +104,10 @@ beforeEach(async () => {
 });
 
 describe("la quittance et le CMC, qui arrivent avec la moto", () => {
-  /* **S53 leur retire leurs etapes.** Leur disponibilite se coche sur la moto
-     et leur remise sur la vente : le dossier n'a plus rien a stocker pour eux,
-     sinon le fait qu'ils soient ecartes. La regle doit le dire aussi fort que
-     le domaine, sans quoi un appareil modifie ecrirait un statut que plus
+  /* **S53 leur retire leurs étapes.** Leur disponibilité se coche sur la moto
+     et leur remise sur la vente : le dossier n'a plus rien à stocker pour eux,
+     sinon le fait qu'ils soient écartés. La règle doit le dire aussi fort que
+     le domaine, sans quoi un appareil modifié écrirait un statut que plus
      personne ne lit (D27). */
   it("n’ont plus qu’un passage : celui qui les écarte", async () => {
     await poser({ quittance: {}, cmc: {} });

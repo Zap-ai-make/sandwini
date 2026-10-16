@@ -277,14 +277,14 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
             <Phone aria-hidden="true" className="size-3.5 shrink-0" />
             {prestataire.telephone}
           </span>
-          {/* **Un prestataire sans type est signale** (S53). Il n'apparaitra
-              dans aucune liste de depot, et « Aucun type de document » en gris
-              doux ne le disait pas : c'etait une phrase parmi d'autres, sur une
-              fiche qui a l'air complete. Le trou de S48 en a produit — des
-              fiches nees avec `plaque` seul, dont le type a cesse d'exister. */}
+          {/* **Un prestataire sans type est signalé** (S53). Il n'apparaîtra
+              dans aucune liste de dépôt, et « Aucun type de document » en gris
+              doux ne le disait pas : c'était une phrase parmi d'autres, sur une
+              fiche qui a l'air complète. Le trou de S48 en a produit — des
+              fiches nées avec `plaque` seul, dont le type a cessé d'exister. */}
           {prestataire.typesDocuments.length === 0 ? (
             <span className="block text-sm font-medium text-alerte">
-              Aucun type de document : ce prestataire n’est propose nulle part.
+              Aucun type de document : ce prestataire n’est proposé nulle part.
             </span>
           ) : (
             <span className="block text-sm text-encre-doux">

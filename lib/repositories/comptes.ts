@@ -85,9 +85,9 @@ export function useCeQuiAttend(): {
       sansPerimetre ? () => {} : ecouterDossiers(boutiqueId, auChangement, enErreur),
     [boutiqueId, sansPerimetre],
   );
-  /* S53 : l'etat d'un papier se lit en partie sur la moto. La pastille « en
-     retard » du menu doit dire la meme chose que l'ecran des dossiers, et sans
-     cette ecoute elle lirait tous les papiers « a faire ». */
+  /* S53 : l'état d'un papier se lit en partie sur la moto. La pastille « en
+     retard » du menu doit dire la même chose que l'écran des dossiers, et sans
+     cette écoute elle lirait tous les papiers « à faire ». */
   const souscrireStock = useCallback(
     (auChangement: (motos: Moto[]) => void, enErreur: (cause: unknown) => void) =>
       sansPerimetre ? () => {} : ecouterStock(boutiqueId, auChangement, enErreur),

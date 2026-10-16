@@ -967,14 +967,14 @@ async function dossierFini(
 ): Promise<boolean> {
   if (vente.statutPaiement !== "solde" || vente.motoRemise !== true) return false;
 
-  /* **La cloture lit la vente et les documents, jamais la moto** (S53). Sans
-     cette propriete il faudrait reveiller la cloture a chaque case cochee sur
+  /* **La clôture lit la vente et les documents, jamais la moto** (S53). Sans
+     cette propriété il faudrait réveiller la clôture à chaque case cochée sur
      un arrivage : une moto dont le CMC arrive clorait un dossier que personne
-     n'a touche. La remise au client est un GESTE, donc un fait ecrit sur la
+     n'a touché. La remise au client est un GESTE, donc un fait écrit sur la
      vente, et c'est lui qui fait foi.
 
-     Aucun nouveau declencheur n'est necessaire : `cloturerSurVente` se
-     declenche sur toute ecriture de `ventesMotos/{venteId}`, donc sur
+     Aucun nouveau déclencheur n'est nécessaire : `cloturerSurVente` se
+     déclenche sur toute écriture de `ventesMotos/{venteId}`, donc sur
      `emporte`. */
   const emporte = (vente.emporte ?? {}) as Record<string, unknown>;
   const documents = await base.collection(`ventesMotos/${venteId}/documents`).get();

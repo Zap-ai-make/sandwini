@@ -210,7 +210,7 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
           {suivi && peutRemettreMoto(vente, suivi.resteDu) && <RemiseMoto vente={vente} />}
 
           {/* Les papiers avant les versements : c'est le geste du jour quand le
-              client repasse, et l'argent est deja regle sur la ligne du haut. */}
+              client repasse, et l'argent est déjà réglé sur la ligne du haut. */}
           <PapiersDeLaVente vente={vente} moto={moto} />
 
           <section>
