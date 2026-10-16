@@ -112,7 +112,7 @@ export default function PageDossiers() {
   );
 
   /* Les paquets de la boutique. La liste est courte par construction — un
-     paquet vit quelques semaines — et le tri se fait en memoire : un `orderBy`
+     paquet vit quelques semaines — et le tri se fait en mémoire : un `orderBy`
      demanderait un index composite pour quelques dizaines de lignes. */
   const souscrirePaquets = useCallback(
     (auChangement: (paquets: PaquetCartesGrises[]) => void, enErreur: (cause: unknown) => void) =>
@@ -121,7 +121,7 @@ export default function PageDossiers() {
   );
   const { valeur: paquets } = useAbonnement(
     souscrirePaquets,
-    "Les paquets de cartes grises n\u2019ont pas pu \u00eatre lus.",
+    "Les paquets de cartes grises n’ont pas pu être lus.",
   );
 
   const souscrireDossiers = useCallback(
@@ -341,12 +341,12 @@ export default function PageDossiers() {
         numeroDe={(venteId) => ventes?.find((vente) => vente.id === venteId)?.numero ?? venteId}
       />
 
-      {/* La barre n'existe que quand quelque chose est coche : un bandeau
-          permanent a zero occuperait la place de la file sans rien dire. */}
+      {/* La barre n'existe que quand quelque chose est coché : un bandeau
+          permanent à zéro occuperait la place de la file sans rien dire. */}
       {choisies.size > 0 && boutiqueId !== null && (
         <div className="mb-5 cadre flex flex-wrap items-center justify-between gap-3 p-3">
           <p className="text-encre">
-            {compter(choisies.size, "carte grise", "cartes grises")} s\u00e9lectionn\u00e9e
+            {compter(choisies.size, "carte grise", "cartes grises")} sélectionnée
             {choisies.size > 1 ? "s" : ""}
           </p>
           <div className="flex flex-wrap gap-2">
@@ -362,7 +362,7 @@ export default function PageDossiers() {
               onClick={() => setChoisies(new Set())}
               className="bouton bouton-neutre"
             >
-              Tout d\u00e9cocher
+              Tout décocher
             </button>
           </div>
         </div>
