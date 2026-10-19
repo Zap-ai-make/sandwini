@@ -65,8 +65,31 @@ export type Piece = {
   reference: string;
   designation: string;
   categorie: string;
-  /** Nul tant que le responsable ne l'a pas posé : une pièce sans prix ne se vend pas (S21). */
+  /**
+   * La boutique à qui appartient cette référence.
+   *
+   * **Chaque gérant tient son propre catalogue**, sur décision du
+   * commanditaire : « pour les pièces c'est complètement différent, le
+   * responsable ne fera que superviser, rien d'autre — donc tout est fait par
+   * le gérant ». Un catalogue partagé aurait voulu dire qu'un gérant déplace
+   * les prix d'une autre boutique en corrigeant les siens, et que deux
+   * boutiques ne peuvent pas vendre la même pièce à deux prix.
+   *
+   * Corollaire : l'unicité d'une référence se juge **dans sa boutique**. Deux
+   * boutiques peuvent porter « NGK-7 » sans que ce soit un doublon.
+   */
+  boutiqueId: string;
+  /** Nul tant que le gérant ne l'a pas posé : une pièce sans prix ne se vend pas (S21). */
   prixVente: number | null;
+  /**
+   * Ce que la pièce a coûté — et il est **visible du gérant**, à l'inverse du
+   * prix d'achat d'une moto que D2 cloisonne. Même décision que ci-dessus :
+   * celui qui vend la bougie fixe son coût, donc il voit sa marge.
+   *
+   * Nul quand on ne le sait pas encore : une caisse reçue dont la facture
+   * suit. La marge est alors inconnue plutôt que fausse.
+   */
+  prixAchat: number | null;
   seuilAlerte: number;
   actif: boolean;
 };
@@ -81,9 +104,6 @@ export type MouvementPiece = {
   note: string;
   date: Date | null;
 };
-
-/** Le côté privé d'une pièce : ce qu'elle coûte, réservé au responsable (D2). */
-export type CoutPiece = { prixAchat: number };
 
 export const LONGUEUR_REFERENCE_MAX = 40;
 export const LONGUEUR_DESIGNATION_MAX = 120;
@@ -180,10 +200,16 @@ export const LIBELLE_ETAT_STOCK: Record<EtatStock, string> = {
 
 /* --- Le catalogue --------------------------------------------------------- */
 
+/**
+ * Ce qu'un formulaire porte. **Pas de boutique ici** : elle vient du périmètre
+ * courant au moment d'enregistrer, comme pour un mouvement de stock. Un gérant
+ * ne choisit pas la boutique de sa pièce — il n'en a qu'une.
+ */
 export type SaisiePiece = {
   reference: string;
   designation: string;
   categorie: string;
+  prixAchat: string;
   prixVente: string;
   seuilAlerte: string;
 };
@@ -192,6 +218,7 @@ export const PIECE_VIDE: SaisiePiece = {
   reference: "",
   designation: "",
   categorie: "",
+  prixAchat: "",
   prixVente: "",
   seuilAlerte: "0",
 };
@@ -221,6 +248,16 @@ export function validerPiece(saisie: SaisiePiece): string | null {
     const prix = lireEntier(saisie.prixVente);
     if (prix === null) return "Le prix de vente s’écrit en chiffres entiers.";
     if (prix > MONTANT_MAX) return "Le prix de vente dépasse le maximum admis.";
+  }
+
+  /* Le prix d'achat est facultatif pour la même raison, et il n'est **pas**
+     comparé au prix de vente : on écoule parfois un stock dormant en dessous
+     de ce qu'il a coûté. Refuser ce cas empêcherait d'enregistrer une vente
+     réelle ; c'est la marge qui le dira, en négatif. */
+  if (saisie.prixAchat.trim()) {
+    const cout = lireEntier(saisie.prixAchat);
+    if (cout === null) return "Le prix d’achat s’écrit en chiffres entiers.";
+    if (cout > MONTANT_MAX) return "Le prix d’achat dépasse le maximum admis.";
   }
 
   const seuil = lireEntier(saisie.seuilAlerte.trim() || "0");

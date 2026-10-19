@@ -18,21 +18,25 @@ import {
   updateDoc,
   where,
 } from "firebase/firestore";
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
  * Règles sur les pièces détachées (S20).
  *
  * Trois frontières, et aucune n’est évidente.
  *
- * **Le prix d’achat d’une référence est hors de portée du gérant**, dans les
- * deux sens dès le premier jour. S39 a montré ce que coûte un cloisonnement
- * tenu en lecture et ouvert en écriture (D89) : ces tests le vérifient des deux
- * côtés plutôt que d’attendre qu’on le découvre.
+ * **Le prix d'achat d'une pièce est visible du gérant**, et c'est l'inverse
+ * d'une moto. Le commanditaire a tranché : « pour les pièces c'est complètement
+ * différent, le responsable ne fera que superviser, rien d'autre — donc tout
+ * est fait par le gérant ». Celui qui vend la bougie fixe son coût et lit sa
+ * marge. L'ancien sous-dossier `prive/cout`, qu'aucun écran n'a jamais écrit,
+ * est désormais fermé à tout le monde — un cloisonnement qui ne cloisonne plus
+ * rien doit cesser de le prétendre.
  *
- * **Le catalogue appartient au responsable**, le stock au comptoir. Un gérant
- * écrit des mouvements et ne touche pas aux références — une référence porte un
- * prix, et les prix appartiennent à la supervision.
+ * **Le catalogue appartient à la boutique qui le vend**, et non plus au
+ * responsable. Chaque gérant tient ses références et ses prix ; le responsable
+ * garde l'écriture pour ne pas rouvrir le trou de S55, mais son métier est de
+ * regarder.
  *
  * **Un mouvement ne se corrige pas.** La quantité étant la somme des
  * mouvements, retoucher l’un d’eux déplacerait un total sans laisser de trace.
@@ -76,7 +80,9 @@ const piece = (partie: Record<string, unknown> = {}, auteur = "resp-1") => ({
   reference: "PLQ-0142",
   designation: "Plaquette de frein avant",
   categorie: "Freinage",
+  boutiqueId: "PTG",
   prixVente: 3_500,
+  prixAchat: 2_000,
   seuilAlerte: 5,
   actif: true,
   ...audit(auteur),
@@ -115,11 +121,18 @@ beforeEach(async () => {
   await env.clearFirestore();
   await env.withSecurityRulesDisabled(async (contexte) => {
     const base = contexte.firestore();
+    /* `boutiqueOuverte` lit la boutique : sans elle, aucune référence ne peut
+       naître, et l'échec accuserait la propriété au lieu du décor. */
+    await setDoc(doc(base, "boutiques/PTG"), { nom: "Pouytenga", actif: true, ...auditFige });
+    await setDoc(doc(base, "boutiques/KDG"), { nom: "Koudougou", actif: true, ...auditFige });
+    await setDoc(doc(base, "boutiques/FERMEE"), { nom: "Fermée", actif: false, ...auditFige });
     await setDoc(doc(base, "pieces/plaquette"), {
       reference: "PLQ-0142",
       designation: "Plaquette de frein avant",
       categorie: "Freinage",
+      boutiqueId: "PTG",
       prixVente: 3_500,
+      prixAchat: 2_000,
       seuilAlerte: 5,
       actif: true,
       ...auditFige,
@@ -151,38 +164,44 @@ beforeEach(async () => {
   });
 });
 
-describe("le prix d’achat d’une référence", () => {
-  it("le gérant ne le lit pas", async () => {
-    await assertFails(getDoc(doc(gerant(), "pieces/plaquette/prive/cout")));
-    await assertFails(getDocs(collection(gerant(), "pieces/plaquette/prive")));
+describe("le prix d’achat d’une pièce, que le gérant voit", () => {
+  it("se lit sur la pièce elle-même, par celui qui la vend", async () => {
+    /* Firestore ne masque pas un champ : poser le coût sur le document public
+       le rend lisible par quiconque lit la pièce. C'est précisément ce que le
+       commanditaire a voulu pour les pièces, et ce test le fige — sans quoi
+       un retour au cloisonnement passerait pour une correction. */
+    const instantane = await assertSucceeds(getDoc(doc(gerant(), "pieces/plaquette")));
+    expect(instantane.data()?.prixAchat).toBe(2_000);
   });
 
-  /* L’autre moitié, et c’est celle qui manquait aux motos jusqu’à S39 : un
-     cloisonnement tenu d’un seul côté n’est pas un cloisonnement (D89). */
-  it("et ne l’écrit pas non plus", async () => {
-    await assertFails(
-      setDoc(doc(gerant(), "pieces/plaquette/prive/cout"), {
-        prixAchat: 1,
-        updatedAt: serverTimestamp(),
-        updatedBy: "ger-1",
-        updatedByName: "Gérant",
-      }),
-    );
-  });
-
-  it("le responsable le lit et le pose", async () => {
-    await assertSucceeds(getDoc(doc(responsable(), "pieces/plaquette/prive/cout")));
+  it("se pose et se corrige par le gérant de la boutique", async () => {
     await assertSucceeds(
-      setDoc(doc(responsable(), "pieces/plaquette/prive/cout"), {
-        prixAchat: 2_100,
-        updatedAt: serverTimestamp(),
-        updatedBy: "resp-1",
-        updatedByName: "Responsable",
-      }),
+      updateDoc(doc(gerant(), "pieces/plaquette"), modification({ prixAchat: 2_100 }, "ger-1")),
     );
   });
 
-  it("personne ne l’efface", async () => {
+  it("reste facultatif : une caisse reçue dont la facture suit", async () => {
+    await assertSucceeds(
+      addDoc(collection(gerant(), "pieces"), piece({ reference: "X-9", prixAchat: null }, "ger-1")),
+    );
+  });
+
+  it("refuse un coût décimal — le FCFA ne se divise pas", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "pieces"), piece({ reference: "X-8", prixAchat: 1.5 }, "ger-1")),
+    );
+  });
+
+  /* L'ancien sous-dossier privé, fermé des deux côtés et pour tout le monde.
+     Le laisser ouvert au responsable aurait entretenu deux endroits où lire un
+     prix d'achat, dont un que plus rien n'écrit — la panne la plus pénible à
+     diagnostiquer, six mois plus tard. */
+  it("l’ancien sous-dossier privé ne s’ouvre plus à personne", async () => {
+    await assertFails(getDoc(doc(gerant(), "pieces/plaquette/prive/cout")));
+    await assertFails(getDoc(doc(responsable(), "pieces/plaquette/prive/cout")));
+    await assertFails(
+      setDoc(doc(responsable(), "pieces/plaquette/prive/cout"), { prixAchat: 1 }),
+    );
     await assertFails(deleteDoc(doc(responsable(), "pieces/plaquette/prive/cout")));
   });
 });
@@ -205,15 +224,59 @@ describe("le catalogue", () => {
     );
   });
 
-  /* La frontière avec les marques, et elle est volontaire : un gérant tape une
-     marque manquante sur son formulaire (D90), mais pas une référence — une
-     référence porte un prix. */
-  it("le gérant n’en crée ni n’en corrige aucune", async () => {
-    await assertFails(
+  /* **Le gérant tient son catalogue, et c'est le renversement de S20.** Il ne
+     pouvait ni créer ni corriger une référence, parce qu'une référence porte un
+     prix. Le commanditaire a tranché l'inverse : pour les pièces, tout est fait
+     par le gérant. */
+  it("le gérant crée et corrige une référence dans sa boutique", async () => {
+    await assertSucceeds(
       addDoc(collection(gerant(), "pieces"), piece({ reference: "CHN-0088" }, "ger-1")),
     );
+    await assertSucceeds(
+      updateDoc(doc(gerant(), "pieces/plaquette"), modification({ prixVente: 3_800 }, "ger-1")),
+    );
+  });
+
+  it("mais pas dans celle d'un autre", async () => {
+    /* La moitié qui compte : ouvrir l'écriture au gérant sans la borner à sa
+       boutique aurait fait de chaque gérant le maître des prix de tous. */
     await assertFails(
-      updateDoc(doc(gerant(), "pieces/plaquette"), modification({ prixVente: 1 }, "ger-1")),
+      addDoc(
+        collection(gerant(), "pieces"),
+        piece({ reference: "CHN-0099", boutiqueId: "KDG" }, "ger-1"),
+      ),
+    );
+  });
+
+  it("et ne corrige pas une référence d'une autre boutique", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant("ger-2", "KDG"), "pieces/plaquette"),
+        modification({ prixVente: 1 }, "ger-2"),
+      ),
+    );
+  });
+
+  it("une référence ne change jamais de boutique", async () => {
+    /* Son stock et ses ventes la citent là où elle est née. Un transfert de
+       pièces déplacera du stock, pas le catalogue. */
+    await assertFails(
+      updateDoc(doc(gerant(), "pieces/plaquette"), modification({ boutiqueId: "KDG" }, "ger-1")),
+    );
+  });
+
+  it("et ne naît pas dans une boutique inconnue ou fermée", async () => {
+    await assertFails(
+      addDoc(collection(responsable(), "pieces"), piece({ reference: "Z-1", boutiqueId: "NEANT" })),
+    );
+    await assertFails(
+      addDoc(collection(responsable(), "pieces"), piece({ reference: "Z-2", boutiqueId: "FERMEE" })),
+    );
+  });
+
+  it("refuse une référence sans boutique", async () => {
+    await assertFails(
+      addDoc(collection(responsable(), "pieces"), piece({ reference: "Z-3", boutiqueId: "" })),
     );
   });
 
@@ -223,12 +286,9 @@ describe("le catalogue", () => {
     );
   });
 
-  /* Firestore ne masque pas un champ : un prix d’achat posé sur le document
-     public serait lisible par tout gérant. La règle le refuse explicitement
-     plutôt que de compter sur la discipline (D2). */
-  it("refuse un prix d’achat glissé dans le document public", async () => {
-    await assertFails(
-      addDoc(collection(responsable(), "pieces"), piece({ reference: "X-1", prixAchat: 2_000 })),
+  it("accepte un prix d’achat sur le document public — c’est désormais sa place", async () => {
+    await assertSucceeds(
+      addDoc(collection(gerant(), "pieces"), piece({ reference: "X-1", prixAchat: 2_000 }, "ger-1")),
     );
   });
 

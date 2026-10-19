@@ -1428,10 +1428,14 @@ service cloud.firestore {
     // prétendent pas la tenir.
 
     function pieceValide(donnees) {
-      return donnees.keys().hasOnly(['reference', 'designation', 'categorie', 'prixVente',
-                                     'seuilAlerte', 'actif'].concat(champsAudit()))
-             && donnees.keys().hasAll(['reference', 'designation', 'categorie', 'prixVente',
-                                       'seuilAlerte', 'actif'].concat(champsAudit()))
+      return donnees.keys().hasOnly(['reference', 'designation', 'categorie', 'boutiqueId',
+                                     'prixVente', 'prixAchat', 'seuilAlerte',
+                                     'actif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['reference', 'designation', 'categorie', 'boutiqueId',
+                                       'prixVente', 'prixAchat', 'seuilAlerte',
+                                       'actif'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.boutiqueId.size() > 0
              && donnees.reference is string
              && donnees.reference.size() > 0
              && donnees.reference.size() <= 40
@@ -1445,26 +1449,46 @@ service cloud.firestore {
              // arrive parfois avant qu'on ait décidé de son prix. Elle existe
              // alors au catalogue et ne se vend pas (S21).
              && (donnees.prixVente == null || montantValide(donnees.prixVente))
+             // Nul quand on ne sait pas encore ce que la pièce a coûté : une
+             // caisse reçue dont la facture suit. La marge est alors inconnue
+             // plutôt que fausse.
+             && (donnees.prixAchat == null || montantValide(donnees.prixAchat))
              && donnees.seuilAlerte is int
              && donnees.seuilAlerte >= 0
              && donnees.seuilAlerte <= 1000000
-             && donnees.actif is bool
-             // **Aucun prix d'achat sur le document public.** Firestore ne sait
-             // pas masquer un champ : un `prixAchat` posé ici serait lisible
-             // par quiconque lit la pièce, c'est-à-dire par tout gérant (D2).
-             && !donnees.keys().hasAny(['prixAchat']);
+             && donnees.actif is bool;
     }
 
-    // Le catalogue appartient au responsable : une référence porte un prix, et
-    // les prix appartiennent à la supervision. C'est la réponse 4 de S20, et
-    // elle se sépare volontairement de celle des marques — une marque est un
-    // mot du vocabulaire, une référence est un article avec un prix.
+    // **Le catalogue appartient à la boutique qui le vend, et c'est un
+    // renversement de la réponse 4 de S20.** Il appartenait au responsable,
+    // parce qu'une référence porte un prix et que les prix appartenaient à la
+    // supervision. Le commanditaire a tranché l'inverse pour les pièces : « le
+    // responsable ne fera que superviser, rien d'autre — donc tout est fait par
+    // le gérant ».
+    //
+    // Les marques et les modèles de motos, eux, restent au responsable : une
+    // marque est un mot du vocabulaire commun à l'entreprise, une référence de
+    // pièce est un article d'un magasin, avec ses propres prix.
+    //
+    // La lecture reste ouverte à tout compte connecté. Le filtre par boutique
+    // vit dans la requête (`ecouterCatalogue`), pas ici.
     match /pieces/{pieceId} {
       allow read: if connecte();
-      allow create: if estResponsable()
+      // Le responsable garde l'écriture : la lui fermer rouvrirait le trou que
+      // S55 a trouvé sur les dépenses — un responsable travaillant dans une de
+      // ses boutiques ne pouvait rien écrire, et le geste devenait intraçable.
+      // Le partage du travail est porté par les écrans, pas par une
+      // interdiction.
+      allow create: if peutVendrePour(request.resource.data.boutiqueId)
+                    && boutiqueOuverte(request.resource.data.boutiqueId)
                     && pieceValide(request.resource.data)
                     && traceCreation(request.resource.data);
-      allow update: if estResponsable()
+      // **La boutique ne se réécrit jamais.** Une référence ne change pas de
+      // magasin : son stock et ses ventes la citent là où elle est née. Le jour
+      // où les pièces se transféreront, ce sera du stock qui bouge, pas le
+      // catalogue.
+      allow update: if peutVendrePour(resource.data.boutiqueId)
+                    && request.resource.data.boutiqueId == resource.data.boutiqueId
                     && pieceValide(request.resource.data)
                     && traceModification(request.resource.data, resource.data);
       // Rien ne se supprime : des mouvements citent leur pièce. On la
@@ -1472,24 +1496,17 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Le prix d'achat d'une référence, cloisonné comme celui d'une moto (D2),
-    // et fermé au gérant dans les deux sens dès le premier jour — S39 a montré
-    // ce que coûte un cloisonnement tenu d'un seul côté (D89).
-    function coutPieceValide(donnees) {
-      return donnees.keys().hasOnly(['prixAchat', 'updatedAt', 'updatedBy', 'updatedByName'])
-             && donnees.keys().hasAll(['prixAchat', 'updatedAt', 'updatedBy', 'updatedByName'])
-             && montantValide(donnees.prixAchat)
-             && donnees.updatedAt == request.time
-             && donnees.updatedBy == request.auth.uid
-             && texteBorne(donnees.updatedByName, 200);
-    }
-
+    // **Le sous-dossier privé d'une pièce a été retiré, et ce n'est pas un
+    // oubli.** Il portait un `prixAchat` cloisonné comme celui d'une moto (D2),
+    // fermé au gérant dans les deux sens. Aucun écran ne l'a jamais écrit : les
+    // deux fonctions du dépôt n'étaient appelées de nulle part.
+    //
+    // Le commanditaire a tranché l'inverse pour les pièces : celui qui vend
+    // fixe le coût et voit sa marge. Le prix d'achat vit donc sur la pièce
+    // elle-même, lisible par qui lit la pièce. Laisser la règle en place aurait
+    // laissé croire à un cloisonnement que le produit ne tient plus.
     match /pieces/{pieceId}/prive/{section} {
-      allow read: if estResponsable();
-      allow create, update: if section == 'cout'
-                            && estResponsable()
-                            && coutPieceValide(request.resource.data);
-      allow delete: if false;
+      allow read, write: if false;
     }
 
     // Les mouvements. La quantité est **toujours positive** : le sens vient du
@@ -1541,9 +1558,9 @@ service cloud.firestore {
     // peut pas tenir est nommé plus bas.
     function ligneVenteValide(ligne) {
       return ligne.keys().hasOnly(['pieceId', 'reference', 'designation', 'quantite',
-                                   'prixUnitaire', 'total'])
+                                   'prixUnitaire', 'prixAchatUnitaire', 'total'])
              && ligne.keys().hasAll(['pieceId', 'reference', 'designation', 'quantite',
-                                     'prixUnitaire', 'total'])
+                                     'prixUnitaire', 'prixAchatUnitaire', 'total'])
              && ligne.pieceId is string
              && texteBorne(ligne.reference, 40)
              && texteBorne(ligne.designation, 120)
@@ -1553,6 +1570,11 @@ service cloud.firestore {
              && ligne.prixUnitaire is int
              && ligne.prixUnitaire > 0
              && ligne.prixUnitaire <= 1000000000
+             // Le coût du jour, recopié dans la ligne pour que la marge d'une
+             // vente passée ne bouge pas quand la même pièce est rachetée plus
+             // cher. Nul quand le catalogue ne le portait pas encore ; zéro
+             // dirait « elle n'a rien coûté », ce qui est autre chose.
+             && (ligne.prixAchatUnitaire == null || montantValide(ligne.prixAchatUnitaire))
              // Le total de la ligne est **calculé**, pas déclaré : un document
              // dont les nombres ne s'accordent pas entre eux est un document
              // qu'on ne peut plus relire avec confiance six mois plus tard.

@@ -1,10 +1,8 @@
 import {
   collection,
   doc,
-  getDoc,
   onSnapshot,
   query,
-  serverTimestamp,
   setDoc,
   Timestamp,
   updateDoc,
@@ -17,7 +15,6 @@ import {
   comparerPieces,
   lireEntier,
   normaliserReference,
-  type CoutPiece,
   type MouvementPiece,
   type Piece,
   type SaisieMouvement,
@@ -41,9 +38,12 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * Ce que ça coûte est écrit d'avance dans la spec : au-delà de `SEUIL_MOUVEMENTS`
  * mouvements, il faudra un arrêté périodique — pas un agrégat entretenu.
  *
- * Le catalogue est **commun à l'entreprise**, le stock appartient à la boutique.
- * Une référence n'est pas à Pouytenga ou à Koudougou ; seuls ses mouvements le
- * sont.
+ * **Le catalogue appartient à la boutique**, comme son stock. Ce n'était pas le
+ * cas jusqu'ici — une référence était commune à l'entreprise — et le
+ * commanditaire l'a renversé : « pour les pièces c'est complètement différent,
+ * le responsable ne fera que superviser, rien d'autre ». Un catalogue partagé
+ * aurait voulu dire qu'un gérant déplace les prix d'une autre boutique en
+ * corrigeant les siens.
  */
 
 function lirePiece(instantane: QueryDocumentSnapshot<DocumentData>): Piece {
@@ -53,7 +53,9 @@ function lirePiece(instantane: QueryDocumentSnapshot<DocumentData>): Piece {
     reference: donnees.reference ?? "",
     designation: donnees.designation ?? "",
     categorie: donnees.categorie ?? "",
+    boutiqueId: donnees.boutiqueId ?? "",
     prixVente: typeof donnees.prixVente === "number" ? donnees.prixVente : null,
+    prixAchat: typeof donnees.prixAchat === "number" ? donnees.prixAchat : null,
     seuilAlerte: typeof donnees.seuilAlerte === "number" ? donnees.seuilAlerte : 0,
     actif: donnees.actif !== false,
   };
@@ -73,13 +75,25 @@ function lireMouvement(instantane: QueryDocumentSnapshot<DocumentData>): Mouveme
   };
 }
 
-/** Le catalogue entier, en direct. Commun à l'entreprise : aucun filtre. */
+/**
+ * Le catalogue du périmètre courant, en direct.
+ *
+ * `boutiqueId` à `null` veut dire « toutes les boutiques », exactement comme
+ * pour les mouvements : le responsable seul y a droit, et c'est ce qui lui
+ * permet de superviser sans rien écrire. Un gérant, lui, n'a jamais ce
+ * périmètre — le sien est sa boutique, et il ne voit que ses références.
+ *
+ * Aucun tri demandé au serveur : combiner un filtre et un tri exigerait un
+ * index composite, et le tri en mémoire marche aussi bien, hors ligne compris.
+ */
 export function ecouterCatalogue(
+  boutiqueId: string | null,
   auChangement: (pieces: Piece[]) => void,
   enErreur: (cause: unknown) => void,
 ): () => void {
+  const base = collection(db(), "pieces");
   return onSnapshot(
-    collection(db(), "pieces"),
+    boutiqueId ? query(base, where("boutiqueId", "==", boutiqueId)) : query(base),
     { includeMetadataChanges: true },
     (instantane) => {
       signalerSourceDonnees(instantane.metadata.fromCache);
@@ -133,12 +147,18 @@ export function ecouterMouvements(
  */
 export function creerPiece(
   saisie: SaisiePiece,
+  boutiqueId: string,
   auteur: Auteur,
 ): { id: string; enregistre: Promise<void> } {
   const reference = doc(collection(db(), "pieces"));
   return {
     id: reference.id,
-    enregistre: suivreEcriture(setDoc(reference, { ...champsPiece(saisie), ...traceCreation(auteur) })),
+    /* La boutique s'écrit à la naissance et ne se réécrit jamais : une
+       référence ne change pas de magasin. Un transfert de pièces, le jour où il
+       existera, déplacera du stock et non le catalogue. */
+    enregistre: suivreEcriture(
+      setDoc(reference, { ...champsPiece(saisie), boutiqueId, ...traceCreation(auteur) }),
+    ),
   };
 }
 
@@ -171,6 +191,9 @@ function champsPiece(saisie: SaisiePiece) {
     designation: saisie.designation.trim(),
     categorie: saisie.categorie.trim(),
     prixVente: saisie.prixVente.trim() ? lireEntier(saisie.prixVente) : null,
+    /* `null` et non `0` quand le champ est vide : on ne sait pas ce que la
+       pièce a coûté, et zéro affirmerait qu'elle n'a rien coûté. */
+    prixAchat: saisie.prixAchat.trim() ? lireEntier(saisie.prixAchat) : null,
     seuilAlerte: lireEntier(saisie.seuilAlerte.trim() || "0") ?? 0,
     actif: true,
   };
@@ -208,29 +231,12 @@ export function enregistrerMouvement(
   };
 }
 
-/**
- * Le prix d'achat d'une référence — réservé au responsable.
- *
- * Pour un gérant, cet appel échoue par les règles, et c'est voulu : la
- * protection ne doit pas dépendre du fait que l'interface ait pensé à ne pas
- * l'appeler.
- */
-export async function lireCoutPiece(pieceId: string): Promise<CoutPiece | null> {
-  const instantane = await getDoc(doc(db(), "pieces", pieceId, "prive", "cout"));
-  if (!instantane.exists()) return null;
-  return { prixAchat: instantane.data().prixAchat ?? 0 };
-}
-
-export function poserCoutPiece(pieceId: string, prixAchat: number, auteur: Auteur): Promise<void> {
-  return suivreEcriture(
-    setDoc(doc(db(), "pieces", pieceId, "prive", "cout"), {
-      prixAchat,
-      updatedAt: serverTimestamp(),
-      updatedBy: auteur.uid,
-      updatedByName: auteur.nom,
-    }),
-  );
-}
+/* **Le sous-dossier privé d'une pièce a été retiré ici, et ce n'est pas un
+   oubli.** `lireCoutPiece` et `poserCoutPiece` lisaient et posaient un
+   `prixAchat` dans `pieces/{id}/prive/cout`, cloisonné comme celui d'une moto
+   (D2). Elles n'ont jamais été appelées par aucun écran — écrites, jamais
+   branchées — et le commanditaire a tranché l'inverse : pour les pièces, le
+   gérant voit ce qu'il a payé. Le prix vit donc sur la pièce elle-même. */
 
 /** Traduit les refus de Firestore en phrases qui disent quoi faire. */
 export function messageErreurPiece(cause: unknown): string {

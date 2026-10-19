@@ -6,6 +6,9 @@ import {
   figerLignes,
   libelleEncaissement,
   LIGNES_MAX,
+  margeDesVentesPieces,
+  margeLigne,
+  margeVentePiece,
   PANIER_VIDE,
   piecesEnAlerte,
   refusAjout,
@@ -29,6 +32,8 @@ function piece(partie: Partial<Piece> & { id: string }): Piece {
     reference: `REF-${partie.id}`,
     designation: "Plaquette de frein avant",
     categorie: "Freinage",
+    boutiqueId: "terrain",
+    prixAchat: 2000,
     prixVente: 3500,
     seuilAlerte: 5,
     actif: true,
@@ -300,5 +305,102 @@ describe("la carte « pièces en alerte » de la supervision", () => {
     const alertes = piecesEnAlerte(pieces, stocks(["sansSeuil", 4], ["sansSeuilVide", 0]));
 
     expect(alertes.map((a) => a.piece.id)).toEqual(["sansSeuilVide"]);
+  });
+});
+
+/**
+ * **La marge d'une vente de pièces.**
+ *
+ * Le commanditaire voulait que la vente « gonfle le chiffre d'affaires ». La
+ * recette y était déjà ; la marge manquait, et un chiffre d'affaires sans marge
+ * ne dit pas si le commerce gagne de l'argent — il dit seulement qu'il bouge.
+ *
+ * Le prix d'achat est **recopié dans la ligne** au moment de la vente, comme la
+ * désignation l'est déjà. La raison est comptable : si la même bougie est
+ * rachetée plus cher le mois suivant, la marge des ventes passées ne doit pas
+ * changer derrière le dos de celui qui les a faites.
+ */
+describe("la marge d'une vente de pièces", () => {
+  it("recopie le prix d'achat dans la ligne, au lieu de le relire plus tard", () => {
+    const panier = ajouterAuPanier(PANIER_VIDE, piece({ id: "p1", prixAchat: 1800 }), 10);
+    const [ligne] = figerLignes(panier, carte(piece({ id: "p1", prixAchat: 1800 })));
+    expect(ligne.prixAchatUnitaire).toBe(1800);
+  });
+
+  it("note un prix d'achat inconnu plutôt que zéro", () => {
+    /* Zéro dirait « cette pièce n'a rien coûté », ce qui est une autre
+       affirmation — et elle gonflerait la marge d'autant. */
+    const piecesSansCout = carte(piece({ id: "p1", prixAchat: null }));
+    const panier = ajouterAuPanier(PANIER_VIDE, piece({ id: "p1", prixAchat: null }), 10);
+    const [ligne] = figerLignes(panier, piecesSansCout);
+    expect(ligne.prixAchatUnitaire).toBeNull();
+  });
+
+  it("multiplie l'écart par la quantité", () => {
+    expect(
+      margeLigne({
+        pieceId: "p1",
+        reference: "REF-p1",
+        designation: "Bougie",
+        quantite: 3,
+        prixUnitaire: 3500,
+        prixAchatUnitaire: 2000,
+        total: 10_500,
+      }),
+    ).toBe(4500);
+  });
+
+  it("rend une marge négative quand la pièce est vendue à perte", () => {
+    /* On écoule parfois un stock dormant en dessous de son prix d'achat. Le
+       chiffre doit le dire, pas l'arrondir à zéro. */
+    expect(
+      margeLigne({
+        pieceId: "p1",
+        reference: "REF-p1",
+        designation: "Bougie",
+        quantite: 2,
+        prixUnitaire: 1500,
+        prixAchatUnitaire: 2000,
+        total: 3000,
+      }),
+    ).toBe(-1000);
+  });
+
+  it("ignore une ligne sans prix d'achat et compte les autres", () => {
+    const vente = {
+      lignes: [
+        { pieceId: "a", reference: "A", designation: "A", quantite: 1, prixUnitaire: 3000, prixAchatUnitaire: 1000, total: 3000 },
+        { pieceId: "b", reference: "B", designation: "B", quantite: 1, prixUnitaire: 5000, prixAchatUnitaire: null, total: 5000 },
+      ],
+    };
+    expect(margeVentePiece(vente)).toBe(2000);
+  });
+
+  it("rend une marge inconnue quand aucune ligne ne porte son coût", () => {
+    /* `null` et non `0` : le même partage qu'au mois des motos (`chiffres.ts`).
+       Zéro annoncerait une marge nulle, ce qui est un fait ; ici on n'en sait
+       rien, et l'écran doit pouvoir l'écrire autrement. */
+    const vente = {
+      lignes: [
+        { pieceId: "b", reference: "B", designation: "B", quantite: 1, prixUnitaire: 5000, prixAchatUnitaire: null, total: 5000 },
+      ],
+    };
+    expect(margeVentePiece(vente)).toBeNull();
+  });
+
+  it("additionne la marge de plusieurs ventes, et reste inconnue si aucune n'est connue", () => {
+    const connue = {
+      lignes: [
+        { pieceId: "a", reference: "A", designation: "A", quantite: 2, prixUnitaire: 3000, prixAchatUnitaire: 1000, total: 6000 },
+      ],
+    };
+    const inconnue = {
+      lignes: [
+        { pieceId: "b", reference: "B", designation: "B", quantite: 1, prixUnitaire: 5000, prixAchatUnitaire: null, total: 5000 },
+      ],
+    };
+    expect(margeDesVentesPieces([connue, inconnue])).toBe(4000);
+    expect(margeDesVentesPieces([inconnue])).toBeNull();
+    expect(margeDesVentesPieces([])).toBeNull();
   });
 });

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { GardeCapacite, GardeEspace } from "@/components/GardeSession";
-import { EtatErreurSaisie } from "@/components/patrons/Etats";
+import { EtatErreurSaisie, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -17,17 +17,24 @@ import {
   type Piece,
   type SaisiePiece,
 } from "@/lib/domain/piece";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { creerPiece, ecouterCatalogue, messageErreurPiece } from "@/lib/repositories/pieces";
 
 export default function PageNouvellePiece() {
   return (
     <GardeEspace espace="pieces">
-      {/* Le catalogue appartient au responsable : une référence porte un prix,
-          et les prix appartiennent à la supervision (S20, réponse 4). C'est la
-          frontière avec les marques, qu'un gérant peut créer (D90) — une marque
-          est un mot du vocabulaire, une référence est un article. */}
-      <GardeCapacite capacite="gerer_referentiels">
+      {/* **Le gérant tient ce catalogue, et c'est un renversement.** Il
+          appartenait au responsable, parce qu'une référence porte un prix et
+          que les prix appartenaient à la supervision (S20, réponse 4). Le
+          commanditaire a tranché l'inverse pour les pièces : « le responsable
+          ne fera que superviser, rien d'autre — donc tout est fait par le
+          gérant ». D'où `gerer_pieces`, la seule capacité qu'un gérant porte.
+
+          Les marques et les modèles de motos, eux, restent sous
+          `gerer_referentiels` : une marque est un mot du vocabulaire commun,
+          une référence de pièce est un article d'une boutique. */}
+      <GardeCapacite capacite="gerer_pieces">
         <NouvellePiece />
       </GardeCapacite>
     </GardeEspace>
@@ -51,10 +58,18 @@ export default function PageNouvellePiece() {
  */
 function NouvellePiece() {
   const session = useSession();
+  /* Une référence naît dans une boutique : c'est le périmètre courant qui la
+     désigne, jamais un champ du formulaire. Un gérant n'a qu'une boutique, et
+     un responsable posé sur « toutes les boutiques » n'en désigne aucune — on
+     le lui dit plutôt que d'en choisir une pour lui. */
+  const { perimetre } = usePerimetre();
+  const boutiqueId = perimetre.boutiqueId;
+  const surUneBoutique = perimetre.type === "boutique";
+
   const souscrire = useCallback(
     (auChangement: (pieces: Piece[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterCatalogue(auChangement, enErreur),
-    [],
+      ecouterCatalogue(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
   );
   const { valeur: catalogue } = useAbonnement(souscrire, "Le catalogue n’a pas pu être lu.");
 
@@ -68,7 +83,7 @@ function NouvellePiece() {
 
   function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
-    if (session.statut !== "connecte") return;
+    if (session.statut !== "connecte" || !boutiqueId) return;
     setCreee(null);
 
     const probleme = validerPiece(saisie);
@@ -99,7 +114,7 @@ function NouvellePiece() {
     }
 
     setErreur(null);
-    const { enregistre } = creerPiece(saisie, {
+    const { enregistre } = creerPiece(saisie, boutiqueId, {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
     });
@@ -109,12 +124,23 @@ function NouvellePiece() {
     setSaisie(PIECE_VIDE);
   }
 
+  /* Après les crochets, jamais avant : React exige le même nombre d'appels à
+     chaque rendu. Même montage que l'écran de vente de pièces. */
+  if (!surUneBoutique) {
+    return (
+      <SansBoutique
+        titre="Nouvelle référence"
+        sansBoutiqueDeclaree="Une référence appartient à une boutique. Choisissez-en une dans le bandeau, en haut de l’écran."
+      />
+    );
+  }
+
   return (
     <div>
       <TetePage
         retour={{ href: "/pieces", libelle: "Catalogue" }}
         titre="Nouvelle référence"
-        sousTitre="Le catalogue est commun à l’entreprise : cette référence servira à toutes les boutiques."
+        sousTitre="Cette référence appartiendra à votre boutique, avec ses propres prix."
       />
 
       {creee && (
@@ -195,9 +221,26 @@ function NouvellePiece() {
         </fieldset>
 
         <fieldset className="mt-6 cadre p-4">
-          <legend className="px-1 font-semibold text-encre">Le prix et l’alerte</legend>
+          <legend className="px-1 font-semibold text-encre">Les prix et l’alerte</legend>
 
           <div className="mt-2">
+            <label htmlFor="prix-achat" className="block text-sm font-medium text-encre">
+              Prix d’achat <span className="font-normal text-encre-doux">(facultatif)</span>
+            </label>
+            <input
+              id="prix-achat"
+              inputMode="numeric"
+              value={saisie.prixAchat}
+              onChange={(evenement) => changer({ prixAchat: evenement.target.value })}
+              className="saisie mt-1.5"
+            />
+            <p className="mt-1 text-sm text-encre-doux">
+              Ce que la pièce vous a coûté. Il sert à calculer votre marge, et il ne sort pas de
+              votre boutique. Laissé vide, la marge restera inconnue.
+            </p>
+          </div>
+
+          <div className="mt-4">
             <label htmlFor="prix-vente" className="block text-sm font-medium text-encre">
               Prix de vente <span className="font-normal text-encre-doux">(facultatif)</span>
             </label>
@@ -230,10 +273,12 @@ function NouvellePiece() {
             </p>
           </div>
 
-          {/* Le prix d’achat n’est pas ici, et ce n’est pas un oubli : il vit
-              dans une sous-collection que seul le responsable lit (D2), et le
-              formulaire ne le demande pas — S39 a montré qu’un champ qu’on ne
-              relit jamais se remplit mal (D89). */}
+          {/* **Le prix d’achat est ici, à l’inverse de celui d’une moto.** Il
+              vivait dans une sous-collection que seul le responsable lisait
+              (D2), et aucun écran ne le demandait — les deux fonctions qui
+              l’écrivaient n’ont jamais été appelées. Le commanditaire a
+              tranché : pour les pièces, celui qui vend fixe le coût et voit sa
+              marge. Il est donc sur la pièce, lisible par qui lit la pièce. */}
         </fieldset>
 
         <EtatErreurSaisie message={erreur} className="mt-3" />

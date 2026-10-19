@@ -34,6 +34,17 @@ export type Capacite =
   | "gerer_utilisateurs"
   | "gerer_boutiques"
   | "gerer_referentiels"
+  /**
+   * Tenir le catalogue des pièces détachées : créer une référence, fixer ses
+   * deux prix, la désactiver.
+   *
+   * **La seule capacité que le gérant partage avec le responsable**, et elle
+   * vient d'une décision du commanditaire : pour les pièces, « le responsable
+   * ne fera que superviser, rien d'autre ». Le catalogue des pièces appartient
+   * donc à la boutique qui le vend, à l'inverse des marques et des modèles de
+   * motos, qui restent sous `gerer_referentiels`.
+   */
+  | "gerer_pieces"
   | "voir_marges"
   | "voir_toutes_boutiques"
   | "corriger_versement";
@@ -44,11 +55,17 @@ const CAPACITES: Record<Role, readonly Capacite[]> = {
     "gerer_utilisateurs",
     "gerer_boutiques",
     "gerer_referentiels",
+    "gerer_pieces",
     "voir_marges",
     "voir_toutes_boutiques",
     "corriger_versement",
   ],
-  gerant: [],
+  /* Le responsable la garde aussi : il ne s'en sert pas au quotidien, mais lui
+     fermer l'écriture rouvrirait le trou que S55 a trouvé sur les dépenses —
+     un responsable travaillant dans une de ses boutiques ne pouvait rien
+     écrire, et le geste devenait intraçable. Le partage du travail est porté
+     par les écrans, pas par une interdiction. */
+  gerant: ["gerer_pieces"],
 };
 
 export function peut(role: Role, capacite: Capacite): boolean {

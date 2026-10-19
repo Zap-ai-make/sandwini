@@ -26,7 +26,9 @@ const piece = (partie: Partial<Piece> = {}): Piece => ({
   reference: "PLQ-0142",
   designation: "Plaquette de frein avant",
   categorie: "Freinage",
+  boutiqueId: "terrain",
   prixVente: 3_500,
+  prixAchat: 2_000,
   seuilAlerte: 5,
   actif: true,
   ...partie,
@@ -304,5 +306,61 @@ describe("validerMouvement", () => {
 
   it("ne contrôle pas le stock d’une entrée", () => {
     expect(validerMouvement(geste({ type: "entree", quantite: "99" }), 0)).toBeNull();
+  });
+});
+
+/**
+ * **Le prix d'achat d'une pièce, et pourquoi il n'est pas cloisonné.**
+ *
+ * Pour une moto, le prix d'achat est caché au gérant (D2). Le commanditaire a
+ * tranché l'inverse pour les pièces : « pour les pièces c'est complètement
+ * différent, le responsable ne fera que superviser, rien d'autre — donc tout
+ * est fait par le gérant ». Celui qui vend la bougie fixe son prix d'achat et
+ * voit sa marge ; le prix vit donc sur la pièce, et non dans un sous-dossier
+ * privé.
+ */
+describe("le prix d'achat d'une pièce", () => {
+  it("reste facultatif, comme le prix de vente", () => {
+    /* Une référence arrive parfois avant qu'on sache ce qu'elle a coûté — une
+       caisse reçue dont la facture suit. Elle existe alors au catalogue, et sa
+       marge est inconnue plutôt que fausse. */
+    expect(validerPiece({ ...PIECE_VIDE, reference: "NGK-7", designation: "Bougie" })).toBeNull();
+  });
+
+  it("s'écrit en chiffres entiers", () => {
+    expect(
+      validerPiece({
+        ...PIECE_VIDE,
+        reference: "NGK-7",
+        designation: "Bougie",
+        prixAchat: "mille cinq cents",
+      }),
+    ).toMatch(/prix d’achat/);
+  });
+
+  it("refuse un montant au-delà du maximum admis", () => {
+    expect(
+      validerPiece({
+        ...PIECE_VIDE,
+        reference: "NGK-7",
+        designation: "Bougie",
+        prixAchat: "9000000000",
+      }),
+    ).toMatch(/prix d’achat/);
+  });
+
+  it("accepte un prix d'achat supérieur au prix de vente", () => {
+    /* Ce n'est pas une faute de saisie à refuser : on vend parfois à perte pour
+       écouler un stock dormant, et l'écran doit pouvoir l'enregistrer. C'est la
+       marge qui le dira, en négatif. */
+    expect(
+      validerPiece({
+        ...PIECE_VIDE,
+        reference: "NGK-7",
+        designation: "Bougie",
+        prixAchat: "3000",
+        prixVente: "2500",
+      }),
+    ).toBeNull();
   });
 });
