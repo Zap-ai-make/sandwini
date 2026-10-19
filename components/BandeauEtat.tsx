@@ -4,6 +4,7 @@ import { ChevronDown, CloudOff, RefreshCw } from "lucide-react";
 import { usePathname, useRouter } from "next/navigation";
 import { useId } from "react";
 import { PaletteCommandes } from "@/components/PaletteCommandes";
+import { Assistant } from "@/components/Assistant";
 import { useSession } from "@/lib/auth/session";
 import { destinationApresPerimetre } from "@/lib/domain/espaces";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -200,6 +201,16 @@ export function BandeauEtat() {
             {message}
           </>
         )}
+      </span>
+
+      {/* **L’assistant vit en haut, et au bout.** Le bandeau porte le contexte
+          d’écriture — où l’on est, où en est le réseau. L’assistant s’y range
+          parce qu’il en dépend : il lit le périmètre courant, et il a besoin du
+          réseau que le voyant d’à côté annonce. `ml-auto` le pousse à droite,
+          loin de la plaque du périmètre : une erreur de clic entre « changer de
+          boutique » et « ouvrir l’assistant » n’a pas le même prix. */}
+      <span className="ml-auto shrink-0">
+        <Assistant />
       </span>
     </header>
   );
