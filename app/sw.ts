@@ -1,7 +1,13 @@
 /// <reference lib="webworker" />
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
-import { Serwist } from "serwist";
+import { NetworkOnly, Serwist } from "serwist";
+
+/* Chemin relatif et non `@/`, à l'inverse du reste du dépôt : ce fichier est
+   compilé par Serwist dans son propre passage webpack, et non par Next. Ne pas
+   dépendre de la résolution de l'alias évite une panne qui ne se verrait qu'au
+   build de production. */
+import { estTraficFirebase } from "../lib/sw/trafic-firebase";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -16,7 +22,10 @@ declare const self: ServiceWorkerGlobalScope;
    cache IndexedDB et sa file d’écritures. Doubler ce travail ici produirait deux
    caches qui se contredisent — la panne la plus pénible à diagnostiquer.
 
-   Corollaire : rien de ce qui part vers googleapis.com n’est mis en cache. */
+   Corollaire : rien de ce qui part vers Firebase n’est mis en cache. Ce
+   corollaire a été faux pendant longtemps — `defaultCache` reprenait d'une main
+   ce que cette phrase donnait de l'autre. C'est la première règle de
+   `runtimeCaching`, plus bas, qui le rend vrai. */
 const serwist = new Serwist({
   precacheEntries: self.__SW_MANIFEST,
   /* Un paramètre d'URL ne change pas quel document servir : nos écrans sont
@@ -65,7 +74,32 @@ const serwist = new Serwist({
      qu'un onglet rechargé reparte non contrôlé, donc sans repli hors ligne. */
   clientsClaim: true,
   navigationPreload: true,
-  runtimeCaching: defaultCache,
+  /**
+   * **La promesse de l'en-tête, enfin tenue (S41).**
+   *
+   * `defaultCache` se termine par une règle qui attrape *tout* GET
+   * cross-origin en `NetworkFirst`, réseau abandonné au bout de dix secondes
+   * et réponse gardée une heure (`@serwist/next/dist/index.worker.mjs:207`).
+   * Firebase y tombait en entier.
+   *
+   * Appliquée au canal d'écoute de Firestore — un long-poll gardé ouvert
+   * exprès — elle le coupait à chaque fois, servait une réponse de cache, et le
+   * canal se rouvrait sans fin. Un mouvement de caisse déjà publié n'arrivait
+   * donc jamais chez un lecteur qui venait de recharger, pendant que celui qui
+   * l'avait saisi le voyait par son cache local. C'était S41, et ce n'était pas
+   * la caisse : toute écoute fraîche était atteinte.
+   *
+   * Serwist retient la **première** règle qui correspond. Celle-ci passe donc
+   * devant, et `defaultCache` reste intact — le démonter nous exposerait à
+   * chaque version du paquet.
+   */
+  runtimeCaching: [
+    {
+      matcher: ({ url, sameOrigin }) => estTraficFirebase(url, sameOrigin),
+      handler: new NetworkOnly(),
+    },
+    ...defaultCache,
+  ],
   fallbacks: {
     entries: [
       {
