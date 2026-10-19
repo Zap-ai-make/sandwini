@@ -10,6 +10,13 @@
  * **Conséquence assumée, et à dire à l'utilisateur** : l'historique ne suit pas
  * d'un téléphone à l'autre, et il part avec le cache du navigateur. C'est le
  * bon compromis pour ce qu'il contient.
+ *
+ * **La clé porte l'identifiant du compte**, comme celle du périmètre
+ * (`lib/perimetre/memoire.ts`), et pour la même raison : sur la tablette du
+ * comptoir, deux personnes se relaient toute la journée. Une clé commune aurait
+ * montré au suivant les questions du précédent — et une question cite des noms
+ * de clients, des montants, parfois une marge. La déconnexion efface tout,
+ * comme elle efface déjà le cache Firestore.
  */
 
 export type Bulle = { de: "humain" | "assistant"; texte: string; outils?: string[] };
@@ -23,7 +30,9 @@ export type Discussion = {
   bulles: Bulle[];
 };
 
-const CLE = "sdi.assistant.discussions";
+const PREFIXE = "sdi.assistant.discussions.";
+
+const cle = (uid: string) => `${PREFIXE}${uid}`;
 
 /** Au-delà, les plus anciennes tombent : le stockage local est petit et partagé. */
 const GARDEES = 20;
@@ -63,10 +72,10 @@ function estDiscussion(valeur: unknown): valeur is Discussion {
  * format : une entrée abîmée doit coûter une discussion perdue, jamais un
  * assistant qui refuse de s'ouvrir.
  */
-export function lireDiscussions(): Discussion[] {
-  if (typeof localStorage === "undefined") return [];
+export function lireDiscussions(uid: string): Discussion[] {
+  if (typeof localStorage === "undefined" || !uid) return [];
   try {
-    const brut = JSON.parse(localStorage.getItem(CLE) ?? "[]");
+    const brut = JSON.parse(localStorage.getItem(cle(uid)) ?? "[]");
     if (!Array.isArray(brut)) return [];
     return brut.filter(estDiscussion).sort((a, b) => b.quand.localeCompare(a.quand));
   } catch {
@@ -74,29 +83,58 @@ export function lireDiscussions(): Discussion[] {
   }
 }
 
-export function enregistrerDiscussion(discussion: Discussion): void {
-  if (typeof localStorage === "undefined") return;
+export function enregistrerDiscussion(uid: string, discussion: Discussion): void {
+  if (typeof localStorage === "undefined" || !uid) return;
   /* Une discussion sans échange n'a rien à montrer dans une liste : on ouvre un
      « nouveau chat » bien plus souvent qu'on ne s'en sert. */
   if (discussion.bulles.length === 0) return;
-  const gardees = [discussion, ...lireDiscussions().filter((autre) => autre.id !== discussion.id)]
+  const gardees = [
+    discussion,
+    ...lireDiscussions(uid).filter((autre) => autre.id !== discussion.id),
+  ]
     .sort((a, b) => b.quand.localeCompare(a.quand))
     .slice(0, GARDEES);
   try {
-    localStorage.setItem(CLE, JSON.stringify(gardees));
+    localStorage.setItem(cle(uid), JSON.stringify(gardees));
   } catch {
     /* Quota dépassé : l'historique est un confort, et le perdre ne doit pas
        empêcher de poser la question suivante. */
   }
 }
 
-export function oublierDiscussion(id: string): void {
-  if (typeof localStorage === "undefined") return;
-  const restantes = lireDiscussions().filter((discussion) => discussion.id !== id);
+export function oublierDiscussion(uid: string, id: string): void {
+  if (typeof localStorage === "undefined" || !uid) return;
+  const restantes = lireDiscussions(uid).filter((discussion) => discussion.id !== id);
   try {
-    localStorage.setItem(CLE, JSON.stringify(restantes));
+    localStorage.setItem(cle(uid), JSON.stringify(restantes));
   } catch {
     /* Même raison que ci-dessus. */
+  }
+}
+
+/**
+ * Efface les discussions de **tous** les comptes de cet appareil.
+ *
+ * Appelée à la déconnexion, à côté de `oublierPerimetres`. Tous les comptes et
+ * pas seulement celui qui part : c'est la tablette qu'on rend, pas la session.
+ * Quelqu'un qui se déconnecte au comptoir le fait en général parce qu'un autre
+ * va s'en servir.
+ */
+export function oublierLesDiscussions(): void {
+  if (typeof localStorage === "undefined") return;
+  try {
+    /* `length` et `key(i)` plutôt que `Object.keys` : c'est l'API que la norme
+       définit pour parcourir un stockage, et la seule qui marche partout.
+       Relevées d'abord, effacées ensuite — retirer pendant qu'on parcourt
+       décale les index et en saute une sur deux. */
+    const aEffacer: string[] = [];
+    for (let rang = 0; rang < localStorage.length; rang += 1) {
+      const nom = localStorage.key(rang);
+      if (nom?.startsWith(PREFIXE)) aEffacer.push(nom);
+    }
+    for (const nom of aEffacer) localStorage.removeItem(nom);
+  } catch {
+    /* Navigation privée, quota : ne jamais empêcher une déconnexion. */
   }
 }
 

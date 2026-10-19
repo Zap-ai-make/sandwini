@@ -62,6 +62,10 @@ export function Assistant() {
   const { perimetre } = usePerimetre();
   const { enLigne } = useEtatReseau();
 
+  /* L'historique est cloisonné par compte : deux personnes qui se relaient sur
+     la tablette du comptoir ne s'héritent pas leurs questions. */
+  const uid = session.statut === "connecte" ? session.utilisateur.uid : "";
+
   const [ouvert, setOuvert] = useState(false);
   const [montreHistorique, setMontreHistorique] = useState(false);
   const [discussions, setDiscussions] = useState<Discussion[]>([]);
@@ -85,8 +89,8 @@ export function Assistant() {
   }, [perimetreCourant]);
 
   useEffect(() => {
-    if (ouvert) setDiscussions(lireDiscussions());
-  }, [ouvert]);
+    if (ouvert) setDiscussions(lireDiscussions(uid));
+  }, [ouvert, uid]);
 
   useEffect(() => {
     filDeDiscussion.current?.scrollTo({ top: filDeDiscussion.current.scrollHeight });
@@ -153,8 +157,8 @@ export function Assistant() {
           bulles: [...avecQuestion, { de: "assistant", texte, outils }],
         };
         setDiscussion(complete);
-        enregistrerDiscussion(complete);
-        setDiscussions(lireDiscussions());
+        enregistrerDiscussion(uid, complete);
+        setDiscussions(lireDiscussions(uid));
       } catch (cause) {
         /* La conversation est jetée : une session de chat qui a échoué garde un
            historique incohérent côté SDK, et la question suivante repartirait
@@ -255,8 +259,8 @@ export function Assistant() {
                         <button
                           type="button"
                           onClick={() => {
-                            oublierDiscussion(ancienne.id);
-                            setDiscussions(lireDiscussions());
+                            oublierDiscussion(uid, ancienne.id);
+                            setDiscussions(lireDiscussions(uid));
                           }}
                           aria-label={`Oublier « ${ancienne.titre} »`}
                           className="bouton bouton-neutre"

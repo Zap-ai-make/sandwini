@@ -5,6 +5,7 @@ import { clearIndexedDbPersistence, terminate } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { authentification, configurationPresente, db } from "@/lib/firebase/client";
 import { estRole, type Role } from "@/lib/domain/roles";
+import { oublierLesDiscussions } from "@/lib/ia/historique";
 import { oublierPerimetres } from "@/lib/perimetre/memoire";
 
 export type Utilisateur = {
@@ -93,6 +94,9 @@ export function useSession(): Session {
 export async function seDeconnecter(): Promise<void> {
   await signOut(authentification());
   oublierPerimetres();
+  /* Les questions posées à l'assistant citent des clients et des montants :
+     elles partent avec le périmètre, pour la même raison. */
+  oublierLesDiscussions();
   try {
     await terminate(db());
     await clearIndexedDbPersistence(db());
