@@ -1,6 +1,6 @@
 "use client";
 
-import { getAI, getGenerativeModel, GoogleAIBackend } from "firebase/ai";
+import { AgentPlatformBackend, getAI, getGenerativeModel } from "firebase/ai";
 import { getApp } from "firebase/app";
 
 import { DECLARATIONS, executerOutil, type ContexteOutils } from "./outils";
@@ -31,6 +31,24 @@ import { promptSysteme, type QuiParle } from "./prompt";
 const MODELE = "gemini-3.8-flash";
 
 /**
+ * **La facturation passe par le compte Google Cloud, et non par des crédits
+ * prépayés.**
+ *
+ * Le premier essai réel a rendu « [429] Your prepayment credits are depleted » :
+ * le backend Gemini Developer facture sur une cagnotte qu'il faut recharger à
+ * la main, et qui s'épuise sans prévenir. Le commanditaire a choisi l'autre
+ * voie — le projet est déjà en plan Blaze pour ses Cloud Functions, donc
+ * l'assistant se facture là où tout le reste se facture déjà.
+ *
+ * `global` plutôt qu'une région nommée : c'est le défaut du SDK, et il route
+ * vers la région où le modèle demandé existe. Fixer `europe-west1` gagnerait
+ * quelques dizaines de millisecondes depuis Ouagadougou, mais ferait échouer
+ * l'appel le jour où un modèle récent n'y est pas encore déployé — un arbitrage
+ * qui se change ici, en un mot, si la latence devient gênante.
+ */
+const BACKEND = () => new AgentPlatformBackend();
+
+/**
  * Le nombre d'allers-retours d'outils qu'un tour s'autorise.
  *
  * Sans plafond, un modèle qui boucle sur un outil en erreur consommerait des
@@ -47,7 +65,7 @@ export type Conversation = {
 };
 
 export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils): Conversation {
-  const ia = getAI(getApp(), { backend: new GoogleAIBackend() });
+  const ia = getAI(getApp(), { backend: BACKEND() });
   const modele = getGenerativeModel(ia, {
     model: MODELE,
     systemInstruction: promptSysteme(quiParle),
