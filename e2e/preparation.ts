@@ -31,7 +31,13 @@ const SERVICES = [
  * Une fonction de plus dans `functions/src` est une ligne de plus ici. L’oubli
  * se paie par un échec au milieu d’un test, loin de sa cause.
  */
-const FONCTIONS = ["creerGerant", "changerActivationUtilisateur", "attribuerBoutique"];
+const FONCTIONS = [
+  "creerGerant",
+  "changerActivationUtilisateur",
+  "attribuerBoutique",
+  "modifierGerant",
+  "supprimerGerant",
+];
 const BASE_FONCTIONS = "http://127.0.0.1:5301/sdi-dev/europe-west1";
 
 async function joignable(url: string): Promise<boolean> {

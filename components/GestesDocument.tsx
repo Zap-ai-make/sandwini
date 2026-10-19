@@ -38,9 +38,21 @@ import { EtatErreur } from "@/components/patrons/Etats";
  */
 export function GestesDocument({
   document,
+  fini,
   className = "",
 }: {
   document: DocumentDossier;
+  /**
+   * Le papier est-il fini, d'après son état **calculé** (S53) ?
+   *
+   * Sans cette entrée, l'écran proposait « Non concerné par cette vente »
+   * sous une quittance que le client avait déjà emportée : un clic, et un
+   * papier en main chez le client se déclarait « Sans objet ». Le bouton
+   * venait de `statutsSuivants`, qui ne lit que le statut STOCKÉ — or S53 a
+   * vidé ce statut de son sens pour la quittance et le CMC. Troisième endroit
+   * où la même omission se cachait, après la fiche et son résumé.
+   */
+  fini: boolean;
   className?: string;
 }) {
   const session = useSession();
@@ -53,7 +65,9 @@ export function GestesDocument({
     gesteParti.current = false;
   }, [document.venteId, document.type, document.statut]);
 
-  const suivants = statutsSuivants(document.type, document.statut);
+  /* Un papier fini n'a plus de geste : ni grisé, ni absent par hasard: le
+     chemin est terminé, et le seul bouton qui restait le ferait reculer. */
+  const suivants = fini ? [] : statutsSuivants(document.type, document.statut);
 
   /* On n'attend pas le serveur pour rendre la main (D76). Firestore applique
      l'ecriture au cache local sur-le-champ : la ligne affiche deja le nouveau
@@ -203,7 +217,7 @@ function FormulaireDepot({
         <p className="mt-3 text-sm text-encre-doux">Lecture des prestataires…</p>
       ) : candidats.length === 0 ? (
         <p className="mt-3 text-sm text-encre">
-          Aucun prestataire ne traite ce document. Déclarez-en un dans Réglages, puis revenez.
+          Aucun prestataire ne traite ce document. Déclarez-en un dans Paramètres, puis revenez.
         </p>
       ) : (
         <>

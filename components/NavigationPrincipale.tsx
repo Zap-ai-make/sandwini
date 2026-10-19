@@ -23,6 +23,7 @@ import {
   type ReactNode,
 } from "react";
 import { BasculeTheme } from "@/components/BasculeTheme";
+import { Chiffre } from "@/components/patrons/Chiffre";
 import { ICONE_ECRAN } from "@/components/icones-ecrans";
 import { Monogramme } from "@/components/Monogramme";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
@@ -34,6 +35,7 @@ import {
   groupesVisibles,
   type Espace,
 } from "@/lib/domain/espaces";
+import { compter } from "@/lib/domain/format";
 import { LIBELLE_ROLE, type Role } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useComptes } from "@/lib/repositories/comptes";
@@ -94,7 +96,7 @@ export function NavigationPrincipale() {
 
   if (session.statut !== "connecte") return null;
   const role = session.utilisateur.role;
-  const espaces = espacesVisibles(role, perimetre.metiers);
+  const espaces = espacesVisibles(role, perimetre.metiers, perimetre.type);
   const courant = espaceDuChemin(chemin, espaces) ?? espaces[0] ?? null;
 
   return (
@@ -173,7 +175,12 @@ function Colonne({
   chemin: string;
   role: Role;
 }) {
-  const groupes = groupesVisibles(espace, role);
+  /* La portée du périmètre, et non plus ses métiers : le métier se joue au
+     niveau de l'espace (`accedeEspace`), et ce qui se décide ici est l'autre
+     question — « ce geste a-t-il un sens sans boutique choisie ? ». Sur
+     « Toutes les boutiques », faire entrer une moto n'en a pas (S54). */
+  const { perimetre } = usePerimetre();
+  const groupes = groupesVisibles(espace, role, perimetre.type);
   const courant = ecranCourant(espace, role, chemin);
   const repliee = useRepli();
   const comptes = useComptes();
@@ -190,10 +197,22 @@ function Colonne({
         <BoutonRepli repliee={repliee} />
       </div>
 
-      {/* La colonne défile, pas la coquille : à trois groupes plus la liste des
-          boutiques, elle dépasse la fenêtre sur un portable — et le pied, qui
-          dit qui est connecté, partait avec. */}
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* Les groupes ne défilent plus. Ce sont des entrées fixes, en nombre
+          connu, et un ascenseur posé sur la navigation elle-même donnait
+          l'impression que l'application débordait de partout. Ce qui peut
+          vraiment s'allonger sans borne, c'est la liste des boutiques — et
+          c'est elle seule qui défile désormais, dans sa propre zone bornée
+          plus bas. À trois boutiques, rien ne défile du tout.
+
+          **Pas de `min-h-0` ici, et c'est ce qui manquait.** Il servait au
+          défilement interne que S54 a retiré, et il est resté : il autorise ce
+          bloc à rétrécir **sous** la hauteur de son contenu. Les groupes
+          continuaient alors de se peindre, mais hors de leur boîte — par-dessus
+          le pied de colonne, qui portait l'adresse du compte. Vu dans l'espace
+          Motos, le seul où le responsable gagne un quatrième groupe. Sans lui,
+          la hauteur minimale redevient celle du contenu, la colonne s'allonge,
+          et son `overflow-y: auto` fait son travail. */}
+      <div className="flex-1">
         {groupes.map((groupe) => (
           <section key={groupe.titre} className="pt-4 first-of-type:pt-0">
             {/* Chaque espace nomme ses groupes, et ce sont les mots de sa
@@ -284,9 +303,16 @@ function LienColonne({
           tronque le mot qu'on cherche ne sert plus à chercher. 224 px ne
           tiennent pas tous les intitulés du métier sur une ligne. */}
       <span className="colonne-libelle min-w-0 flex-1">{libelle}</span>
+      {/* La pastille se relève quand le nombre change sous les yeux — une
+          écriture qui tombe d'une autre boutique fait passer la file de 2 à 3
+          pendant qu'on regarde ailleurs (D66). Elle ne se relève pas quand elle
+          apparaît depuis rien : `useComptes` rend `null` à zéro (D63), et c'est
+          ce `null` qui monte puis démonte la pastille. Une pastille qui surgit
+          est déjà un signal ; la relever en plus ferait défiler toute la
+          colonne à chaque changement de boutique. */}
       {compte !== null && (
         <span className="colonne-libelle colonne-compte mt-0.5 self-start">
-          {compte}
+          <Chiffre valeur={String(compte)} />
           {quoiCompte && <span className="sr-only"> {quoiCompte}</span>}
         </span>
       )}
@@ -318,7 +344,11 @@ function LesBoutiques({ repliee, chemin }: { repliee: boolean; chemin: string })
   return (
     <section className="pt-4">
       <TitreGroupe repliee={repliee}>Les boutiques</TitreGroupe>
-      <ul>
+      {/* La seule zone de la colonne qui défile, et la seule qui le mérite :
+          son contenu croît avec l'entreprise, pas avec le produit. Le plafond
+          est en `rem` plutôt qu'en nombre d'entrées — c'est la hauteur de la
+          fenêtre qui décide, pas une constante à tenir à jour. */}
+      <ul className="max-h-[14rem] overflow-y-auto">
         {actives.map((boutique) => {
           /* « Courante » veut dire : c'est cette boutique que je regarde, et je
              suis sur un écran qui en dépend. Sur la vue d'ensemble, aucune ne
@@ -402,10 +432,6 @@ function PiedColonne({ repliee }: { repliee: boolean }) {
       </span>
     </Link>
   );
-}
-
-function compter(nombre: number, mot: string): string {
-  return `${nombre} ${mot}${nombre > 1 ? "s" : ""}`;
 }
 
 function sousChemin(chemin: string, href: string): boolean {

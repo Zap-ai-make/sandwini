@@ -1,8 +1,9 @@
 "use client";
 
-import { Plus } from "lucide-react";
+import { Plus, ShoppingCart } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useMemo, useState } from "react";
 import { GardeEspace } from "@/components/GardeSession";
 import { PanneauPiece } from "@/components/PanneauPiece";
 import { ErreurDeLecture, EtatVide } from "@/components/patrons/Etats";
@@ -18,6 +19,7 @@ import {
   filtrerPieces,
   stockParPiece,
   type FiltreStock,
+  type FiltresPieces,
   type MouvementPiece,
   type Piece,
 } from "@/lib/domain/piece";
@@ -29,7 +31,13 @@ import { ecouterCatalogue, ecouterMouvements } from "@/lib/repositories/pieces";
 export default function EspacePieces() {
   return (
     <GardeEspace espace="pieces">
-      <Catalogue />
+      {/* `useSearchParams` exige cette frontière, sinon tout l'écran bascule en
+          rendu dynamique. Le repli est vide : le catalogue porte déjà son
+          propre état de chargement, et en afficher un second le ferait
+          clignoter deux fois. */}
+      <Suspense fallback={null}>
+        <Catalogue />
+      </Suspense>
     </GardeEspace>
   );
 }
@@ -75,8 +83,24 @@ function Catalogue() {
   const catalogue = useAbonnement(souscrireCatalogue, "Le catalogue n’a pas pu être lu.");
   const journal = useAbonnement(souscrireMouvements, "Les mouvements n’ont pas pu être lus.");
 
-  const [filtres, setFiltres] = useState(FILTRES_PIECES_VIDES);
-  const [ouverte, setOuverte] = useState<string | null>(null);
+  /* **C'est ici qu'atterrissent les liens de réparation** (D90). Un refus de
+     vente propose « Fixer le prix » ou « Faire entrer un lot » en désignant la
+     référence ; la carte de supervision, elle, pointe le stock bas. Arriver sur
+     un catalogue vierge obligerait à rechercher ce qu'on venait précisément de
+     désigner — et un écran qui oublie ce qu'on lui a demandé n'est plus cru la
+     fois d'après, ce qui est exactement ce que D90 cherche à éviter.
+
+     Lu à l'initialisation seulement : ensuite les filtres appartiennent à qui
+     les manipule, et les réécrire depuis l'URL déferait sa saisie sous ses
+     doigts. */
+  const parametres = useSearchParams();
+  const [filtres, setFiltres] = useState<FiltresPieces>(() => {
+    const stock = parametres.get("stock");
+    return stock === "bas" || stock === "epuise"
+      ? { ...FILTRES_PIECES_VIDES, stock }
+      : FILTRES_PIECES_VIDES;
+  });
+  const [ouverte, setOuverte] = useState<string | null>(() => parametres.get("piece"));
 
   const pieces = catalogue.valeur;
   const mouvements = journal.valeur;
@@ -182,12 +206,28 @@ function Catalogue() {
             : "Le catalogue est commun à l’entreprise, et les quantités sont celles de toutes les boutiques réunies. Choisissez-en une pour voir son étagère et y faire bouger le stock."
         }
         actions={
-          tientLeCatalogue ? (
-            <Link href="/pieces/nouvelle" className="bouton bouton-principal">
-              <Plus aria-hidden="true" className="size-4" />
-              Nouvelle référence
-            </Link>
-          ) : undefined
+          <>
+            {/* **Vendre est le geste du comptoir**, et il passe donc devant : le
+                catalogue se tient de temps en temps, on vend toute la journée.
+                Il demande une boutique — un stock sort d'une étagère précise —
+                d'où l'absence de ce bouton en périmètre « toutes les
+                boutiques » plutôt qu'un bouton qui mènerait à un refus. */}
+            {surUneBoutique && (
+              <Link href="/pieces/vendre" className="bouton bouton-principal">
+                <ShoppingCart aria-hidden="true" className="size-4" />
+                Vendre
+              </Link>
+            )}
+            {tientLeCatalogue && (
+              <Link
+                href="/pieces/nouvelle"
+                className={surUneBoutique ? "bouton bouton-neutre" : "bouton bouton-principal"}
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Nouvelle référence
+              </Link>
+            )}
+          </>
         }
       />
 

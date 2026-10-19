@@ -1,5 +1,5 @@
 import { formaterMontant } from "./format";
-import { lireLignes, ligneTropLongue, LIGNES_MAX, LONGUEUR_LIGNE_MAX } from "./saisie";
+import { dansLaPeriode, type BornesPeriode } from "./periode";
 
 /**
  * Une vente de moto (`prompt.md` §5.4, §6.1, §6.2).
@@ -60,15 +60,27 @@ export const LIBELLE_MOYEN: Record<MoyenPaiement, string> = {
   wave: "Wave",
 };
 
-/** Les quatre documents du dossier, dans l'ordre où le magasin les traite (§13). */
-export const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise", "plaque"] as const;
+/**
+ * Les documents du dossier, dans l'ordre où le magasin les traite (§13).
+ *
+ * **La plaque n'en fait plus partie (S48).** Elle y figurait comme une
+ * quatrième pièce à obtenir, alors que dans ce commerce l'immatriculation *est*
+ * la carte grise : la plaque se pose dans la foulée, chez le même prestataire,
+ * et la suivre à part créait une ligne qui restait « à faire » sur des dossiers
+ * en réalité terminés. Un dossier se ferme donc sur **trois** documents.
+ *
+ * Les documents `plaque` déjà écrits restent en base — on n'efface pas
+ * l'historique — mais plus rien ne les lit, et plus rien n'en crée. Les règles
+ * continuent d'accepter leurs mises à jour, faute de quoi un dossier ancien
+ * deviendrait impossible à corriger.
+ */
+export const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise"] as const;
 export type TypeDocument = (typeof TYPES_DOCUMENT)[number];
 
 export const LIBELLE_DOCUMENT: Record<TypeDocument, string> = {
   quittance: "Quittance",
   cmc: "CMC",
   carte_grise: "Carte grise",
-  plaque: "Plaque",
 };
 
 export const STATUTS_DOCUMENT = [
@@ -91,6 +103,35 @@ export const LIBELLE_STATUT_DOCUMENT: Record<StatutDocument, string> = {
 export const STATUTS_DOSSIER = ["ouvert", "clos"] as const;
 export type StatutDossier = (typeof STATUTS_DOSSIER)[number];
 
+/**
+ * Ce que le client a emporté à l'achat.
+ *
+ * **La carte grise n'y figure pas**, et c'est une règle du métier, pas un
+ * oubli : « la carte grise n'est jamais disponible à l'achat » — elle est
+ * encore chez le prestataire le jour de la vente. Lui faire une case serait
+ * promettre un geste que personne ne peut faire.
+ */
+export type PapiersEmportes = { quittance: boolean; cmc: boolean };
+
+export const PAPIERS_EMPORTES_VIDES: PapiersEmportes = { quittance: false, cmc: false };
+
+/**
+ * Lit le champ d'une vente, y compris quand il n'existe pas.
+ *
+ * Aucune vente d'avant S53 ne le porte, et elles sont la majorité : une
+ * lecture qui rendrait `undefined` ferait afficher un vide là où l'écran doit
+ * dire « à faire » (D82 — une absence n'est pas une inconnue).
+ *
+ * Une clé inconnue est ignorée plutôt que recopiée : ce lecteur est la
+ * frontière du modèle, et ce qui le traverse doit avoir exactement la forme
+ * attendue.
+ */
+export function lireEmporte(brut: unknown): PapiersEmportes {
+  if (brut === null || typeof brut !== "object") return PAPIERS_EMPORTES_VIDES;
+  const valeurs = brut as Record<string, unknown>;
+  return { quittance: valeurs.quittance === true, cmc: valeurs.cmc === true };
+}
+
 export type Vente = {
   id: string;
   /** Le numéro qu'on imprime. Le serveur peut le corriger en cas de collision (D44). */
@@ -103,6 +144,37 @@ export type Vente = {
   date: Date | null;
   prixConvenu: number;
   modePaiement: ModePaiement;
+  /**
+   * Ce qui part avec la moto (S44). `null` pour une vente d'avant S44, qui
+   * portait deux listes de texte libre au lieu de deux cases.
+   */
+  carteGrise: boolean | null;
+  casque: boolean | null;
+  /**
+   * Ce que le client a emporté à l'achat (S53).
+   *
+   * **À ne pas confondre avec `carteGrise` ci-dessus**, qui dit si le papier
+   * fait partie de ce qu'on a vendu. Celui-ci dit si le client est parti avec,
+   * ce qui est une autre question : un papier peut être inclus dans l'achat et
+   * rester au magasin parce qu'il n'est pas encore arrivé.
+   *
+   * Jamais `null` : `lireEmporte` comble les ventes d'avant cette spec.
+   */
+  emporte: PapiersEmportes;
+  /**
+   * Le scan de la carte grise, déposé au retour du prestataire.
+   *
+   * Chemin Storage et non URL, comme les scans de la moto : une URL de
+   * téléchargement se redemande à chaque lecture et finit par expirer.
+   */
+  carteGriseChemin: string | null;
+  /**
+   * Les deux listes d'avant S44 — **lues, jamais écrites**.
+   *
+   * On ne les traduit pas en booléens : deviner ce qu'un gérant avait tapé
+   * fabriquerait une donnée que personne n'a saisie. Elles restent telles
+   * quelles, et l'écran les affiche quand les booléens manquent.
+   */
   inclus: string[];
   nonInclus: string[];
   totalPaye: number;
@@ -175,8 +247,9 @@ export type SaisieVente = {
   clientId: string;
   prixConvenu: string;
   modePaiement: ModePaiement;
-  inclus: string;
-  nonInclus: string;
+  /** Ce qui part avec la moto. Coché par défaut : c'est le cas ordinaire. */
+  carteGrise: boolean;
+  casque: boolean;
   /** Ce que le client dépose au moment de la vente. Vide vaut zéro. */
   montantEncaisse: string;
   moyenPaiement: MoyenPaiement;
@@ -188,12 +261,43 @@ export const SAISIE_VENTE_VIDE: SaisieVente = {
   clientId: "",
   prixConvenu: "",
   modePaiement: "comptant",
-  inclus: "",
-  nonInclus: "",
+  carteGrise: true,
+  casque: true,
   montantEncaisse: "",
   moyenPaiement: "especes",
   reference: "",
 };
+
+/**
+ * Applique un changement à la saisie de vente, le montant reçu suivant le mode.
+ *
+ * **Tant qu'il n'a pas été tapé à la main**, le montant reçu se déduit : au
+ * comptant le prix convenu entier — que la règle exige de toute façon —, et
+ * rien ailleurs, parce qu'un crédit pré-rempli au prix entier se lirait comme
+ * une vente déjà soldée. Dès que le gérant y a mis quelque chose, fût-ce un
+ * zéro, le champ lui appartient : c'est le même principe que le prix conseillé,
+ * un point de départ et jamais un verrou.
+ *
+ * *Cette fonction existe parce que la règle vivait dans le composant, accrochée
+ * au changement de mode — et ne jouait donc jamais.* Le comptant étant le mode
+ * par défaut, le prix arrive toujours après lui, et cliquer « Comptant » quand
+ * il est déjà coché n'émet aucun `change` : seul celui qui sortait du comptant
+ * puis y revenait voyait le montant se poser. Le défaut a traversé un lot
+ * entier sans qu'aucun test unitaire puisse l'atteindre ; il est ici pour que
+ * ce ne soit plus vrai.
+ */
+export function appliquerSaisieVente(
+  actuel: SaisieVente,
+  partie: Partial<SaisieVente>,
+  montantTouche: boolean,
+): SaisieVente {
+  const suivant = { ...actuel, ...partie };
+  if (partie.montantEncaisse !== undefined || montantTouche) return suivant;
+  return {
+    ...suivant,
+    montantEncaisse: suivant.modePaiement === "comptant" ? suivant.prixConvenu : "",
+  };
+}
 
 /**
  * Le nombre saisi, ou `null` si le champ ne contient pas un entier utilisable.
@@ -307,19 +411,86 @@ export function validerVente(saisie: SaisieVente): string | null {
     return `La référence dépasse ${LONGUEUR_REFERENCE_MAX} caractères.`;
   }
 
-  for (const [champ, brut] of [
-    ["inclus", saisie.inclus],
-    ["non inclus", saisie.nonInclus],
-  ] as const) {
-    const lignes = lireLignes(brut);
-    const trop = ligneTropLongue(lignes);
-    if (trop) return `Une ligne « ${champ} » dépasse ${LONGUEUR_LIGNE_MAX} caractères.`;
-    if (brut.split("\n").filter((ligne) => ligne.trim()).length > LIGNES_MAX) {
-      return `La liste « ${champ} » ne peut pas dépasser ${LIGNES_MAX} lignes.`;
-    }
-  }
-
+  /* Les inclusions ne se valident plus : deux cases à cocher n'ont pas de
+     forme fautive. C'est tout ce que S44 a retiré d'ici. */
   return null;
+}
+
+/** Les deux inclusions, dans l'ordre où elles se lisent sur un reçu. */
+export const LIBELLE_INCLUSION = { carteGrise: "Carte grise", casque: "Casque" } as const;
+
+/**
+ * Ce qui part avec la moto, prêt à afficher — ou `null` pour une vente d'avant S44.
+ *
+ * `null` n'est pas « rien n'est inclus » : c'est « cette vente-là ne le disait
+ * pas ainsi ». L'appelant retombe alors sur ses deux listes de texte, qui sont
+ * ce que le gérant avait réellement écrit. Traduire les unes dans les autres
+ * fabriquerait une donnée que personne n'a saisie — et un reçu réimprimé ne
+ * dirait plus ce que le client a lu le jour de la vente (D61).
+ */
+export function inclusionsDeVente(
+  vente: Pick<Vente, "carteGrise" | "casque">,
+): { libelle: string; inclus: boolean }[] | null {
+  if (vente.carteGrise === null || vente.casque === null) return null;
+  return [
+    { libelle: LIBELLE_INCLUSION.carteGrise, inclus: vente.carteGrise },
+    { libelle: LIBELLE_INCLUSION.casque, inclus: vente.casque },
+  ];
+}
+
+/**
+ * Ce que le client a emporté, nommé une fois pour tous les écrans (S53).
+ *
+ * **Le reçu et la fiche de vente lisent cette fonction, et rien d'autre.** La
+ * spec l'exige — « le reçu dit la même chose que la fiche » — et une seule
+ * lecture est la seule façon de le garantir : deux parcours de `vente.emporte`
+ * écrits à deux endroits finiraient par nommer les papiers différemment, et un
+ * reçu qui contredit l'écran est un reçu qu'on ne peut pas opposer à un client.
+ *
+ * Dans l'ordre du cahier, celui de `TYPES_DOCUMENT` : la quittance accompagne
+ * la moto, le CMC s'obtient avec elle. La carte grise n'en est jamais — elle
+ * n'est pas disponible à l'achat.
+ */
+export function papiersEmportesDeVente(vente: Pick<Vente, "emporte">): string[] {
+  const noms: string[] = [];
+  if (vente.emporte.quittance) noms.push(LIBELLE_DOCUMENT.quittance);
+  if (vente.emporte.cmc) noms.push(LIBELLE_DOCUMENT.cmc);
+  return noms;
+}
+
+export type BilanVentes = {
+  ventes: number;
+  chiffreAffaires: number;
+  encaisse: number;
+  resteAPercevoir: number;
+};
+
+/**
+ * Les quatre chiffres de tête du registre des ventes (S44).
+ *
+ * **Lus, jamais stockés** (D61) : ils se somment des documents que l'écran
+ * écoute déjà, donc ils ne peuvent pas diverger de ce dont ils sont tirés, et
+ * l'écran continue de les afficher réseau coupé. Un agrégat entretenu par
+ * déclencheur coûterait moins à lire et mentirait en silence le jour où le
+ * déclencheur échoue.
+ *
+ * **Aucune marge ici, et c'est une frontière, pas un oubli.** Les trois
+ * montants se lisent sur le document de vente, que le gérant a le droit de
+ * lire. Le coût et la marge vivent dans `prive/marge`, hors de sa portée (D2) —
+ * une carte de plus les ferait entrer par la fenêtre.
+ */
+export function bilanVentes(
+  ventes: readonly Pick<Vente, "prixConvenu" | "totalPaye" | "resteDu">[],
+): BilanVentes {
+  return ventes.reduce<BilanVentes>(
+    (bilan, vente) => ({
+      ventes: bilan.ventes + 1,
+      chiffreAffaires: bilan.chiffreAffaires + vente.prixConvenu,
+      encaisse: bilan.encaisse + vente.totalPaye,
+      resteAPercevoir: bilan.resteAPercevoir + vente.resteDu,
+    }),
+    { ventes: 0, chiffreAffaires: 0, encaisse: 0, resteAPercevoir: 0 },
+  );
 }
 
 /**
@@ -369,18 +540,6 @@ export function chercherVentes<T extends VenteCherchable>(
 /** De la plus récente à la plus ancienne : au comptoir, on cherche celle de tout à l'heure. */
 export function comparerVentes(a: Vente, b: Vente): number {
   return (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0);
-}
-
-/** Le résumé du dossier affiché en liste : « 4 à faire », « 2 remis, 2 à faire »… */
-export function resumerDossier(documents: readonly DocumentDossier[]): string {
-  if (documents.length === 0) return "Dossier non chargé";
-  const parStatut = new Map<StatutDocument, number>();
-  for (const document of documents) {
-    parStatut.set(document.statut, (parStatut.get(document.statut) ?? 0) + 1);
-  }
-  return STATUTS_DOCUMENT.filter((statut) => parStatut.has(statut))
-    .map((statut) => `${parStatut.get(statut)} ${LIBELLE_STATUT_DOCUMENT[statut].toLowerCase()}`)
-    .join(" · ");
 }
 
 /* ---------------------------------------------------------------------------
@@ -453,6 +612,15 @@ export function joursDepuis(date: Date | null, maintenant: Date): number | null 
  */
 export type LignePaiement = {
   vente: Vente;
+  /**
+   * Les versements de cette vente, tels qu'ils ont servi aux totaux.
+   *
+   * Portés par la ligne plutôt que relus à côté : c'est ce qui permet de la
+   * borner dans le temps sans redonner la collection entière à qui filtre
+   * (S46). `dernierVersementAt` ne suffisait pas — un mois se juge sur tous
+   * les versements qu'il contient, pas sur le plus récent de la vente.
+   */
+  versements: readonly Versement[];
   totalPaye: number;
   resteDu: number;
   statutPaiement: StatutPaiement;
@@ -476,6 +644,7 @@ export function lignePaiement(
   );
   return {
     vente,
+    versements,
     totalPaye,
     resteDu,
     statutPaiement,
@@ -540,6 +709,141 @@ export function estInactive(ligne: LignePaiement, seuil: number): boolean {
   return ligne.joursSansVersement !== null && ligne.joursSansVersement >= seuil;
 }
 
+/**
+ * Les lignes qui ont reçu de l'argent pendant la période (S46).
+ *
+ * **La règle est celle du versement, pas celle de la vente.** « Les paiements
+ * de septembre », ce sont les ventes sur lesquelles quelqu'un a versé quelque
+ * chose en septembre — qu'elles aient été conclues en septembre ou en mars.
+ * L'acompte encaissé au comptoir étant lui-même un versement daté du jour de la
+ * vente (`enregistrerVente`), une vente de septembre entre d'elle-même dans
+ * septembre : il n'y a pas deux règles à tenir, il y en a une.
+ *
+ * **Ce qui sort du filtre, et c'est assumé** : un crédit conclu sans le moindre
+ * acompte ne porte aucun versement, donc aucune période ne le montre — sauf
+ * « Tout », qui ne borne rien. C'est la lecture littérale d'un écran de
+ * paiements : personne n'a payé, il n'y a pas de paiement à dater. La dette,
+ * elle, reste entière dans le total de « Tout ».
+ *
+ * Les montants affichés ne sont pas recoupés par la période : un reste dû est
+ * un état, pas un flux. On choisit **quelles lignes** paraissent, jamais ce
+ * qu'elles valent.
+ */
+export function paiementsDeLaPeriode(
+  lignes: readonly LignePaiement[],
+  bornes: BornesPeriode,
+): LignePaiement[] {
+  if (bornes === null) return [...lignes];
+  return lignes.filter((ligne) =>
+    ligne.versements.some((versement) => dansLaPeriode(versement.date, bornes)),
+  );
+}
+
+/**
+ * Tout ce que l'écran des paiements suit, en une liste (S48).
+ *
+ * L'union des dettes et des tranches en cours, de la plus ancienne à la plus
+ * récente : on relance d'abord celui qui attend depuis le plus longtemps. Ce
+ * qui n'y figure pas n'y figurait pas non plus avant — un comptant est soldé
+ * par définition, un crédit payé n'attend rien, une moto remise a fini son
+ * parcours.
+ *
+ * **Les deux notions restent nommées sur chaque ligne, et c'est la condition
+ * pour qu'elles puissent partager un tableau.** Une *dette* est de l'argent qui
+ * manque au magasin ; une *tranche* est de l'argent que le magasin détient. Les
+ * additionner donnerait un chiffre qui ne veut rien dire — c'est la confusion
+ * métier la plus coûteuse du projet (`AGENTS.md`, `prompt.md` §13). D'où la
+ * colonne « Mode » sur l'écran, et **deux totaux distincts** en tête, jamais
+ * une somme.
+ */
+export function paiementsASuivre(lignes: readonly LignePaiement[]): LignePaiement[] {
+  return [...dettes(lignes), ...tranchesEnCours(lignes)].sort(comparerParAnciennete);
+}
+
+/**
+ * Tout le paiement échelonné, soldé compris — ce que l'écran des paiements
+ * montre désormais.
+ *
+ * `paiementsASuivre` ne retient que ce qui attend encore : une dette ouverte,
+ * une tranche dont la moto n'est pas partie. C'était le bon périmètre pour une
+ * file de relance, et c'est pourquoi « Soldées » n'était pas proposé en
+ * pastille — elle n'aurait jamais rien rendu. Cet écran répond maintenant à une
+ * question plus large, « où en est chaque vente à paiement échelonné », donc il
+ * garde les ventes terminées plutôt que de les faire disparaître le jour où
+ * elles se soldent.
+ *
+ * **Le comptant reste dehors**, et ce n'est pas un oubli : il est soldé à
+ * l'instant de la saisie, il n'a jamais rien attendu, et l'inscrire ici
+ * noierait ce qu'on vient y chercher sous toutes les ventes du magasin.
+ *
+ * **Ce que l'élargissement n'a pas le droit de fausser.** Les deux totaux de
+ * l'en-tête ne portent que sur l'engagement en cours : `totalDu(dettes(...))`
+ * et `totalDetenu(tranchesEnCours(...))`. Une tranche soldée dont la moto est
+ * partie n'est plus de l'argent détenu — la compter ferait croire que le
+ * magasin tient une somme qu'il a déjà rendue en moto. Les deux fonctions
+ * écartent ces cas d'elles-mêmes ; c'est la raison pour laquelle on les garde
+ * plutôt que de sommer la liste affichée.
+ */
+export function paiementsEchelonnes(lignes: readonly LignePaiement[]): LignePaiement[] {
+  return lignes
+    .filter((ligne) => ligne.vente.modePaiement !== "comptant")
+    .sort(comparerParAnciennete);
+}
+
+export const FILTRES_PAIEMENT = ["tout", "credit", "partiel", "solde"] as const;
+export type FiltrePaiement = (typeof FILTRES_PAIEMENT)[number];
+
+export const LIBELLE_FILTRE_PAIEMENT: Record<FiltrePaiement, string> = {
+  tout: "Tout",
+  credit: "Crédit",
+  partiel: "Partiellement payées",
+  solde: "Soldées",
+};
+
+/**
+ * Le filtre d'une seule rangée, sur deux axes qui ne se recouvrent pas.
+ *
+ * « Crédit » dit **où est la moto** ; « Partiellement payées » et « Soldées »
+ * disent **où en est l'argent**. On aurait pu en faire deux rangées
+ * combinables ; une seule suffit, parce que la question qu'on pose à cet écran
+ * est toujours l'une *ou* l'autre, et deux rangées de pastilles au-dessus d'un
+ * tableau se lisent comme un formulaire à remplir avant de voir quoi que ce
+ * soit.
+ *
+ * **Deux pastilles ont été retirées, chacune pour la même raison : la ligne le
+ * disait déjà.** « Tranches » doublait la colonne « Mode », « Impayées »
+ * doublait la colonne « État ». Un filtre qui ne fait que répéter une colonne
+ * visible n'est pas un tri, c'est du bruit au-dessus du tableau. Une vente
+ * impayée reste donc atteignable — sous « Tout » et sous « Crédit » —, elle n'a
+ * simplement plus de pastille à elle.
+ *
+ * **Ce que le retrait de « Tranches » n'a pas le droit de coûter.** Une *dette*
+ * est de l'argent qui manque au magasin, une *tranche* de l'argent qu'il
+ * détient pour le client ; les additionner donnerait un chiffre qui ne veut
+ * rien dire (`AGENTS.md` §13). La distinction ne vivait pas dans cette
+ * pastille : elle vit dans la colonne « Mode » de chaque ligne et dans les
+ * **deux totaux distincts** de l'en-tête, qui ne sont jamais sommés. C'est à
+ * cette condition que la pastille pouvait partir.
+ *
+ * « Soldées » rend enfin quelque chose depuis que la liste porte tout le
+ * paiement échelonné (`paiementsEchelonnes`) et non plus les seules ventes en
+ * attente.
+ */
+export function filtrerPaiements(
+  lignes: readonly LignePaiement[],
+  filtre: FiltrePaiement,
+): LignePaiement[] {
+  switch (filtre) {
+    case "tout":
+      return [...lignes];
+    case "credit":
+      return lignes.filter((ligne) => ligne.vente.modePaiement === "credit");
+    case "partiel":
+    case "solde":
+      return lignes.filter((ligne) => ligne.statutPaiement === filtre);
+  }
+}
+
 /** Le total dû par les clients — l'en-tête de la liste des dettes. */
 export function totalDu(lignes: readonly LignePaiement[]): number {
   return lignes.reduce((somme, ligne) => somme + ligne.resteDu, 0);
@@ -559,4 +863,31 @@ export function totalDetenu(lignes: readonly LignePaiement[]): number {
  */
 export function peutRemettreMoto(vente: Vente, resteDu: number): boolean {
   return vente.modePaiement === "tranches" && !vente.motoRemise && resteDu === 0;
+}
+
+/**
+ * Les achats d'un client, du plus récent au plus ancien.
+ *
+ * **Ce que la liste reçue contient décide de ce que la fiche montre, et c'est
+ * voulu.** L'écran n'interroge pas « les ventes du client X » : il écoute les
+ * ventes de son périmètre — celles que les règles laissent déjà lire, sa
+ * boutique pour un gérant, toutes pour le responsable — et trie en mémoire.
+ * Aucune règle Firestore n'est donc ouverte pour afficher une fiche, et aucun
+ * index composite n'est ajouté. C'est exactement le montage de
+ * `lotsDuFournisseur` (S50), et pour la même raison : l'écran doit répondre
+ * coupure faite (D66).
+ *
+ * La conséquence est à dire à l'écran, pas à cacher : un gérant voit les achats
+ * faits *dans sa boutique*, et la fiche l'écrit. Ouvrir les règles pour qu'il
+ * voie les autres serait élargir une lecture d'argent pour un confort
+ * d'affichage.
+ *
+ * Du plus récent d'abord : on ouvre une fiche pour « qu'est-ce qu'il a pris
+ * cette fois-ci », rarement pour remonter à son premier achat.
+ */
+export function ventesDuClient(ventes: readonly Vente[], clientId: string): Vente[] {
+  if (!clientId) return [];
+  return ventes
+    .filter((vente) => vente.clientId === clientId)
+    .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
 }

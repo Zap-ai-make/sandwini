@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, Info, KeyRound, Lock, Printer, ReceiptText } from "lucide-react";
+import { Check, CircleAlert, Info, KeyRound, Lock, Minus, Printer, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { DossierDocuments } from "@/components/DossierDocuments";
@@ -14,8 +14,9 @@ import {
   TitrePanneau,
 } from "@/components/patrons/PanneauLateral";
 import { useSession } from "@/lib/auth/session";
-import { formaterTelephone, type Client } from "@/lib/domain/client";
+import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
+import { PapiersDeLaVente } from "@/components/PapiersDeLaVente";
 import type { Moto } from "@/lib/domain/moto";
 import { identifiantRecu, rangInscrit } from "@/lib/domain/recu";
 import {
@@ -25,9 +26,9 @@ import {
   MOYENS_PAIEMENT,
   SAISIE_VERSEMENT_VIDE,
   estRenumerotee,
+  inclusionsDeVente,
   lignePaiement,
   peutRemettreMoto,
-  resumerDossier,
   validerVersement,
   type DocumentDossier,
   type LignePaiement,
@@ -75,8 +76,16 @@ import {
  * trois cadres empilés de quatre lignes chacun ; dans 420 px, trois cadres font
  * une pile de boîtes. Ils sont une seule liste de faits, dans l'ordre où la
  * question se pose : qui, quoi, combien, combien reste-t-il.
+ *
+ * **`base` dit chez qui le panneau est affiché, et c'est tout son objet.** La
+ * même fiche s'ouvre désormais depuis trois écrans — les ventes, les paiements,
+ * la fiche d'un client —, et chacun doit la garder chez lui : fermer le panneau
+ * doit revenir à l'écran d'où l'on vient, pas renvoyer dans les ventes. Le
+ * commanditaire l'a dit en une phrase : « tout doit être indépendant et bien
+ * structuré » (S54). Sans ce paramètre, consulter un paiement vous déposait
+ * dans un autre onglet, sans retour.
  */
-export function FicheVente({ id }: { id: string }) {
+export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: string }) {
   const session = useSession();
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
@@ -132,7 +141,7 @@ export function FicheVente({ id }: { id: string }) {
   return (
     <PanneauLateral
       nom={vente ? `Vente ${vente.numero}` : "Vente"}
-      fermerVers="/motos/ventes"
+      fermerVers={base}
       identite={
         vente ? (
           <div className="souche">
@@ -156,7 +165,7 @@ export function FicheVente({ id }: { id: string }) {
             {/* Le reçu de la vente se réimprime à tout moment, et il se compose
                 à la lecture : rien n'a été figé à la première impression (D61). */}
             <Link
-              href={`/motos/recus?recu=${identifiantRecu(vente.id, null)}`}
+              href={`${base}?recu=${identifiantRecu(vente.id, null)}`}
               className="bouton bouton-principal"
             >
               <Printer aria-hidden="true" className="size-4" />
@@ -199,9 +208,13 @@ export function FicheVente({ id }: { id: string }) {
 
           {suivi && peutRemettreMoto(vente, suivi.resteDu) && <RemiseMoto vente={vente} />}
 
+          {/* Les papiers avant les versements : c'est le geste du jour quand le
+              client repasse, et l'argent est déjà réglé sur la ligne du haut. */}
+          <PapiersDeLaVente vente={vente} moto={moto} />
+
           <section>
             <TitrePanneau>Les versements</TitrePanneau>
-            <ListeVersements versements={versements} />
+            <ListeVersements versements={versements} base={base} />
             {/* Le formulaire n’apparaît qu’une fois les versements lus : leur
                 nombre donne le rang du reçu, et leur somme le reste réellement
                 dû. Sans eux, on numéroterait à l’aveugle. */}
@@ -216,19 +229,10 @@ export function FicheVente({ id }: { id: string }) {
 
           <section>
             <TitrePanneau>Le dossier</TitrePanneau>
-            {documents && documents.length > 0 && (
-              <p className="mb-2 text-corps text-encre-doux">{resumerDossier(documents)}</p>
-            )}
-            <DossierDocuments documents={documents} />
+            <DossierDocuments documents={documents} vente={vente} moto={moto} />
           </section>
 
-          {(vente.inclus.length > 0 || vente.nonInclus.length > 0) && (
-            <section>
-              <TitrePanneau>Ce qui était convenu</TitrePanneau>
-              <ListeConvenue titre="Inclus dans la vente" valeurs={vente.inclus} />
-              <ListeConvenue titre="Non inclus" valeurs={vente.nonInclus} />
-            </section>
-          )}
+          <CeQuiEtaitConvenu vente={vente} />
 
           <section>
             <TitrePanneau>Marge</TitrePanneau>
@@ -266,7 +270,7 @@ function Identite({
 
   return (
     <Faits>
-      <Fait titre="Client">{client?.nom ?? "Client inconnu"}</Fait>
+      <Fait titre="Client">{nomDuClient(client)}</Fait>
       {client && (
         <Fait titre="Téléphone" code>
           {formaterTelephone(client.telephone)}
@@ -392,7 +396,7 @@ function RemiseMoto({ vente }: { vente: Vente }) {
   );
 }
 
-function ListeVersements({ versements }: { versements: Versement[] | null }) {
+function ListeVersements({ versements, base }: { versements: Versement[] | null; base: string }) {
   if (versements === null) return <p className="text-corps text-encre-doux">Chargement…</p>;
   if (versements.length === 0)
     return (
@@ -423,7 +427,7 @@ function ListeVersements({ versements }: { versements: Versement[] | null }) {
                     accessible du lien doit dire où il mène, et une suite de
                     chiffres ne le dit pas (`DESIGN.md` §8). */}
                 <Link
-                  href={`/motos/recus?recu=${identifiantRecu(versement.venteId, versement.id)}`}
+                  href={`${base}?recu=${identifiantRecu(versement.venteId, versement.id)}`}
                   className="inline-flex items-center gap-1 font-medium text-encre underline underline-offset-2"
                 >
                   <ReceiptText aria-hidden="true" className="size-3.5" />
@@ -435,6 +439,51 @@ function ListeVersements({ versements }: { versements: Versement[] | null }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+/**
+ * Ce qui était convenu, dans les deux formes que le produit a connues.
+ *
+ * Depuis S44 ce sont deux cases ; avant, deux listes de texte libre. On ne
+ * traduit pas les unes dans les autres : une vente ancienne dit ce qu'elle
+ * disait, et la fiche doit rester d'accord avec le reçu qu'on réimprime.
+ */
+function CeQuiEtaitConvenu({ vente }: { vente: Vente }) {
+  const inclusions = inclusionsDeVente(vente);
+
+  if (inclusions) {
+    return (
+      <section>
+        <TitrePanneau>Ce qui part avec la moto</TitrePanneau>
+        <ul className="mt-2 space-y-1">
+          {inclusions.map(({ libelle, inclus }) => (
+            <li key={libelle} className="flex items-center gap-2 text-corps">
+              {inclus ? (
+                <Check aria-hidden="true" className="size-4 shrink-0 text-solde" />
+              ) : (
+                <Minus aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+              )}
+              {/* Le mot dit l'état : la couleur et l'icône ne font que le
+                  doubler (`DESIGN.md` §5). */}
+              <span className={inclus ? "text-encre" : "text-encre-doux"}>
+                {libelle}
+                {inclus ? "" : " — non inclus"}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </section>
+    );
+  }
+
+  if (vente.inclus.length === 0 && vente.nonInclus.length === 0) return null;
+  return (
+    <section>
+      <TitrePanneau>Ce qui était convenu</TitrePanneau>
+      <ListeConvenue titre="Inclus dans la vente" valeurs={vente.inclus} />
+      <ListeConvenue titre="Non inclus" valeurs={vente.nonInclus} />
+    </section>
   );
 }
 

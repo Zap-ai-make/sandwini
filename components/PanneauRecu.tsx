@@ -20,7 +20,7 @@ import { ecouterVente, ecouterVersements } from "@/lib/repositories/ventes";
 /**
  * Le panneau qui montre un reçu et permet de l'imprimer ou de le partager.
  *
- * Ce n'est pas une route : c'est `/motos/recus?recu=<clé>`, comme la fiche
+ * Ce n'est pas une route : c'est `/motos/ventes?recu=<clé>`, comme la fiche
  * d'une moto ou d'une vente. Une route dynamique `/recus/[id]` obligerait le
  * navigateur à demander au serveur un document que le service worker n'a jamais
  * vu, et le reçu d'une vente saisie il y a dix secondes tomberait sur la page de
@@ -32,7 +32,29 @@ import { ecouterVente, ecouterVersements } from "@/lib/repositories/ventes";
  * immuables. Une réimpression six mois plus tard redonne donc exactement le
  * même papier.
  */
-export function PanneauRecu({ cle }: { cle: string }) {
+export function PanneauRecu({
+  cle,
+  base = "/motos/ventes",
+  libelleRetour = "Ventes",
+  libelleRevenir = "Revenir aux ventes",
+}: {
+  cle: string;
+  base?: string;
+  /**
+   * Le nom de l'écran qui porte ce panneau.
+   *
+   * **`base` paramétrait les liens, jamais les mots.** Le panneau a gagné deux
+   * hôtes en S54 — les paiements et la fiche d'un client — et continuait d'y
+   * afficher « Ventes » et « Revenir aux ventes ». Le lien ramenait au bon
+   * endroit sous une étiquette qui en nommait un autre : le pire des deux, car
+   * rien ne casse et le lecteur se croit ailleurs.
+   *
+   * Deux chaînes explicites plutôt qu'une règle d'accord : « aux ventes », « aux
+   * paiements », « au client » ne se dérivent pas d'un nom d'écran.
+   */
+  libelleRetour?: string;
+  libelleRevenir?: string;
+}) {
   const { boutiques } = usePerimetre();
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
@@ -107,12 +129,14 @@ export function PanneauRecu({ cle }: { cle: string }) {
   return (
     <div>
       <div className="print:hidden">
+        {/* Retour aux ventes, et non plus « aux reçus » (S54) : les reçus
+            n'ont plus d'écran à eux, ils sont un panneau de la vente. */}
         <Link
-          href="/motos/recus"
+          href={base}
           className="inline-flex items-center gap-2 text-sm text-encre-doux hover:text-encre"
         >
           <ArrowLeft aria-hidden="true" className="size-4" />
-          Reçus
+          {libelleRetour}
         </Link>
       </div>
 
@@ -121,10 +145,10 @@ export function PanneauRecu({ cle }: { cle: string }) {
       ) : enCours ? (
         <EtatChargement className="mt-6">Chargement du reçu…</EtatChargement>
       ) : !contenu ? (
-        <Introuvable />
+        <Introuvable base={base} libelleRevenir={libelleRevenir} />
       ) : (
         <>
-          <Actions
+          <Actions base={base}
             titre={`${LIBELLE_TYPE_RECU[contenu.type]} ${contenu.numero}`}
             texte={textePartage(contenu, IDENTITE.raisonSociale, formaterMontant, formaterDate)}
             venteId={contenu.vente.id}
@@ -161,7 +185,7 @@ export function PanneauRecu({ cle }: { cle: string }) {
  * sont natives, donc disponibles hors ligne. Un partage annulé par
  * l'utilisateur n'est pas une erreur — `AbortError` se tait.
  */
-function Actions({ titre, texte, venteId }: { titre: string; texte: string; venteId: string }) {
+function Actions({ titre, texte, venteId, base }: { titre: string; texte: string; venteId: string; base: string }) {
   const [message, setMessage] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -202,7 +226,7 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
           Partager le récapitulatif
         </button>
         <Link
-          href={`/motos/ventes?vente=${venteId}`}
+          href={`${base}?vente=${venteId}`}
           className="bouton bouton-neutre"
         >
           Ouvrir la vente
@@ -230,14 +254,14 @@ function Actions({ titre, texte, venteId }: { titre: string; texte: string; vent
  * appareil : lien recopié à la main, versement d'un autre appareil pas encore
  * synchronisé.
  */
-function Introuvable() {
+function Introuvable({ base, libelleRevenir }: { base: string; libelleRevenir: string }) {
   return (
     <EtatVide
       titre="Ce reçu est introuvable."
       className="mt-6 max-w-prose"
       action={
-        <Link href="/motos/recus" className="bouton bouton-neutre">
-          Revenir aux reçus
+        <Link href={base} className="bouton bouton-neutre">
+          {libelleRevenir}
         </Link>
       }
     >

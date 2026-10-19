@@ -1,8 +1,11 @@
 "use client";
 
-import { Check, ChevronDown, CloudOff, RefreshCw } from "lucide-react";
+import { ChevronDown, CloudOff, RefreshCw } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
 import { useId } from "react";
 import { PaletteCommandes } from "@/components/PaletteCommandes";
+import { useSession } from "@/lib/auth/session";
+import { destinationApresPerimetre } from "@/lib/domain/espaces";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 
@@ -37,17 +40,53 @@ export function BandeauEtat() {
   const { etat, enAttente } = useEtatReseau();
   const { perimetre, boutiques, peutChoisir, choisir } = usePerimetre();
   const idNom = useId();
+  const session = useSession();
+  const router = useRouter();
+  const chemin = usePathname();
+
+  /**
+   * Choisir une boutique, puis aller là où ce choix a du sens.
+   *
+   * La plaque ne fait plus que nommer le périmètre : elle fait entrer dans une
+   * boutique et en sortir. Or l'espace supervision quitte le rail dès qu'une
+   * boutique est nommée — sans ce déplacement, on restait sur un écran dont
+   * l'entrée venait de disparaître, donc sans moyen d'y revenir.
+   *
+   * La règle vit dans `lib/domain/espaces` et non ici : un test unitaire peut
+   * l'y atteindre, et elle a trop d'exceptions pour tenir dans un composant
+   * (D103).
+   */
+  function changerDePerimetre(boutiqueId: string | null) {
+    choisir(boutiqueId);
+    if (session.statut !== "connecte") return;
+    const ou = destinationApresPerimetre(
+      chemin,
+      session.utilisateur.role,
+      boutiqueId ? "boutique" : "toutes",
+    );
+    if (ou) router.push(ou);
+  }
 
   const horsLigne = etat === "hors_ligne";
 
+  /**
+   * Au repos, le bandeau se tait (S54).
+   *
+   * « À jour » occupait le coin de l'œil en permanence pour dire qu'il n'y
+   * avait rien à dire. C'est la même règle que D63 sur les cartes à zéro : un
+   * indicateur toujours vert n'informe plus, il devient du décor — et on cesse
+   * de le lire le jour où il change. Hors ligne et pendant l'envoi, en
+   * revanche, le bandeau parle : ce sont les deux seuls états où la réponse
+   * coûte cher.
+   */
   const message =
     etat === "hors_ligne"
       ? ["Hors ligne", libelleAttente(enAttente)].filter(Boolean).join(" · ")
       : etat === "envoi"
         ? `Envoi ${enAttente === 1 ? "d’une saisie" : enAttente > 1 ? `de ${enAttente} saisies` : "en cours"}…`
-        : "À jour";
+        : "";
 
-  const Icone = etat === "hors_ligne" ? CloudOff : etat === "envoi" ? RefreshCw : Check;
+  const Icone = etat === "hors_ligne" ? CloudOff : RefreshCw;
 
   /* Hors ligne, le bandeau passe au jaune : la plaque s’inverse en négatif pour
      rester lisible et pour que le basculement se voie du coin de l’œil, sans
@@ -78,7 +117,7 @@ export function BandeauEtat() {
             aria-label="Boutique affichée"
             aria-describedby={idNom}
             value={perimetre.boutiqueId ?? ""}
-            onChange={(evenement) => choisir(evenement.target.value || null)}
+            onChange={(evenement) => changerDePerimetre(evenement.target.value || null)}
             className={[
               "plaque-code h-8 cursor-pointer appearance-none rounded-plaque border py-1 pr-7 pl-2 text-sm leading-none",
               plaque,
@@ -130,24 +169,37 @@ export function BandeauEtat() {
       {/* aria-live : le passage hors ligne doit être annoncé, pas seulement
           coloré. Et le texte porte toute l’information — jamais la couleur
           seule (DESIGN.md §5). */}
+      {/* La zone vit en permanence, même vide : `aria-live` n'annonce que ce
+          qui change DANS un élément déjà présent. Monter le `role="status"` en
+          même temps que le texte ferait passer le retour hors ligne sous
+          silence chez qui ne regarde pas l'écran — l'inverse du but. */}
       <span
         role="status"
         aria-live="polite"
+        /* **L'état reste lisible par une machine même quand il se tait.**
+           « À jour » était la seule chose, dans tout le produit, qui disait
+           « la file d'écritures Firestore est vide » — et la suite e2e s'en
+           servait pour savoir quand ouvrir un second navigateur ou couper le
+           réseau sans perdre ce qu'elle venait d'écrire (D97). En retirant la
+           phrase (S54), on a emporté le signal avec elle.
+           L'attribut le rend : invisible, non annoncé, et il ne réintroduit
+           pas le voyant toujours vert que D63 condamne. */
+        data-synchro={etat}
         className={[
           "flex shrink-0 items-center gap-1.5 text-sm",
           // Sur la plaque jaune, l’encre est fixe : elle ne suit pas le thème.
-          horsLigne
-            ? "font-semibold text-encre-fixe"
-            : etat === "envoi"
-              ? "text-encre"
-              : "text-encre-doux",
+          horsLigne ? "font-semibold text-encre-fixe" : "text-encre",
         ].join(" ")}
       >
-        <Icone
-          aria-hidden="true"
-          className={["size-4 shrink-0", etat === "envoi" ? "animate-spin" : ""].join(" ")}
-        />
-        {message}
+        {message && (
+          <>
+            <Icone
+              aria-hidden="true"
+              className={["size-4 shrink-0", etat === "envoi" ? "animate-spin" : ""].join(" ")}
+            />
+            {message}
+          </>
+        )}
       </span>
     </header>
   );

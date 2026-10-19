@@ -483,6 +483,29 @@ Deux corrections, parce qu'il y a deux défauts distincts :
 service qui répond n'est pas un service qui fonctionne.** Le préflight vérifie désormais la
 capacité, pas la présence.
 
+**Quatrième fois, S44 — et le chemin manquant était le déploiement.** Les émulateurs et la
+passe bout en bout portaient leur délai depuis D29 ; le déploiement, lui, ne l'avait que
+sous forme de ligne à recopier dans `DEPLOIEMENT.md`, écrite en syntaxe POSIX
+(`FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy …`). Ce dépôt se développe sous
+Windows, où ce préfixe n'existe pas : PowerShell cherche une commande de ce nom et refuse.
+Le commanditaire a donc retiré le préfixe pour faire passer la commande — et a retrouvé
+`Timeout after 10000`, soit le même diagnostic à repayer. `scripts/deployer.mjs` porte
+désormais le délai et transmet le reste sans le relire (`npm run deployer -- --only
+functions --project sandwini`). La leçon se généralise au-delà du délai : **une consigne
+d'environnement dans un bloc de code est un piège de portabilité ; un lanceur n'en est
+pas un.**
+
+**Et le lanceur s'appelle par `node`, pas par `npm run` — cinquième fois, le même jour.**
+`npm run deployer -- --only functions --project sandwini` ne marche pas davantage : `--only`
+est une option de npm, qui l'avale avec sa valeur avant de transmettre la ligne, `--project`
+de même. Le script recevait `sandwini` seul et `firebase` refusait sur « Too many
+arguments » — une erreur qui ne parle plus du problème. Le `--` protège des options du
+script, jamais de celles que npm reconnaît. `scripts/deployer.mjs` lit `npm_config_only`
+pour détecter le cas et redonner la bonne ligne. La règle se généralise une fois de plus :
+**tout ce qui se tient entre l'intention et la commande peut la réécrire — le shell, puis
+le gestionnaire de paquets. Un remède qui tient dans une ligne à recopier n'en est pas un ;
+il faut qu'il tienne dans un chemin, et que ce chemin refuse d'être emprunté de travers.**
+
 ## D34 — La suite bout en bout tourne sur un seul worker
 S3 — constaté en exécutant la suite complète
 
@@ -1527,6 +1550,59 @@ et non d'une bibliothèque de composants.
 `app/globals.css` doit être suivie d'une capture sous média `print`. Le reçu est le seul
 rendu du produit qui devient un objet physique, et aucune capture d'écran ordinaire ne le
 montre (leçon de S10).
+
+### Amendement S54 — « Acier et braise » : la règle avait raison, sa conséquence non
+
+*Le commanditaire, après plusieurs mois d'usage : « le design actuel ne me satisfait pas…
+c'est surtout les couleurs, manque d'identité, trop standard ».*
+
+**Il avait raison, et la cause est au-dessus.** Deux couleurs couvraient plus de 90 % de la
+surface : le nuit `#14142b` de la coquille et le gris bleuté `#eef1f5` du fond. Ce sont les
+deux couleurs les plus répandues du logiciel de gestion depuis dix ans. Pendant ce temps, la
+règle « le dégradé reste enfermé dans le logo » avait un effet qu'on n'avait pas mesuré :
+**aucune couleur de la marque ne touchait l'interface.** Le logo est du feu sur de la nuit ;
+le produit était du gris froid sur un bleu-violet. Il ne ressemblait pas à sa propre marque.
+
+La règle reste juste — un dégradé or → rouge en fond de section est bien le tic que
+`DESIGN.md` §1 interdit, et on ne l'a pas fait. Ce qui change, c'est **par où la marque
+entre** : non par un aplat, mais par la **température des neutres**.
+
+**La décision.** Tous les neutres passent au chaud, des deux côtés de la feuille :
+
+| | avant | après | ce que c'est |
+|---|---|---|---|
+| coquille | `#14142b` | `#1b1a17` | l'acier huilé de l'atelier |
+| fond | `#eef1f5` | `#efeae1` | le sable de la cour |
+| encre | `#0f1720` | `#16130f` | |
+| bords | `#d5dae0` | `#ddd5c8` | |
+| « réglé » | `#1b6b4a` | `#4f6b24` | l'olive, et non le vert de succès universel |
+
+La feuille reste du blanc pur : l'application s'utilise dehors, sur un écran bon marché, et
+un crème y perdrait le contraste que le soleil mange déjà. C'est **autour** d'elle que la
+chaleur se joue. Le thème sombre suit la même règle — il était bleuté lui aussi, donc tout
+aussi anonyme. Les 34 paires texte/fond sont recalculées : aucune sous 4,5:1 en texte
+normal, 3:1 en élément d'interface.
+
+**Le vert est le détail qui disait le plus.** `#1b6b4a` ne venait d'aucune des deux rampes
+du logo : c'était le troisième terme du trio rouge/bleu/vert qu'on trouve dans tous les
+tableaux de bord du monde. L'olive tient dans une palette chaude et n'appartient à personne
+d'autre.
+
+**Ce qu'on a refusé en chemin.** La maquette comparative montrait le bouton principal en
+braise, et c'est en partie ce qui la rendait chaude. On ne l'a pas retenu : dans ce produit
+la braise dit « retard et irréversible », et `.btn-destructif` est déjà un rouge. Un « Faire
+entrer une moto » rouge plein à côté d'un « Supprimer » rouge en contour est la confusion
+qu'un logiciel d'argent ne peut pas se permettre. Une couleur, un emploi. L'action reste
+l'encre — chaude, désormais, ce qui suffit.
+
+Deux autres directions ont été comparées et écartées, et elles restent lisibles dans
+`maquettes/directions-couleur.html` : « Nuit et or » (trop timide — elle ne faisait que
+retirer le bleu-violet) et « Émail » (un rail bleu d'enseigne peinte, écartée parce que le
+bleu dit déjà « parti chez le prestataire » : le rail aurait tué le signal).
+
+**Ce qui ne change pas.** La plaque et son encre, qui ne basculent pas avec le thème. Les
+cinq arrêts du monogramme. La souche comme signature. Et le bloc `@media print` : un reçu
+sort en noir d'imprimante, une encre chaude n'y changerait rien.
 
 ---
 
@@ -2696,3 +2772,582 @@ d'emblée toute explication par la lenteur.
 *Conséquence :* le protocole est écrit dans `e2e/README.md`, avec le tableau des
 trois réponses et ce que chacune veut dire. Il y est plutôt que dans un message
 de commit parce que c'est là qu'on le cherchera.
+
+---
+
+## D100 — La modale du produit est un calque, et ses garanties s'écrivent une fois
+
+*S44, en factorisant quatre copies — dont deux étaient fausses.*
+
+D72 avait tranché « pas de bibliothèque de composants : `<dialog>` suffit », et
+l'argument tenait : le natif donne gratuitement le piège de focus, Échap, le
+fond inerte, la restitution du focus au déclencheur, et une couche supérieure
+sans `z-index`. Cinq garanties pour une balise.
+
+**S42 a mesuré que ça ne tient pas dès qu'il y en a deux.** Le modal fournisseur
+s'ouvre par-dessus celui de l'arrivage ; deux `<dialog>` modaux imbriqués se
+referment l'un l'autre, et le lot partait **sans fournisseur**. Le remède du
+moment fut local : le modal intérieur est devenu un calque. Puis le suivant, et
+le suivant. À la fin de S43, le produit tenait **deux mécaniques pour un même
+objet** — un `<dialog>` et trois calques —, et la seule raison d'être des trois
+était de survivre au premier.
+
+**Ce que la copie a coûté, et qu'aucun test ne montrait.** Chaque calque
+réimplémentait un bout de ce que le natif donnait, et deux l'ont mal fait :
+
+- `InspecterLotModal` et `ModifierArrivageModal` écoutaient Échap sur leur
+  boîte, sans jamais lui donner le focus à l'ouverture. **La touche n'arrivait
+  à personne.** `FournisseurModal` n'y échappait que par accident, grâce à un
+  `autoFocus` posé pour une autre raison.
+- `FournisseurModal` et `ModifierArrivageModal` étaient centrés sans `max-h` ni
+  défilement : à 390 px, clavier ouvert, le pied du formulaire — donc le bouton
+  qui enregistre — sortait de l'écran sans moyen de l'atteindre. Sur une
+  application dont la suite bout en bout tourne sur un Pixel 7.
+
+Aucun des deux ne cassait un test, parce qu'aucun test ne ferme une modale au
+clavier ni ne mesure la hauteur d'un cadre.
+
+**Décision.** Un patron, `components/patrons/Modale.tsx`, et un seul mécanisme :
+un calque `fixed inset-0`. Il reprend à sa charge les cinq garanties du natif —
+focus pris, piégé, rendu ; Échap ; fond inerte — plus ce que le natif ne donnait
+pas : une hauteur bornée avec défilement, une feuille montée du bas sur
+téléphone, et un empilement décidé par une **pile de modules** plutôt que par
+des `z-index` recopiés à la main, qui se départagent sinon par l'ordre du DOM.
+
+*Conséquence :* les quatre modals du produit passent dessus, `ArrivageModal`
+compris — il quitte `<dialog>`. `PaletteCommandes` le garde : rien ne s'y
+imbrique, et ce n'est pas une modale de saisie. D72 n'est pas renversée sur le
+fond — on n'ajoute toujours aucune dépendance — mais sa justification est
+corrigée : `<dialog>` suffit **tant qu'il est seul**, et ce produit en imbrique.
+
+La leçon générale est celle de D92 dans une autre matière : **une correction
+locale répétée trois fois est une factorisation qu'on n'a pas faite**, et le
+prix ne se paie pas au troisième exemplaire — il se paie le jour où l'on
+découvre que deux des trois étaient faux depuis le début.
+
+---
+
+## D101 — Un champ qui manque n'est pas un champ à zéro, et c'est ce qui évite les migrations
+
+*S44, en séparant le prénom du nom et en remplaçant deux listes par deux cases.*
+
+Deux changements de modèle dans le même lot, et deux façons différentes de les
+rendre rétro-compatibles — la différence ne tient pas au goût, elle tient à
+**quand le validateur tourne**.
+
+**La vente.** `venteValide` ne s'exécute qu'à la création : une vente ne se
+modifie que par deux gestes étroits, qui passent par `seulsChangent`. Les ventes
+d'avant S44 ne sont donc jamais revalidées, et on peut retirer `inclus` /
+`nonInclus` du contrat et exiger `carteGrise` / `casque` sans toucher à une
+seule ligne existante.
+
+**Le client.** `clientValide` tourne à la création **et** à la modification.
+Exiger `prenom` et `nip` rendrait tout le fichier d'avant S44 incorrigible du
+jour au lendemain — un gérant qui corrige un numéro mal noté se verrait refuser
+l'écriture. Les deux champs entrent donc dans le `hasOnly` et **pas** dans le
+`hasAll`. Même montage que `motos.cmcRecu` en S43.
+
+**Et à la lecture, le champ absent se lit `null`, jamais `false`.** Une vente
+d'avant S44 ne disait pas « la carte grise n'est pas incluse » : elle ne le
+disait pas du tout. `inclusionsDeVente` rend donc `null` pour elle, et la fiche
+comme le reçu retombent sur les deux listes que le gérant avait réellement
+écrites. Traduire les unes dans les autres fabriquerait une donnée que personne
+n'a saisie, sur un document qui prétend faire foi — et un reçu réimprimé six
+mois plus tard ne dirait plus ce que le client a lu le jour de la vente (D61).
+
+C'est D95 vu une troisième fois : *« pas encore lu »* n'est pas *« vide »*, et
+*« jamais dit »* n'est pas *« dit non »*. Chaque fois, l'aplatissement se paie à
+l'endroit où l'on décide de quelque chose.
+
+*Conséquence :* aucune migration, donc aucune fenêtre pendant laquelle deux
+formes coexistent mal — elles coexistent **pour de bon**, et quatre tests de
+règles le prouvent au lieu de l'affirmer. `nom` garde son sens et devient le nom
+de famille ; une fiche d'avant porte tout dans `nom` avec `prenom` vide, et
+`nomComplet` rend exactement la chaîne qu'elle rendait déjà.
+
+**Un défaut est sorti de là, et il ne venait pas du changement.** En vérifiant
+que la recherche trouve encore un client dont le prénom est un champ à part, on
+a découvert que `chercherClients` acceptait **n'importe quelle sous-chaîne** :
+« Awa » répondait « S*awa*dogo ». Le défaut vivait depuis S6, invisible tant que
+le nom était un seul champ long ; un prénom est court, donc d'autant plus
+souvent contenu au milieu d'un autre nom. La recherche se fait maintenant par
+début de mot — ce que son propre commentaire annonçait déjà.
+
+---
+
+## D102 — Un champ masqué reste un champ : le focus le cherche, et l'écran le suit
+
+*S44, après un essai du commanditaire — la modale se vidait au premier clic sur
+un segment.*
+
+Le motif est celui du dépôt depuis S20, et il est bon : un choix exclusif se
+dessine en rangée de boutons, mais **ce sont de vrais boutons radio**, masqués
+sous leur étiquette par `sr-only`. Les flèches du clavier parcourent le groupe
+toutes seules, le lecteur d'écran annonce « 2 sur 3 », le groupe porte un nom.
+Une pile de `<button aria-pressed>` aurait le même dessin et ne dirait rien de
+tel.
+
+**Ce que `sr-only` fait et qu'on oublie : il pose `position: absolute`.** Un
+élément absolu se place par rapport à son premier ancêtre *positionné*. Si
+l'étiquette ne l'est pas, ce n'est pas elle : c'est le cadre de la modale, plus
+haut. Sept boutons ainsi projetés ont étiré sa zone défilable de 789 à 1666 px,
+sans que rien ne se voie — un cadre `overflow-hidden` ne montre pas qu'il est
+devenu défilable.
+
+**Le coup de grâce vient du navigateur, et il a raison de le porter.** Cliquer
+une étiquette donne le focus au radio ; le navigateur fait alors défiler le plus
+proche ancêtre défilable pour le révéler. Mesuré : `scrollTop` à 856. Le
+contenu part hors champ, et comme le cadre est `overflow-hidden`, il n'y a ni
+barre de défilement ni geste pour revenir. L'écran reste vide jusqu'à la
+fermeture.
+
+**Décision.** L'étiquette qui enveloppe un champ masqué porte `relative`. Ce
+n'est pas un ajustement de mise en page : c'est ce qui garde le champ dans la
+boîte qui le représente. La règle vaut partout où le dépôt masque un champ sous
+son étiquette — `Segmente`, et le même motif dans `PanneauPiece`.
+
+*Ce que cet épisode dit des tests, et c'est le plus cher.* La suite cliquait ces
+segments et passait au vert. Rien ne disparaissait du DOM : tout était présent,
+simplement défilé hors du cadre — et `toBeChecked`, `toHaveValue`, `toContainText`
+répondent sur un élément invisible. **Une assertion de présence ne dit rien d'un
+écran.** C'est une capture d'écran qui a tranché, pendant que la sonde affirmait
+« Le paiement : 1 » devant un panneau vide. La règle 5 d'`AGENTS.md` n'est pas
+une politesse de fin de spec : ici, elle était le seul instrument capable de
+voir le défaut.
+
+---
+
+## D103 — Une valeur par défaut n'émet pas d'événement : ce qui s'accroche au changement ne joue jamais
+
+*S48, en donnant enfin une exécution loyale au test de période des ventes.*
+
+Le montant reçu se pré-remplissait au prix convenu quand on choisissait
+« Comptant ». Le code le disait, le commentaire l'expliquait — *« le comptant
+impose le montant entier : le pré-remplir évite de faire retaper ce que la règle
+exige déjà »* — et la règle ne s'est **jamais appliquée**.
+
+Deux faits se rencontrent, et aucun n'est surprenant seul :
+
+1. `SAISIE_VENTE_VIDE` ouvre la modale **au comptant**. C'est le bon défaut :
+   c'est la vente la plus fréquente.
+2. Le pré-remplissage vivait dans le `changer` du segment de mode. Or cliquer un
+   bouton radio déjà coché n'émet aucun `change` — il n'y a pas de changement.
+
+Le prix, lui, arrive toujours *après* le mode : il se pose en choisissant la
+moto, ou en le tapant. Au moment où le mode aurait pu pré-remplir, il n'y avait
+rien à recopier ; et quand le prix est arrivé, plus personne n'écoutait. Seul
+quelqu'un qui serait sorti du comptant puis y serait revenu aurait vu le montant
+se poser — c'est-à-dire personne.
+
+**Décision.** Une valeur qui *dépend* d'une autre se recalcule à chaque
+changement, jamais au moment où l'on croit qu'elle change. La règle vit
+maintenant dans `appliquerSaisieVente`, traversée par **tous** les changements
+de la saisie, et elle est formulée par ce qu'elle observe et non par le geste
+qui l'a déclenchée : *tant que le montant reçu n'a pas été tapé à la main, il
+suit le mode — au comptant le prix entier, ailleurs rien.*
+
+Le « tant qu'on n'y a pas touché » n'est pas un détail : c'est le principe déjà
+posé pour le prix conseillé dans `choisirMoto` — **un point de départ, jamais un
+verrou**. Dès que le gérant a mis quelque chose dans le champ, fût-ce un zéro
+délibéré, il lui appartient.
+
+*Pourquoi neuf tests l'ont manqué, et c'est le plus cher.* Les douze cas de
+vente de `ventes.spec.ts` passaient. Tous, sans exception, faisaient l'un des
+deux gestes qui masquent le défaut : ou bien ils **basculaient vers crédit ou
+tranches** — un vrai changement, qui émet l'événement —, ou bien ils
+**remplissaient le montant à la main**. L'aide `vendre()` fait les deux. Le seul
+chemin non couvert était le plus ordinaire de tous : *ouvrir, choisir la moto,
+valider*. Un décor d'essai qui remplit toujours les champs ne rencontre jamais
+les valeurs par défaut — et ce sont elles que l'utilisateur rencontre d'abord.
+
+La règle est sortie du composant pour cette raison précise. `vitest.config.mts`
+ne couvre que `lib/**` : tant qu'elle vivait dans `ModaleVente.tsx`, **aucun
+test unitaire ne pouvait l'atteindre**, et elle a traversé un lot entier. C'est
+la même manœuvre qu'en S47 pour `peserBoutiques` et qu'en S46 pour `periode.ts`
+— *une règle métier logée dans un composant est une règle sans preuve.*
+
+---
+
+## D104 — Une zone qui défile doit être le bloc conteneur de ce qu'elle contient
+
+*S49, en cherchant pourquoi le comptoir comptait deux ascenseurs.*
+
+Le commanditaire l'a dit en quatre mots : « y'a deux scroll bar ». La coquille
+promet pourtant l'inverse — navigation fixe, zone de travail qui défile, un seul
+ascenseur. **Deux causes, sans rapport l'une avec l'autre, et aucune lisible
+dans le CSS.**
+
+**La première est un piège déjà payé.** `Tableau` pose un
+`<caption class="sr-only">` pour nommer le tableau à qui ne le voit pas. Or
+`sr-only`, c'est `position: absolute` — exactement ce que [D102] avait appris à
+ses dépens sur les étiquettes de champs. Entre ce `caption` et `<html>`, aucun
+ancêtre n'était positionné : son bloc conteneur était **le document**. Un
+élément absolu n'est pas rogné par une zone de défilement dont il ne dépend pas,
+et son débordement est compté par la fenêtre.
+
+Ce que la mesure donne, et c'est la signature du défaut :
+
+| fenêtre | `html.scrollHeight` |
+|---|---|
+| 945 | 945 |
+| 900 | **944** |
+| 860 | **944** |
+| 760 | **944** |
+
+Un document dont la hauteur ne bouge pas quand la fenêtre rétrécit n'est pas un
+document : c'est un élément échappé. La correction est une ligne — `relative`
+sur `main` — mais elle est posée là plutôt que sur le `caption`, parce que la
+règle juste est générale : **une zone de défilement doit être le bloc conteneur
+de ce qu'elle contient.** Posée au coupable, elle attendrait le prochain
+`sr-only`.
+
+**La seconde est une constante qui devinait.** `.cadre-tableau` se plafonnait à
+`calc(100dvh - 14rem)` : la fenêtre moins ce qu'on estimait au-dessus de lui. Le
+commentaire d'origine l'assumait — « approchée, pas calculée au pixel — si elle
+tombe court, la page reprend le défilement, ce qui ne casse rien ». **Cela
+cassait quelque chose.** Les 14 rem comptaient le bandeau, la marge et la tête
+d'écran ; une barre de filtres de plus et la devinette tombait court. Mesuré sur
+« Ventes » à 1920×860 : le cadre bridé à 636 px pendant que la page en réclamait
+943. Les deux défilaient, côte à côte.
+
+**Décision.** On ne devine plus la hauteur de ce qui surmonte un tableau : un
+écran de liste se déclare `.ecran-plein`, remplit la zone de travail, et le
+cadre prend ce qui reste. La hauteur n'est plus estimée, elle est produite par
+la mise en page. Un écran qui ne se déclare pas garde un cadre de hauteur libre
+— c'est la page qui défile, une seule fois, ce qu'il faut pour un tableau logé
+au milieu d'un tableau de bord comme la supervision.
+
+*Ce que cet épisode dit du harnais, et c'est le plus cher.* La suite bout en
+bout ne tourne que sur un profil **Pixel 7**. Les deux défauts sont des défauts
+de bureau : le plafond ne s'applique qu'au-dessus de 1024 px, et il faut une
+fenêtre basse pour que la page déborde. **Aucun des deux ne pouvait être vu par
+la suite existante** — elle serait restée verte indéfiniment pendant que l'écran
+avait tort. `e2e/defilement.spec.ts` fixe donc sa propre fenêtre, 1920×860,
+l'ordre de grandeur de ce qu'un Chrome maximisé laisse d'un écran 1080p.
+
+Et le défaut ne se voit qu'au **chargement** de la page : après une navigation
+interne, la hauteur du document a déjà été recalculée et la fenêtre ne défile
+plus. Un test qui se contentait d'arriver par la navigation passait au vert sur
+un écran défectueux. Il faut un `goto` franc — ce que fait le comptoir, une
+adresse tapée, une touche F5.
+
+---
+
+## D105 — Un identifiant vide et un identifiant introuvable ne disent pas la même chose
+
+*En rendant le modèle facultatif à l'entrée en stock.*
+
+Le modèle a cessé d'être exigé, et pour une raison de comptoir : un lot se
+réceptionne caisses encore fermées. La marque se lit sur le carton, le modèle
+souvent pas. L'exiger obligeait à **inventer une entrée de référentiel** pour
+pouvoir enregistrer le lot — c'est-à-dire à salir le catalogue pour contourner
+un champ, et à produire des « modèles » qui ne désignent rien. *Une moto sans
+modèle est une information exacte ; un modèle inventé est une information
+fausse.* La marque, elle, reste exigée : c'est par elle que le stock se range
+et se compte, et on la connaît toujours.
+
+**Ce que ce changement a révélé ailleurs.** Rendre un champ facultatif dans le
+domaine, dans la règle Firestore et dans les deux formulaires ne suffit pas :
+il reste à décider **comment son absence s'écrit**. Le nommage du catalogue
+faisait `find(…)?.nom ?? "—"`, ce qui mettait dans le même sac deux faits sans
+rapport :
+
+| `modeleId` | Ce que ça veut dire | Ce qui s'affichait |
+|---|---|---|
+| `""` | rien n'a été saisi — état **normal** | `Yamaha —` |
+| `"m-42"` introuvable | l'entrée a disparu sous les pieds de la moto — **anomalie** | `Yamaha —` |
+
+**Décision.** Trois cas, et non deux. Un identifiant vide rend la **chaîne
+vide** : il n'y a rien à dire, on n'écrit rien. Un identifiant présent mais
+introuvable garde son **tiret**, parce que c'est le seul endroit où cette
+anomalie se voit. La règle vit dans `nommerEntree` (`lib/domain/referentiel.ts`)
+et non plus dans `lib/repositories/catalogue.ts` : c'est D103 appliqué par
+avance — `vitest.config.mts` ne couvre que `lib/**`, mais un `nommer` privé de
+module restait sans preuve. Il en a trois maintenant.
+
+*Ce que cet épisode dit du dépôt, et c'est le plus utile.* Deux composants —
+`BordereauLot` et `InspecterLotModal` — portaient **déjà** la garde
+`nomModele(id) ? … : ""`. Leur auteur avait donc anticipé le bon comportement.
+La garde était **morte** : « — » n'est pas une chaîne vide, la condition était
+toujours vraie. Une intention juste, écrite au bon endroit, et inopérante parce
+que la fonction qu'elle interrogeait répondait autre chose. Ce n'est pas une
+faute d'inattention : c'est ce qui arrive quand une convention d'affichage
+(« un tiret pour ce qu'on ne sait pas ») n'est jamais écrite une seule fois,
+quelque part où un test peut l'atteindre.
+
+
+---
+
+## D106 — Signer, c'est engager : ce qui a été tapé ne compte pas
+
+*8 octobre 2026 — S52.*
+
+**Le problème.** Le commanditaire a tranché : un compte de gérant s'efface
+« seulement si rien n'a été signé ». Reste à dire ce que « signer » veut dire,
+et la réponse décide tout — trop large, et plus aucun compte ne s'efface jamais ;
+trop étroite, et un compte qui tient de l'argent disparaît avec son nom.
+
+**Ce qui était en jeu.** Chaque document du produit porte `createdBy`, imposé à
+l'écriture par `traceCreation` dans `firestore.rules`. Compter *toutes* les
+collections aurait rendu la question triviale à poser — et sa réponse presque
+toujours « non ». Un gérant qui a déclaré une marque « Yamaha » le premier jour
+serait indéboulonnable pour l'éternité, et l'arbitrage du commanditaire se serait
+retourné en interdiction pure : la fonction aurait existé sans jamais aboutir.
+
+**Décision.** La question se pose à **cinq** collections, celles qui engagent de
+l'argent ou du stock : `ventesMotos`, `ventesPieces`, `encaissements`,
+`cloturesCaisse`, `mouvementsPieces`. Pas les référentiels, pas les clients, pas
+les fournisseurs, pas les arrivages.
+
+La frontière n'est pas « a-t-il écrit ? » mais « son nom doit-il rester lisible
+pour qu'on comprenne un mouvement d'argent ? ». Une marque est une entrée de
+catalogue : qui l'a tapée n'éclaire rien. Un encaissement est une affirmation
+— *j'ai reçu cette somme* — et le nom qui la porte fait partie de ce qu'elle
+affirme.
+
+**Ce que la décision laisse passer, et c'est assumé.** Un compte qui n'a créé
+qu'un client ou qu'un fournisseur s'efface, et ces documents gardent un
+`createdBy` qui ne désigne plus personne. Ils portent aussi `createdByName`,
+recopié à la saisie : le nom reste lisible là où il sert. C'est exactement le
+partage retenu ailleurs dans le produit — l'identifiant pour la machine, le nom
+figé pour la personne qui lit (`lib/repositories/ventes.ts`, D56).
+
+**Où la règle vit.** Dans `supprimerGerant` (`functions/src/index.ts`), et nulle
+part ailleurs : le navigateur ne pourrait pas la rejouer sans des lectures que
+les règles refusent au gérant, et une seconde version de cette règle serait une
+occasion de diverger. L'écran annonce la condition d'avance, et affiche le refus
+du serveur tel quel (`components/SupprimerGerantModal.tsx`).
+
+## D107 — Un papier a un seul endroit où il vit, et le mot qui le nomme n'en désigne qu'un
+
+*S53, 15 octobre 2026. Le commanditaire, après des mois d'usage : « trop de
+saisies pour la même carte », « le logiciel ne suit pas le vrai circuit »,
+« trop d'écrans pour ça ».*
+
+**Le mot « carte » désignait sept choses dans le produit, et rien ne les
+reliait.** L'inventaire du 9 octobre :
+
+| Où | Ce que ça voulait dire | Posé par |
+|----|------------------------|----------|
+| `motos.papiersFournis` | une liste de texte libre, occasion seulement | S4 |
+| `motos.quittanceChemin`, `motos.cmcChemin` | deux scans dans Storage | S11 |
+| `motos.cmcRecu` | une case : la carte est-elle dans le tiroir ? | S43 |
+| `ventesMotos/{id}/documents/{…}` | trois documents, cinq statuts, deux parcours | S11, S30 |
+| `ventesMotos/{id}.carteGrise` | une case au comptoir : « part avec la moto » | S44 |
+| `prestataires.typesDocuments` | une énumération à une seule valeur | S30, amputée en S48 |
+| `.plaque-code`, `BandeauEtat` | la métaphore visuelle du produit | S28 |
+
+Le septième n'est pas une donnée : c'est la palette, née de la plaque jaune
+d'immatriculation. Il explique pourquoi `grep plaque` rend une centaine de
+fichiers, et **toute suppression doit l'exclure explicitement** — sinon on
+enlève le design en croyant enlever une fonctionnalité.
+
+**Celui qui survit est le quatrième, et réduit.** Le document de dossier reste,
+mais il ne garde pour la quittance et le CMC qu'un seul fait : *ce papier est
+sans objet pour cette vente*. Tout le reste se calcule à la lecture (D61).
+
+**La décision.** Un papier a **un seul endroit où il vit**, et les écrans n'en
+sont que des lecteurs :
+
+| Papier | Où vit sa disponibilité | Où vit sa remise |
+|--------|-------------------------|------------------|
+| Quittance | `motos.quittanceRecue` | `ventesMotos.emporte.quittance` |
+| CMC | `motos.cmcRecu` | `ventesMotos.emporte.cmc` |
+| Carte grise | son statut stocké | — (le retour est le terme) |
+
+**Pourquoi la carte grise échappe à la règle.** Elle a une vie **dehors**, chez
+quelqu'un, que ni la moto ni la vente ne connaissent. Son statut stocké est donc
+la seule source possible — et c'est ce qui justifie qu'elle garde seule un cycle.
+
+**Ce que ça rend impossible, et c'est tout l'intérêt.** Le CMC était suivi à deux
+endroits qui ne se parlaient jamais : `motos.cmcRecu` disait « la carte est là »
+pendant que le document du dossier disait « à faire ». Les recoller à la lecture
+ne répare pas la contradiction, elle la rend **inexprimable** — il n'y a plus
+deux champs à synchroniser, il y en a un.
+
+**Le prix, et il est réel.** L'écran des dossiers ne chargeait pas les motos. Il
+lui faut une écoute de plus — celle du stock du périmètre, que l'écran des motos
+tient déjà. Si elle s'avère coûteuse, le repli est de ne calculer l'état que sur
+la fiche de la vente, où la moto est déjà chargée. À décider sur mesure.
+
+**Le corollaire de vocabulaire, sans lequel la confusion repousse.** « Papiers
+fournis » devient « Notes du vendeur » à l'écran : c'est une note sur une
+occasion, pas un document à suivre. Et aucun exemple de test ne reprend le nom
+d'un papier du dossier comme valeur de texte libre — `lib/domain/moto.test.ts`
+prenait « Carte grise », et figeait le symptôme noir sur blanc.
+
+**La leçon de méthode, payée deux fois.** Deux secondes écritures d'un même
+chemin ont survécu au changement et n'ont été trouvées que par un test de bout
+en bout : `transitionDossierAutorisee` dans `firestore.rules` autorisait encore
+un passage que le domaine venait de retirer, et `PARCOURS_*` dans
+`lib/domain/dossier.ts` annonçait encore une étape que plus aucun geste
+n'atteint. Quand une règle est écrite deux fois — ici par nécessité, le serveur
+devant juger sans le client (D27) —, **la changer d'un côté ne la change pas de
+l'autre**, et seul un test qui traverse les deux le dit.
+
+### Amendement S53 — Un groupement n'a pas d'état : il se recompte
+
+Le **paquet de cartes grises** groupe un dépôt sans le remplacer. Quatre choses
+en découlent, et il faut les dire ensemble parce que c'est leur conjonction qui
+tient.
+
+**Chaque document garde ses champs de dépôt.** Les règles Firestore évaluent
+chaque écriture d'un lot contre l'état d'**avant** le lot : un document validé
+contre un paquet créé dans le même lot serait refusé. `depotRenseigne` reste
+donc vrai mot pour mot, et le paquet n'est qu'une **couche de regroupement**
+par-dessus un modèle qui tient déjà. Les écrans de dossier existants continuent
+de fonctionner sans rien savoir de lui.
+
+**Le paquet n'a pas d'état « rendu ».** Il est soldé quand aucune de ses cartes
+n'est plus dehors, ce qui se calcule. Lui donner un champ rouvrirait la
+contradiction B sous un autre nom — le champ dirait « rendu » pendant qu'une
+carte serait encore chez le prestataire, et il faudrait un geste pour les
+raccorder. C'est aussi ce qui rend le **retour partiel gratuit** : cinq cartes
+revenues sur dix ne demandent rien à personne, et c'est exactement l'arbitrage 9
+(« il peut partir avec 10 et ramener 5 »). Le `hasOnly` de la règle est ce qui
+empêche de réintroduire ce champ par bonne intention, et un test le fige.
+
+**L'avance sort une fois, et se répartit.** Un seul encaissement, dont
+l'`origineRefId` est le paquet : dix sorties de 15 000 feraient croire à dix
+décisions et rendraient le journal illisible. Mais chaque document porte sa
+**part**, pas le total — sans cela, dix documents à 150 000 feraient lire
+1 500 000 sortis de la caisse à qui ouvre les dossiers un par un. Le reste de la
+division entière va à la première carte.
+
+Elle se range dans un poste de dépense **sans `posteId`** : S55 replie
+`libelleDuPoste` sur l'origine quand aucun poste n'est posé, et
+`avance_prestataire` en est une. Inventer une ligne de référentiel ferait
+dépendre un dépôt de l'existence d'un poste.
+
+**La borne vient du calcul.** Un lot Firestore accepte 500 écritures ; un paquet
+en fait `2N + 2` — lui-même, puis par carte une mise à jour et une ligne
+d'historique, plus l'encaissement. `2N + 2 ≤ 500` donne **249**. C'est un
+plafond et non une cible — le geste réel en tend dix —, mais une borne choisie
+au hasard se révèle un jour fausse dans le mauvais sens, alors que celle-ci est
+la limite au-delà de laquelle l'écriture échouerait en bloc, sans message utile.
+
+**Ce que les règles ne peuvent pas prouver, et comment on le prouve quand même.**
+Aucune règle ne peut vérifier que les `venteIds` du paquet correspondent aux
+documents mis à jour dans le même lot : les règles ne savent pas joindre. Ce que
+la base garantit — et qui suffit — c'est qu'un lot est accepté ou refusé **en
+bloc**. Le test le prouve donc par la conséquence : après le refus d'une écriture
+du lot, le paquet, première écriture et valide à elle seule, **n'existe pas**.
+
+### La dernière conséquence, tirée le 16 octobre 2026 : le dossier n'ouvre plus qu'un document
+
+S53bis a retiré la quittance et le CMC du dossier à la demande du
+commanditaire. Les documents, eux, continuaient d'être **créés à chaque
+vente** : deux par vente, que plus aucun lecteur n'ouvrait — les trois
+(`dossiersEnAttente`, `DossierDocuments`, l'écran des dossiers) filtrent par
+`passeParUnPrestataire`. De la donnée morte, qui s'accumule, et que la règle
+interdit d'effacer.
+
+`documentDossierValide` n'accepte donc plus que `carte_grise` **à la
+création**, et le lot de vente passe de six écritures à quatre.
+
+**L'asymétrie est la même que partout ailleurs dans ce dépôt** :
+`documentDossierMaj` ne revalide pas le type, donc les `plaque`, `quittance` et
+`cmc` déjà en base restent lisibles et corrigeables. On ferme la porte
+d'entrée, pas celle de la réparation — comme `typesACreer` pour les
+prestataires, et comme S48 l'avait fait pour `plaque`.
+
+**Ce qui ne bouge pas, et qu'il ne faut pas confondre.** `TypeDocument` garde
+ses trois valeurs : le mot « quittance » désigne encore un **papier** —
+`motos.quittanceRecue`, `ventesMotos.emporte.quittance`, la case du comptoir,
+la ligne du reçu. Seul le *document de dossier* disparaît. Les confondre
+casserait le reçu.
+
+**Les documents déjà écrits restent**, sur la préversion comme ailleurs :
+`allow delete: if false` est voulu — `non_applicable` est la façon d'écarter un
+papier, et elle laisse une trace. Les effacer serait une migration, qui se
+demande.
+
+---
+
+## D108 — Le portail du prestataire : une fonction est la seule porte, et il n'y a pas de solde
+
+*S56, 16 octobre 2026. Le commanditaire, le 15 octobre : « chaque prestataire
+doit avoir un lien de suivi de tous les dossiers pris avec l'entreprise,
+l'historique, en cours. Et limité à ça uniquement, les avances prises,
+soldes… »*
+
+**Trois décisions ont été prises sans arbitrage humain, et les voici.**
+
+### 1. Aucune lecture publique de Firestore
+
+Le chemin court existait : une collection `suiviPrestataire/{jeton}` en
+`allow read: if true`. Il est refusé, pour deux raisons qui se cumulent.
+
+Les **règles Firestore ne savent pas joindre**. Montrer les cartes d'un
+prestataire demande de lire `ventesMotos/*/documents`, les ventes, les motos et
+les clients ; aucune règle ne peut autoriser « ces documents-là, parce que ce
+jeton-ci ». Il faudrait donc **recopier** le suivi dans un document public et
+tenir cette copie à jour par des déclencheurs — la contradiction B de S53,
+réintroduite à l'extérieur. Et une copie publique est un endroit où un champ de
+coût se glisse un jour par inadvertance : **le mur de D2 redeviendrait une
+affaire de vigilance.**
+
+La porte est donc une **fonction HTTP**, appelée depuis le serveur Next. Trois
+propriétés en découlent, et aucune ne demande d'entretien :
+
+- Firestore reste fermé. Un test de règles prouve qu'un visiteur non
+  authentifié ne lit rien.
+- La fonction **n'ouvre jamais `prive/`**. Ce n'est pas une précaution, c'est
+  l'absence de code pour le faire — et un test de déclencheur sème un coût pour
+  le vérifier par ce qui sort.
+- Ce que le prestataire voit est un **type**, relu par un contrôleur qui refuse
+  tout champ de trop. La non-fuite est un test, plus une intention.
+
+### 2. Pas de solde : « Avances reçues », et c'est tout
+
+Le commanditaire avait demandé « les avances prises, soldes… ». Le portail ne
+montre que la première moitié.
+
+**Le produit ne sait pas ce qu'un travail coûte.** `lotsCartesGrises` et les
+documents de dossier portent une **avance**, et rien d'autre : aucun prix
+convenu avec le prestataire, aucun règlement final. Le solde n'est pas difficile
+à calculer — **les deux termes de la soustraction n'existent pas.**
+
+Le mot n'apparaît pas non plus à zéro, et un test le fige : un fournisseur qui
+lit « solde : 0 » comprend « on ne me doit rien », ce que le produit n'est pas
+en mesure d'affirmer. Afficher un solde faux à un fournisseur est pire que ne
+pas l'afficher.
+
+Le prix convenu et le règlement sont une **spec à part**, qui touche la caisse
+et les postes de dépense de S55.
+
+### 3. Le portail est en ligne seulement — exception nommée à D40
+
+Pas de cache, pas de service worker, pas de lecture hors réseau. Le prestataire
+consulte depuis chez lui, pas depuis un comptoir en coupure. La route n'entre
+donc pas dans `ECRANS_HORS_LIGNE` — et elle ne le **peut** pas : une route à
+jeton variable n'a pas d'URL à précharger, et une entrée qui rend 404 empêche le
+service worker de s'installer, ce qui fait tomber le hors-ligne **en entier**
+(le défaut de `/diagnostic`, S54).
+
+Quand le réseau manque, la page le **dit**. Elle ne reste pas blanche, et elle
+ne se déguise pas en « lien invalide » — sinon le prestataire jetterait un lien
+parfaitement valable.
+
+### Ce que ces décisions coûtent, écrit noir sur blanc
+
+**Le lien est le mot de passe.** Qui l'a entre. Le jeton fait 32 octets tirés au
+hasard par le serveur, il ne donne accès qu'à un prestataire, régénérer révoque
+l'ancien immédiatement, et la page porte `noindex`. Mais il n'identifie pas une
+personne : il n'y a aucune trace de *qui* a regardé, et c'est assumé.
+
+**Le jeton est lisible par tout compte connecté.** Il vit sur
+`prestataires/{id}`, dont la règle est `allow read: if connecte()`. Un gérant ne
+voit pas l'écran qui l'affiche — il est derrière `gerer_referentiels`, réservé
+au responsable — mais rien ne l'empêche de lire le document. Ce qu'il y
+gagnerait est un lien vers des données qu'il voit déjà dans l'application. **Le
+jour où ce ne serait plus vrai, ce champ doit descendre dans une sous-collection
+`prive/`, comme les coûts (D2).**
+
+**Un piège a été trouvé avant d'être payé.** `prestataireValide` impose son
+`hasOnly` en modification aussi : dès qu'une fonction pose `jetonSuivi` sur une
+fiche, le document porte un champ de trop et **plus personne ne peut y corriger
+un numéro de téléphone**. Le refus se lirait comme un défaut de droits — le
+blocage vécu sur `sandwini` le matin même. La règle accepte donc les deux champs
+du jeton **et interdit au client d'y toucher** : on ouvre la serrure sans ouvrir
+la porte, comme `typesACreer`.

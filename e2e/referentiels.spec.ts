@@ -1,10 +1,12 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 import { IDENTITE } from "@/lib/domain/entreprise";
 import {
   attendreLaFileVide,
   contenu,
   emailUnique,
   nomUnique,
+  ouvrirOnglet,
+  panneau,
   seConnecter,
   seConnecterEtEntrer,
 } from "./aide";
@@ -17,12 +19,6 @@ import {
  * un stock en deux, un modèle rangé sous la mauvaise marque ne se retrouve
  * plus, et un reçu sans en-tête part chez un client tel quel.
  */
-
-function section(page: Page, titre: string) {
-  return page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: titre }) });
-}
 
 test.describe("identité de l’entreprise", () => {
   /* Depuis D71 il n'y a plus rien à saisir ici : l'identité est une constante
@@ -85,7 +81,7 @@ test.describe("marques et modèles", () => {
   test("un modèle se range sous sa marque, et sous elle seule", async ({
     page,
   }) => {
-    const marques = section(page, "Marques");
+    const marques = panneau(page, "Marques");
     const premiere = nomUnique("Yamaha");
     const seconde = nomUnique("TVS");
 
@@ -101,7 +97,8 @@ test.describe("marques et modèles", () => {
       marques.getByRole("listitem").filter({ hasText: seconde }),
     ).toBeVisible();
 
-    const modeles = section(page, "Modèles");
+    await ouvrirOnglet(page, "Modèles");
+    const modeles = panneau(page, "Modèles");
     await modeles.getByLabel("Marque").selectOption({ label: premiere });
 
     const modele = nomUnique("Crux");
@@ -121,7 +118,7 @@ test.describe("marques et modèles", () => {
   test("le même nom écrit autrement est refusé — sinon le stock se coupe en deux", async ({
     page,
   }) => {
-    const marques = section(page, "Marques");
+    const marques = panneau(page, "Marques");
     const nom = nomUnique("Apsonic");
 
     await marques.getByLabel("Ajouter une marque").fill(nom);
@@ -148,7 +145,7 @@ test.describe("provenances et frais", () => {
       .getByRole("heading", { name: "Provenances et frais", level: 1 })
       .waitFor();
 
-    const provenances = section(page, "Provenances");
+    const provenances = panneau(page, "Provenances");
     const nom = nomUnique("Import");
     await provenances.getByLabel("Ajouter une provenance").fill(nom);
     await provenances.getByRole("button", { name: "Ajouter" }).click();
@@ -168,7 +165,10 @@ test.describe("provenances et frais", () => {
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/referentiels", { waitUntil: "load" });
 
-    const frais = section(page, "Types de frais");
+    /* Les types de frais sont dans le second onglet depuis S54 : l'écran
+       s'ouvre sur les provenances. */
+    await ouvrirOnglet(page, "Types de frais");
+    const frais = panneau(page, "Types de frais");
     const avant = nomUnique("Transport");
     const apres = nomUnique("Transport et douane");
 
@@ -203,9 +203,11 @@ test.describe("prestataires", () => {
       .waitFor();
 
     const nom = nomUnique("Kaboré");
-    const formulaire = page.locator("form").filter({
-      has: page.getByRole("button", { name: "Enregistrer le prestataire" }),
-    });
+    /* La création est passée en modale (S54) : l'écran s'ouvre sur la liste.
+       Le bouton d'envoi vit dans le pied de la modale, hors du `<form>` —
+       c'est le dialogue qu'on vise, pas le formulaire. */
+    await page.getByRole("button", { name: "Ajouter un prestataire" }).click();
+    const formulaire = page.getByRole("dialog");
     await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
     await formulaire.getByLabel("Téléphone").fill("70 11 22 33");
     await formulaire.getByLabel("Carte grise").check();
@@ -224,9 +226,8 @@ test.describe("prestataires", () => {
     await seConnecterEtEntrer(page);
     await page.goto("/parametres/prestataires", { waitUntil: "load" });
 
-    const formulaire = page.locator("form").filter({
-      has: page.getByRole("button", { name: "Enregistrer le prestataire" }),
-    });
+    await page.getByRole("button", { name: "Ajouter un prestataire" }).click();
+    const formulaire = page.getByRole("dialog");
     await formulaire
       .getByLabel("Nom", { exact: true })
       .fill(nomUnique("Sans document"));
@@ -251,9 +252,8 @@ test.describe("droits", () => {
 
     const email = emailUnique("referentiels");
     const motDePasse = "gerant-referentiels-1";
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation
       .getByLabel("Nom", { exact: true })
       .fill("Gérant sans réglages");

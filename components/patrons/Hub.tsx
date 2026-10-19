@@ -27,16 +27,27 @@ export function Hub({ destinations }: { destinations: readonly Destination[] }) 
             className="flex items-center gap-4 px-4 py-4 hover:bg-survol"
           >
             <destination.icone aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
-            <span className="min-w-0 flex-1">
-              <span className="block font-medium text-encre">{destination.libelle}</span>
-              <span className="block text-corps text-encre-doux">{destination.quoi}</span>
+            {/* Le compte passe **sous** la phrase tant que l’écran est étroit,
+                et revient à côté d’elle dès qu’il y a la place. Posé en colonne
+                fixe à 390 px, il ne laissait que cent cinquante pixels au
+                texte, et la phrase des boutiques sortait en quatre lignes de
+                trois mots — vu sur la capture de S44. Depuis que le hub ne
+                s’affiche plus que là où la colonne de gauche n’existe pas,
+                c’est le seul rendu qu’il ait. */}
+            <span className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-4">
+              <span className="block min-w-0 sm:flex-1">
+                <span className="block font-medium text-encre">{destination.libelle}</span>
+                <span className="block text-corps text-encre-doux">{destination.quoi}</span>
+              </span>
+              {/* Ce qu’on y trouverait, dit avant d’y aller. « 3 prestataires » et
+                  « aucun prestataire » ne demandent pas la même visite — et sur une
+                  installation neuve, c’est ce compte qui dit ce qui reste à poser. */}
+              {destination.etat && (
+                <span className="mt-1 block text-legende text-encre-doux sm:mt-0 sm:shrink-0 sm:text-right">
+                  {destination.etat}
+                </span>
+              )}
             </span>
-            {/* Ce qu’on y trouverait, dit avant d’y aller. « 3 prestataires » et
-                « aucun prestataire » ne demandent pas la même visite — et sur une
-                installation neuve, c’est ce compte qui dit ce qui reste à poser. */}
-            {destination.etat && (
-              <span className="shrink-0 text-legende text-encre-doux">{destination.etat}</span>
-            )}
             <ChevronRight aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
           </Link>
         </li>

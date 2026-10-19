@@ -3,14 +3,22 @@
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { EtatVide } from "@/components/patrons/Etats";
 import { LIBELLE_ORIGINE, montantSigne, type Mouvement } from "@/lib/domain/caisse";
-import { formaterHeure, formaterNombre } from "@/lib/domain/format";
+import {
+  compter,
+  formaterDateCourte,
+  formaterHeure,
+  formaterNombre,
+} from "@/lib/domain/format";
 import { LIBELLE_MOYEN } from "@/lib/domain/vente";
 
 /**
  * Le journal d’une journée de caisse (`c2:84-149`).
  *
  * Six colonnes, une par question qu’on se pose en relisant sa journée : *quand,
- * quelle pièce, de quelle nature, pour qui, par quel moyen, combien*. C’est le
+ * de quelle nature, sur quelle pièce, saisi par qui, par quel moyen, combien*.
+ * La sixième — « saisi par » — a été posée en S55 : la donnée était là depuis
+ * S8 et ne s’affichait nulle part, alors que c’est la première chose qu’on
+ * demande quand le compte ne tombe pas. C’est le
  * patron `Tableau` du produit et non une liste de cartes — des montants qu’on
  * ne peut pas lire les uns sous les autres ne se comparent pas, et une caisse
  * ne se relit que par comparaison.
@@ -25,19 +33,49 @@ export function JournalCaisse({
   mouvements,
   chargement,
   jourEstPasse,
+  avecDate,
+  nomDuPoste,
 }: {
   mouvements: Mouvement[];
   chargement: boolean;
-  /** Une journée passée sans mouvement n’est pas la même chose qu’une journée qui commence. */
+  /**
+   * Nomme le poste d'une dépense, pour la colonne « Objet ».
+   *
+   * **Le détail d'une dépense est devenu facultatif en S55**, et sans ce
+   * repli la colonne affichait un tiret : le journal perdait la raison de la
+   * sortie au moment même où l'écran de saisie cessait de l'exiger. Le poste
+   * la porte désormais — « Loyer » vaut mieux qu'un tiret, et c'est ce que le
+   * gérant a effectivement choisi.
+   */
+  nomDuPoste?: (id: string) => string;
+  /**
+   * La période couvre plus d'une journée : la date doit alors précéder l'heure.
+   *
+   * **Sans ce drapeau, le passage au mois rendait le journal illisible (S55).**
+   * La colonne n'affichait que l'heure — ce qui suffisait tant que l'écran ne
+   * montrait qu'un jour. Sur un mois, « 15:00 » se retrouvait au-dessus de
+   * « 08:00 » parce qu'ils venaient de deux journées différentes, et plus rien
+   * ne disait laquelle. Sur une seule journée, répéter la date à chaque ligne
+   * serait du bruit : d'où le drapeau plutôt qu'une date systématique.
+   */
+  avecDate: boolean;
+  /** Une période passée sans mouvement n’est pas la même chose qu’une journée qui commence. */
   jourEstPasse: boolean;
 }) {
   const colonnes: Colonne<Mouvement>[] = [
     {
       cle: "heure",
-      titre: "Heure",
+      titre: avecDate ? "Quand" : "Heure",
       chiffre: true,
-      rendu: (mouvement) => (mouvement.date ? formaterHeure(mouvement.date) : "—"),
+      rendu: (mouvement) => {
+        if (!mouvement.date) return "—";
+        const heure = formaterHeure(mouvement.date);
+        return avecDate ? `${formaterDateCourte(mouvement.date)} ${heure}` : heure;
+      },
     },
+    /* L'origine, et non le poste de dépense : celui-ci se lit dans l'écran
+       « Dépenses », avec son historique et ses totaux. Le journal dit ce qui
+       s'est passé ; le classement comptable vit à côté (S55). */
     { cle: "nature", titre: "Nature", rendu: (m) => LIBELLE_ORIGINE[m.origine] },
     {
       cle: "objet",
@@ -57,7 +95,32 @@ export function JournalCaisse({
          qui semblait parfaite parce que le semis écrivait ce que le produit
          n'écrit pas. Le manque est au backlog (S35) — il se comble en écrivant
          le nom dans le libellé à l'encaissement, ce qui touche S8 et S9. */
-      rendu: (mouvement) => mouvement.libelle || <span className="text-encre-doux">—</span>,
+      rendu: (mouvement) => {
+        if (mouvement.libelle) return mouvement.libelle;
+        /* Le poste prend le relais quand le détail est vide : il dit toujours
+           où l'argent est parti, ce qu'un tiret ne dit pas. */
+        if (mouvement.posteId && nomDuPoste) return nomDuPoste(mouvement.posteId);
+        return <span className="text-encre-doux">—</span>;
+      },
+    },
+    {
+      /**
+       * **Qui a saisi — et non pour qui (S55).** La maquette demandait une
+       * colonne « Qui » en pensant au **client** ; celle-ci nomme l'opérateur.
+       * Ce n'est pas la même question, et il ne faut pas que l'une passe pour
+       * l'autre : le client reste au backlog (S35), faute d'être écrit dans un
+       * encaissement.
+       *
+       * Celle-ci se rend tout de suite parce que la donnée est déjà là —
+       * `createdByName` est sur chaque mouvement depuis S8 — et parce qu'elle
+       * répond à la première question qu'on pose quand le tiroir est court le
+       * soir : qui était au comptoir. Un livre de caisse sans nom sur ses
+       * lignes ne se vérifie pas.
+       */
+      cle: "operateur",
+      titre: "Saisi par",
+      rendu: (mouvement) =>
+        mouvement.operateur || <span className="text-encre-doux">—</span>,
     },
     { cle: "moyen", titre: "Moyen", rendu: (m) => LIBELLE_MOYEN[m.moyenPaiement] },
     {
@@ -80,9 +143,9 @@ export function JournalCaisse({
 
   if (!chargement && mouvements.length === 0) {
     return (
-      <EtatVide titre={jourEstPasse ? "Rien ce jour-là" : "Rien encore aujourd’hui"}>
+      <EtatVide titre={jourEstPasse ? "Rien sur cette période" : "Rien encore aujourd’hui"}>
         {jourEstPasse
-          ? "Aucun mouvement n’a été enregistré ce jour-là — la boutique était fermée, ou tout s’est fait ailleurs."
+          ? "Aucun mouvement n’a été enregistré sur cet intervalle — la boutique était fermée, ou tout s’est fait ailleurs."
           : "Les ventes, les versements et les sorties d’espèces apparaîtront ici au fur et à mesure."}
       </EtatVide>
     );
@@ -97,23 +160,23 @@ export function JournalCaisse({
         <h2 className="text-bloc font-bold tracking-tight text-encre">Les mouvements</h2>
 
         {/* Le comptage se lit avant le tableau. Il sert deux fois : il dit
-            d'abord que la journée arrive, puis combien elle a compté — et
+            d'abord que la période arrive, puis combien elle a compté — et
             « 6 mouvements » se rapproche du carnet qu'on tenait avant, où l'on
             comptait les lignes du doigt. `aria-live` sans `role` : la coquille
             n'a qu'un seul `status`, et c'est le bandeau réseau. */}
         <p aria-live="polite" aria-atomic="true" className="ml-auto text-corps text-encre-doux">
           {chargement ? (
-            "Lecture de la journée…"
+            "Lecture des mouvements…"
           ) : (
             <strong className="font-semibold text-encre">
-              {mouvements.length === 1 ? "1 mouvement" : `${mouvements.length} mouvements`}
+              {compter(mouvements.length, "mouvement")}
             </strong>
           )}
         </p>
       </div>
 
       <Tableau
-        legende="Mouvements de caisse de la journée, du plus ancien au plus récent"
+        legende="Mouvements de caisse de la période, du plus ancien au plus récent"
         colonnes={colonnes}
         lignes={mouvements}
         cleDe={(mouvement) => mouvement.id}

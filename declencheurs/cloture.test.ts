@@ -24,7 +24,12 @@ process.env.FIRESTORE_EMULATOR_HOST = FIRESTORE;
 process.env.GCLOUD_PROJECT = PROJET;
 
 const BOUTIQUE = "CLO";
-const TYPES = ["quittance", "cmc", "carte_grise", "plaque"] as const;
+/* Trois depuis S48 : la plaque a quitté le dossier, l'immatriculation étant
+   obtenue avec la carte grise. C'est donc la carte grise qui joue « le document
+   qui traîne » — sans quoi ce test resterait vert en laissant en souffrance un
+   type que plus personne ne compte. */
+const TYPES = ["quittance", "cmc", "carte_grise"] as const;
+const QUI_TRAINE = "carte_grise";
 
 let base: Firestore;
 let rang = 0;
@@ -78,25 +83,45 @@ const audit = {
   updatedByName: "Test",
 };
 
-/** Écrit une vente et ses quatre documents dans l'état demandé. */
+/**
+ * Écrit une vente et ses trois documents dans l'état demandé.
+ *
+ * **Le décor a changé avec S53.** Un papier ne se clôt plus en passant par
+ * `remis_client` sur le dossier : la quittance et le CMC se closent parce que
+ * la VENTE dit que le client est parti avec, et la carte grise parce qu'elle
+ * est revenue du prestataire. Écrire `remis_client` ici ne prouverait plus
+ * rien — c'est un statut que le produit n'écrit plus.
+ */
 async function poser(options: {
   soldee: boolean;
   motoRemise: boolean;
   documents: "tous_regles" | "un_en_cours";
+  /* Ce que le client a emporté, quand le cas testé n'est pas « tout est
+     parti ». Il se pose à la CRÉATION de la vente et non après : le
+     déclencheur clôt, il ne réouvre jamais, donc une vente déjà close ne
+     redevient pas ouverte parce qu'on décoche une case. Un test qui posait
+     `emporte` après coup observait donc une clôture déjà prononcée. */
+  emporte?: { quittance: boolean; cmc: boolean };
 }): Promise<{ venteId: string }> {
   rang += 1;
   const venteId = `${BOUTIQUE}-cloture-${rang}-${Date.now()}`;
   const reference = base.doc(`ventesMotos/${venteId}`);
+  const complet = options.documents === "tous_regles";
 
   /* Les documents d'abord, la vente ensuite : chaque écriture réveille les
      déclencheurs, et on veut que la dernière trouve le dossier complet. */
   for (const type of TYPES) {
-    const regle = options.documents === "tous_regles" || type !== "plaque";
+    /* La carte grise est celle qui traîne (voir `QUI_TRAINE`) : son retour est
+       le seul statut qui la clôt, donc son absence de retour est ce qui bloque. */
+    const statut = type === QUI_TRAINE && !complet ? "chez_prestataire" : "revenu_magasin";
     await reference.collection("documents").doc(type).set({
       boutiqueId: BOUTIQUE,
       venteId,
       type,
-      statut: regle ? "remis_client" : "a_faire",
+      /* La quittance et le CMC restent `a_faire` : ce n'est plus leur statut qui
+         les clôt, et un `revenu_magasin` sur eux serait un état que le produit
+         n'écrit plus depuis que `CHEMIN_SANS_ETAPE` l'interdit. */
+      statut: type === QUI_TRAINE ? statut : "a_faire",
       ...audit,
     });
   }
@@ -105,6 +130,12 @@ async function poser(options: {
     boutiqueId: BOUTIQUE,
     statutPaiement: options.soldee ? "solde" : "partiel",
     motoRemise: options.motoRemise,
+    /* Ce que le client a emporté : c'est lui qui clôt les deux papiers de main.
+       Un dossier dont le CMC n'est pas parti ne se clôt pas, même si tout le
+       reste est en ordre — et c'est ce que `un_en_cours` ne teste PAS, puisqu'il
+       bloque sur la carte grise. Les deux voies de blocage ont chacune son
+       test. */
+    emporte: options.emporte ?? { quittance: true, cmc: true },
     statutDossier: "ouvert",
     dateClotureDossier: null,
     ...audit,
@@ -113,18 +144,43 @@ async function poser(options: {
   return { venteId };
 }
 
-async function attendreStatut(venteId: string, attendu: string, budget = 30_000): Promise<void> {
+/**
+ * Attend que le déclencheur ait fait son travail.
+ *
+ * **Le budget par défaut est de 60 s, et ce n'est pas de la marge gratuite.**
+ * Ce test n'affirme rien sur la vitesse : il affirme que le dossier *finit* par
+ * se clore. Le réveil, quelques lignes plus haut, s'accorde 90 s — sur une
+ * machine où un aller-retour de déclencheur peut prendre ce temps-là, un budget
+ * de 30 s ne mesure plus la clôture, il mesure la charge de l'émulateur. Il a
+ * rendu un rouge sur trois passes, vert à chaque fois que le fichier tournait
+ * seul : un verdict qui dépend de qui tourne à côté n'est pas un verdict (S27).
+ */
+async function attendreStatut(venteId: string, attendu: string, budget = 60_000): Promise<void> {
   const limite = Date.now() + budget;
   while (Date.now() < limite) {
     const vente = await base.doc(`ventesMotos/${venteId}`).get();
     if (vente.get("statutDossier") === attendu) return;
     await new Promise((suite) => setTimeout(suite, 500));
   }
-  throw new Error(`Le dossier ${venteId} n'est jamais passé à « ${attendu} ».`);
+  /* **Ce que le dossier valait à l'expiration.** Sans cela, le message accuse
+     le budget — « il n'est jamais passé à clos » — alors que la cause est
+     toujours l'une de trois : le paiement, la moto, ou un document. Le
+     déclencheur lit exactement ces champs ; l'échec doit les montrer. */
+  const vente = await base.doc(`ventesMotos/${venteId}`).get();
+  const documents = await base.collection(`ventesMotos/${venteId}/documents`).get();
+  const etat = vente.exists
+    ? `statutDossier=${vente.get("statutDossier")} statutPaiement=${vente.get("statutPaiement")} motoRemise=${vente.get("motoRemise")}`
+    : "la vente n'existe plus";
+  const papiers = documents.docs
+    .map((document) => `${document.get("type")}:${document.get("statut")}`)
+    .join(" ");
+  throw new Error(
+    `Le dossier ${venteId} n'est jamais passé à « ${attendu} ». ${etat} · documents [${papiers || "aucun"}]`,
+  );
 }
 
 describe("clôture automatique", () => {
-  it("clôt le dossier quand tout est remis, soldé et livré", async () => {
+  it("clôt le dossier quand la carte grise est revenue, la vente soldée et la moto livrée", async () => {
     const { venteId } = await poser({
       soldee: true,
       motoRemise: true,
@@ -149,6 +205,23 @@ describe("clôture automatique", () => {
     await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
   });
 
+  /* **Le changement du 16 octobre 2026, côté serveur.** Le client n'est pas
+     parti avec son CMC, et le dossier se clôt quand même : la quittance et le
+     CMC ont quitté le dossier, ils se cochent sur le lot à l'arrivée.
+
+     Ce test disait exactement le contraire jusqu'à cette date. Il est inversé
+     plutôt que supprimé : c'est la même question qui se pose, et la réponse a
+     changé — l'effacer aurait laissé la nouvelle règle sans témoin au serveur. */
+  it("clôt même si le client n’est pas parti avec son CMC", async () => {
+    const { venteId } = await poser({
+      soldee: true,
+      motoRemise: true,
+      documents: "tous_regles",
+      emporte: { quittance: true, cmc: false },
+    });
+    await attendreStatut(venteId, "clos");
+  });
+
   it("ne clôt pas une vente qui reste due", async () => {
     const { venteId } = await poser({
       soldee: false,
@@ -158,7 +231,7 @@ describe("clôture automatique", () => {
     await expect(attendreStatut(venteId, "clos", 8_000)).rejects.toThrow();
   });
 
-  /* Le cas des tranches : tout est payé, tous les papiers sont remis, mais la
+  /* Le cas des tranches : tout est payé, tous les papiers ont fini, mais la
      moto dort encore au magasin. Le dossier n'est pas fini. */
   it("ne clôt pas une vente soldée dont la moto n’est pas partie", async () => {
     const { venteId } = await poser({

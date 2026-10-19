@@ -20,7 +20,7 @@ import {
   where,
   writeBatch,
 } from "firebase/firestore";
-import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 /**
  * Règles sur les ventes de motos (S8).
@@ -81,8 +81,8 @@ const vente = (partie: Record<string, unknown> = {}, auteur = "ger-1") => ({
   date: hier,
   prixConvenu: 1_200_000,
   modePaiement: "comptant",
-  inclus: ["Casque"],
-  nonInclus: [],
+  carteGrise: true,
+  casque: true,
   totalPaye: 1_200_000,
   resteDu: 0,
   statutPaiement: "solde",
@@ -328,15 +328,48 @@ describe("le lot complet d’une vente", () => {
     const lot = writeBatch(base);
 
     lot.set(reference, vente());
-    for (const type of ["quittance", "cmc", "carte_grise", "plaque"]) {
-      lot.set(doc(reference, "documents", type), documentDossier({ type, venteId: reference.id }));
-    }
+    /* **Un seul document depuis le 16 octobre 2026** : trois en S8, deux après
+       S48 qui a sorti la plaque, et plus que la carte grise aujourd'hui —
+       depuis S53bis, rien ne lit une quittance ni un CMC de dossier. */
+    lot.set(
+      doc(reference, "documents", "carte_grise"),
+      documentDossier({ type: "carte_grise", venteId: reference.id }),
+    );
     lot.set(doc(collection(reference, "versements")), {
       ...versement({ venteId: reference.id, montant: 1_200_000, encaissementId: enc.id }),
     });
     lot.set(enc, encaissement({ montant: 1_200_000, origineRefId: reference.id }));
 
     await assertSucceeds(lot.commit());
+  });
+
+  /* **Le lot entier tombe si une quittance s'y glisse**, et c'est la propriété
+     qui compte : un appareil resté sur une version antérieure ne réussira pas
+     à moitié sa vente. Firestore accepte ou refuse un lot **en bloc** — le test
+     le prouve par la conséquence, en vérifiant que la vente, première écriture
+     et valide à elle seule, n'existe pas après le refus. */
+  it("un lot qui ouvre encore une quittance est refusé en entier", async () => {
+    const base = gerant();
+    const reference = doc(collection(base, "ventesMotos"));
+    const lot = writeBatch(base);
+
+    lot.set(reference, vente());
+    lot.set(
+      doc(reference, "documents", "carte_grise"),
+      documentDossier({ type: "carte_grise", venteId: reference.id }),
+    );
+    lot.set(
+      doc(reference, "documents", "quittance"),
+      documentDossier({ type: "quittance", venteId: reference.id }),
+    );
+
+    await assertFails(lot.commit());
+
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      const avecDroits = contexte.firestore();
+      const trace = await getDoc(doc(avecDroits, "ventesMotos", reference.id));
+      expect(trace.exists()).toBe(false);
+    });
   });
 
   it("le responsable vend dans n’importe quelle boutique", async () => {
@@ -438,6 +471,127 @@ describe("l’arithmétique de la vente, vérifiée côté serveur", () => {
   });
 });
 
+/* Ce qui part avec la moto se coche depuis S44. Le validateur l'exige, et
+   refuse les deux listes de texte qu'il remplace — sans quoi un ancien
+   navigateur en cache continuerait d'écrire l'ancienne forme, et la base
+   porterait deux modèles à la fois. */
+describe("ce qui part avec la moto (S44)", () => {
+  it("accepte les quatre combinaisons de cases", async () => {
+    for (const carteGrise of [true, false]) {
+      for (const casque of [true, false]) {
+        await assertSucceeds(
+          addDoc(collection(gerant(), "ventesMotos"), vente({ carteGrise, casque })),
+        );
+      }
+    }
+  });
+
+  it("refuse une vente qui ne dit pas ce qui est inclus", async () => {
+    const { carteGrise, ...sansCarteGrise } = vente();
+    void carteGrise;
+    await assertFails(addDoc(collection(gerant(), "ventesMotos"), sansCarteGrise));
+
+    const { casque, ...sansCasque } = vente();
+    void casque;
+    await assertFails(addDoc(collection(gerant(), "ventesMotos"), sansCasque));
+  });
+
+  it("refuse autre chose qu’un booléen", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "ventesMotos"), vente({ carteGrise: "oui" })),
+    );
+  });
+
+  it("refuse les deux listes d’avant S44 — elles ne s’écrivent plus", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "ventesMotos"), vente({ inclus: ["Casque"] })),
+    );
+    await assertFails(addDoc(collection(gerant(), "ventesMotos"), vente({ nonInclus: [] })));
+  });
+});
+
+describe("ce que le client a emporté (S53)", () => {
+  /* Les trois champs d'audit accompagnent tout geste : `seulsChangent` les
+     compte dans le geste, pas en plus de lui. */
+  const majDe = (champs: Record<string, unknown>, auteur = "ger-1") => ({
+    ...champs,
+    updatedAt: serverTimestamp(),
+    updatedBy: auteur,
+    updatedByName: "Auteur",
+  });
+
+  it("le gérant marque un papier emporté sur sa vente", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: true, cmc: false } }),
+      ),
+    );
+  });
+
+  /* **Point de vigilance 4 du plan.** On ne remet pas ce qu'on n'a pas — mais
+     une règle Firestore ne peut pas lire la moto pour le vérifier. Elle borne
+     donc la FORME, et l'écran tient la condition métier. Ce test fige la
+     frontière entre les deux : ce qui est refusé ici est refusé au serveur, le
+     reste est une affaire d'interface. */
+  it("refuse un emporté qui ne soit pas deux booléens", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: "oui", cmc: false } }),
+      ),
+    );
+  });
+
+  it("refuse une clé inconnue dans emporté — la carte grise n’y a pas sa place", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: true, cmc: true, carte_grise: true } }),
+      ),
+    );
+  });
+
+  it("le gérant ne marque rien d’emporté sur la vente d’une autre boutique", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-kdg"),
+        majDe({ emporte: { quittance: true, cmc: true } }),
+      ),
+    );
+  });
+
+  /* Le scan arrive au retour du prestataire, donc longtemps après la vente :
+     il doit pouvoir s'ajouter seul, sans rien d'autre. */
+  it("le gérant dépose le scan de la carte grise au retour", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ carteGriseChemin: "ventes/vente-ptg/carte-grise.jpg" }),
+      ),
+    );
+  });
+
+  /* La porte d'`update` n'admettait que deux gestes — encaisser, remettre la
+     moto. Un troisième geste ne doit pas devenir un passe-droit : rien d'autre
+     ne bouge dans la même écriture. */
+  /* Le defaut que ce prédicat a introduit, et que la suite S9 a trouvé : une
+     écriture qui ne touche que ses horodatages satisfait `seulsChangent`, et
+     ouvrait la porte à toute réécriture à l'identique. */
+  it("refuse une écriture qui ne change aucun des deux champs", async () => {
+    await assertFails(updateDoc(doc(gerant(), "ventesMotos/vente-ptg"), majDe({})));
+  });
+
+  it("refuse de changer le prix sous couvert de marquer un papier emporté", async () => {
+    await assertFails(
+      updateDoc(
+        doc(gerant(), "ventesMotos/vente-ptg"),
+        majDe({ emporte: { quittance: true, cmc: false }, prixConvenu: 1 }),
+      ),
+    );
+  });
+});
+
 describe("crédit et tranches ne se confondent pas", () => {
   it("une vente en tranches retient la moto : pas de remise, pas de date de remise", async () => {
     await assertSucceeds(addDoc(collection(gerant(), "ventesMotos"), venteTranches()));
@@ -492,7 +646,7 @@ describe("le token de suivi", () => {
   });
 });
 
-describe("le dossier naît ouvert, ses quatre documents à faire", () => {
+describe("le dossier naît ouvert, ses trois documents à faire", () => {
   it("refuse une vente qui naîtrait close ou déjà envoyée", async () => {
     await assertFails(
       addDoc(collection(gerant(), "ventesMotos"), vente({ statutDossier: "clos" })),
@@ -505,12 +659,44 @@ describe("le dossier naît ouvert, ses quatre documents à faire", () => {
   it("refuse un document de dossier qui naîtrait déjà avancé — c’est S11 qui le fera vivre", async () => {
     const base = gerant();
     const reference = doc(collection(base, "ventesMotos"));
-    for (const statut of ["chez_prestataire", "remis_client", "non_applicable"]) {
+    /* `non_applicable` a quitté cette liste avec S53 : une carte grise décochée
+       au comptoir naît « sans objet », et c'est le cas voisin qui le fige. Un
+       statut AVANCÉ reste interdit. */
+    for (const statut of ["chez_prestataire", "remis_client"]) {
       const lot = writeBatch(base);
       lot.set(reference, vente());
       lot.set(
         doc(reference, "documents", "carte_grise"),
         documentDossier({ statut, venteId: reference.id }),
+      );
+      await assertFails(lot.commit());
+    }
+  });
+
+  /* **L'arbitrage 5 de S53, vu depuis le lot de la vente.** C'est le seul
+     endroit du produit qui écrit ce statut à la création, et le chemin réel :
+     la case décochée au comptoir, dans le même `writeBatch` que la vente. */
+  it("accepte une carte grise née « sans objet » — la case du comptoir l’a décochée", async () => {
+    const base = gerant();
+    const reference = doc(collection(base, "ventesMotos"));
+    const lot = writeBatch(base);
+    lot.set(reference, vente({ carteGrise: false }));
+    lot.set(
+      doc(reference, "documents", "carte_grise"),
+      documentDossier({ statut: "non_applicable", venteId: reference.id }),
+    );
+    await assertSucceeds(lot.commit());
+  });
+
+  it("refuse la quittance et le CMC nés « sans objet » : leur disponibilité vient de la moto", async () => {
+    const base = gerant();
+    for (const type of ["quittance", "cmc"]) {
+      const reference = doc(collection(base, "ventesMotos"));
+      const lot = writeBatch(base);
+      lot.set(reference, vente());
+      lot.set(
+        doc(reference, "documents", type),
+        documentDossier({ type, statut: "non_applicable", venteId: reference.id }),
       );
       await assertFails(lot.commit());
     }
@@ -528,13 +714,30 @@ describe("le dossier naît ouvert, ses quatre documents à faire", () => {
     );
     await assertFails(inconnu.commit());
 
+    /* L'identifiant du document est un type valide, et le champ `type` en
+       nomme un autre, valide lui aussi : c'est bien le **mensonge** qu'on
+       éprouve ici, et non un type inconnu — que le cas précédent couvre déjà.
+       Avec « plaque » comme identifiant, retiré du dossier en S48, ce test
+       aurait continué de passer pour la mauvaise raison. */
     const menteur = writeBatch(base);
     menteur.set(reference, vente());
     menteur.set(
-      doc(reference, "documents", "plaque"),
+      doc(reference, "documents", "cmc"),
       documentDossier({ type: "carte_grise", venteId: reference.id }),
     );
     await assertFails(menteur.commit());
+  });
+
+  it("refuse un document « plaque » : il a quitté le dossier en S48", async () => {
+    const base = gerant();
+    const reference = doc(collection(base, "ventesMotos"));
+    const lot = writeBatch(base);
+    lot.set(reference, vente());
+    lot.set(
+      doc(reference, "documents", "plaque"),
+      documentDossier({ type: "plaque", venteId: reference.id }),
+    );
+    await assertFails(lot.commit());
   });
 
   /* Le cycle des documents appartient à S11, et se prouve dans

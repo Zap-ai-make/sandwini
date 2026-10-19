@@ -30,7 +30,14 @@ const serwist = new Serwist({
      correspondre au cache de précharge. Tout nouveau paramètre d'état d'écran
      s'ajoute ici — l'oubli ne se voit qu'en coupure. */
   precacheOptions: {
-    ignoreURLParametersMatching: [/^utm_/, /^fbclid$/, /^moto$/, /^vente$/, /^recu$/],
+    ignoreURLParametersMatching: [
+      /^utm_/,
+      /^fbclid$/,
+      /^moto$/,
+      /^vente$/,
+      /^nouvelle$/,
+      /^recu$/,
+    ],
   },
   /* Une mise à jour n'emporte jamais une saisie en cours (S34, réponse 5).
 

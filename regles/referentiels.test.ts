@@ -86,6 +86,11 @@ beforeEach(async () => {
     const base = contexte.firestore();
     await setDoc(doc(base, "marques/yamaha"), { nom: "Yamaha", actif: true, ...creationFigee });
     await setDoc(doc(base, "provenances/import"), { nom: "Import", actif: true, ...creationFigee });
+    await setDoc(doc(base, "postesDepense/carburant"), {
+      nom: "Carburant",
+      actif: true,
+      ...creationFigee,
+    });
     await setDoc(doc(base, "typesFrais/transport"), {
       nom: "Transport",
       actif: true,
@@ -104,6 +109,19 @@ beforeEach(async () => {
       actif: true,
       ...creationFigee,
     });
+    /* Une fiche qui PORTE un jeton de suivi (S56), posée ici par les droits du
+       serveur — comme la Cloud Function le fera. Elle existe pour le test le
+       plus important de ce bloc : celui qui prouve qu'une fiche à jeton reste
+       corrigeable. */
+    await setDoc(doc(base, "prestataires/sawadogo"), {
+      nom: "Sawadogo",
+      telephone: "70 11 11 11",
+      typesDocuments: ["carte_grise"],
+      actif: true,
+      jetonSuivi: "a".repeat(43),
+      jetonEmisLe: new Date("2026-10-16T08:00:00Z"),
+      ...creationFigee,
+    });
     await setDoc(doc(base, "entreprise/profil"), {
       seuilInactiviteTranches: 30,
       updatedAt: new Date("2026-01-01T08:00:00Z"),
@@ -113,11 +131,14 @@ beforeEach(async () => {
   });
 });
 
-const TROIS = ["marques", "provenances", "typesFrais"] as const;
+/* Quatre depuis S55 : les postes de dépense ont rejoint la famille — même
+   forme, mêmes règles de lecture, et la création ouverte au gérant comme pour
+   les marques (il nomme le poste au moment où il sort le billet). */
+const TOUS = ["marques", "provenances", "typesFrais", "postesDepense"] as const;
 
 describe("lecture — le gérant a besoin de ces listes pour saisir", () => {
   it("le gérant lit les trois référentiels de même forme", async () => {
-    for (const nomCollection of TROIS) {
+    for (const nomCollection of TOUS) {
       await assertSucceeds(getDocs(collection(gerant(), nomCollection)));
     }
   });
@@ -137,7 +158,7 @@ describe("lecture — le gérant a besoin de ces listes pour saisir", () => {
 
 describe("écriture des référentiels", () => {
   it("le responsable ajoute une entrée dans chacun des trois", async () => {
-    for (const nomCollection of TROIS) {
+    for (const nomCollection of TOUS) {
       await assertSucceeds(
         addDoc(collection(responsable(), nomCollection), {
           nom: "Nouvelle",
@@ -174,6 +195,18 @@ describe("écriture des référentiels", () => {
         ...creation("ger-1"),
       }),
     );
+    /* **Le poste de dépense suit les marques, pas les types de frais (S55).**
+       Un gérant qui sort un billet pour une course imprévue doit pouvoir
+       nommer le poste sur-le-champ : l'en empêcher ferait partir la sortie
+       sans classement, et un livre de caisse analytique qui laisse passer des
+       sorties non classées ne vaut pas mieux qu'un journal. */
+    await assertSucceeds(
+      addDoc(collection(gerant(), "postesDepense"), {
+        nom: "Carburant",
+        actif: true,
+        ...creation("ger-1"),
+      }),
+    );
   });
 
   /* L'autre moitié, sans laquelle la précédente n'aurait rien cloisonné.
@@ -182,6 +215,11 @@ describe("écriture des référentiels", () => {
   it("le gérant ne renomme ni ne désactive ce qui sert déjà", async () => {
     await assertFails(
       updateDoc(doc(gerant(), "marques/yamaha"), modification({ nom: "Autre" }, "ger-1")),
+    );
+    /* Créer un poste, oui ; rebaptiser celui que des mois d'écritures citent,
+       non — c'est la même frontière que pour les marques. */
+    await assertFails(
+      updateDoc(doc(gerant(), "postesDepense/carburant"), modification({ nom: "Autre" }, "ger-1")),
     );
     await assertFails(
       updateDoc(doc(gerant(), "marques/yamaha"), modification({ actif: false }, "ger-1")),
@@ -331,7 +369,9 @@ describe("prestataires", () => {
   const prestataire = (partie: Record<string, unknown> = {}) => ({
     nom: "Ouédraogo plaques",
     telephone: "70 11 22 33",
-    typesDocuments: ["plaque"],
+    /* `carte_grise` et non `plaque` : la plaque a quitté le dossier en S48, et
+       S53 ferme la porte que S48 avait laissée ouverte à la création. */
+    typesDocuments: ["carte_grise"],
     actif: true,
     ...creation(),
     ...partie,
@@ -357,6 +397,31 @@ describe("prestataires", () => {
     );
   });
 
+  /* **Le trou de S48, fermé par S53.** La plaque a quitté le dossier en S48 :
+     `TYPES_DOCUMENTS` ne la propose plus côté domaine, mais les règles
+     l'acceptaient encore à la CRÉATION. Une fiche neuve pouvait donc naître
+     avec un type que plus aucun écran ne sait afficher — et S48 avait documenté
+     ce reste comme volontaire pour la modification, sans voir qu'il valait
+     aussi pour la création. */
+  it("refuse plaque à la création d’un prestataire : le type n’existe plus", async () => {
+    await assertFails(
+      addDoc(collection(responsable(), "prestataires"), prestataire({ typesDocuments: ["plaque"] })),
+    );
+  });
+
+  /* L'asymétrie est voulue : les fiches posées avant S48 portent `plaque`, et
+     les refuser en modification les rendrait incorrigibles — on ne pourrait
+     plus y changer un numéro de téléphone sans d'abord réparer un champ que
+     l'écran ne montre pas. */
+  it("accepte encore plaque en modification, pour que les fiches anciennes se corrigent", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(responsable(), "prestataires/kabore"),
+        modification({ typesDocuments: ["plaque"] }),
+      ),
+    );
+  });
+
   it("refuse un token écrit depuis le navigateur — un secret ne se fabrique pas ici", async () => {
     await assertFails(
       addDoc(collection(responsable(), "prestataires"), prestataire({ token: "jeton-choisi" })),
@@ -364,6 +429,72 @@ describe("prestataires", () => {
     await assertFails(
       updateDoc(doc(responsable(), "prestataires/kabore"), modification({ token: "jeton-choisi" })),
     );
+  });
+
+  /* **Le piège du `hasOnly`, pris à l'envers** (S56, 16 octobre 2026).
+     `prestataireValide` impose sa liste de champs en MODIFICATION aussi. Dès
+     qu'une Cloud Function pose `jetonSuivi` sur une fiche, le document résultant
+     porte un champ de plus — et plus personne ne peut y corriger un numéro de
+     téléphone. Le refus se lirait comme un défaut de droits sur un geste
+     parfaitement légitime : c'est mot pour mot le blocage vécu sur `sandwini` le
+     matin même, où S53 avait ajouté des champs que les règles déployées
+     n'acceptaient pas. */
+  it("une fiche qui porte un jeton reste modifiable : on y corrige un téléphone", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(responsable(), "prestataires/sawadogo"),
+        modification({
+          nom: "Sawadogo",
+          telephone: "70 11 11 12",
+          typesDocuments: ["carte_grise"],
+          actif: true,
+        }),
+      ),
+    );
+  });
+
+  /* Un navigateur ne fabrique pas de secret (`SECURITY.md` §4), et le
+     responsable n'y fait pas exception : sa prérogative est de décider, pas
+     d'inventer de l'aléa. Le jeton n'arrive que par la fonction. */
+  it("personne n’écrit un jetonSuivi depuis un navigateur, responsable compris", async () => {
+    await assertFails(
+      updateDoc(
+        doc(responsable(), "prestataires/kabore"),
+        modification({ jetonSuivi: "z".repeat(43) }),
+      ),
+    );
+  });
+
+  /* Et il ne s'efface pas davantage. Révoquer un lien se fait en le
+     RÉGÉNÉRANT, par la fonction : un `null` posé depuis l'écran laisserait
+     croire à une révocation sans qu'aucune trace serveur ne l'enregistre. */
+  it("un jetonSuivi ne s’efface pas depuis un navigateur", async () => {
+    await assertFails(
+      updateDoc(doc(responsable(), "prestataires/sawadogo"), modification({ jetonSuivi: null })),
+    );
+  });
+
+  /* Une fiche ne NAÎT jamais avec un jeton : il s'émet ensuite, sur une fiche
+     qui existe. Sans ce refus, un navigateur contournerait la fonction en
+     posant son propre aléa à la création. */
+  it("une fiche ne naît pas avec un jeton", async () => {
+    await assertFails(
+      addDoc(
+        collection(responsable(), "prestataires"),
+        prestataire({ jetonSuivi: "y".repeat(43) }),
+      ),
+    );
+  });
+
+  /* **Le critère central de S56 : la fonction est la seule porte.** Aucune
+     règle n'est assouplie par ce portail, et ce test est ce qui le prouve. Il
+     est posé ici, au plus près du jeton, pour que quiconque serait tenté
+     d'ouvrir une lecture publique « puisque le jeton protège » le trouve sur
+     son chemin. */
+  it("un visiteur non authentifié ne lit rien, jeton ou pas", async () => {
+    const anonyme = env.unauthenticatedContext().firestore();
+    await assertFails(getDoc(doc(anonyme, "prestataires/sawadogo")));
+    await assertFails(getDocs(collection(anonyme, "prestataires")));
   });
 
   it("le gérant lit mais ne modifie pas", async () => {

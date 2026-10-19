@@ -119,6 +119,47 @@ const csp = [
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
+  /**
+   * Le répertoire de compilation, déplaçable par l'environnement.
+   *
+   * **Il n'y a qu'un seul `.next`, et c'est ce qui coûte.** Regarder un écran
+   * avant de le déclarer fait (règle 5) demande un build pointé vers les
+   * émulateurs ; or le commanditaire fait tourner un `next start` sur le port
+   * 3000, qui sert un build de production. Reconstruire par-dessus **casse son
+   * serveur** : le processus garde en mémoire l'ancien bundle serveur pendant
+   * que les chunks sur disque changent de nom, et sa page tombe en 404 de
+   * chunks. La revue visuelle devenait donc un choix entre regarder le rendu et
+   * laisser quelqu'un travailler.
+   *
+   * `NEXT_DIST_DIR=.next-emulateurs npm run build` met le build d'à côté
+   * ailleurs. La même variable doit accompagner le `next start` qui le sert —
+   * `next start` relit cette configuration, donc les deux doivent s'accorder.
+   *
+   * Sans la variable, rien ne change : `.next`, comme avant.
+   *
+   * *Réserve connue :* Serwist écrit `public/sw.js`, hors de ce répertoire. Deux
+   * builds de configurations différentes se le disputent donc encore. Il est
+   * régénéré à chaque compilation et n'est pas commité (`.gitignore`) ; le
+   * sauvegarder le temps d'un build d'émulateurs suffit à ne pas troubler le
+   * serveur d'à côté.
+   *
+   * **Et depuis S53, `npm run verifier:sw` le dit.** Cette réserve était une
+   * phrase qu'il fallait avoir lue : un build d'émulateurs laissait derrière lui
+   * un service worker qui cite des fragments absents de `.next`, et **rien** ne
+   * le signalait. En ligne l'application marche ; elle ne cesse de marcher qu'au
+   * moment précis où elle devait tenir, sur un comptoir en coupure. Le contrôle
+   * échoue désormais, avec les deux causes connues dans son message. À lancer
+   * après tout build fait pour les émulateurs.
+   *
+   * *Seconde réserve :* `next build` **réécrit `tsconfig.json`** quand il voit
+   * un répertoire inhabituel — il y ajoute `.next-emulateurs/types/**` et, au
+   * passage, reformate tous les tableaux du fichier à raison d'un élément par
+   * ligne. Ce n'est pas un changement à garder : `tsc --noEmit` passe sans ces
+   * chemins, et le reformatage est du bruit de générateur. Un
+   * `git checkout -- tsconfig.json` après un build d'émulateurs, et ne pas le
+   * prendre pour du travail.
+   */
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
   /* Next 16 réécrit un bloc de consignes dans AGENTS.md à chaque `next dev`.
      Or AGENTS.md est la source unique de vérité de ce projet, tenue à la main :
      un outil qui y réinjecte ses propres instructions salit l'arbre git à
@@ -135,6 +176,25 @@ const nextConfig: NextConfig = {
     NEXT_PUBLIC_VERSION: lireNumeroDeVersion(),
     NEXT_PUBLIC_COMPILEE_LE: COMPILEE_LE,
     NEXT_PUBLIC_EMPREINTE: lireEmpreinte(),
+  },
+  /**
+   * L'Inventaire a quitté `/supervision/` pour `/motos/inventaire` (S55).
+   *
+   * **Il n'était plus un écran de supervision.** Le commanditaire l'a voulu « à
+   * deux niveaux, pour chaque gérant et pour le superviseur » : un gérant s'en
+   * sert tous les jours, et le segment `/supervision/` porte une garde de
+   * capacité qu'il ne franchit pas. Cette garde est juste — c'est l'adresse qui
+   * mentait. L'affaiblir pour un seul enfant aurait laissé une garde à
+   * exception, c'est-à-dire une garde qu'on oublie.
+   *
+   * La redirection existe parce que l'écran a vécu six semaines à l'ancienne
+   * adresse : elle est dans les signets, dans `specs/S24`, et dans les liens
+   * déjà envoyés. Permanente, parce que ce déménagement-ci ne se rejoue pas.
+   */
+  async redirects() {
+    return [
+      { source: "/supervision/chiffres", destination: "/motos/inventaire", permanent: true },
+    ];
   },
   async headers() {
     return [
@@ -175,19 +235,31 @@ const ECRANS_HORS_LIGNE = [
   "/login",
   "/dashboard",
   "/supervision",
-  "/supervision/couts",
   "/motos",
   "/motos/nouvelle",
   "/motos/ventes",
   "/motos/dossiers",
   "/motos/ventes/nouvelle",
   "/motos/paiements",
-  "/motos/recus",
+  /* **Jamais `/diagnostic` : la route a disparu en S54, la ligne est restée,
+     et le hors-ligne entier est tombé avec elle.** Serwist refuse l'installation
+     quand une entrée préchargée rend 404 — le service worker ne s'activait plus
+     du tout, donc plus aucun écran n'était disponible en coupure. Le défaut est
+     muet en ligne : l'application marche, et ne cesse de marcher qu'au moment
+     précis où elle devait tenir. Une route supprimée est une ligne à retirer
+     ici, au même titre qu'une route ajoutée est une ligne à poser. */
+  "/motos/inventaire",
   "/clients",
   "/pieces",
   "/pieces/nouvelle",
   "/caisse",
-  "/diagnostic",
+  "/caisse/depenses",
+  /* **Jamais `/suivi/[jeton]` non plus, et pour une raison de plus** (S56) :
+     une route à jeton variable n'a pas d'URL à précharger, et en inscrire une
+     ferait rendre 404 — le défaut de `/diagnostic`, qui fait tomber le
+     hors-ligne EN ENTIER. Le portail du prestataire est d'ailleurs en ligne
+     seulement, par décision : c'est une exception écrite à D40, parce qu'on le
+     consulte depuis chez soi et non depuis un comptoir en coupure. */
   "/parametres",
   "/parametres/boutiques",
   "/parametres/utilisateurs",

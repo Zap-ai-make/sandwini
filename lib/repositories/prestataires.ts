@@ -21,11 +21,18 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
 /**
  * Les prestataires.
  *
- * Le champ `token` du cahier des charges n'existe pas encore : il donne accès à
- * une page publique, et un secret ne se fabrique pas dans un navigateur
- * (`SECURITY.md` §4). Il arrivera avec S15, produit par une Cloud Function.
- * Rien ici ne devra bouger — les règles interdisent déjà d'écrire un champ qui
- * n'est pas au contrat.
+ * **Le champ `token` du cahier des charges est arrivé** (S56), sous le nom
+ * `jetonSuivi`. Il est produit par une Cloud Function, comme annoncé : un
+ * secret ne se fabrique pas dans un navigateur (`SECURITY.md` §4), et les
+ * règles refusent qu'un navigateur l'écrive. Ce module le **lit** seulement.
+ *
+ * **Ce qu'il faut savoir en le lisant.** `prestataires` est lisible par tout
+ * compte connecté (`allow read: if connecte()`), donc ce jeton l'est aussi. Un
+ * gérant ne voit pas l'écran qui l'affiche — il est derrière
+ * `gerer_referentiels`, réservé au responsable — mais rien ne l'empêche de lire
+ * le document. Ce qu'il y gagnerait est un lien vers des données qu'il voit
+ * déjà dans l'application ; le jour où ce ne serait plus vrai, ce champ devrait
+ * descendre dans une sous-collection `prive/`, comme les coûts (D2).
  */
 
 function lirePrestataire(instantane: QueryDocumentSnapshot<DocumentData>): Prestataire {
@@ -37,6 +44,7 @@ function lirePrestataire(instantane: QueryDocumentSnapshot<DocumentData>): Prest
     telephone: donnees.telephone ?? "",
     typesDocuments: types.filter(estTypeDocument),
     actif: donnees.actif !== false,
+    jetonSuivi: typeof donnees.jetonSuivi === "string" ? donnees.jetonSuivi : null,
   };
 }
 

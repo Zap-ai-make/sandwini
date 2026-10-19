@@ -12,17 +12,19 @@ import {
   SansBoutique,
 } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
+import { ExportMotos } from "@/components/ExportMotos";
+import { MotosParties } from "@/components/MotosParties";
+import { RepartitionStock } from "@/components/RepartitionStock";
+import { Statut } from "@/components/StatutMoto";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import {
   ETATS,
   FILTRES_VIDES,
   LIBELLE_ETAT,
-  LIBELLE_STATUT,
   filtrerMotos,
   type Filtres,
   type Moto,
-  type StatutMoto,
 } from "@/lib/domain/moto";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -83,6 +85,10 @@ function Stock() {
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const catalogue = useCatalogue();
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
+  /* Les motos cochées pour l'export (S50). Un `Set` d'identifiants plutôt qu'un
+     drapeau porté par chaque moto : la liste se recharge en direct à chaque
+     écriture Firestore, et un état posé sur les objets repartirait avec eux. */
+  const [cochees, setCochees] = useState<ReadonlySet<string>>(new Set());
   /* Avant tout retour anticipé : un hook appelé sous condition change
      l'ordre des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
   const surTitre = useSurTitre("Motos");
@@ -95,6 +101,9 @@ function Stock() {
   );
 
   const sansPerimetre = perimetre.type === "aucune";
+  /* Ce qui fait entrer une moto réclame un `boutiqueId` : sur « Toutes les
+     boutiques », le geste n'a nulle part où aboutir (S54). */
+  const dansUneBoutique = perimetre.type === "boutique";
   const {
     valeur: stock,
     erreur,
@@ -108,8 +117,35 @@ function Stock() {
     : catalogue.modeles;
 
   const toutesBoutiques = perimetre.type === "toutes";
+  const basculer = useCallback((id: string) => {
+    setCochees((actuel) => {
+      const suivant = new Set(actuel);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
+  }, []);
+
   const colonnes = useMemo<Colonne<Moto>[]>(() => {
     const liste: Colonne<Moto>[] = [
+      {
+        /* La case de l'export (S50). Une colonne ordinaire : le patron
+           `Tableau` n'a pas eu à apprendre la sélection pour un seul écran, et
+           `rendu` suffisait déjà à poser ce qu'on veut dans une cellule.
+           L'étiquette nomme le châssis — « Choisir » répété quarante fois ne
+           dit à personne *laquelle* on choisit. */
+        cle: "choix",
+        titre: "Export",
+        rendu: (moto) => (
+          <input
+            type="checkbox"
+            checked={cochees.has(moto.id)}
+            onChange={() => basculer(moto.id)}
+            aria-label={`Choisir la moto ${moto.numeroChassis} pour l’export`}
+            className="size-4 accent-encre"
+          />
+        ),
+      },
       {
         cle: "chassis",
         /* « Numéro de châssis » (`a4:104`), le nom qui figure sur la carte
@@ -168,7 +204,7 @@ function Stock() {
       });
     }
     return liste;
-  }, [catalogue, toutesBoutiques]);
+  }, [catalogue, toutesBoutiques, cochees, basculer]);
 
   if (sansPerimetre)
     return (
@@ -185,17 +221,44 @@ function Stock() {
   const chargement = stock === null && !erreur;
 
   return (
-    <div>
+    <div className="ecran-plein">
       <TetePage
         surTitre={surTitre}
         titre="Stock motos"
+        /* Le geste n'existe que dans une boutique (S54). Une moto entre
+           quelque part : sur « Toutes les boutiques », il n'y a pas de
+           `boutiqueId` à lui donner, et le bouton n'ouvrait que sur un écran
+           qui demandait de choisir. Le rail applique la même règle par
+           `exigeBoutique` ; ici c'est la même décision, prise au même endroit
+           que la lecture du périmètre. */
         actions={
+          /* Le bouton ne disparaît plus hors d'une boutique : il mène à l'écran
+             de saisie, qui pose lui-même la question du lieu (S54). */
           <Link href="/motos/nouvelle" className="bouton bouton-principal">
             <Plus aria-hidden="true" className="size-4" />
             Faire entrer une moto
           </Link>
         }
       />
+
+      {/* Le comptage par marque, replié. Posé ici et non dans la branche du
+          tableau : il rend `null` sur une liste vide, donc il s'efface tout
+          seul pendant le chargement, sur une erreur et sur un stock vide — ce
+          qui évite de l'enfermer dans un fragment et de décaler tout le cadre.
+          Il compte ce que l'écran montre, filtres compris. */}
+      <RepartitionStock
+        motos={resultats}
+        filtre={resultats.length !== total}
+        nomMarque={catalogue.nomMarque}
+        nomModele={catalogue.nomModele}
+      />
+
+      {/* Ce qui a quitte cette boutique (S17). Meme traitement que le bloc
+          ci-dessus : il rend `null` quand il n'y a rien, donc il s'efface seul
+          et n'a pas besoin d'etre enferme dans une condition ici. Rien pour le
+          responsable sur « Toutes les boutiques » : une moto deplacee entre
+          deux de ses boutiques n'est partie de nulle part de son point de vue. */}
+      <MotosParties boutiqueId={boutiqueId} />
 
       {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
           vide, filtres compris, ferait croire à un stock à zéro. C'est le bloc
@@ -212,7 +275,7 @@ function Stock() {
           fonctionne normalement&nbsp;: ce geste n’a pas besoin de cette lecture.
         </ErreurDeLecture>
       ) : !chargement && total === 0 ? (
-        <StockVide perimetreEnCours={perimetreEnCours} />
+        <StockVide perimetreEnCours={perimetreEnCours} dansUneBoutique={dansUneBoutique} />
       ) : (
         /* `aria-busy` pendant la lecture : les lignes fantômes disent à l'œil
            que ça arrive, cet attribut le dit à qui ne les voit pas. */
@@ -291,6 +354,23 @@ function Stock() {
                 </>
               )}
             </p>
+
+            {/* L'export, sous les filtres : on coche ce que les filtres ont
+                laissé, donc la barre appartient à la même tête d'écran. Elle
+                n'apparaît qu'une fois le stock arrivé — proposer d'exporter
+                zéro moto pendant le chargement serait proposer un fichier
+                vide. */}
+            {!chargement && (
+              <div className="w-full border-t border-bord pt-3">
+                <ExportMotos
+                  motos={resultats.filter((moto) => cochees.has(moto.id))}
+                  nomMarque={catalogue.nomMarque}
+                  nomModele={catalogue.nomModele}
+                  toutCocher={() => setCochees(new Set(resultats.map((moto) => moto.id)))}
+                  toutDecocher={() => setCochees(new Set())}
+                />
+              </div>
+            )}
           </div>
 
           {chargement ? (
@@ -317,21 +397,6 @@ function Stock() {
       )}
     </div>
   );
-}
-
-/* Trois statuts sur quatre se lisent d'un mot ; la couleur ne fait que doubler
-   le mot (DESIGN.md §5). « Réservée » prend le bleu de la goutte : la moto est
-   promise et n'est pas encore partie (D70). Vendue et transférée sont des faits
-   accomplis, sans rien à décider : elles restent neutres. */
-const TON_STATUT: Record<StatutMoto, string> = {
-  en_stock: "pastille-solde",
-  reservee: "pastille-transit",
-  vendue: "",
-  transferee: "",
-};
-
-function Statut({ statut }: { statut: StatutMoto }) {
-  return <span className={`pastille ${TON_STATUT[statut]}`}>{LIBELLE_STATUT[statut]}</span>;
 }
 
 function Recherche({
@@ -410,7 +475,13 @@ function Filtre({
   );
 }
 
-function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
+function StockVide({
+  perimetreEnCours,
+  dansUneBoutique,
+}: {
+  perimetreEnCours: boolean;
+  dansUneBoutique: boolean;
+}) {
   if (perimetreEnCours) return null;
   /* Le cadre reste, et le vide s'y installe : c'est ce que montre `b4:92`. Un
      vide qui remplace aussi la boîte laisse la page nue, et l'écran a l'air
@@ -422,6 +493,10 @@ function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
     <EtatVide
       icone={<Bike aria-hidden="true" />}
       titre="Aucune moto en stock pour l’instant."
+      /* Même règle qu'en tête d'écran : le bouton existe toujours, et c'est
+         l'écran de saisie qui demande la boutique quand elle manque (S54). Un
+         écran vide dont le seul bouton a disparu est précisément ce qui a fait
+         croire au commanditaire que la saisie était cassée. */
       action={
         <Link href="/motos/nouvelle" className="bouton bouton-principal">
           <Plus aria-hidden="true" className="size-4" />
@@ -429,8 +504,9 @@ function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
         </Link>
       }
     >
-      La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se
-      déclarent dans les réglages.
+      {dansUneBoutique
+        ? "La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se déclarent dans les réglages."
+        : "Aucune des boutiques n’a de moto en stock. La saisie vous demandera laquelle reçoit la première."}
     </EtatVide>
     </div>
   );

@@ -9,13 +9,23 @@
 ```
 NOM        : SDI pour Sandwidi et frere
 QUOI       : Application de gestion multi-boutique pour un commerce de vente de motos — ventes,
-             paiements échelonnés, dossiers administratifs (carte grise, plaque), pièces détachées —
+             paiements échelonnés, dossiers administratifs (quittance, CMC, carte grise), pièces détachées —
              utilisée au comptoir par des gérants et pilotée par un responsable.
 STACK      : Next.js (App Router) + TypeScript strict + Tailwind + PWA
              Firebase : Auth, Firestore (persistance hors-ligne), Storage, Cloud Functions
              Vercel pour l'hébergement (D1) — Firebase Emulator Suite en développement (D3)
 LANCER     : npm install && npm run emulators (puis npm run dev)
 TESTER     : npm test (Vitest + règles Firestore) · npm run test:e2e (Playwright, dont hors-ligne)
+             L'e2e exige un build compilé pour les émulateurs, et son garde lit le PAQUET et non un
+             fichier d'environnement (S53) : un `.env.local` juste avec un build périmé faisait
+             tourner la suite sur le vrai projet, sans un mot.
+               NEXT_PUBLIC_FIREBASE_EMULATEURS=1 NEXT_PUBLIC_FIREBASE_PROJECT_ID=sdi-dev \
+               NEXT_DIST_DIR=.next-emulateurs npm run build     (autres valeurs : .env.local.emulateurs)
+               NEXT_DIST_DIR=.next-emulateurs NEXT_PUBLIC_FIREBASE_EMULATEURS=1 npm run test:e2e
+             APRÈS tout build d'émulateurs : `npm run build` sans variable, puis `npm run verifier:sw`.
+             Serwist écrit `public/sw.js` HORS du répertoire de build : un sw.js qui cite des
+             fragments absents fait tomber le hors-ligne EN ENTIER, en silence, et seulement en
+             coupure — c'est-à-dire au seul moment où il servait.
 PARTICULARITÉS :
   - Le hors-ligne se cherche, il ne commande plus. Une saisie fonctionne sans réseau chaque fois
     que c'est possible — les écritures passent par le SDK Firestore, pas par une Cloud Function
@@ -23,6 +33,11 @@ PARTICULARITÉS :
     **dit** au lieu d'échouer en silence, et la spec reste terminée. Ne pas faire tourner une
     architecture entière autour de ce point (D66).
   - Interface entièrement en français, montants en FCFA entiers.
+  - **Une seule page est accessible sans compte** : `app/suivi/[jeton]` (S56), le portail du
+    prestataire. Elle est rendue côté serveur et lit par une Cloud Function — aucune règle
+    Firestore n'est assouplie. Elle n'entre **jamais** dans `ECRANS_HORS_LIGNE` : une route à
+    jeton variable n'a pas d'URL à précharger, et une entrée qui rend 404 fait tomber le
+    hors-ligne en entier. Le portail est en ligne seulement, exception nommée à D40 (voir D108).
   - Coûts et marges cloisonnés hors de portée des gérants via des sous-collections `prive/` (D2) —
     Firestore ne masque pas un champ, c'est le seul moyen. Chaque cloisonnement est prouvé par un
     test de règles, sinon il n'existe pas.

@@ -11,6 +11,7 @@ import {
   EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
+import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -40,6 +41,17 @@ import {
  * Les modèles se gèrent marque par marque plutôt qu'en une liste unique. « Crux
  * » ne veut rien dire sans « Yamaha » devant, et une liste de deux cents
  * modèles toutes marques confondues ne se relit pas.
+ *
+ * **Les deux listes sont en onglets depuis S54.** Empilées, elles obligeaient à
+ * dépasser toutes les marques pour atteindre les modèles, alors qu'on ne vient
+ * jamais faire les deux dans le même geste.
+ *
+ * **Le catalogue est celui de l'entreprise, pas d'une boutique.** `marques` et
+ * `modeles` sont des collections uniques : une marque tapée au comptoir de
+ * Pouytenga est la même partout — y compris celles qu'un gérant ajoute depuis
+ * le formulaire d'entrée en stock sans jamais ouvrir cet écran (S39). C'est
+ * pourquoi l'écran s'atteint depuis n'importe quelle boutique de motos et
+ * montre tout, d'où que ce soit venu.
  */
 export default function PageCatalogue() {
   return (
@@ -68,9 +80,13 @@ function Catalogue() {
     [],
   );
 
+  /* Les deux écoutes vivent ici, au-dessus des onglets : l'onglet inactif est
+     démonté, et si elles vivaient dedans, revenir sur « Marques » rouvrirait
+     une écoute et réafficherait « Chargement… » sur une liste déjà lue. */
   const marques = useAbonnement(souscrireMarques, "Les marques n’ont pas pu être chargées.");
   const modeles = useAbonnement(souscrireModeles, "Les modèles n’ont pas pu être chargés.");
 
+  const [onglet, setOnglet] = useState<"marques" | "modeles">("marques");
   const [marqueChoisie, setMarqueChoisie] = useState("");
   /* Pour le **choix** d'une marque, une liste pas encore lue et une liste vide
      mènent au même écran : aucun menu. C'est pour la **décision d'écrire** que
@@ -85,31 +101,48 @@ function Catalogue() {
 
   return (
     <div>
-      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Marques et modèles" />
+      <TetePage retour={{ href: "/motos", libelle: "Motos" }} titre="Marques et modèles" />
       <p className="mt-2 max-w-prose text-encre-doux">
-        Ce que vous vendez. Une moto entrée en stock choisira sa marque puis son modèle dans ces
-        listes — jamais en texte libre, sinon le même modèle finit écrit de trois façons.
+        Ce que vend l’entreprise, dans toutes ses boutiques de motos. Une moto entrée en stock
+        choisira sa marque puis son modèle dans ces listes — jamais en texte libre, sinon le même
+        modèle finit écrit de trois façons.
       </p>
 
-      <div className="mt-6 space-y-8">
-        <ListeReferentiel
-          titre="Marques"
-          singulier="marque"
-          determinant="cette"
-          exemples="Yamaha, TVS, Apsonic"
-          entrees={marques.valeur}
-          erreur={marques.erreur}
-          actions={ACTIONS_MARQUES}
-        />
-
-        <Modeles
-          marques={marques.valeur === null ? null : ouvertes}
-          marqueActive={marqueActive}
-          choisir={setMarqueChoisie}
-          modeles={modeles.valeur}
-          erreur={modeles.erreur}
-        />
-      </div>
+      <Onglets
+        libelle="Ce que vous réglez"
+        valeur={onglet}
+        changer={setOnglet}
+        className="mt-6"
+        onglets={[
+          {
+            valeur: "marques",
+            libelle: "Marques",
+            contenu: (
+              <ListeReferentiel
+                singulier="marque"
+                determinant="cette"
+                exemples="Yamaha, TVS, Apsonic"
+                entrees={marques.valeur}
+                erreur={marques.erreur}
+                actions={ACTIONS_MARQUES}
+              />
+            ),
+          },
+          {
+            valeur: "modeles",
+            libelle: "Modèles",
+            contenu: (
+              <Modeles
+                marques={marques.valeur === null ? null : ouvertes}
+                marqueActive={marqueActive}
+                choisir={setMarqueChoisie}
+                modeles={modeles.valeur}
+                erreur={modeles.erreur}
+              />
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
@@ -145,24 +178,17 @@ function Modeles({
      section conseillait d'ajouter une marque à quelqu'un qui en a peut-être
      vingt. C'est D95 côté affichage — le même aplatissement de trois états en
      deux, avec une conséquence plus douce mais du même genre : on envoie
-     quelqu'un créer une donnée qu'il possède déjà (`DESIGN.md` §10). */
+     quelqu'un créer une donnée qu'il possède déjà (`DESIGN.md` §10).
+     Le titre de section a disparu en S54 : l'onglet actif nomme le panneau. */
   if (marques === null) {
-    return (
-      <section>
-        <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Modèles</h2>
-        <EtatChargement className="mt-3">Chargement…</EtatChargement>
-      </section>
-    );
+    return <EtatChargement>Chargement…</EtatChargement>;
   }
 
   if (marques.length === 0) {
     return (
-      <section>
-        <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Modèles</h2>
-        <EtatSansResultat className="mt-3">
-          Ajoutez d’abord une marque&nbsp;: un modèle n’existe pas tout seul.
-        </EtatSansResultat>
-      </section>
+      <EtatSansResultat>
+        Ajoutez d’abord une marque, dans l’onglet voisin&nbsp;: un modèle n’existe pas tout seul.
+      </EtatSansResultat>
     );
   }
 
@@ -193,10 +219,8 @@ function Modeles({
   }
 
   return (
-    <section>
-      <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">Modèles</h2>
-
-      <div className="colonne-formulaire mt-3 max-w-[40rem]">
+    <div>
+      <div className="colonne-formulaire max-w-[40rem]">
         <Champ id="marque-active" libelle="Marque">
           <select
             id="marque-active"
@@ -255,7 +279,7 @@ function Modeles({
           ))}
         </ul>
       )}
-    </section>
+    </div>
   );
 }
 

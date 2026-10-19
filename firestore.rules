@@ -117,8 +117,21 @@ service cloud.firestore {
     }
 
     match /boutiques/{code} {
-      allow read: if estResponsable()
-                  || (connecte() && boutiqueDuCompte() == code);
+      // **La lecture s'ouvre a tout compte connecte depuis S17.** Un gerant ne
+      // lisait que la sienne, et ne pouvait donc pas choisir ou envoyer une
+      // moto : la liste des destinations lui etait invisible. Firestore ne
+      // masque pas un champ — un document lisible l'est en entier — donc c'est
+      // tout ou rien.
+      //
+      // Ce que porte un document boutique : le nom, le code, les metiers,
+      // l'adresse, le telephone, l'etat d'ouverture. L'enseigne au-dessus de la
+      // porte, rien qu'un client ne puisse lire sur place. Aucune decision du
+      // depot ne protegeait la restriction d'avant — c'etait de la moindre
+      // exposition par defaut (SECURITY.md SS0), et elle devenait ici un
+      // obstacle reel.
+      //
+      // L'ecriture, elle, ne bouge pas d'un pouce.
+      allow read: if connecte();
 
       allow create: if estResponsable()
                     && boutiqueValide(request.resource.data, code)
@@ -237,6 +250,24 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // Les postes de dépense (S55) : carburant, loyer, transport — les mots dans
+    // lesquels une sortie de caisse se range. Ils se créent comme les marques,
+    // par n'importe quel compte connecté : un gérant qui sort un billet pour
+    // une course que personne n'avait prévue doit pouvoir nommer le poste sans
+    // attendre le responsable, sinon la sortie part sans classement et le livre
+    // de caisse perd son intérêt. Le renommage, lui, reste au responsable — un
+    // poste cité par des mois d'écritures ne se rebaptise pas à la légère.
+    match /postesDepense/{id} {
+      allow read: if connecte();
+      allow create: if connecte()
+                    && referentielValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && referentielValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
     match /typesFrais/{id} {
       allow read: if connecte();
       allow create: if estResponsable()
@@ -275,11 +306,31 @@ service cloud.firestore {
       allow delete: if false;
     }
 
-    // Le champ « token » du cahier des charges n'est pas au contrat : il donne
-    // accès à une page publique, et un secret ne se fabrique pas dans un
-    // navigateur. Il viendra d'une Cloud Function en S15.
+    // Le champ « token » du cahier des charges existe enfin, sous le nom
+    // `jetonSuivi` (S56). Il donne accès à une page publique, et un secret ne se
+    // fabrique pas dans un navigateur : c'est une Cloud Function qui l'emet.
+    //
+    // Trois choses tiennent ensemble ici, et il faut les trois :
+    //
+    // 1. les deux champs du jeton sont ACCEPTES par le `hasOnly`. Sans cela,
+    //    une fiche a qui la fonction a pose un jeton deviendrait
+    //    incorrigible — on ne pourrait plus y changer un numero de telephone,
+    //    et le refus parlerait de droits. C'est mot pour mot le blocage vecu
+    //    sur sandwini le 16 octobre 2026, quand des champs ajoutes par S53
+    //    n'etaient pas dans les regles deployees.
+    // 2. ils ne sont PAS dans le `hasAll` : les fiches posees avant S56 n'en
+    //    portent pas, et les leur exiger les rendrait tout aussi
+    //    incorrigibles.
+    // 3. aucun navigateur ne les ECRIT (`jetonIntact`, plus bas), responsable
+    //    compris : sa prerogative est de decider, pas d'inventer de l'alea.
+    //
+    // C'est la meme asymetrie que `typesACreer` : on ouvre la serrure sans
+    // ouvrir la porte. Aucun controle de type n'est necessaire sur ces deux
+    // champs — un client ne peut jamais y mettre une valeur, seulement
+    // reconduire celle du serveur.
     function prestataireValide(donnees) {
-      return donnees.keys().hasOnly(['nom', 'telephone', 'typesDocuments', 'actif'].concat(champsAudit()))
+      return donnees.keys().hasOnly(['nom', 'telephone', 'typesDocuments', 'actif',
+                                     'jetonSuivi', 'jetonEmisLe'].concat(champsAudit()))
              && donnees.keys().hasAll(['nom', 'telephone', 'typesDocuments', 'actif'].concat(champsAudit()))
              && nomBorne(donnees.nom)
              && donnees.telephone is string
@@ -287,17 +338,81 @@ service cloud.firestore {
              && donnees.telephone.size() <= 40
              && donnees.typesDocuments is list
              && donnees.typesDocuments.size() > 0
+             // Les deux types jamais acceptes a la CREATION : voir
+             // `typesACreer` juste en dessous.
              && donnees.typesDocuments.hasOnly(['carte_grise', 'plaque'])
              && donnees.actif is bool;
+    }
+
+    // **Le trou de S48, ferme par S53.** La plaque a quitte le dossier en S48 :
+    // l'immatriculation s'obtient avec la carte grise, chez le meme
+    // prestataire. `TYPES_DOCUMENTS` ne la propose plus cote domaine, mais ces
+    // regles l'acceptaient encore — et S48 avait documente ce reste comme
+    // volontaire sans distinguer les deux gestes.
+    //
+    // **L'asymetrie est voulue, et c'est tout l'objet de cette separation.**
+    // Une fiche NEUVE ne doit plus naitre avec un type que plus aucun ecran ne
+    // sait afficher. Mais les fiches posees avant S48 en portent, et les
+    // refuser en MODIFICATION les rendrait incorrigibles : on ne pourrait plus
+    // y changer un numero de telephone sans d'abord reparer un champ que
+    // l'ecran ne montre pas. On ferme la porte d'entree, on laisse celle de la
+    // reparation.
+    function typesACreer(donnees) {
+      return donnees.typesDocuments.hasOnly(['carte_grise']);
+    }
+
+    // Le jeton de suivi est reconduit tel quel, ou il n'existe pas. Un `null`
+    // pose depuis l'ecran serait une fausse revocation : le lien cesserait de
+    // resoudre sans qu'aucune trace serveur ne dise qui l'a ferme ni quand.
+    // Revoquer se fait en REGENERANT, par la fonction, qui ecrase l'ancien.
+    function jetonIntact(apres, avant) {
+      return apres.get('jetonSuivi', null) == avant.get('jetonSuivi', null)
+             && apres.get('jetonEmisLe', null) == avant.get('jetonEmisLe', null);
     }
 
     match /prestataires/{id} {
       allow read: if connecte();
       allow create: if estResponsable()
                     && prestataireValide(request.resource.data)
+                    && typesACreer(request.resource.data)
+                    // Une fiche ne NAIT jamais avec un jeton : il s'emet
+                    // ensuite, sur une fiche qui existe. Sans ce refus, un
+                    // navigateur contournerait la fonction en posant son
+                    // propre alea a la creation.
+                    && !request.resource.data.keys().hasAny(['jetonSuivi', 'jetonEmisLe'])
                     && traceCreation(request.resource.data);
       allow update: if estResponsable()
                     && prestataireValide(request.resource.data)
+                    && jetonIntact(request.resource.data, resource.data)
+                    && traceModification(request.resource.data, resource.data);
+      allow delete: if false;
+    }
+
+    // --- Fournisseurs (S42) -------------------------------------------------
+    // De qui les motos arrivent, par lots. Comme les provenances : tout le
+    // monde lit, et un fournisseur s'ajoute au comptoir en plein formulaire
+    // d'arrivage (même geste que la marque créée en pleine entrée en stock,
+    // S39). Le corriger ensuite reste au responsable. Rien ne se supprime.
+    function fournisseurValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'telephone', 'localite', 'actif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'telephone', 'localite', 'actif'].concat(champsAudit()))
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && donnees.telephone is string
+             && donnees.telephone.size() <= 40
+             && donnees.localite is string
+             && donnees.localite.size() <= 80
+             && donnees.actif is bool;
+    }
+
+    match /fournisseurs/{id} {
+      allow read: if connecte();
+      allow create: if connecte()
+                    && fournisseurValide(request.resource.data)
+                    && traceCreation(request.resource.data);
+      allow update: if estResponsable()
+                    && fournisseurValide(request.resource.data)
                     && traceModification(request.resource.data, resource.data);
       allow delete: if false;
     }
@@ -366,9 +481,10 @@ service cloud.firestore {
     function motoValide(donnees) {
       return donnees.keys().hasOnly(['boutiqueId', 'etat', 'marqueId', 'modeleId', 'couleur',
                                      'annee', 'numeroChassis', 'numeroMoteur',
-                                     'prixVenteConseille', 'provenanceId', 'papiersFournis',
+                                     'prixVenteConseille', 'provenanceId', 'arrivageId', 'papiersFournis',
                                      'photos', 'statut', 'dateEntree',
-                                     'quittanceChemin', 'cmcChemin'].concat(champsAudit()))
+                                     'quittanceChemin', 'cmcChemin', 'cmcRecu',
+                                     'quittanceRecue', 'plaque'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'etat', 'marqueId', 'modeleId',
                                        'numeroChassis', 'provenanceId', 'photos', 'statut',
                                        'dateEntree'].concat(champsAudit()))
@@ -377,10 +493,26 @@ service cloud.firestore {
              && donnees.statut in ['en_stock', 'reservee', 'vendue', 'transferee']
              && donnees.marqueId is string
              && donnees.marqueId.size() > 0
+             // Le modele reste **ecrit** — il est dans `hasAll` — mais il
+             // s'accepte vide. Un lot se receptionne caisses fermees : la
+             // marque se lit sur le carton, le modele souvent pas, et l'exiger
+             // obligeait a inventer une entree de referentiel pour pouvoir
+             // enregistrer. Un modele invente est une information fausse ;
+             // l'absence de modele est une information exacte.
+             // La marque, elle, garde son `size() > 0` juste au-dessus : c'est
+             // par elle que le stock se range et se compte. Les deux lignes
+             // sont volontairement voisines pour que l'ecart se voie.
              && donnees.modeleId is string
-             && donnees.modeleId.size() > 0
              && donnees.provenanceId is string
-             && donnees.provenanceId.size() > 0
+             // Une moto tient son origine d'une provenance (saisie unitaire, S5)
+             // ou d'un arrivage (lot, S42) : l'un des deux, jamais aucun.
+             && (donnees.provenanceId.size() > 0
+                 || (donnees.keys().hasAny(['arrivageId'])
+                     && donnees.arrivageId is string
+                     && donnees.arrivageId.size() > 0))
+             && (!donnees.keys().hasAny(['arrivageId'])
+                 || donnees.arrivageId == null
+                 || (donnees.arrivageId is string && donnees.arrivageId.size() > 0))
              && donnees.numeroChassis is string
              && donnees.numeroChassis.size() > 0
              && donnees.numeroChassis.size() <= 32
@@ -401,6 +533,20 @@ service cloud.firestore {
              // pas des URL : l'URL se redemande a chaque lecture et expire.
              && cheminFichier(donnees, 'quittanceChemin')
              && cheminFichier(donnees, 'cmcChemin')
+             // Le CMC reçu (S43) : absent des motos d'avant cette spec, donc
+             // facultatif — mais booléen dès qu'il est là. Le rendre obligatoire
+             // casserait la mise à jour des motos déjà en base.
+             && (!donnees.keys().hasAny(['cmcRecu']) || donnees.cmcRecu is bool)
+             // La quittance recue et la plaque (S53), au meme regime facultatif
+             // que `cmcRecu` ci-dessus : aucune moto d'avant cette spec n'en
+             // porte, et une moto neuve n'a pas de plaque avant le retour de sa
+             // carte grise. La plaque accepte `null` explicitement — c'est ce
+             // qu'ecrit `poserPlaque` quand on efface une saisie, et le nul doit
+             // pouvoir remplacer une valeur deja posee.
+             && (!donnees.keys().hasAny(['quittanceRecue']) || donnees.quittanceRecue is bool)
+             && (!donnees.keys().hasAny(['plaque'])
+                 || donnees.plaque == null
+                 || texteBorne(donnees.plaque, 20))
              // La date d'entrée vient de l'appareil (D38), on la borne seulement
              // contre une horloge déréglée.
              && donnees.dateEntree is timestamp
@@ -415,14 +561,137 @@ service cloud.firestore {
                     && request.resource.data.statut == 'en_stock'
                     && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
 
-      // La boutique d'une moto ne change pas ici : c'est un transfert, et le
-      // transfert a sa propre spec (S17) parce qu'il laisse une trace.
+      // **Le deplacement d'une moto entre boutiques (S17), et la garde centrale
+      // du lot : on pousse, on ne tire jamais.**
+      //
+      // `estGerantDe(resource.data.boutiqueId)` vise la boutique que la moto
+      // **quitte**. Un gerant peut donc donner une moto qu'il detient, et ne
+      // peut pas s'en attribuer une qu'il ne detient pas : il n'a aucun droit
+      // d'ecriture dessus tant qu'elle est ailleurs. Le sens du transfert est
+      // porte par la regle, pas par une condition dans un ecran.
+      //
+      // `seulsChangent(['boutiqueId'])` borne le geste. Sans lui, la meme
+      // ecriture ferait passer une moto d'une boutique a l'autre **et** la
+      // marquerait vendue, ou lui changerait son chassis — une retouche que la
+      // trace decrirait comme un simple deplacement.
+      //
+      // Le statut est verifie sur l'etat **d'avant** : une moto reservee ou
+      // vendue est promise a quelqu'un, et la deplacer ferait voyager la
+      // promesse sans que le client qui l'attend en sache rien.
       allow update: if motoValide(request.resource.data)
                     && traceModification(request.resource.data, resource.data)
-                    && request.resource.data.boutiqueId == resource.data.boutiqueId
+                    && (request.resource.data.boutiqueId == resource.data.boutiqueId
+                        || deplacementValide())
                     && (estResponsable() || estGerantDe(resource.data.boutiqueId));
 
       allow delete: if false;
+    }
+
+    // --- Deplacement d'une moto entre boutiques (S17) -----------------------
+
+    function boutiqueOuverte(code) {
+      return exists(/databases/$(database)/documents/boutiques/$(code))
+             && get(/databases/$(database)/documents/boutiques/$(code)).data.actif == true;
+    }
+
+    function deplacementValide() {
+      return seulsChangent(['boutiqueId'])
+             && resource.data.statut == 'en_stock'
+             && boutiqueOuverte(request.resource.data.boutiqueId);
+    }
+
+    // La trace d'un deplacement. Une collection de premier niveau, et non une
+    // sous-collection sous la moto : **la moto quitte le perimetre de la
+    // boutique de depart**, qui ne peut plus l'ouvrir — ni elle, ni ce qui pend
+    // dessous. Or c'est precisement elle qui se demande ou la moto est passee.
+    //
+    // Le chassis y est recopie, comme `createdByName` ailleurs : la trace doit
+    // rester lisible meme quand son sujet ne l'est plus.
+    function transfertMotoValide(donnees) {
+      return donnees.keys().hasOnly(['motoId', 'numeroChassis', 'deBoutiqueId',
+                                     'versBoutiqueId', 'motif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['motoId', 'numeroChassis', 'deBoutiqueId',
+                                       'versBoutiqueId', 'motif'].concat(champsAudit()))
+             && donnees.motoId is string
+             && donnees.motoId.size() > 0
+             && texteBorne(donnees.numeroChassis, 40)
+             && donnees.deBoutiqueId is string
+             && donnees.deBoutiqueId.matches('^[A-Z]{3}$')
+             && donnees.versBoutiqueId is string
+             && donnees.versBoutiqueId.matches('^[A-Z]{3}$')
+             && donnees.deBoutiqueId != donnees.versBoutiqueId
+             && texteBorne(donnees.motif, 200);
+    }
+
+    match /transfertsMotos/{transfertId} {
+      // Les deux boutiques lisent : celle qui perd la moto veut savoir ou elle
+      // est allee, celle qui la recoit d'ou elle vient.
+      allow read: if estResponsable()
+                  || estGerantDe(resource.data.deBoutiqueId)
+                  || estGerantDe(resource.data.versBoutiqueId);
+
+      // Meme garde que sur la moto : la trace d'un depart appartient a la
+      // boutique d'ou la moto part.
+      allow create: if transfertMotoValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && (estResponsable() || estGerantDe(request.resource.data.deBoutiqueId));
+
+      // Un deplacement est un fait. On le corrige en retransferant, ce qui
+      // laisse les deux traces.
+      allow update, delete: if false;
+    }
+
+    // --- Paquets de cartes grises (S53) -------------------------------------
+    // « On tend dix cartes grises. » Le paquet GROUPE un depot, il ne le
+    // remplace pas : chaque document `carte_grise` continue de porter son
+    // prestataire, sa date et son avance, parce que les regles evaluent chaque
+    // ecriture d'un lot contre l'etat d'AVANT le lot — un document valide
+    // contre un paquet cree dans le meme lot serait refuse (lecon de S5,
+    // redite en S17). `depotRenseigne` reste donc vrai mot pour mot.
+    //
+    // Une trace de premier niveau, comme `transfertsMotos` : elle se liste par
+    // boutique sans requete de groupe de collections.
+    //
+    // **Aucun champ d'etat.** Un paquet est solde quand aucune de ses cartes
+    // n'est plus dehors, ce qui se calcule (`lib/domain/paquet.ts`). Un champ
+    // « rendu » dirait un jour le contraire de ses propres documents, et il
+    // faudrait un geste pour les raccorder. Le `hasOnly` ci-dessous est ce qui
+    // empeche de le reintroduire par inadvertance.
+    function paquetCartesGrisesValide(donnees) {
+      return donnees.keys().hasOnly(['boutiqueId', 'prestataireId', 'prestataireNom',
+                                     'deposeLe', 'disponibleLe', 'avance',
+                                     'venteIds'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'prestataireId', 'prestataireNom',
+                                       'deposeLe', 'disponibleLe', 'avance',
+                                       'venteIds'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.prestataireId is string
+             && donnees.prestataireId.size() > 0
+             && texteBorne(donnees.prestataireNom, 80)
+             && dateAppareil(donnees.deposeLe)
+             && (donnees.disponibleLe == null || dateAppareil(donnees.disponibleLe))
+             // Strictement positive, comme au depot unitaire : une avance a
+             // zero n'est pas une avance, c'est un travail confie a credit.
+             && montantValide(donnees.avance)
+             && donnees.avance > 0
+             && donnees.venteIds is list
+             // Un paquet vide ferait sortir l'avance sans contrepartie.
+             && donnees.venteIds.size() > 0
+             // La borne redit `CARTES_PAR_PAQUET_MAX` du domaine, et cette
+             // repetition est voulue (D27) : le domaine decide de ce qu'il
+             // PROPOSE, la base de ce qu'elle ACCEPTE. 249 vient de la limite
+             // de 500 ecritures par lot — un paquet en fait `2N + 2`.
+             && donnees.venteIds.size() <= 249;
+    }
+
+    match /lotsCartesGrises/{paquetId} {
+      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+      allow create: if paquetCartesGrisesValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+      // Un paquet est un fait. On le corrige en faisant revenir les cartes, ce
+      // qui laisse les deux traces.
+      allow update, delete: if false;
     }
 
     // Le coût. Le `boutiqueId` y est répété : au sein d'un même lot d'écriture,
@@ -475,6 +744,48 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Arrivages (S42) ----------------------------------------------------
+    // Un lot de motos entrées ensemble, rattaché à une boutique. Même portée
+    // que les motos : le responsable voit tout, le gérant les lots de sa
+    // boutique. Le gérant peut en créer (c'est un geste de réception), mais le
+    // coût des motos du lot vit ailleurs, dans `motos/{id}/prive/cout`, où il
+    // n'a pas accès (D2). Rien ne se supprime : des motos y renvoient.
+    function arrivageValide(donnees) {
+      return donnees.keys().hasOnly(['nom', 'fournisseurId', 'boutiqueId', 'date',
+                                     'description', 'annule'].concat(champsAudit()))
+             && donnees.keys().hasAll(['nom', 'fournisseurId', 'boutiqueId',
+                                       'description'].concat(champsAudit()))
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && donnees.fournisseurId is string
+             && donnees.fournisseurId.size() > 0
+             && donnees.boutiqueId is string
+             && (!donnees.keys().hasAny(['date'])
+                 || donnees.date == null
+                 || donnees.date is timestamp)
+             && donnees.description is string
+             && donnees.description.size() <= 200
+             // L'annulation douce (S43), facultative et booléenne.
+             && (!donnees.keys().hasAny(['annule']) || donnees.annule is bool);
+    }
+
+    match /arrivages/{id} {
+      allow read: if estResponsable()
+                  || (connecte() && boutiqueDuCompte() == resource.data.boutiqueId);
+      allow create: if arrivageValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
+      allow update: if arrivageValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data)
+                    && request.resource.data.boutiqueId == resource.data.boutiqueId
+                    && (estResponsable() || estGerantDe(resource.data.boutiqueId));
+      // Supprimer, adapté au journal (S43) : l'entête seule s'efface, jamais en
+      // cascade — les motos ne se suppriment pas (elles sont citées ailleurs).
+      // L'écran ne l'offre que pour un lot vide ; ici, on borne à sa boutique.
+      allow delete: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+    }
+
     // --- Clients (S6) -------------------------------------------------------
     // Le fichier clients est **commun à toutes les boutiques** (D16) : pas de
     // `boutiqueId`, donc pas de cloisonnement. C'est la seule collection dans
@@ -486,16 +797,30 @@ service cloud.firestore {
     // toujours pas : les ventes, les montants et les dossiers des autres
     // boutiques, qui restent cloisonnés ailleurs dans ce fichier.
 
+    // `prenom` et `nip` sont dans le `hasOnly` et **pas** dans le `hasAll`, et
+    // c'est ce qui rend S44 rétro-compatible : ce validateur tourne à la
+    // création **comme à la modification**, et une fiche saisie avant S44 ne
+    // porte ni l'un ni l'autre. Les exiger rendrait tout le fichier clients
+    // incorrigible du jour au lendemain. Même montage que `motos.cmcRecu` (S43).
     function clientValide(donnees) {
-      return donnees.keys().hasOnly(['nom', 'nomNormalise', 'telephone', 'telephoneNormalise',
-                                     'telephone2', 'adresse', 'note'].concat(champsAudit()))
+      return donnees.keys().hasOnly(['nom', 'prenom', 'nip', 'nomNormalise', 'telephone',
+                                     'telephoneNormalise', 'telephone2', 'adresse',
+                                     'note'].concat(champsAudit()))
              && donnees.keys().hasAll(['nom', 'nomNormalise', 'telephone', 'telephoneNormalise',
                                        'telephone2', 'adresse', 'note'].concat(champsAudit()))
              && donnees.nom is string
              && donnees.nom.size() > 0
              && donnees.nom.size() <= 80
+             && (!donnees.keys().hasAny(['prenom'])
+                 || (donnees.prenom is string && donnees.prenom.size() <= 80))
+             // Le numéro de la pièce d'identité : dix-sept chiffres, ou rien.
+             // Vide est une valeur ordinaire — une vente ne s'arrête pas parce
+             // que le client a oublié sa carte (D76).
+             && (!donnees.keys().hasAny(['nip'])
+                 || (donnees.nip is string
+                     && (donnees.nip == '' || donnees.nip.matches('^[0-9]{17}$'))))
              && donnees.nomNormalise is string
-             && donnees.nomNormalise.size() <= 80
+             && donnees.nomNormalise.size() <= 161
              && donnees.telephone is string
              && donnees.telephone.size() > 0
              && donnees.telephone.size() <= 32
@@ -541,9 +866,9 @@ service cloud.firestore {
       return valeur is string && valeur.matches('^[A-Z]{3}-[0-9]{4}-[0-9]{4,}$');
     }
 
-    function listeBornee(valeur, maximum) {
-      return valeur is list && valeur.size() <= maximum;
-    }
+    // `listeBornee` était ici, pour les deux listes de texte libre « inclus »
+    // et « non inclus ». S44 les a remplacées par deux booléens : ce qui part
+    // avec la moto se coche, et deux cases n'ont pas de taille à borner.
 
     function dateAppareil(valeur) {
       // La date métier vient de l'appareil (D38). On ne peut pas vérifier une
@@ -553,13 +878,14 @@ service cloud.firestore {
 
     function venteValide(donnees) {
       return donnees.keys().hasOnly(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
-                                     'date', 'prixConvenu', 'modePaiement', 'inclus', 'nonInclus',
+                                     'date', 'prixConvenu', 'modePaiement', 'carteGrise', 'casque',
                                      'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
                                      'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
                                      'lienSuiviEnvoyeAt', 'statutDossier',
-                                     'dateClotureDossier'].concat(champsAudit()))
+                                     'dateClotureDossier',
+                                     'emporte', 'carteGriseChemin'].concat(champsAudit()))
              && donnees.keys().hasAll(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
-                                       'date', 'prixConvenu', 'modePaiement', 'inclus', 'nonInclus',
+                                       'date', 'prixConvenu', 'modePaiement', 'carteGrise', 'casque',
                                        'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
                                        'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
                                        'lienSuiviEnvoyeAt', 'statutDossier',
@@ -574,12 +900,17 @@ service cloud.firestore {
              && donnees.motoId.size() > 0
              && donnees.clientId is string
              && donnees.clientId.size() > 0
+             && emporteValide(donnees)
              && dateAppareil(donnees.date)
              && montantValide(donnees.prixConvenu)
              && donnees.prixConvenu > 0
              && donnees.modePaiement in ['comptant', 'credit', 'tranches']
-             && listeBornee(donnees.inclus, 20)
-             && listeBornee(donnees.nonInclus, 20)
+             // Ce qui part avec la moto : deux cases, pas deux listes (S44).
+             // Les ventes d'avant gardent leurs listes sans être inquiétées —
+             // ce validateur ne tourne qu'à la création, et une vente ne se
+             // modifie que par les deux gestes ouverts plus bas.
+             && donnees.carteGrise is bool
+             && donnees.casque is bool
              // L'arithmétique de la vente, vérifiée ici et pas seulement dans le
              // formulaire : c'est le seul endroit qu'un client modifié ne
              // contourne pas.
@@ -658,6 +989,43 @@ service cloud.firestore {
     // sens : `totalPaye` n'additionne que des versements réels, donc il reste
     // inférieur ou égal à la vérité, donc `resteDu` reste supérieur ou égal.
     // Un reste dû nul l'est donc vraiment.
+    // Ce que le client a emporte, et le scan de la carte grise (S53).
+    //
+    // La forme seule est bornee ici. « On ne remet pas ce qu'on n'a pas » est
+    // une condition METIER qui demanderait de lire la moto : une regle ne joint
+    // pas, et recopier l'etat de la moto sur la vente serait la contradiction B
+    // de la spec. L'ecran tient la condition, les regles tiennent la forme.
+    function emporteValide(donnees) {
+      return (!donnees.keys().hasAny(['emporte'])
+              || (donnees.emporte.keys().hasOnly(['quittance', 'cmc'])
+                  && donnees.emporte.quittance is bool
+                  && donnees.emporte.cmc is bool))
+             && (!donnees.keys().hasAny(['carteGriseChemin'])
+                 || donnees.carteGriseChemin == null
+                 || texteBorne(donnees.carteGriseChemin, 400));
+    }
+
+    // Le troisieme geste de comptoir sur une vente, apres l'encaissement et la
+    // remise de la moto : dire ce que le client a emporte, et deposer le scan de
+    // la carte grise a son retour. Les deux arrivent LONGTEMPS apres la vente,
+    // donc ils doivent pouvoir s'ecrire seuls.
+    //
+    // `seulsChangent` est ce qui empeche ce geste de devenir un passe-droit :
+    // rien d'autre ne bouge dans la meme ecriture, et le prix reste intouchable.
+    //
+    // Le `hasAny` n'est pas une ceinture de plus : sans lui, une ecriture qui ne
+    // change RIEN d'autre que ses horodatages satisfait `seulsChangent`, et la
+    // porte s'ouvre a toute reecriture a l'identique. Quatre tests
+    // d'immuabilite de S9 sont tombes la-dessus — un total paye qui stagne, une
+    // remise de moto rejouee. `hasOnly` borne ce qui PEUT changer ; `hasAny`
+    // exige qu'un geste ait bien eu lieu.
+    function papiersEmportesValide(donnees) {
+      return request.resource.data.diff(resource.data).affectedKeys()
+               .hasAny(['emporte', 'carteGriseChemin'])
+             && seulsChangent(['emporte', 'carteGriseChemin'])
+             && emporteValide(donnees);
+    }
+
     function remiseMotoValide(donnees, ancien) {
       return seulsChangent(['motoRemise', 'dateRemiseMoto'])
              && ancien.modePaiement == 'tranches'
@@ -677,7 +1045,8 @@ service cloud.firestore {
       allow update: if peutVendrePour(resource.data.boutiqueId)
                     && traceModification(request.resource.data, resource.data)
                     && (encaissementValideSurVente(request.resource.data, resource.data)
-                        || remiseMotoValide(request.resource.data, resource.data));
+                        || remiseMotoValide(request.resource.data, resource.data)
+                        || papiersEmportesValide(request.resource.data));
 
       // Une vente ne se supprime pas : elle s'annule, et l'annulation laisse
       // une trace. S25.
@@ -733,9 +1102,31 @@ service cloud.firestore {
              && donnees.boutiqueId is string
              && donnees.venteId == venteId
              && donnees.type == type
-             && type in ['quittance', 'cmc', 'carte_grise', 'plaque']
-             // S8 ouvre le dossier ; c'est S11 qui fera vivre les autres statuts.
-             && donnees.statut == 'a_faire';
+             // **UN SEUL type se cree depuis le 16 octobre 2026 : la carte
+             // grise.** Trois en S8, trois moins la plaque en S48, et plus
+             // qu'un aujourd'hui.
+             //
+             // Depuis S53bis, RIEN ne lit un document `quittance` ou `cmc` :
+             // les trois lecteurs du dossier filtrent par
+             // `passeParUnPrestataire`. Leur disponibilite se coche sur la
+             // moto, leur remise sur la vente. En ecrire deux a chaque vente,
+             // c'etait accumuler de la donnee morte que personne n'ouvrirait
+             // jamais.
+             //
+             // Seule la CREATION est resserree, et c'est tout l'objet de cette
+             // asymetrie : `documentDossierMaj` ne revalide pas le type, donc
+             // les `plaque`, `quittance` et `cmc` deja en base restent lisibles
+             // et corrigeables. On ferme la porte d'entree, pas celle de la
+             // reparation — comme `typesACreer` pour les prestataires.
+             && type == 'carte_grise'
+             // S8 ouvre le dossier ; c'est S11 qui fait vivre les autres statuts.
+             //
+             // **Decochee au comptoir, la carte grise nait « sans objet »**
+             // (S53, arbitrage 5). La decocher laissait jusqu'ici un document
+             // « a faire » que personne n'allait jamais faire, et qui bloquait
+             // la cloture : le recu imprimait « non inclus » pendant que le
+             // dossier la reclamait.
+             && (donnees.statut == 'a_faire' || donnees.statut == 'non_applicable');
     }
 
     // La machine a etats, cote serveur. Elle repete `lib/domain/dossier.ts`, et
@@ -747,20 +1138,29 @@ service cloud.firestore {
       return type in ['quittance', 'cmc'];
     }
 
+    // **S53 retire leurs etapes a la quittance et au CMC.** Leur disponibilite
+    // vit sur la moto (`quittanceRecue`, `cmcRecu`) et leur remise sur la vente
+    // (`emporte`) : il ne reste au dossier qu'a dire s'ils sont ecartes. Et la
+    // carte grise s'arrete a son retour — sa preuve de remise est le scan et la
+    // plaque saisis sur la fiche de vente, non un troisieme statut a promener.
+    //
+    // Cette copie doit dire exactement ce que dit `CHEMIN_SANS_ETAPE` dans
+    // `lib/domain/dossier.ts`. Si elle en disait davantage, un appareil dont le
+    // code a ete modifie ecrirait un statut que plus personne ne lit — et le
+    // dossier redeviendrait la seconde source de verite que cette spec ferme.
     function transitionDossierAutorisee(type, de, vers) {
       return de == 'a_faire'
                ? (vers == 'non_applicable'
-                  || vers == (arriveDejaFait(type) ? 'revenu_magasin' : 'chez_prestataire'))
+                  || (!arriveDejaFait(type) && vers == 'chez_prestataire'))
              : de == 'chez_prestataire'
                ? (!arriveDejaFait(type) && vers == 'revenu_magasin')
-             : de == 'revenu_magasin'
-               ? vers == 'remis_client'
-             // 'remis_client' et 'non_applicable' ne ressortent jamais.
+             // 'revenu_magasin', 'remis_client' et 'non_applicable' ne
+             // ressortent jamais.
              : false;
     }
 
     // Les champs du depot et de la remise n'existent pas a la creation : S8
-    // ouvre quatre documents nus. Ils apparaissent au fil du cycle, d'ou un
+    // ouvre trois documents nus. Ils apparaissent au fil du cycle, d'ou un
     // `hasOnly` plus large que le `hasAll`, qui n'exige que le socle.
     function champsDossier() {
       return ['boutiqueId', 'venteId', 'type', 'statut'];
@@ -901,7 +1301,7 @@ service cloud.firestore {
     function encaissementValide(donnees) {
       return donnees.keys().hasOnly(['boutiqueId', 'date', 'sens', 'montant', 'moyenPaiement',
                                      'origine', 'origineRefId', 'libelle',
-                                     'categorieTranches'].concat(champsAudit()))
+                                     'categorieTranches', 'posteId'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'date', 'sens', 'montant', 'moyenPaiement',
                                        'origine', 'origineRefId', 'libelle',
                                        'categorieTranches'].concat(champsAudit()))
@@ -918,7 +1318,20 @@ service cloud.firestore {
              // L'argent des tranches est un engagement, pas une recette, tant
              // que la moto dort au magasin (§6.2). Le drapeau se pose à
              // l'encaissement ; le retrouver après coup serait un cauchemar.
-             && donnees.categorieTranches is bool;
+             && donnees.categorieTranches is bool
+             // Le poste de dépense (S55) : facultatif, et il doit le rester.
+             // Les encaissements d'avant cette spec n'en ont pas, et trois
+             // écrivains sur quatre produisent des entrées, qui n'ont pas de
+             // poste par nature. Exiger la clé casserait la vente, le versement
+             // et la vente de pièces pour une colonne qui ne les concerne pas.
+             //
+             // Une entrée ne peut pas en porter : un poste de dépense sur une
+             // recette n'aurait aucun sens, et la règle le refuse plutôt que de
+             // laisser l'écran seul garant.
+             && (!donnees.keys().hasAny(['posteId'])
+                 || (donnees.posteId is string
+                     && (donnees.posteId == ''
+                         || (donnees.sens == 'sortie' && texteBorne(donnees.posteId, 200)))));
     }
 
     match /encaissements/{encaissementId} {
@@ -1120,6 +1533,158 @@ service cloud.firestore {
       // de trace. On corrige par un mouvement inverse, qui se voit.
       allow update, delete: if false;
     }
+
+    // --- La vente de pièces au comptoir (S21) ------------------------------
+    // Une vente de pièces est une **pièce comptable**, au même titre qu'une
+    // vente de moto : elle porte un numéro qu'on dicte au téléphone, et elle ne
+    // se retouche pas. Ce que la règle peut tenir, elle le tient ; ce qu'elle ne
+    // peut pas tenir est nommé plus bas.
+    function ligneVenteValide(ligne) {
+      return ligne.keys().hasOnly(['pieceId', 'reference', 'designation', 'quantite',
+                                   'prixUnitaire', 'total'])
+             && ligne.keys().hasAll(['pieceId', 'reference', 'designation', 'quantite',
+                                     'prixUnitaire', 'total'])
+             && ligne.pieceId is string
+             && texteBorne(ligne.reference, 40)
+             && texteBorne(ligne.designation, 120)
+             && ligne.quantite is int
+             && ligne.quantite > 0
+             && ligne.quantite <= 1000000
+             && ligne.prixUnitaire is int
+             && ligne.prixUnitaire > 0
+             && ligne.prixUnitaire <= 1000000000
+             // Le total de la ligne est **calculé**, pas déclaré : un document
+             // dont les nombres ne s'accordent pas entre eux est un document
+             // qu'on ne peut plus relire avec confiance six mois plus tard.
+             && ligne.total == ligne.quantite * ligne.prixUnitaire;
+    }
+
+    // **Ce qu'on peut tenir sur les vingt lignes — et ce qui a été mesuré.**
+    //
+    // Le langage des règles n'a pas de repli sur une liste : vérifier vingt
+    // lignes demande de les écrire vingt fois. Et `||` n'y court-circuite pas
+    // comme on l'espère — CEL évalue ses deux membres —, si bien qu'un
+    // `size() <= index || ligneVenteValide(lignes[index])` déplié coûte ses
+    // vingt validations complètes même pour une vente d'une seule ligne.
+    //
+    // Mesuré sur l'émulateur (`regles/vente-pieces.test.ts`, dernier test du
+    // groupe) : le plafond de **1000 expressions par requête** tombe dès la
+    // sixième ligne ainsi dépliée, et dès la dixième même en ne gardant que les
+    // nombres. Vingt lignes intégralement vérifiées n'est donc pas une question
+    // de patience : la plateforme ne le permet pas.
+    //
+    // Ce qui tient, en revanche : le **total de chaque ligne** — entier,
+    // strictement positif — et le **total du document égal à leur somme**.
+    // C'est ce qui porte l'argent. Une ligne ne peut plus gonfler la recette
+    // sans que l'en-tête le dise, ni se compenser avec une ligne négative, et
+    // la caisse ne peut plus recevoir un montant que le détail contredit. Ce
+    // qui reste hors de portée est nommé plus bas.
+    //
+    // **Les deux contrôles n'en font qu'un, et c'est une contrainte de budget.**
+    // Un second passage de vingt termes pour la positivité franchissait le
+    // plafond ; un appel de fonction par terme aussi. Restent vingt termes en
+    // ligne, où une ligne malsaine — total absent, non entier, nul ou négatif —
+    // n'est pas rejetée sur place mais **empoisonne la somme** avec deux
+    // milliards.
+    //
+    // Ce que cela vaut, précisément : `montantValide` borne `donnees.total` à un
+    // milliard, chaque terme sain est nul ou strictement positif, donc une
+    // seule ligne empoisonnée porte la somme au-delà de deux milliards et
+    // l'égalité devient impossible à satisfaire. Un dépassement d'entier n'est
+    // pas une échappatoire non plus : CEL en fait une erreur, et une erreur
+    // refuse l'écriture.
+    function sommeDesLignes(lignes) {
+      return (lignes.size() <= 0 ? 0 : (lignes[0].total is int && lignes[0].total > 0 ? lignes[0].total : 2000000000))
+             + (lignes.size() <= 1 ? 0 : (lignes[1].total is int && lignes[1].total > 0 ? lignes[1].total : 2000000000))
+             + (lignes.size() <= 2 ? 0 : (lignes[2].total is int && lignes[2].total > 0 ? lignes[2].total : 2000000000))
+             + (lignes.size() <= 3 ? 0 : (lignes[3].total is int && lignes[3].total > 0 ? lignes[3].total : 2000000000))
+             + (lignes.size() <= 4 ? 0 : (lignes[4].total is int && lignes[4].total > 0 ? lignes[4].total : 2000000000))
+             + (lignes.size() <= 5 ? 0 : (lignes[5].total is int && lignes[5].total > 0 ? lignes[5].total : 2000000000))
+             + (lignes.size() <= 6 ? 0 : (lignes[6].total is int && lignes[6].total > 0 ? lignes[6].total : 2000000000))
+             + (lignes.size() <= 7 ? 0 : (lignes[7].total is int && lignes[7].total > 0 ? lignes[7].total : 2000000000))
+             + (lignes.size() <= 8 ? 0 : (lignes[8].total is int && lignes[8].total > 0 ? lignes[8].total : 2000000000))
+             + (lignes.size() <= 9 ? 0 : (lignes[9].total is int && lignes[9].total > 0 ? lignes[9].total : 2000000000))
+             + (lignes.size() <= 10 ? 0 : (lignes[10].total is int && lignes[10].total > 0 ? lignes[10].total : 2000000000))
+             + (lignes.size() <= 11 ? 0 : (lignes[11].total is int && lignes[11].total > 0 ? lignes[11].total : 2000000000))
+             + (lignes.size() <= 12 ? 0 : (lignes[12].total is int && lignes[12].total > 0 ? lignes[12].total : 2000000000))
+             + (lignes.size() <= 13 ? 0 : (lignes[13].total is int && lignes[13].total > 0 ? lignes[13].total : 2000000000))
+             + (lignes.size() <= 14 ? 0 : (lignes[14].total is int && lignes[14].total > 0 ? lignes[14].total : 2000000000))
+             + (lignes.size() <= 15 ? 0 : (lignes[15].total is int && lignes[15].total > 0 ? lignes[15].total : 2000000000))
+             + (lignes.size() <= 16 ? 0 : (lignes[16].total is int && lignes[16].total > 0 ? lignes[16].total : 2000000000))
+             + (lignes.size() <= 17 ? 0 : (lignes[17].total is int && lignes[17].total > 0 ? lignes[17].total : 2000000000))
+             + (lignes.size() <= 18 ? 0 : (lignes[18].total is int && lignes[18].total > 0 ? lignes[18].total : 2000000000))
+             + (lignes.size() <= 19 ? 0 : (lignes[19].total is int && lignes[19].total > 0 ? lignes[19].total : 2000000000));
+    }
+
+    function ventePieceValide(donnees) {
+      return donnees.keys().hasOnly(['numero', 'numeroInitial', 'boutiqueId', 'date', 'clientId',
+                                     'lignes', 'total', 'moyenPaiement'].concat(champsAudit()))
+             && donnees.keys().hasAll(['numero', 'numeroInitial', 'boutiqueId', 'date', 'clientId',
+                                       'lignes', 'total', 'moyenPaiement'].concat(champsAudit()))
+             // Les deux numéros sont égaux à la création, et `numeroInitial` ne
+             // bougera plus : c'est la clé de rapprochement des doublons que la
+             // réconciliation serveur suffixe (D5). Même contrat qu'une vente de
+             // moto, parce que Q1 a tranché un compteur **partagé** entre les
+             // deux collections — un numéro dicté désigne une seule pièce.
+             && numeroDOrigine(donnees.numero)
+             && donnees.numeroInitial == donnees.numero
+             && donnees.boutiqueId is string
+             && dateAppareil(donnees.date)
+             // Le client est facultatif au comptoir (§9) : la chaîne vide dit
+             // « quelqu'un qui passe », et c'est le cas courant.
+             && donnees.clientId is string
+             && donnees.lignes is list
+             && donnees.lignes.size() > 0
+             && donnees.lignes.size() <= 20
+             // La première ligne intégralement — c'est tout ce que le plafond
+             // d'expressions autorise. Les vingt totaux, eux, sont tenus par
+             // l'égalité qui suit : `montantValide` la borne, et la somme
+             // refuse toute ligne dont le total n'est pas un entier positif.
+             && ligneVenteValide(donnees.lignes[0])
+             && montantValide(donnees.total)
+             && donnees.total > 0
+             && donnees.total == sommeDesLignes(donnees.lignes)
+             && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave'];
+    }
+
+    match /ventesPieces/{venteId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+
+      allow create: if ventePieceValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+
+      // **Une vente enregistrée ne se retouche pas, elle se contre-passe.**
+      // Même principe qu'un versement et qu'une écriture de caisse : le stock
+      // est descendu, la recette est au journal, et un document modifiable
+      // rendrait les trois incohérents sans laisser de trace.
+      allow update, delete: if false;
+    }
+
+    // **Ce que ces règles ne peuvent pas tenir, et il faut le dire.**
+    //
+    // *Le détail des lignes au-delà de la première.* Leur quantité, leur prix
+    // unitaire, leur référence et leur jeu de clés ne sont pas vérifiés : le
+    // plafond d'expressions tombe avant. Ce qui l'est, et qui borne les dégâts,
+    // c'est leur total — positif — et la somme qui doit tomber juste. Une
+    // deuxième ligne peut donc annoncer une quantité absurde en face d'un total
+    // exact ; elle ne peut plus faire mentir la recette. Le reste est tenu par
+    // `validerPanier` et `figerLignes`, c'est-à-dire par le geste, et par rien
+    // d'autre côté base.
+    //
+    // *Le lien vers les mouvements de stock.* Une vente doit produire un
+    // `sortie_vente` par ligne et un encaissement ; c'est le **batch** qui le
+    // tient, parce qu'une règle ne voit qu'un document à la fois. Rien ici ne
+    // le vérifie — et, à ce jour, **aucun test non plus** : le test bout en
+    // bout qui le prouverait est le critère resté ouvert de
+    // `specs/S21-vente-pieces.md`. Tant qu'il n'existe pas, l'invariant tient
+    // sur la relecture de `enregistrerVentePiece`, et sur rien d'autre. Le dire
+    // ici est le minimum : une protection annoncée mais absente est pire que
+    // pas de protection, parce qu'on cesse de la chercher.
+    //
+    // *Le stock disponible.* Une règle ne sait pas additionner une collection,
+    // et une transaction ne fonctionne pas hors ligne. « Pas de négatif » est
+    // donc une règle du **geste** (D94), tenue là où le geste se fait.
 
     // --- Écritures de vérification de la synchronisation -------------------
     // Produites par l'écran /diagnostic. Sans valeur métier, jamais lues par

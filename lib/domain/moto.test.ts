@@ -9,9 +9,13 @@ import {
   coutTotal,
   coutTotalSaisie,
   filtrerMotos,
+  LONGUEUR_CHASSIS_MAX,
   lireEntier,
   lirePapiers,
   normaliserChassis,
+  normaliserPlaque,
+  PLAQUE_LONGUEUR_MAX,
+  validerChassis,
   validerCout,
   validerCoutPose,
   validerMoto,
@@ -45,10 +49,14 @@ const moto = (partie: Partial<Moto> = {}): Moto => ({
   numeroMoteur: "",
   prixVenteConseille: null,
   provenanceId: "p1",
+  arrivageId: null,
   papiersFournis: [],
   photos: [],
   statut: "en_stock",
   dateEntree: null,
+  cmcRecu: false,
+  quittanceRecue: false,
+  plaque: null,
   ...partie,
 });
 
@@ -110,10 +118,19 @@ describe("validerMoto", () => {
     expect(validerMoto(saisie())).toBeNull();
   });
 
-  it("exige les trois choix qui rattachent la moto au référentiel", () => {
+  it("exige les deux choix qui rattachent la moto au référentiel", () => {
     expect(validerMoto(saisie({ marqueId: "" }))).toMatch(/marque/i);
-    expect(validerMoto(saisie({ modeleId: "" }))).toMatch(/modèle/i);
     expect(validerMoto(saisie({ provenanceId: "" }))).toMatch(/provenance/i);
+  });
+
+  /* Le modèle a quitté les champs exigés, ici comme au lot. Les deux chemins
+     d'entrée en stock devaient bouger ensemble : laisser la saisie unitaire
+     stricte aurait fait dépendre l'acceptation d'une moto du formulaire par
+     lequel elle passe, et c'est au comptoir que cette incohérence se serait
+     rencontrée. La règle Firestore ne sait de toute façon pas distinguer les
+     deux chemins. */
+  it("accepte une moto sans modèle, comme un lot", () => {
+    expect(validerMoto(saisie({ modeleId: "" }))).toBeNull();
   });
 
   it("exige un châssis — c’est l’identité de la moto", () => {
@@ -220,9 +237,15 @@ describe("le coût, séparé de la moto (S39)", () => {
 });
 
 describe("lirePapiers", () => {
+  /* **Aucun exemple ne reprend le nom d'un papier du dossier** (S53). Celui-ci
+     prenait « Carte grise », et figeait noir sur blanc le symptôme que la spec
+     a relevé : le même papier était une chaîne tapée à la main ici, et un
+     document à cycle dans le fichier voisin. Ce champ est une note du vendeur
+     sur une occasion — ce qu'il a trouvé dans le top-case, pas un document
+     administratif à suivre. */
   it("lit une liste tapée une ligne par papier", () => {
-    expect(lirePapiers("Carte grise\n  Facture  \n\nAssurance")).toEqual([
-      "Carte grise",
+    expect(lirePapiers("Double des clés\n  Facture  \n\nAssurance")).toEqual([
+      "Double des clés",
       "Facture",
       "Assurance",
     ]);
@@ -310,5 +333,44 @@ describe("validerFichierPapier", () => {
 
   it("refuse un fichier vide", () => {
     expect(validerFichierPapier(fichier("image/jpeg", 0))).toMatch(/vide/i);
+  });
+});
+
+describe("validerChassis", () => {
+  it("refuse un châssis vide : c'est l'identité de la moto", () => {
+    expect(validerChassis("  ")).toMatch(/obligatoire/i);
+  });
+
+  it("refuse un châssis trop long", () => {
+    expect(validerChassis("A".repeat(LONGUEUR_CHASSIS_MAX + 1))).toMatch(/dépasse/i);
+  });
+
+  it("refuse un châssis avec des caractères autres que lettres et chiffres", () => {
+    expect(validerChassis("LC6/PCJ")).toMatch(/lettres et.*chiffres/i);
+  });
+
+  it("accepte un châssis normalisé", () => {
+    expect(validerChassis("lc6pcj1a9k0000123")).toBeNull();
+  });
+});
+
+describe("normaliserPlaque", () => {
+  it("taille les espaces et met en capitales : une plaque se lit d’un coup d’œil", () => {
+    expect(normaliserPlaque("  11 aa 1234  ")).toBe("11 AA 1234");
+  });
+
+  it("réduit les espaces internes multiples à un seul", () => {
+    expect(normaliserPlaque("11   AA   1234")).toBe("11 AA 1234");
+  });
+
+  /* **Point de vigilance 5.** Un champ libre reçoit tôt ou tard un collage
+     malheureux ; la borne protège la règle Firestore d’un refus que le gérant
+     ne saurait pas lire. */
+  it("borne la longueur sans rien inventer au-delà", () => {
+    expect(normaliserPlaque("A".repeat(200))).toHaveLength(PLAQUE_LONGUEUR_MAX);
+  });
+
+  it("rend une chaîne vide sur une saisie vide, jamais null", () => {
+    expect(normaliserPlaque("   ")).toBe("");
   });
 });

@@ -1,38 +1,52 @@
 import { defineConfig, devices } from "@playwright/test";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { projetsCompiles, verdictGarde } from "./lib/domain/garde-emulateurs";
 
 /**
- * Garde-fou : la suite ne tourne QUE sur les émulateurs.
+ * Garde-fou : la suite ne tourne QUE sur un build compilé pour les émulateurs.
  *
  * Ces tests créent des comptes, des boutiques, des motos et des ventes, puis
  * vident la base. Pointés sur un vrai projet Firebase, ils détruiraient des
  * données réelles — et personne ne s'en apercevrait avant de les chercher.
  *
- * Le contrôle lit les fichiers d'environnement plutôt que `process.env` : Next
- * les charge lui-même au démarrage du serveur de test, et ce processus-ci ne
- * les voit pas. C'est le même fichier qui décidera dans quelques secondes à
- * quel projet l'application parle.
+ * **Il lisait un fichier, il lit maintenant le paquet (S53).** L'ancienne
+ * version cherchait `NEXT_PUBLIC_FIREBASE_EMULATEURS=1` dans le texte de
+ * `.env.local` ou `.env`. Or le `webServer` ci-dessous sert un build **déjà
+ * compilé**, où ces variables sont figées depuis le `next build` : poser le
+ * fichier puis lancer la suite sans recompiler faisait passer le garde pendant
+ * que le navigateur parlait au vrai projet. Aucun message, verdict vert — soit
+ * exactement la catastrophe qu'il existe pour empêcher, dans le cas le plus
+ * naturel qui soit. Trou constaté le 6 octobre 2026.
+ *
+ * Le `projectId` compilé est littéralement ce à quoi le navigateur va parler :
+ * c'est donc lui qu'on interroge. Le fichier ne décide de rien. Contrepartie
+ * voulue : la suite exige qu'on ait recompilé, et le dit quand ce n'est pas le
+ * cas. La logique du verdict vit dans `lib/domain/garde-emulateurs.ts`, sous
+ * tests — une règle écrite deux fois ne se change pas d'un seul côté (D107).
  */
-const SAUT = String.fromCharCode(10);
+const REPERTOIRE_BUILD = process.env.NEXT_DIST_DIR ?? ".next";
+
+function projetsDuBuild(): string[] {
+  const racine = join(REPERTOIRE_BUILD, "static", "chunks");
+  /* Répertoire absent : `verdictGarde` traite l'absence de projet comme un
+     refus, et son message dit de compiler. Rien à décider ici. */
+  if (!existsSync(racine)) return [];
+
+  const projets = new Set<string>();
+  for (const entree of readdirSync(racine, { recursive: true })) {
+    const chemin = String(entree);
+    if (!chemin.endsWith(".js")) continue;
+    for (const projet of projetsCompiles([readFileSync(join(racine, chemin), "utf8")])) {
+      projets.add(projet);
+    }
+  }
+  return [...projets];
+}
 
 function exigerLesEmulateurs(): void {
-  const fichier = [".env.local", ".env"].find((nom) => existsSync(nom));
-  const contenu = fichier ? readFileSync(fichier, "utf8") : "";
-  const surEmulateurs = /^NEXT_PUBLIC_FIREBASE_EMULATEURS\s*=\s*1\s*$/m.test(contenu);
-  if (surEmulateurs) return;
-
-  throw new Error(
-    [
-      "Les tests bout en bout refusent de tourner hors des émulateurs.",
-      "",
-      `Le fichier « ${fichier ?? "(aucun)"} » ne pose pas NEXT_PUBLIC_FIREBASE_EMULATEURS=1 :`,
-      "l'application viserait un vrai projet Firebase, et cette suite y créerait",
-      "puis effacerait des comptes, des boutiques et des ventes.",
-      "",
-      "Pour lancer les tests, remettez la configuration des émulateurs :",
-      "  mv .env.local.emulateurs .env.local",
-    ].join(SAUT),
-  );
+  const verdict = verdictGarde(projetsDuBuild());
+  if (verdict !== null) throw new Error(verdict);
 }
 
 exigerLesEmulateurs();

@@ -216,16 +216,16 @@ test.describe("hors ligne", () => {
     /* L'écran des reçus n'a jamais été ouvert sur cet appareil : s'il s'affiche,
        c'est qu'il a été mis en cache à l'installation et non à la visite (D40).
        C'est l'oubli que cette liste rend invisible jusqu'à la première coupure. */
-    await page.goto("/motos/recus", { waitUntil: "load" });
+    await page.goto("/motos/ventes", { waitUntil: "load" });
     await expect(contenu(page).getByRole("heading", { level: 1 })).toHaveText("Reçus", {
       timeout: 30_000,
     });
 
     /* Le reçu lui-même, par son paramètre d'écran — le service worker sert le
-       même document qu'à `/motos/recus` (D39). Les chiffres viennent du cache
+       même document qu'à `/motos/ventes` (D39). Les chiffres viennent du cache
        Firestore, l'en-tête du logo et des coordonnées déjà lus, et les polices
        de notre domaine : rien à demander au réseau. */
-    await page.goto(`/motos/recus?recu=${venteId}`, { waitUntil: "load" });
+    await page.goto(`/motos/ventes?recu=${venteId}`, { waitUntil: "load" });
 
     const recu = page.getByRole("article");
     await expect(recu).toBeVisible({ timeout: 30_000 });
@@ -244,7 +244,7 @@ test.describe("hors ligne", () => {
 test.describe("états", () => {
   test("un reçu introuvable se dit, il ne tourne pas dans le vide", async ({ page }) => {
     await seConnecterEtEntrer(page);
-    await page.goto("/motos/recus?recu=vente-qui-nexiste-pas", { waitUntil: "load" });
+    await page.goto("/motos/ventes?recu=vente-qui-nexiste-pas", { waitUntil: "load" });
     await expect(contenu(page)).toContainText("Ce reçu est introuvable", { timeout: 30_000 });
     await expect(page.getByRole("link", { name: "Revenir aux reçus" })).toBeVisible();
   });

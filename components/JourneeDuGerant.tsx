@@ -3,6 +3,7 @@
 import { Bike, Coins, Receipt } from "lucide-react";
 import { useCallback, useMemo } from "react";
 import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
+import { nomComplet } from "@/lib/domain/client";
 import { formaterHeure, formaterMontant, memeJour } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_MODE, LIBELLE_MOYEN, type Vente, type Versement } from "@/lib/domain/vente";
@@ -73,7 +74,7 @@ export function JourneeDuGerant() {
   const { valeur: motos } = useAbonnement(souscrireStock, "Le stock n’a pas pu être lu.");
 
   const nomDuClient = useMemo(
-    () => new Map(clients.map((client) => [client.id, client.nom])),
+    () => new Map(clients.map((client) => [client.id, nomComplet(client)])),
     [clients],
   );
 

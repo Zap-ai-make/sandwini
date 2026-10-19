@@ -272,4 +272,37 @@ describe("la sortie d’espèces — réponse 2, et aucune règle nouvelle", () 
   it("refuse un montant nul : une sortie de rien n’est pas un mouvement", async () => {
     await assertFails(addDoc(collection(gerant(), "encaissements"), sortieEspeces({ montant: 0 })));
   });
+
+  /**
+   * **Le poste de dépense (S55) : facultatif par nécessité, borné au sens.**
+   *
+   * Facultatif, parce que trois écrivains sur quatre produisent des *entrées* —
+   * la vente, le versement, la vente de pièces — et qu'une recette n'a pas de
+   * poste de dépense. L'exiger aurait cassé le comptoir entier pour une colonne
+   * qui ne le concerne pas. Les sorties d'avant cette spec n'en ont pas non
+   * plus, et elles restent lisibles.
+   *
+   * Borné, parce qu'un poste de dépense posé sur une recette ne veut rien dire.
+   * La règle le refuse plutôt que de laisser l'écran seul garant : c'est D27 —
+   * ce qui compte se revérifie côté serveur.
+   */
+  it("accepte un poste sur une sortie, et le refuse sur une entrée", async () => {
+    await assertSucceeds(
+      addDoc(collection(gerant(), "encaissements"), sortieEspeces({ posteId: "carburant" })),
+    );
+    await assertFails(
+      addDoc(
+        collection(gerant(), "encaissements"),
+        sortieEspeces({ sens: "entree", origine: "versement", posteId: "carburant" }),
+      ),
+    );
+    /* La chaîne vide passe des deux côtés : c'est l'état « non classé », et
+       c'est ce que le lecteur rend pour un document qui n'a pas le champ. */
+    await assertSucceeds(
+      addDoc(
+        collection(gerant(), "encaissements"),
+        sortieEspeces({ sens: "entree", origine: "versement", posteId: "" }),
+      ),
+    );
+  });
 });

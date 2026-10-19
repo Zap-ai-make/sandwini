@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Store } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { ChoixOuNouveau } from "@/components/ChoixOuNouveau";
@@ -51,7 +51,8 @@ import { creerEntree, creerModele, type Auteur } from "@/lib/repositories/refere
  * cours. Un référentiel vide ne bloque plus un comptoir.
  */
 export default function PageNouvelleMoto() {
-  const { perimetre } = usePerimetre();
+  const { perimetre, boutiques, choisir } = usePerimetre();
+  const boutiquesOuvertes = boutiques.filter((boutique) => boutique.actif);
   const session = useSession();
   const catalogue = useCatalogue();
 
@@ -132,13 +133,44 @@ export default function PageNouvelleMoto() {
     setSaisie(SAISIE_VIDE);
   }
 
+  /* **La question, et non le refus (S54).** Cet écran se contentait d'une
+     phrase renvoyant vers la plaque du bandeau : le commanditaire, travaillant
+     en « toutes les boutiques », en a conclu que la saisie était cassée. Elle
+     ne l'était pas — elle ne disait pas assez fort ce qui lui manquait. Elle
+     pose donc la question elle-même, et le formulaire suit. */
   if (perimetre.type !== "boutique") {
     return (
       <Cadre>
-        <p className="max-w-prose text-encre-doux">
-          Une moto entre dans une boutique précise. Choisissez-en une dans le bandeau, en haut de
-          l’écran, avant de la saisir.
+        <h2 className="text-bloc font-semibold text-encre">Dans quelle boutique entre-t-elle ?</h2>
+        <p className="mt-1 max-w-prose text-corps text-encre-doux">
+          Une moto entre dans une boutique précise : celle qui la détient et qui la vendra.
         </p>
+        <ul className="mt-4 grid max-w-md gap-2">
+          {boutiquesOuvertes.length === 0 ? (
+            <li className="text-corps text-encre-doux">
+              Aucune boutique ouverte. Déclarez-en une dans les réglages avant de saisir une moto.
+            </li>
+          ) : (
+            boutiquesOuvertes.map((boutique) => (
+              <li key={boutique.id}>
+                <button
+                  type="button"
+                  onClick={() => choisir(boutique.id)}
+                  className="flex w-full items-center gap-3 rounded-plaque border border-bord px-3 py-3 text-left hover:bg-survol"
+                >
+                  <Store aria-hidden="true" className="size-4 shrink-0 text-encre-doux" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-medium text-encre">{boutique.nom}</span>
+                    {boutique.adresse && (
+                      <span className="block text-legende text-encre-doux">{boutique.adresse}</span>
+                    )}
+                  </span>
+                  <span className="plaque-code shrink-0 text-encre-doux">{boutique.code}</span>
+                </button>
+              </li>
+            ))
+          )}
+        </ul>
       </Cadre>
     );
   }
@@ -208,31 +240,47 @@ export default function PageNouvelleMoto() {
             </div>
           </div>
 
-          <div className="mt-4">
+          {/* Marque et modèle sont une seule étape, et se lisent comme telle.
+              Le modèle paraissait verrouillé : il était `disabled` tant
+              qu'aucune marque n'était choisie, et le gris s'interprétait comme
+              un refus plutôt que comme une attente. Il a désormais l'aspect et
+              le comportement de la marque ; ce qui reste vrai — un modèle
+              appartient à une marque (S40) — est dit par l'invite, avant le
+              geste, et non par un champ éteint. */}
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <ChoixOuNouveau
               id="marque"
               libelle="Marque"
               singulier="marque"
               determinant="cette"
               valeur={saisie.marqueId}
-              changer={(marqueId) => changer({ marqueId, modeleId: "" })}
+              changer={(marqueId) => {
+                changer({ marqueId, modeleId: "" });
+                /* Le focus enchaîne sur le modèle : c'est la question
+                   suivante, et l'attente que l'invite annonçait vient de se
+                   lever. Après la peinture, sinon le champ visé n'a pas
+                   encore repris sa forme de `<select>` quand la marque
+                   vient d'être créée à la volée. */
+                if (marqueId) {
+                  requestAnimationFrame(() => document.getElementById("modele")?.focus());
+                }
+              }}
               toutes={catalogue.lues.marques}
               invite="Choisir une marque"
               creer={(nom, auteur) => creerEntree("marques", nom, auteur)}
             />
-          </div>
 
-          <div className="mt-4">
             <ChoixOuNouveau
               id="modele"
               libelle="Modèle"
+              facultatif
               singulier="modèle"
               determinant="ce"
               valeur={saisie.modeleId}
               changer={(modeleId) => changer({ modeleId })}
               toutes={modelesDeLaMarque}
               invite={saisie.marqueId ? "Choisir un modèle" : "Choisissez d’abord une marque"}
-              desactive={!saisie.marqueId}
+              enAttente={!saisie.marqueId}
               creer={(nom, auteur) => creerModele(saisie.marqueId, nom, auteur)}
             />
           </div>
@@ -318,8 +366,11 @@ export default function PageNouvelleMoto() {
 
           {saisie.etat === "occasion" && (
             <div className="mt-4">
+              {/* « Notes du vendeur » : voir `FicheMoto.tsx`. Le mot
+                  « papiers » le faisait confondre avec les documents du
+                  dossier (S53). */}
               <label htmlFor="papiers" className="block text-sm font-medium text-encre">
-                Papiers fournis
+                Notes du vendeur
               </label>
               <textarea
                 id="papiers"
@@ -360,11 +411,8 @@ export default function PageNouvelleMoto() {
           <fieldset className="mt-6 cadre p-4">
             <legend className="px-1 font-semibold text-encre">Ce qu’elle a coûté</legend>
             <p className="mt-1 text-sm text-encre-doux">
-              Réservé au responsable. Vous pouvez le laisser vide et le poser plus tard depuis{" "}
-              <Link href="/supervision/couts" className="underline">
-                Prix d’achat
-              </Link>
-              .
+              Réservé au responsable. Vous pouvez le laisser vide et le poser plus tard depuis
+              la fiche de la moto, section « Coût d’entrée ».
             </p>
 
             <div className="mt-4">

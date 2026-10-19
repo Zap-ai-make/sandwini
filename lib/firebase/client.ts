@@ -9,6 +9,7 @@ import {
 } from "firebase/firestore";
 import { connectFunctionsEmulator, getFunctions, type Functions } from "firebase/functions";
 import { connectStorageEmulator, getStorage, type FirebaseStorage } from "firebase/storage";
+import { PORT_FONCTIONS_EMULATEUR, REGION_FONCTIONS } from "@/lib/fonctions/url";
 
 /* Configuration Firebase côté client. Ces valeurs ne sont pas des secrets : ce
    sont des identifiants publics, et c’est la raison pour laquelle les règles
@@ -68,13 +69,18 @@ export function stockage(): FirebaseStorage {
   return storage;
 }
 
-/** Région des Cloud Functions — doit correspondre à celle déclarée dans `functions/src/index.ts`. */
-export const REGION_FONCTIONS = "europe-west1";
+/* La région et le port de l'émulateur vivent dans `lib/fonctions/url.ts`, qui ne
+   dépend d'aucun SDK : le portail du prestataire (S56) est rendu côté serveur et
+   a besoin de ces deux valeurs sans tirer Firebase avec elles. Réexportés ici
+   sous leur nom habituel pour que rien ne bouge chez les appelants. */
+export { REGION_FONCTIONS } from "@/lib/fonctions/url";
 
 export function fonctions(): Functions {
   if (functionsInstance) return functionsInstance;
   functionsInstance = getFunctions(application(), REGION_FONCTIONS);
-  if (surEmulateurs) connectFunctionsEmulator(functionsInstance, "127.0.0.1", 5301);
+  if (surEmulateurs) {
+    connectFunctionsEmulator(functionsInstance, "127.0.0.1", PORT_FONCTIONS_EMULATEUR);
+  }
   return functionsInstance;
 }
 

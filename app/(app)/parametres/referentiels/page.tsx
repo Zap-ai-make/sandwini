@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
 import { ListeReferentiel, type ActionsReferentiel } from "@/components/ListeReferentiel";
+import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage } from "@/components/patrons/Page";
 import type { Referentiel } from "@/lib/domain/referentiel";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -20,6 +21,14 @@ import {
  * Deux listes courtes qui n'ont pas de page chacune : on les consulte au même
  * moment — en préparant la saisie d'une entrée en stock — et les séparer
  * ajouterait un aller-retour pour rien.
+ *
+ * **En onglets depuis S54**, comme le catalogue. Elles sont courtes, mais deux
+ * écrans qui font la même chose doivent la faire pareil : le geste appris sur
+ * les marques doit marcher ici sans réapprentissage.
+ *
+ * **Les deux listes appartiennent à l'entreprise, pas à une boutique.**
+ * Collections uniques, comme les marques : ce qu'une boutique déclare, les
+ * autres le lisent.
  */
 export default function PageReferentiels() {
   return (
@@ -40,6 +49,8 @@ const ACTIONS_PROVENANCES = actionsPour("provenances");
 const ACTIONS_TYPES_FRAIS = actionsPour("typesFrais");
 
 function Referentiels() {
+  const [onglet, setOnglet] = useState<"provenances" | "frais">("provenances");
+
   const souscrireProvenances = useCallback(
     (auChangement: (v: Referentiel[]) => void, enErreur: (c: unknown) => void) =>
       ecouterReferentiel("provenances", auChangement, enErreur),
@@ -62,36 +73,48 @@ function Referentiels() {
 
   return (
     <div>
-      <TetePage
-        retour={{ href: "/parametres", libelle: "Réglages" }}
-        titre="Provenances et frais"
-      />
+      <TetePage retour={{ href: "/motos", libelle: "Motos" }} titre="Provenances et frais" />
       <p className="mt-2 max-w-prose text-encre-doux">
         D’où viennent les motos, et quels frais s’ajoutent à leur prix d’achat. Ces deux listes
-        alimenteront le formulaire d’entrée en stock.
+        valent pour toutes les boutiques de motos, et alimentent le formulaire d’entrée en stock.
       </p>
 
-      <div className="mt-6 space-y-8">
-        <ListeReferentiel
-          titre="Provenances"
-          singulier="provenance"
-          determinant="cette"
-          exemples="Import, Confrère, Reprise client"
-          entrees={provenances.valeur}
-          erreur={provenances.erreur}
-          actions={ACTIONS_PROVENANCES}
-        />
-
-        <ListeReferentiel
-          titre="Types de frais"
-          singulier="type de frais"
-          determinant="ce"
-          exemples="Transport, Remise en état, Commission"
-          entrees={typesFrais.valeur}
-          erreur={typesFrais.erreur}
-          actions={ACTIONS_TYPES_FRAIS}
-        />
-      </div>
+      <Onglets
+        libelle="Ce que vous réglez"
+        valeur={onglet}
+        changer={setOnglet}
+        className="mt-6"
+        onglets={[
+          {
+            valeur: "provenances",
+            libelle: "Provenances",
+            contenu: (
+              <ListeReferentiel
+                singulier="provenance"
+                determinant="cette"
+                exemples="Import, Confrère, Reprise client"
+                entrees={provenances.valeur}
+                erreur={provenances.erreur}
+                actions={ACTIONS_PROVENANCES}
+              />
+            ),
+          },
+          {
+            valeur: "frais",
+            libelle: "Types de frais",
+            contenu: (
+              <ListeReferentiel
+                singulier="type de frais"
+                determinant="ce"
+                exemples="Transport, Remise en état, Commission"
+                entrees={typesFrais.valeur}
+                erreur={typesFrais.erreur}
+                actions={ACTIONS_TYPES_FRAIS}
+              />
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }

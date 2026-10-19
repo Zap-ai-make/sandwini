@@ -44,6 +44,9 @@ export type Moto = {
   numeroMoteur: string;
   prixVenteConseille: number | null;
   provenanceId: string;
+  /* Le lot d'arrivage dont la moto vient (S42). Nul pour une saisie unitaire :
+     une moto tient son origine soit d'une provenance, soit d'un arrivage. */
+  arrivageId: string | null;
   papiersFournis: string[];
   photos: string[];
   statut: StatutMoto;
@@ -54,6 +57,28 @@ export type Moto = {
      tard, l'envoi étant la seule opération de S11 qui exige du réseau. */
   quittanceChemin: string | null;
   cmcChemin: string | null;
+  /* Le CMC de cette moto est-il en main ? Témoin coché à la main (S43), distinct
+     du scan `cmcChemin` : on peut avoir reçu la carte sans l'avoir encore
+     photographiée, et inversement. C'est lui qui nourrit le décompte des « CMC
+     manquants » d'un arrivage. Rien à voir avec le stock de cartes de S16. */
+  cmcRecu: boolean;
+  /**
+   * La quittance est-elle dans le tiroir ?
+   *
+   * Posée en face de `cmcRecu`, qui existait seul depuis S43. Deux papiers de
+   * même nature qui se comportaient différemment sur le même écran, c'était
+   * exactement le « on comprend rien » du commanditaire.
+   */
+  quittanceRecue: boolean;
+  /**
+   * L'immatriculation, saisie au retour de la carte grise.
+   *
+   * **Rangée sur la moto et non sur la vente** : une plaque appartient à
+   * l'engin, elle lui survit à une revente, et l'inventaire peut l'afficher
+   * sans rouvrir une vente. La saisie, elle, se fait sur la fiche de vente —
+   * c'est là que se trouve le gérant au moment du retour.
+   */
+  plaque: string | null;
 };
 
 /** Les deux papiers qu'une moto peut porter en pièce jointe (D66). */
@@ -194,12 +219,14 @@ export function ecrirePapiers(papiers: string[]): string {
   return ecrireLignes(papiers);
 }
 
-export function validerMoto(saisie: SaisieMoto): string | null {
-  if (!saisie.marqueId) return "Choisissez une marque.";
-  if (!saisie.modeleId) return "Choisissez un modèle.";
-  if (!saisie.provenanceId) return "Choisissez une provenance.";
-
-  const chassis = normaliserChassis(saisie.numeroChassis);
+/**
+ * Le numéro de châssis est-il recevable ? Message à afficher, ou `null`.
+ *
+ * Isolé de `validerMoto` pour que la saisie d'un lot (S42) applique la même
+ * règle à chaque ligne sans dupliquer la normalisation ni le motif.
+ */
+export function validerChassis(numero: string): string | null {
+  const chassis = normaliserChassis(numero);
   if (!chassis) return "Le numéro de châssis est obligatoire : c’est l’identité de la moto.";
   if (chassis.length > LONGUEUR_CHASSIS_MAX) {
     return `Le numéro de châssis dépasse ${LONGUEUR_CHASSIS_MAX} caractères.`;
@@ -207,6 +234,20 @@ export function validerMoto(saisie: SaisieMoto): string | null {
   if (!/^[A-Z0-9]+$/.test(chassis)) {
     return "Le numéro de châssis ne contient que des lettres et des chiffres.";
   }
+  return null;
+}
+
+export function validerMoto(saisie: SaisieMoto): string | null {
+  if (!saisie.marqueId) return "Choisissez une marque.";
+  /* Le modèle n'est plus exigé — voir `validerSousLot`, qui porte la raison.
+     Les deux chemins d'entrée en stock bougent ensemble : faire dépendre
+     l'acceptation d'une moto du formulaire par lequel elle passe serait une
+     incohérence que le comptoir rencontrerait, et la règle Firestore ne sait
+     de toute façon pas distinguer un lot d'une saisie unitaire. */
+  if (!saisie.provenanceId) return "Choisissez une provenance.";
+
+  const messageChassis = validerChassis(saisie.numeroChassis);
+  if (messageChassis) return messageChassis;
 
   if (normaliserChassis(saisie.numeroMoteur).length > LONGUEUR_CHASSIS_MAX) {
     return `Le numéro de moteur dépasse ${LONGUEUR_CHASSIS_MAX} caractères.`;
@@ -345,4 +386,19 @@ export function filtrerMotos(motos: Moto[], filtres: Filtres): Moto[] {
 export function chassisDejaPris(chassis: string, stock: Moto[], sauf?: string): Moto | undefined {
   const cible = normaliserChassis(chassis);
   return stock.find((moto) => moto.id !== sauf && moto.numeroChassis === cible);
+}
+
+/** Assez pour toute plaque d'Afrique de l'Ouest, trop peu pour un collage. */
+export const PLAQUE_LONGUEUR_MAX = 20;
+
+/**
+ * Met une plaque en forme avant de l'écrire.
+ *
+ * Les capitales et l'espace unique ne sont pas de la coquetterie : une plaque
+ * se compare à l'œil avec celle qui est vissée sur la moto, et « 11aa1234 » ne
+ * se compare pas. La borne protège la règle Firestore d'un refus que le gérant
+ * ne saurait pas lire.
+ */
+export function normaliserPlaque(brut: string): string {
+  return brut.trim().replace(/\s+/g, " ").toUpperCase().slice(0, PLAQUE_LONGUEUR_MAX);
 }

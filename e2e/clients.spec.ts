@@ -82,8 +82,14 @@ test.describe("création et correction", () => {
     await page.getByLabel("Téléphone", { exact: true }).fill(`+226 ${telephone}`);
     await page.getByRole("button", { name: "Créer le client" }).click();
 
-    await expect(contenu(page).getByRole("alert").first()).toContainText("déjà celui de");
-    await expect(contenu(page).getByRole("alert").first()).toContainText(nom);
+    /* Depuis S44 le contrôle **propose** la fiche reconnue au lieu de refuser
+       sèchement. Ce n'est pas un relâchement : le doublon est toujours empêché
+       — rien n'est écrit — mais la personne a un geste pour s'en sortir. Un mur
+       sans panneau apprend surtout à contourner le mur, en changeant un chiffre
+       du numéro, ce qui fabrique précisément ce qu'on voulait éviter (D95). */
+    const rapproche = contenu(page).getByRole("status").filter({ hasText: "déjà dans le fichier" });
+    await expect(rapproche).toBeVisible();
+    await expect(rapproche).toContainText(nom);
   });
 
   test("un client sans téléphone est refusé — c’est par lui qu’on le retrouve", async ({
@@ -139,9 +145,8 @@ test.describe("droits", () => {
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
     const email = emailUnique("clients");
     const motDePasse = "gerant-clients-001";
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation.getByLabel("Nom", { exact: true }).fill("Gérant du fichier");
     await creation.getByLabel("Adresse e-mail").fill(email);
     await creation.getByLabel("Mot de passe provisoire").fill(motDePasse);
@@ -196,6 +201,6 @@ test.describe("hors ligne", () => {
     await expect(page.getByRole("listitem").filter({ hasText: nom })).toBeVisible();
 
     await context.setOffline(false);
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+    await attendreLaFileVide(page, 30_000);
   });
 });

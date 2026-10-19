@@ -35,6 +35,8 @@ function vente(fait: Partial<Vente> & { date: Date; prixConvenu: number }): Vent
     motoId: `m${compteur}`,
     clientId: "c1",
     modePaiement: "comptant",
+    carteGrise: true,
+    casque: true,
     inclus: [],
     nonInclus: [],
     totalPaye: fait.prixConvenu,

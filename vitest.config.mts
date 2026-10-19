@@ -8,7 +8,8 @@ import { defineConfig } from "vitest/config";
    `functions/src` y figure parce que la reconciliation des numeros est, elle
    aussi, du calcul pur : elle merite d'etre verifiee sans emulateur, en
    millisecondes. Le declencheur qui l'appelle, lui, se verifie sur emulateur
-   (npm run test:fonctions). */
+   (npm run test:declencheurs), et les gardes des fonctions appelables ont
+   la leur (npm run test:appelables). */
 export default defineConfig({
   test: {
     include: ["lib/**/*.test.ts", "functions/src/**/*.test.ts"],

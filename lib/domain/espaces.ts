@@ -15,7 +15,7 @@
  * la permission se joue dans les règles Firestore (`DECISIONS.md` D27).
  */
 
-import type { Metier } from "./boutique";
+import { type Metier } from "./boutique";
 import { peut, type Capacite, type Role } from "./roles";
 
 export type Espace = "supervision" | "accueil" | "motos" | "pieces" | "caisse" | "reglages";
@@ -26,7 +26,7 @@ export const ESPACES: Record<Espace, { href: string; libelle: string }> = {
   motos: { href: "/motos", libelle: "Motos" },
   pieces: { href: "/pieces", libelle: "Pièces" },
   caisse: { href: "/caisse", libelle: "Caisse" },
-  reglages: { href: "/parametres", libelle: "Réglages" },
+  reglages: { href: "/parametres", libelle: "Paramètres" },
 };
 
 /** L'espace qui porte un métier, et le métier qu'il demande. */
@@ -60,18 +60,87 @@ export function accueilDuRole(role: Role): string {
  * sans boutique — ne rend que les espaces dont la réponse est certaine. Mieux
  * vaut une barre courte qui s'allonge qu'une entrée qui disparaît sous le doigt.
  */
-export function espacesVisibles(role: Role, metiers: readonly Metier[]): Espace[] {
-  const ordre: Espace[] = peut(role, "acceder_supervision")
+export function espacesVisibles(
+  role: Role,
+  metiers: readonly Metier[],
+  perimetre: PortéeDuPerimetre = "toutes",
+): Espace[] {
+  const ordre: Espace[] = surveille(role, perimetre)
     ? ["supervision", "motos", "pieces", "caisse", "reglages"]
     : ["accueil", "motos", "pieces", "caisse", "reglages"];
 
-  return ordre.filter((espace) => accedeEspace(role, metiers, espace));
+  return ordre.filter((espace) => accedeEspace(role, metiers, espace, perimetre));
+}
+
+/**
+ * L'étendue de ce que l'on regarde : l'entreprise, ou une boutique.
+ *
+ * C'est `Perimetre.type` de `lib/perimetre`, repris ici en type minimal pour
+ * que ce fichier reste une fonction pure sans rien importer de React.
+ * `aucune` — pas encore de boutique déclarée — se comporte comme `toutes` :
+ * il n'y a pas de boutique dans laquelle descendre.
+ */
+export type PortéeDuPerimetre = "toutes" | "boutique" | "aucune";
+
+/**
+ * Ce compte surveille-t-il, ou travaille-t-il dans une boutique ?
+ *
+ * **Le responsable qui choisit une boutique travaille dedans.** Tant que la
+ * plaque annonce « Toutes les boutiques », il est au-dessus et la supervision
+ * est son point de vue ; dès qu'il nomme une boutique, il veut l'interface de
+ * cette boutique — celle que son gérant voit — et non un poste d'observation
+ * qui en parlerait à la troisième personne. La plaque redevient le chemin du
+ * retour, et c'est le seul.
+ *
+ * Le gérant, lui, ne surveille jamais : la condition ne le concerne pas.
+ */
+function surveille(role: Role, perimetre: PortéeDuPerimetre): boolean {
+  return peut(role, "acceder_supervision") && perimetre !== "boutique";
+}
+
+/**
+ * Où emmener quelqu'un dont la plaque vient de changer, ou `null` pour le
+ * laisser où il est.
+ *
+ * **Le cas qui oblige à cette fonction.** Choisir une boutique depuis la vue
+ * d'ensemble retirait « Supervision » du rail sans fermer l'écran de
+ * supervision : on se retrouvait sur une page dont l'entrée n'existait plus,
+ * et donc sans moyen d'y revenir après l'avoir quittée. Un écran qu'aucune
+ * navigation ne mentionne est un écran qu'on croit disparu.
+ *
+ * **L'exception a disparu avec S55, et il faut dire pourquoi elle existait.**
+ * L'Inventaire vivait à `/supervision/chiffres` tout en étant rangé dans
+ * l'espace motos : il fallait donc le soustraire au traitement « écran de
+ * supervision » que son chemin lui valait, sans quoi choisir une boutique le
+ * fermait au moment précis où l'on voulait lire ses chiffres. En s'ouvrant au
+ * gérant, l'écran a pris l'adresse qui lui correspond — `/motos/inventaire` —
+ * et le cas particulier s'est effacé de lui-même. Une adresse exacte vaut mieux
+ * qu'une exception qui la corrige.
+ */
+export function destinationApresPerimetre(
+  chemin: string,
+  role: Role,
+  perimetre: PortéeDuPerimetre,
+): string | null {
+  /* Un gérant ne change pas de périmètre : le déplacer serait le chasser d'un
+     écran légitime pour une transition qui ne le concerne pas. */
+  if (!peut(role, "acceder_supervision")) return null;
+
+  if (perimetre === "boutique") {
+    return sousChemin(chemin, ESPACES.supervision.href) ? ESPACES.accueil.href : null;
+  }
+  return chemin === ESPACES.accueil.href ? ESPACES.supervision.href : null;
 }
 
 /** Cet espace est-il ouvert à ce rôle sur ce périmètre ? */
-export function accedeEspace(role: Role, metiers: readonly Metier[], espace: Espace): boolean {
-  if (espace === "supervision") return peut(role, "acceder_supervision");
-  if (espace === "accueil") return !peut(role, "acceder_supervision");
+export function accedeEspace(
+  role: Role,
+  metiers: readonly Metier[],
+  espace: Espace,
+  perimetre: PortéeDuPerimetre = "toutes",
+): boolean {
+  if (espace === "supervision") return surveille(role, perimetre);
+  if (espace === "accueil") return !surveille(role, perimetre);
 
   const metier = METIER_DE[espace];
   return metier ? metiers.includes(metier) : true;
@@ -106,6 +175,23 @@ export type EcranDEspace = {
   libelle: string;
   /** Sans elle, l'entrée est ouverte à tous les rôles qui voient l'espace. */
   capacite?: Capacite;
+  /**
+   * Cette entrée exige-t-elle qu'une boutique soit choisie ?
+   *
+   * Troisième axe, après le droit (`capacite`) et le métier de l'espace.
+   * Certains gestes n'ont **aucun sens** sur « Toutes les boutiques » : faire
+   * entrer une moto, enregistrer une vente. Ils réclament un `boutiqueId`, et
+   * la vue d'ensemble n'en a pas à donner.
+   *
+   * Les proposer quand même, c'est le défaut que S54 corrige : le produit
+   * ouvrait une porte pour s'excuser derrière, avec un écran « choisissez une
+   * boutique ». Une entrée qu'on ne peut pas suivre vaut moins qu'une entrée
+   * absente — le rail dit alors la vérité sur ce qu'on peut faire d'ici.
+   *
+   * C'est un filtre d'**affichage**. Ce qui protège réellement reste la règle
+   * Firestore, qui exige un `boutiqueId` valide (D27).
+   */
+  exigeBoutique?: true;
   /**
    * Ce qu'on y fait, en une ligne — pour les écrans où le libellé seul ne
    * suffit pas à choisir.
@@ -167,19 +253,24 @@ export type GroupeDEcrans = {
 export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
   supervision: [
     {
+      /**
+       * La supervision ne porte plus qu'un écran, et c'est le sujet de S54.
+       *
+       * **Ventes, Paiements et Dossiers en sont partis**, à la demande du
+       * commanditaire : ils appartiennent au métier, donc aux espaces Motos et
+       * Pièces. Les voir ici aussi faisait croire à deux listes là où il n'y en
+       * a qu'une — « trop d'écrans pour ça ».
+       *
+       * **Et ce doublon était un défaut, pas seulement un encombrement.**
+       * `espaceDuChemin` départage deux espaces candidats par la longueur du
+       * chemin ; pour `/motos/ventes`, déclaré ici *et* dans l'espace motos,
+       * les deux longueurs étaient égales et c'est le premier de la liste qui
+       * gagnait — la supervision. Ouvrir les ventes depuis l'espace motos
+       * ramenait donc la colonne de la supervision. Le doublon retiré, la
+       * question ne se pose plus : un écran, un espace.
+       */
       titre: "Le commerce",
-      ecrans: [
-        { href: "/supervision", libelle: "Vue d’ensemble" },
-        { href: "/motos/ventes", libelle: "Ventes" },
-        { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
-        { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },
-        /* S39. Le prix d'achat ne se saisit plus au comptoir : c'est ici qu'il
-           se pose, et cet écran est le seul endroit d'où l'on sait quelles
-           motos en attendent un. Sans cette entrée il n'était atteignable que
-           par un bouton de la vue d'ensemble — et le rail surlignait « Vue
-           d'ensemble » pendant qu'on y travaillait. */
-        { href: "/supervision/couts", libelle: "Prix d’achat" },
-      ],
+      ecrans: [{ href: "/supervision", libelle: "Vue d’ensemble" }],
     },
     /* « Les boutiques » n'est pas ici : c'est une liste de données, pas
        d'écrans, et elle change avec l'entreprise. La colonne la monte depuis
@@ -207,18 +298,45 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
     {
       titre: "Vendre",
       ecrans: [
-        { href: "/motos/ventes/nouvelle", libelle: "Nouvelle vente" },
-        { href: "/motos/nouvelle", libelle: "Faire entrer une moto" },
+        /* Un renvoi depuis S44 : la vente est une modale posée sur le registre,
+           et non plus un écran à elle. L'entrée ouvre donc `/motos/ventes` avec
+           son paramètre — elle mentionne cet écran, elle ne le possède pas, et
+           c'est « Ventes » que la colonne allume pendant la saisie. */
+        { href: "/motos/ventes?nouvelle=1", libelle: "Nouvelle vente", renvoi: true, exigeBoutique: true },
+        { href: "/motos/nouvelle", libelle: "Faire entrer une moto", exigeBoutique: true },
       ],
     },
     {
       titre: "Suivre",
       ecrans: [
         { href: "/motos", libelle: "Stock motos" },
+        { href: "/motos/arrivages", libelle: "Arrivages" },
         { href: "/motos/ventes", libelle: "Ventes" },
         { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
         { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },
-        { href: "/motos/recus", libelle: "Reçus" },
+        /**
+         * **L'Inventaire s'ouvre au gérant (S55), et c'est une demande du
+         * commanditaire : « l'inventaire doit se faire à deux niveaux, pour
+         * chaque gérant et pour le superviseur qui agrège tout ».**
+         *
+         * Il était gardé par `voir_marges` et rangé chez le responsable. Un
+         * gérant ne pouvait donc pas savoir ce qu'il détenait ni depuis quand —
+         * alors que c'est la personne qui range les motos dans la cour, et la
+         * seule qui puisse agir sur une moto qui dort depuis quatre mois.
+         *
+         * **Aucun mur n'est percé, parce qu'un inventaire ne demande pas les
+         * prix.** Compter les motos et lire leur ancienneté se fait sur le
+         * document `motos/{id}`, que le gérant lit déjà pour tenir son stock.
+         * Les coûts restent en sous-collection `prive/`, où les règles les
+         * refusent (D2, D4) ; l'écran ne les demande que derrière
+         * `voir_marges`, et le serveur retrancherait de toute façon.
+         *
+         * **Les deux niveaux ne sont pas deux écrans.** Le périmètre les porte
+         * déjà : un gérant y est verrouillé sur sa boutique, le responsable
+         * bascule sur « Toutes les boutiques » et obtient l'agrégat. Deux
+         * écrans auraient fait diverger deux définitions du même inventaire.
+         */
+        { href: "/motos/inventaire", libelle: "Inventaire" },
       ],
     },
     {
@@ -226,6 +344,46 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
          le retrouve. C'est le mot de la maquette `b1`. */
       titre: "Le fichier",
       ecrans: [{ href: "/clients", libelle: "Clients" }],
+    },
+    {
+      /**
+       * Les deux écrans que seul le responsable ouvre, rangés là où ils
+       * servent plutôt que dans un espace à part.
+       *
+       * Ils vivaient sous la supervision, qui disparaît du rail dès qu'une
+       * boutique est choisie — c'est-à-dire exactement quand on en a besoin :
+       * le prix d'achat se pose sur une moto, dans une boutique. Ils descendent
+       * donc dans l'espace motos, gardés par `capacite` comme tout le reste.
+       *
+       * **Leurs URL ne bougent pas.** Aucune redirection à écrire, aucun lien
+       * existant cassé, aucun signet mort : seul leur rangement change. Et
+       * l'Inventaire y a gagné une entrée de navigation — il n'en avait
+       * aucune, et n'était atteignable que par un bouton de la vue d'ensemble.
+       * (Il est depuis passé dans « Suivre », ouvert au gérant : S55.)
+       *
+       * La garde d'affichage ne protège rien : le cloisonnement réel est en
+       * sous-collection `prive/` et dans les règles Firestore (D2, D27).
+       */
+      titre: "Réservé au responsable",
+      ecrans: [
+        /* Les deux référentiels du catalogue, descendus des paramètres (S54).
+           Marques, modèles, provenances et frais sont les mots qu'on déclare
+           en faisant entrer une moto : on y allait depuis le formulaire
+           d'entrée, ce qui obligeait à traverser deux espaces pour ajouter une
+           marque. Ils restent gardés par `gerer_referentiels`. */
+        {
+          href: "/parametres/catalogue",
+          libelle: "Marques et modèles",
+          capacite: "gerer_referentiels",
+          quoi: "Ce que vous vendez",
+        },
+        {
+          href: "/parametres/referentiels",
+          libelle: "Provenances et frais",
+          capacite: "gerer_referentiels",
+          quoi: "D’où viennent les motos, ce qui s’ajoute à leur prix d’achat",
+        },
+      ],
     },
   ],
   pieces: [
@@ -245,7 +403,25 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       ],
     },
   ],
-  caisse: [{ titre: "Suivre", ecrans: [{ href: "/caisse", libelle: "Journal de caisse" }] }],
+  caisse: [
+    {
+      titre: "Suivre",
+      ecrans: [
+        { href: "/caisse", libelle: "Journal de caisse" },
+        /* **Les dépenses ont leur écran, et il est ouvert à tous (S55).** Le
+           commanditaire : « l'enregistrement de toutes les dépenses doit se
+           faire dans poste de dépenses, avec l'historique et tout ». C'est donc
+           un gérant qui y saisit, et aucune garde de capacité ne peut le
+           fermer. Ce qui reste au responsable vit **dans** l'écran : l'onglet
+           des postes, où l'on renomme un mot que des mois d'écritures citent. */
+        {
+          href: "/caisse/depenses",
+          libelle: "Dépenses",
+          quoi: "Ce qui sort du tiroir, et où ça part",
+        },
+      ],
+    },
+  ],
   reglages: [
     {
       titre: "L’entreprise",
@@ -268,45 +444,31 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
           capacite: "gerer_utilisateurs",
           quoi: "Créer un gérant, désactiver un compte",
         },
-      ],
-    },
-    {
-      titre: "Le catalogue",
-      ecrans: [
-        {
-          href: "/parametres/catalogue",
-          libelle: "Marques et modèles",
-          capacite: "gerer_referentiels",
-          quoi: "Ce que vous vendez",
-        },
-        {
-          href: "/parametres/referentiels",
-          libelle: "Provenances et frais",
-          capacite: "gerer_referentiels",
-          quoi: "D’où viennent les motos, ce qui s’ajoute à leur prix d’achat",
-        },
         {
           href: "/parametres/prestataires",
           libelle: "Prestataires",
           capacite: "gerer_referentiels",
-          quoi: "Qui traite les cartes grises et les plaques",
+          quoi: "Qui traite les cartes grises",
         },
       ],
     },
-    {
-      titre: "Cet appareil",
-      ecrans: [
-        {
-          href: "/diagnostic",
-          libelle: "Synchronisation",
-          /* Sans cette phrase, le hub des réglages l'écartait : il ne montre
-             que les destinations qui savent dire ce qu'on y fait. Un écran
-             présent dans la colonne et absent du hub est un écran qu'on croit
-             disparu. */
-          quoi: "Ce qui reste à envoyer depuis cet appareil, et depuis quand",
-        },
-      ],
-    },
+    /*
+      « Le catalogue » a disparu, et « Cet appareil » avec lui (S54).
+
+      Marques, modèles, provenances et frais sont descendus dans l'espace
+      motos : ce sont les mots qu'on déclare en faisant entrer une moto, pas
+      des réglages d'application. On y allait depuis le formulaire d'entrée,
+      ce qui obligeait à traverser deux espaces pour ajouter une marque.
+
+      Il restait alors « Prestataires » seul sous un titre qui parlait de
+      catalogue. Un prestataire n'est pas un article : c'est un intervenant de
+      l'entreprise, au même titre qu'une boutique ou qu'un gérant. Il rejoint
+      donc « L'entreprise » plutôt que de garder un groupe pour lui tout seul.
+
+      « Synchronisation » était un outil de test — il écrivait un document
+      jetable pour montrer l'aller-retour. Le bandeau dit déjà ce qui reste à
+      envoyer, et l'écran salissait la base à chaque essai.
+    */
   ],
 };
 
@@ -330,17 +492,45 @@ export const ECRANS_DE: Record<Espace, readonly EcranDEspace[]> = Object.fromEnt
  * gérant qui n'a droit à aucun écran d'administration ne doit pas lire
  * « L'entreprise » suivi de rien.
  */
-export function groupesVisibles(espace: Espace, role: Role): GroupeDEcrans[] {
+export function groupesVisibles(
+  espace: Espace,
+  role: Role,
+  portee: PortéeDuPerimetre = "boutique",
+): GroupeDEcrans[] {
   return GROUPES_DE[espace]
     .map((groupe) => ({
       titre: groupe.titre,
-      ecrans: groupe.ecrans.filter(({ capacite }) => !capacite || peut(role, capacite)),
+      ecrans: groupe.ecrans.filter((ecran) => ouverte(ecran, role, portee)),
     }))
     .filter((groupe) => groupe.ecrans.length > 0);
 }
 
-export function ecransVisibles(espace: Espace, role: Role): EcranDEspace[] {
-  return ECRANS_DE[espace].filter(({ capacite }) => !capacite || peut(role, capacite));
+export function ecransVisibles(
+  espace: Espace,
+  role: Role,
+  portee: PortéeDuPerimetre = "boutique",
+): EcranDEspace[] {
+  return ECRANS_DE[espace].filter((ecran) => ouverte(ecran, role, portee));
+}
+
+/**
+ * Cette entrée paraît-elle ? Deux axes, et il faut les deux.
+ *
+ * Le droit (`capacite`) et la portée du périmètre (`exigeBoutique`). Les deux
+ * filtres vivent ici plutôt que recopiés dans les deux fonctions au-dessus :
+ * c'est l'endroit unique où l'on décide qu'une entrée se montre, et c'est ce
+ * qui empêche la colonne et la palette de commandes de diverger.
+ *
+ * **Le métier a disparu de ce filtre, et ce n'est pas un oubli.** Il n'y
+ * servait qu'aux trois entrées motos de la supervision, parties en S54 ; le
+ * métier se joue un cran plus haut, dans `accedeEspace`, qui décide si
+ * l'espace s'ouvre. Garder ici un axe sans usager aurait fait un mécanisme
+ * documenté que plus rien n'emprunte — exactement la demi-amputation que S48 a
+ * laissée derrière elle sur la plaque, et qu'on ne refait pas.
+ */
+function ouverte(ecran: EcranDEspace, role: Role, portee: PortéeDuPerimetre): boolean {
+  if (ecran.capacite && !peut(role, ecran.capacite)) return false;
+  return !ecran.exigeBoutique || portee === "boutique";
 }
 
 /**

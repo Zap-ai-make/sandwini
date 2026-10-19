@@ -62,9 +62,16 @@ export async function seConnecterEtEntrer(page: Page) {
 /**
  * Attend que **tout ce qui vient d'être écrit soit parti au serveur**.
  *
- * `À jour` au bandeau veut dire : la file d'écritures Firestore est vide. Rien
- * d'autre dans le produit ne dit cela, et c'est exactement la question que le
- * décor doit se poser avant deux gestes précis.
+ * `data-synchro="a_jour"` au bandeau veut dire : la file d'écritures Firestore
+ * est vide. Rien d'autre dans le produit ne dit cela, et c'est exactement la
+ * question que le décor doit se poser avant deux gestes précis.
+ *
+ * **C'était une phrase, c'est devenu un attribut** (S54). Le bandeau affichait
+ * « À jour » en permanence ; le commanditaire l'a fait retirer, et il a raison
+ * — un voyant toujours vert cesse d'être lu (D63). L'état, lui, n'a pas
+ * disparu du modèle : il est juste sorti de la prose. Viser l'attribut plutôt
+ * que le texte a d'ailleurs un mérite propre : la suite ne se casse plus quand
+ * une phrase est reformulée.
  *
  * **Avant d'ouvrir un second navigateur** (S27, D97). Un navigateur qui vient
  * d'écrire lit son propre cache et n'a rien à attendre — c'est la promesse du
@@ -88,8 +95,33 @@ export async function seConnecterEtEntrer(page: Page) {
  * reconnexion à attente croissante (D50) : après une coupure, la file peut
  * mettre près d'une minute à repartir.
  */
-export async function attendreLaFileVide(page: Page) {
-  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 120_000 });
+export async function attendreLaFileVide(page: Page, timeout = 120_000) {
+  await expect(bandeauEtat(page)).toHaveAttribute("data-synchro", "a_jour", { timeout });
+}
+
+/**
+ * Le panneau d'un écran en onglets, et le moyen d'y aller (S54).
+ *
+ * Le panneau actif est une `region` nommée par son onglet ; l'onglet lui-même
+ * est un bouton radio, parce que `Onglets` est bâti sur `Segmente`. Viser le
+ * panneau plutôt que la page entière garde les tests précis le jour où deux
+ * onglets porteront un champ du même nom.
+ */
+export function panneau(page: Page, nom: string) {
+  return page.getByRole("region", { name: nom, exact: true });
+}
+
+export async function ouvrirOnglet(page: Page, nom: string) {
+  const onglet = page.getByRole("radio", { name: nom, exact: true });
+  /* **On clique l'étiquette, pas le bouton radio.** Dans `Segmente` le radio
+     est `sr-only` : il garde une boîte de 1 px au centre de son étiquette, si
+     bien que `check()` vise un point que l'étiquette intercepte — Playwright
+     réessaie jusqu'au délai, sans jamais y arriver. Mesuré en S54. C'est de
+     toute façon le geste réel : personne ne clique un pixel invisible.
+     L'assertion qui suit n'est pas décorative — un clic d'étiquette qui ne
+     cocherait rien passerait autrement inaperçu. */
+  await page.locator("label").filter({ has: onglet }).click();
+  await expect(onglet).toBeChecked();
 }
 
 /** L'indicateur de périmètre du bandeau : sélecteur pour le responsable, texte pour le gérant. */
@@ -171,9 +203,11 @@ export async function creerBoutique(
   metiers: readonly ("Motos" | "Pièces détachées")[] = ["Motos"],
 ) {
   await page.goto("/parametres/boutiques", { waitUntil: "load" });
-  const formulaire = page.locator("form").filter({
-    has: page.getByRole("button", { name: "Créer la boutique" }),
-  });
+  /* Le formulaire est passé en modale (S54) : l'écran s'ouvre sur la liste.
+     Son bouton d'envoi vit dans le pied du dialogue, hors du `<form>` — c'est
+     donc le dialogue qu'on vise, et non plus le formulaire. */
+  await page.getByRole("button", { name: "Ajouter une boutique" }).click();
+  const formulaire = page.getByRole("dialog");
   await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
   await formulaire.getByLabel(/^Code/).fill(code);
   for (const metier of metiers) {
@@ -188,7 +222,32 @@ export async function creerBoutique(
      lit le serveur, elle : enchainer trop vite répond « Cette boutique
      n'existe pas ». Le bandeau dit quand la file d'écritures est vidée, et
      c'est le seul signal qui le dise. */
-  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+  /* **Le budget par défaut, et non 30 s.** `attendreLaFileVide` explique
+     elle-même pourquoi il est large : le SDK Firestore reste dans son cycle de
+     reconnexion à attente croissante (D50), et la file peut mettre près d'une
+     minute à repartir. Le raccourcir ici contredisait ce raisonnement — et
+     faisait échouer le décor sur un bandeau « Hors ligne » au premier geste,
+     alors que le même helper passait dans le fichier voisin. Un décor qui tombe
+     accuse le produit d'un défaut qu'il n'a pas. */
+  await attendreLaFileVide(page);
+}
+
+/** Ajoute une marque et l'un de ses modèles au catalogue, par l'écran de S39. */
+export async function ajouterMarqueEtModele(page: Page, marque: string, modele: string) {
+  await page.goto("/parametres/catalogue", { waitUntil: "load" });
+  const marques = panneau(page, "Marques");
+  await marques.getByLabel("Ajouter une marque").fill(marque);
+  await marques.getByRole("button", { name: "Ajouter" }).click();
+  await expect(marques.getByRole("listitem").filter({ hasText: marque })).toBeVisible();
+
+  /* Les deux listes ne sont plus empilées : les modèles vivent dans l'onglet
+     voisin, et l'onglet inactif est démonté — pas seulement masqué. */
+  await ouvrirOnglet(page, "Modèles");
+  const modeles = panneau(page, "Modèles");
+  await modeles.getByLabel("Marque").selectOption({ label: marque });
+  await modeles.getByLabel(/^Ajouter un modèle/).fill(modele);
+  await modeles.getByRole("button", { name: "Ajouter" }).click();
+  await expect(modeles.getByRole("listitem").filter({ hasText: modele })).toBeVisible();
 }
 
 export type Terrain = { code: string; marque: string; modele: string; provenance: string };
@@ -209,26 +268,10 @@ export async function preparerTerrain(page: Page): Promise<Terrain> {
 
   await creerBoutique(page, code, ["Motos"]);
 
-  await page.goto("/parametres/catalogue", { waitUntil: "load" });
-  const marques = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Marques" }) });
-  await marques.getByLabel("Ajouter une marque").fill(marque);
-  await marques.getByRole("button", { name: "Ajouter" }).click();
-  await expect(marques.getByRole("listitem").filter({ hasText: marque })).toBeVisible();
-
-  const modeles = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Modèles" }) });
-  await modeles.getByLabel("Marque").selectOption({ label: marque });
-  await modeles.getByLabel(/^Ajouter un modèle/).fill(modele);
-  await modeles.getByRole("button", { name: "Ajouter" }).click();
-  await expect(modeles.getByRole("listitem").filter({ hasText: modele })).toBeVisible();
+  await ajouterMarqueEtModele(page, marque, modele);
 
   await page.goto("/parametres/referentiels", { waitUntil: "load" });
-  const provenances = page
-    .locator("section")
-    .filter({ has: page.getByRole("heading", { name: "Provenances" }) });
+  const provenances = panneau(page, "Provenances");
   await provenances.getByLabel("Ajouter une provenance").fill(provenance);
   await provenances.getByRole("button", { name: "Ajouter" }).click();
   await expect(provenances.getByRole("listitem").filter({ hasText: provenance })).toBeVisible();
@@ -313,6 +356,44 @@ export function chassisUnique(prefixe: string): string {
  * `encaisse` est le montant déposé le jour de la vente, celui que S8 écrit dans
  * le lot. Tout le reste vient après.
  */
+/**
+ * Choisit la moto et le client dans la modale de vente déjà ouverte.
+ *
+ * **Les deux listes sont vides tant qu'on n'a pas tapé** (S44) : ce n'est pas
+ * une commodité du décor, c'est le comportement même de l'écran. Remplir le
+ * champ de recherche est donc la seule façon de faire apparaître le bouton
+ * radio — et c'est aussi ce qui donne au test un point d'attente réel.
+ */
+export async function ouvrirLaVente(
+  page: Page,
+  { chassis, client }: { chassis: string; client: string },
+) {
+  await page.getByLabel("Chercher dans le stock").fill(chassis);
+  await page.getByRole("radio", { name: new RegExp(chassis) }).check();
+  await page.getByLabel("Chercher un client").fill(client);
+  await page.getByRole("radio", { name: new RegExp(client) }).check();
+}
+
+/**
+ * Choisit une option dans un groupe segmenté (`components/patrons/Segmente`).
+ *
+ * **On clique l'étiquette, pas le bouton radio.** Le radio y est `sr-only` —
+ * un carré d'un pixel que Playwright refuse de cliquer, parce que le point
+ * qu'il vise tombe sur le cadre qui le recouvre. C'est déjà la convention du
+ * dépôt pour les deux radios de `PanneauPiece` (`pieces.spec.ts`), et c'est
+ * aussi le geste réel : personne ne vise un pixel, on touche le segment.
+ *
+ * Le groupe est nommé parce que la modale de vente en porte deux — le mode et
+ * le moyen de paiement — et que « Espèces » ne doit pas se chercher dans le
+ * mauvais.
+ */
+export async function choisirSegment(page: Page, groupe: string, option: string) {
+  await page
+    .getByRole("radiogroup", { name: groupe })
+    .getByText(option, { exact: true })
+    .click();
+}
+
 export async function vendre(
   page: Page,
   options: { mode: "Crédit" | "Tranches"; prix: string; encaisse: string },
@@ -333,13 +414,14 @@ export async function vendre(
      et l'échec ressemblait trait pour trait à de la lenteur. */
   await attendreLaFileVide(page);
 
-  await page.goto("/motos/ventes/nouvelle", { waitUntil: "load" });
-  await page.getByLabel("Chercher dans le stock").fill(chassis);
-  await page.getByRole("radio", { name: new RegExp(chassis) }).check();
-  await page.getByLabel("Chercher un client").fill(client);
-  await page.getByRole("radio", { name: new RegExp(client) }).check();
+  /* Depuis S44 la vente s'enregistre dans une modale posée sur le registre,
+     et non plus sur une page à elle. Le paramètre d'écran l'ouvre directement :
+     c'est le chemin qu'un raccourci emprunte, et il évite au décor de dépendre
+     de la place d'un bouton. */
+  await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+  await ouvrirLaVente(page, { chassis, client });
   await page.getByLabel("Prix convenu", { exact: true }).fill(options.prix);
-  await page.getByRole("radio", { name: new RegExp(options.mode) }).check();
+  await choisirSegment(page, "Mode de paiement", options.mode);
   await page.getByLabel(/Montant reçu/).fill(options.encaisse);
   await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
@@ -363,22 +445,74 @@ export async function encaisser(page: Page, montant: string) {
 }
 
 /**
- * Déclare un prestataire qui traite la carte grise et la plaque.
+ * Déclare un prestataire qui traite la carte grise.
  *
  * Attend la synchronisation : la liste du formulaire de dépôt lit le serveur,
  * et un prestataire encore dans la file d'écriture n'y apparaît pas (D64).
  */
 export async function creerPrestataire(page: Page, nom: string) {
   await page.goto("/parametres/prestataires", { waitUntil: "load" });
-  const formulaire = page.locator("form").filter({ hasText: "Ajouter un prestataire" });
+  await page.getByRole("button", { name: "Ajouter un prestataire" }).click();
+  const formulaire = page.getByRole("dialog");
   await formulaire.getByLabel("Nom", { exact: true }).fill(nom);
   await formulaire.getByLabel("Téléphone").fill("70112233");
-  await formulaire.getByLabel("Carte grise").check();
-  await formulaire.getByLabel("Plaque").check();
+  /* **Plus de case à cocher depuis S53.** Le groupe « Documents traités » a
+     quitté ce formulaire : il n'avait plus qu'une option depuis S48, et un
+     choix à une seule option est une saisie obligatoire déguisée. Le type se
+     pose implicitement. */
   await formulaire.getByRole("button", { name: "Enregistrer le prestataire" }).click();
-  /* Sur le message de confirmation, pas sur la liste : le nom apparaît aux deux
-     endroits, et Playwright refuse l'ambiguïté. Même piège qu'en D55, et même
-     remède — viser le `role="status"`, qui n'existe qu'une fois. */
-  await expect(contenu(page).getByRole("status")).toContainText("est enregistré");
-  await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 30_000 });
+  /* **La ligne est la confirmation** depuis S54. Il n'y a plus de phrase verte
+     à viser : l'écriture est locale d'abord (D76), donc la modale se ferme et
+     la ligne est déjà là derrière. Attendre la fermeture avant de lire la
+     liste évite de compter le nom deux fois — il est aussi dans le champ. */
+  await expect(formulaire).toBeHidden();
+  await expect(page.getByRole("listitem").filter({ hasText: nom })).toBeVisible();
+  await attendreLaFileVide(page, 30_000);
+}
+
+/**
+ * Une vente de plus **dans le terrain déjà posé**. Rend son numéro de pièce.
+ *
+ * `vendre` ne convient pas quand il en faut deux : il monte son propre
+ * terrain, donc sa propre boutique. Deux appels donnent deux boutiques, et un
+ * écran borné au périmètre courant ne montre alors qu'une des deux ventes —
+ * c'est ce qui a fait échouer le témoin du paquet trois fois en S53. Un paquet
+ * de cartes grises appartient à **une** boutique : les ventes doivent naître
+ * dans le même terrain.
+ *
+ * Partagé par le témoin du paquet et par ses captures : en tenir deux copies,
+ * c'était s'assurer qu'elles divergent.
+ */
+export async function vendreDansLeTerrain(
+  page: Page,
+  terrain: Terrain,
+  marqueur: string,
+  /* **Le mode décide si la moto reste au magasin**, et ce n'est pas un détail
+     de décor : « tranches » la laisse `reservee`, donc dans l'inventaire ;
+     « crédit » la livre et la met `vendue`, donc hors inventaire. Un test qui
+     veut relire une plaque dans l'inventaire doit vendre en tranches — faute
+     de quoi il cherche une moto que l'écran a raison de ne pas montrer. */
+  options: { mode?: "Crédit" | "Tranches" } = {},
+): Promise<{ chassis: string; client: string; numero: string }> {
+  const chassis = chassisUnique(marqueur);
+  await saisirMoto(page, terrain, chassis, { prixAchat: "700000", conseille: "1200000" });
+
+  const client = nomUnique("Zongo");
+  await creerClientDepuisLeFichier(page, client, `78${String(Date.now()).slice(-6)}`);
+
+  /* Même frontière que dans `vendre` : la modale cherche la moto puis le client
+     dans le cache, et la confirmation à l'écran est optimiste. */
+  await attendreLaFileVide(page);
+
+  await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+  await ouvrirLaVente(page, { chassis, client });
+  await page.getByLabel("Prix convenu", { exact: true }).fill("1200000");
+  await choisirSegment(page, "Mode de paiement", options.mode ?? "Crédit");
+  await page.getByLabel(/Montant reçu/).fill("400000");
+  await page.getByRole("button", { name: "Enregistrer la vente" }).click();
+
+  const confirmation = contenu(page).getByRole("status");
+  await expect(confirmation).toContainText("Vente enregistrée", { timeout: 20_000 });
+  const numero = (await confirmation.locator(".plaque-code").textContent())!.trim();
+  return { chassis, client, numero };
 }

@@ -91,11 +91,29 @@ fonctions il déclare. Elle accorde dix secondes. Sur cette machine, le seul cha
 module en prend près de quatre à froid — le reste n'a pas la marge.
 
 Ce n'est pas une erreur de code : `functions/src/index.ts` charge déjà le SDK Admin
-paresseusement, précisément pour ce genre de délai. Le remède est le délai lui-même :
+paresseusement, précisément pour ce genre de délai. Le remède est le délai lui-même, et il
+vit maintenant dans le chemin de déploiement plutôt que dans cette page :
 
 ```
-FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy --only functions --project sandwini
+node scripts/deployer.mjs --only functions --project sandwini
 ```
+
+**Ne déployez pas par `npx firebase deploy` en direct.** Cette page portait auparavant la
+ligne `FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy …`, qui est de la syntaxe POSIX :
+PowerShell, où ce dépôt se développe, n'a pas de préfixe de variable — il cherche une
+commande nommée `FUNCTIONS_DISCOVERY_TIMEOUT=120` et refuse. Qui recopie la ligne la voit
+échouer, retire le préfixe pour la faire passer, et retrouve les dix secondes par défaut.
+C'est exactement ce qui s'est produit en S44, après D23, D25 et D29 : *une ligne de
+documentation se recopie mal ; un chemin unique ne se recopie pas.* `scripts/deployer.mjs`
+porte le délai et transmet le reste sans le relire.
+
+**Et pas non plus par `npm run deployer -- …`.** `npm` lit la ligne avant de la transmettre,
+et `--only` est une de *ses* propres options : il l'avale avec sa valeur, `--project` aussi,
+et le script ne reçoit que le nom du projet, seul. `firebase` refuse alors sur « Too many
+arguments », une erreur qui ne parle plus de rien. Le `--` n'y change rien — il protège des
+options du script, pas de celles que npm reconnaît. Le script détecte ce cas et redonne la
+bonne ligne ; c'est la même leçon que le paragraphe ci-dessus, avec un autre intermédiaire :
+**tout ce qui se trouve entre vous et la commande peut la réécrire.**
 
 ### Le premier déploiement de 2ᵉ génération échoue à moitié
 
@@ -214,25 +232,50 @@ Un compte créé dans la console Firebase n'a **pas de rôle**. Le rôle est un 
 et la console ne sait pas en poser. La connexion réussit, puis l'application refuse
 d'ouvrir. Il faut donc :
 
-```
-# 1. Créer le compte dans la console Firebase (Authentication), avec son mot de passe.
-# 2. Deployer la fonction d'amorcage :
-FUNCTIONS_DISCOVERY_TIMEOUT=120 npx firebase deploy --only functions --project <projet>
+Étapes 1 et 5, communes aux deux shells :
 
-# 3. Obtenir un jeton d'identite pour ce compte. Le mot de passe ne quitte pas votre
-#    machine ; la cle d'API est publique, elle part deja dans chaque navigateur.
+```
+# 1. Creer le compte dans la console Firebase (Authentication), avec son mot de passe.
+# 2. Deployer la fonction d'amorcage :
+node scripts/deployer.mjs --only functions --project <projet>
+
+# 5. La supprimer, une fois l'amorcage reussi :
+npx firebase functions:delete amorcerResponsable --project <projet> --region europe-west1 --force
+```
+
+Les étapes 3 et 4 envoient du JSON, et c'est là que les deux shells divergent. **PowerShell**
+— celui de la machine de développement :
+
+```powershell
+# 3. Obtenir un jeton d'identite. Le mot de passe ne quitte pas votre machine ;
+#    la cle d'API est publique, elle part deja dans chaque navigateur.
+$corps = @{ email = "<email>"; password = "<motdepasse>"; returnSecureToken = $true } | ConvertTo-Json
+$reponse = Invoke-RestMethod -Method Post -ContentType "application/json" -Body $corps `
+  -Uri "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<API_KEY>"
+
+# 4. Appeler l'amorcage. Le jeton reste dans la variable : il ne passe pas par l'historique.
+Invoke-RestMethod -Method Post -ContentType "application/json" -Body "{}" `
+  -Headers @{ Authorization = "Bearer $($reponse.idToken)" } `
+  -Uri "https://europe-west1-<projet>.cloudfunctions.net/amorcerResponsable"
+```
+
+**bash** — CI, WSL, macOS :
+
+```bash
+# 3.
 curl "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=<API_KEY>" \
   -H "Content-Type: application/json" \
   -d '{"email":"...","password":"...","returnSecureToken":true}'
 
-# 4. Appeler l'amorcage avec le champ idToken de la reponse :
+# 4. Avec le champ idToken de la reponse :
 curl -X POST -H "Content-Type: application/json" \
   -H "Authorization: Bearer <idToken>" -d '{}' \
   https://europe-west1-<projet>.cloudfunctions.net/amorcerResponsable
-
-# 5. La supprimer :
-npx firebase functions:delete amorcerResponsable --project <projet> --region europe-west1 --force
 ```
+
+*Les deux formes sont là pour la même raison que `scripts/deployer.mjs` existe* (D29) : cette
+page n'avait que la forme POSIX, et une commande qu'on ne peut pas coller se recopie de
+travers plutôt que pas du tout.
 
 `amorcerResponsable` exige un jeton d'identité valide et ne promeut **que l'appelant
 lui-même** ; elle refuse s'il y a plus d'un compte, et refuse dès que ce compte porte un
@@ -259,7 +302,7 @@ de l'application fonctionne.
 Une fois activé :
 
 ```
-npx firebase deploy --only storage --project <projet>
+node scripts/deployer.mjs --only storage --project <projet>
 ```
 
 **Déployer les fonctions par leur nom**, et non en bloc, quand le dépôt contient une
@@ -267,7 +310,7 @@ fonction qu'on ne veut pas remettre en ligne — `amorcerResponsable` en particu
 supprime après usage :
 
 ```
-npx firebase deploy --only functions:cloturerSurVente,functions:cloturerSurDocument --project <projet>
+node scripts/deployer.mjs --only functions:cloturerSurVente,functions:cloturerSurDocument --project <projet>
 ```
 
 ### Ce qui est en ligne

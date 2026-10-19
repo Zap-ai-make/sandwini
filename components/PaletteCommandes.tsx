@@ -1,6 +1,6 @@
 "use client";
 
-import { CornerDownLeft, Search } from "lucide-react";
+import { CornerDownLeft, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSession } from "@/lib/auth/session";
@@ -55,10 +55,17 @@ export function PaletteCommandes() {
 
   const entrees = useMemo<Entree[]>(() => {
     if (!role) return [];
-    return espacesVisibles(role, perimetre.metiers).flatMap((espace) =>
-      ecransVisibles(espace, role).map(({ href, libelle }) => ({ href, libelle, espace })),
+    /* La palette suit la colonne, sans quoi elle proposerait des écrans que la
+       navigation vient de retirer — et un raccourci qui mène à un espace fermé
+       est pire qu'un raccourci absent. */
+    return espacesVisibles(role, perimetre.metiers, perimetre.type).flatMap((espace) =>
+      ecransVisibles(espace, role, perimetre.type).map(({ href, libelle }) => ({
+        href,
+        libelle,
+        espace,
+      })),
     );
-  }, [role, perimetre.metiers]);
+  }, [role, perimetre.metiers, perimetre.type]);
 
   const resultats = useMemo(() => {
     const cherche = sansAccent(filtre.trim());
@@ -121,6 +128,16 @@ export function PaletteCommandes() {
       <dialog
         ref={dialogue}
         onClose={() => setOuverte(false)}
+        /* Le fond ferme la palette (S54). `showModal()` donne Échap, et rien
+           d'autre : il n'existait aucune façon de sortir à la souris ni au
+           doigt, et la palette piégeait qui l'ouvrait par curiosité. Le
+           `<dialog>` occupe toute la fenêtre — son fond EST l'élément — donc
+           un clic dont la cible est le dialogue lui-même, et non son contenu,
+           est un clic à côté. Même test que `components/patrons/Modale.tsx` :
+           la maison n'a pas besoin de deux mécaniques de fermeture. */
+        onClick={(evenement) => {
+          if (evenement.target === evenement.currentTarget) setOuverte(false);
+        }}
         aria-label="Chercher un écran"
         /* `mx-auto` n'est pas décoratif : la feuille de base de Tailwind remet les
            marges à zéro sur tous les éléments, et `<dialog>` perd le `margin:
@@ -154,6 +171,17 @@ export function PaletteCommandes() {
             placeholder="Nom d’un écran — ventes, dossiers, boutiques…"
             className="h-12 w-full bg-transparent text-champ outline-none placeholder:text-encre-doux"
           />
+          {/* La sortie visible. Le clic sur le fond et Échap ferment aussi,
+              mais ni l'un ni l'autre ne se voit : sur un téléphone, cette
+              croix est la seule porte qu'on peut montrer du doigt. */}
+          <button
+            type="button"
+            onClick={() => setOuverte(false)}
+            aria-label="Fermer"
+            className="-mr-1 shrink-0 rounded-champ p-1.5 text-encre-doux hover:bg-fond hover:text-encre"
+          >
+            <X aria-hidden="true" className="size-4" />
+          </button>
         </div>
 
         {resultats.length === 0 ? (

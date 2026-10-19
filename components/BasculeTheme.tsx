@@ -14,12 +14,16 @@ import { useSyncExternalStore } from "react";
  * faisait une question ouverte — le commanditaire l’a tranchée en validant les
  * maquettes.
  *
- * **Trois états, pas deux.** Sans choix explicite, on suit le système : c’est
- * l’acquis, et le retirer serait une régression pour qui a réglé son appareil
- * une fois pour toutes. Le choix explicite, lui, doit gagner **dans les deux
- * sens** — forcer le clair sur une machine réglée en sombre est le cas qui
- * compte au comptoir. D’où `data-theme="clair"` et `data-theme="sombre"`,
- * l’absence d’attribut valant « comme le système » (`maquettes/socle.css:155`).
+ * **Deux états, et le clair est le défaut** (S54, décision du commanditaire).
+ * Le produit suivait `prefers-color-scheme`, ce qui ouvrait l’application en
+ * sombre sur toute machine réglée ainsi — alors qu’on travaille au comptoir,
+ * souvent en plein jour. L’absence d’attribut vaut donc **clair**, et le
+ * sombre ne s’obtient qu’en appuyant ici.
+ *
+ * Ce que ça retire : le suivi automatique du réglage système. Quelqu’un qui a
+ * réglé son appareil en sombre devra appuyer une fois — son choix est ensuite
+ * gardé. C’est le prix assumé pour qu’aucun comptoir n’ouvre sur un écran
+ * noir en plein soleil sans l’avoir demandé.
  *
  * **L’état vit sur `<html>`, pas dans React**, comme le repli de la navigation
  * — et pour la même raison, apprise au même endroit : c’est le CSS qui le lit,
@@ -55,40 +59,31 @@ export function BasculeTheme({ className }: { className?: string }) {
 }
 
 /**
- * Le thème effectivement rendu, système compris.
+ * Le thème effectivement rendu.
  *
- * On ne lit pas seulement l'attribut : sans choix explicite, il est absent, et
- * c'est `prefers-color-scheme` qui décide. Le bouton doit alors dire le vrai
- * état — sinon, sur une machine réglée en sombre, il annoncerait « Thème
- * clair » devant un écran noir, et le premier appui ne changerait rien de
- * visible.
+ * Il se lit entièrement dans l'attribut depuis S54 : son absence vaut clair.
+ * Avant, il fallait interroger `prefers-color-scheme` en plus — sans quoi, sur
+ * une machine réglée en sombre, le bouton annonçait « Thème clair » devant un
+ * écran noir. Ce décalage ne peut plus exister : plus rien hors de cet
+ * attribut ne décide de la couleur.
  */
 function useSombre(): boolean {
   return useSyncExternalStore(souscrire, lire, () => false);
 }
 
 function lire(): boolean {
-  const choix = document.documentElement.dataset.theme;
-  if (choix === "sombre") return true;
-  if (choix === "clair") return false;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  return document.documentElement.dataset.theme === "sombre";
 }
 
 function souscrire(auChangement: () => void): () => void {
+  /* Une seule source à surveiller, et c'est tout l'intérêt : le réglage
+     système ne change plus rien, donc son écoute a disparu avec lui. */
   const observateur = new MutationObserver(auChangement);
   observateur.observe(document.documentElement, {
     attributes: true,
     attributeFilter: ["data-theme"],
   });
-  /* Le réglage système peut changer pendant qu'on travaille — la nuit tombe,
-     et Windows bascule tout seul. Sans cette écoute, le bouton mentirait
-     jusqu'au rechargement suivant. */
-  const systeme = window.matchMedia("(prefers-color-scheme: dark)");
-  systeme.addEventListener("change", auChangement);
-  return () => {
-    observateur.disconnect();
-    systeme.removeEventListener("change", auChangement);
-  };
+  return () => observateur.disconnect();
 }
 
 function poser(theme: Theme) {

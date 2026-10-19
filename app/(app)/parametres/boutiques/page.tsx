@@ -1,6 +1,6 @@
 "use client";
 
-import { Pencil, Store } from "lucide-react";
+import { Pencil, Plus } from "lucide-react";
 import { useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
 import {
@@ -10,6 +10,7 @@ import {
   EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
+import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -51,18 +52,37 @@ export default function PageBoutiques() {
 
 const VIDE: SaisieBoutique = { nom: "", code: "", metiers: [], adresse: "", telephone: "" };
 
+const FORMULAIRE_BOUTIQUE = "creer-boutique";
+
 function Boutiques() {
   const { boutiques, chargement, erreur } = usePerimetre();
+  const [creation, setCreation] = useState(false);
 
   return (
     <div>
+      {/* La liste d'abord, la création en modale (S54). Le formulaire occupait
+          le haut de l'écran en permanence : on venait presque toujours pour
+          consulter ou corriger, et il fallait le dépasser à chaque fois. Un
+          bouton en tête, et l'écran redevient ce qu'il est — une liste. */}
       <TetePage
-        retour={{ href: "/parametres", libelle: "Réglages" }}
+        retour={{ href: "/parametres", libelle: "Paramètres" }}
         titre="Boutiques"
         sousTitre={<>Ce que vend une boutique décide des espaces que son gérant voit.</>}
+        actions={
+          <button
+            type="button"
+            onClick={() => setCreation(true)}
+            className="bouton bouton-principal"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Ajouter une boutique
+          </button>
+        }
       />
 
-      <FormulaireCreation existantes={boutiques} />
+      {creation && (
+        <FormulaireCreation existantes={boutiques} onFermer={() => setCreation(false)} />
+      )}
 
       <h2 className="mt-8 text-sm font-semibold tracking-wide text-encre-doux uppercase">
         Boutiques déclarées
@@ -74,7 +94,7 @@ function Boutiques() {
         <EtatChargement className="mt-3">Chargement des boutiques…</EtatChargement>
       ) : boutiques.length === 0 && !erreur ? (
         <EtatSansResultat className="mt-3">
-          Aucune boutique pour l’instant. Le formulaire ci-dessus crée la première&nbsp;; tant
+          Aucune boutique pour l’instant. « Ajouter une boutique » crée la première&nbsp;; tant
           qu’elle n’existe pas, aucun gérant ne peut être rattaché.
         </EtatSansResultat>
       ) : (
@@ -288,16 +308,20 @@ function ChampsBoutique({
   );
 }
 
-function FormulaireCreation({ existantes }: { existantes: Boutique[] }) {
+function FormulaireCreation({
+  existantes,
+  onFermer,
+}: {
+  existantes: Boutique[];
+  onFermer: () => void;
+}) {
   const session = useSession();
   const [saisie, setSaisie] = useState<SaisieBoutique>(VIDE);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [succes, setSucces] = useState<string | null>(null);
 
   function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (session.statut !== "connecte") return;
-    setSucces(null);
 
     const probleme = validerBoutique(saisie);
     if (probleme) {
@@ -315,23 +339,39 @@ function FormulaireCreation({ existantes }: { existantes: Boutique[] }) {
     }
 
     setErreur(null);
-    const nom = saisie.nom.trim();
+    /* On ne guette pas l'accusé du serveur (D76) : Firestore écrit au cache
+       local sur-le-champ, donc la boutique est déjà dans la liste derrière la
+       modale. C'est elle, la confirmation — mieux qu'une phrase verte. */
     creerBoutique(saisie, {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
     }).catch((cause) => setErreur(messageErreurBoutique(cause)));
 
     setSaisie(VIDE);
-    setSucces(`Boutique ${nom} créée, code ${code}.`);
+    onFermer();
   }
 
   return (
-    <form onSubmit={soumettre} className="mt-6 cadre p-4" noValidate>
-      <h2 className="flex items-center gap-2 font-semibold text-encre">
-        <Store aria-hidden="true" className="size-5 text-encre-doux" />
-        Ajouter une boutique
-      </h2>
-
+    <Modale
+      ouvert
+      onFermer={onFermer}
+      titre="Ajouter une boutique"
+      pied={
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" form={FORMULAIRE_BOUTIQUE} className="bouton bouton-principal">
+            Créer la boutique
+          </button>
+          {/* « Annuler » et non « Fermer » : on abandonne une saisie, on ne
+              referme pas une consultation. Sur l'écran des boutiques, le mot
+              « Fermer » est déjà pris — il désigne la fermeture d'un point de
+              vente, à deux centimètres de là. */}
+          <button type="button" onClick={onFermer} className="bouton bouton-neutre">
+            Annuler
+          </button>
+        </div>
+      }
+    >
+    <form id={FORMULAIRE_BOUTIQUE} onSubmit={soumettre} noValidate>
       <ChampsBoutique
         saisie={saisie}
         changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
@@ -340,19 +380,8 @@ function FormulaireCreation({ existantes }: { existantes: Boutique[] }) {
       />
 
       <EtatErreurSaisie message={erreur} className="mt-3" />
-      {succes && (
-        <p role="status" aria-live="polite" className="text-sm text-solde">
-          {succes}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        className="bouton bouton-principal mt-3 justify-center"
-      >
-        Créer la boutique
-      </button>
     </form>
+    </Modale>
   );
 }
 

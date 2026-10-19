@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Archivo, IBM_Plex_Mono } from "next/font/google";
 import type { ReactNode } from "react";
+import { FiletMarque } from "@/components/FiletMarque";
 import { FournisseurSession } from "@/lib/auth/session";
 import { FournisseurEtatReseau } from "@/lib/reseau/etat-reseau";
 import "./globals.css";
@@ -31,10 +32,12 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
-    { media: "(prefers-color-scheme: dark)", color: "#0b0f14" },
-  ],
+  /* Une seule valeur depuis S54 : le clair est le défaut, et cette couleur ne
+     peut pas suivre `data-theme` — c'est une métadonnée statique, servie avant
+     que la page existe. Garder une variante sombre indexée sur le réglage
+     système donnerait une barre de navigateur sombre autour d'une application
+     claire, ce qui est pire que de ne pas la décliner du tout. */
+  themeColor: "#ffffff",
   // On ne bride pas le zoom : l’écran se lit parfois à bout de bras, en plein
   // soleil, par quelqu’un qui n’a pas ses lunettes (DESIGN.md §11).
   width: "device-width",
@@ -62,16 +65,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       suppressHydrationWarning
     >
       <body className="min-h-dvh antialiased">
-        {/* Le seul endroit où le dégradé du monogramme sort du logo : un filet
-            de deux pixels en tête de coquille (D70, `CAHIER-UI.md` §4).
-
-            Il vit ici et non dans la navigation, parce qu'il coiffe la marque
-            et non les liens : posé dans `NavigationPrincipale`, il manquait à
-            l'écran de connexion, qui n'a pas de rail pour le porter — et c'est
-            précisément l'écran où la marque se présente. Toutes les maquettes
-            l'ouvrent par ce filet, `a1-connexion.html` comprise. */}
-        <span aria-hidden="true" className="coquille-filet print:hidden" />
-
         {/* L'état de la navigation, posé **avant** le premier rendu.
 
             Sans ce script, la colonne s'ouvrait grande puis se refermait sous
@@ -99,7 +92,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           }}
         />
         <FournisseurSession>
-          <FournisseurEtatReseau>{children}</FournisseurEtatReseau>
+          <FournisseurEtatReseau>
+            {/* Le filet est passé sous le fournisseur : sa lueur dit l'état de
+                la liaison, il doit donc pouvoir le lire. Il reste posé avant
+                tout le reste, et fixé en haut de l'écran — sa place à l'image
+                ne change pas. */}
+            <FiletMarque />
+            {children}
+          </FournisseurEtatReseau>
         </FournisseurSession>
       </body>
     </html>

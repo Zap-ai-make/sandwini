@@ -20,6 +20,10 @@
 # --- Artefacts Node / Next.js ---
 /node_modules
 /.next/
+# Le build d'a cote, pointe vers les emulateurs (`NEXT_DIST_DIR`, cf.
+# next.config.ts) : il existe pour ne pas ecraser le `.next` qu'un serveur
+# sert deja.
+/.next-emulateurs/
 /out/
 /build
 /coverage
@@ -52,3 +56,10 @@ storage-debug.log*
 
 .vercel
 .env*
+
+# --- Outillage d'agent (worktrees, etat local) ---
+# `.claude/worktrees/` porte des copies de travail completes du depot, chacune
+# avec son propre `.git` et ses `node_modules`. Les commiter reviendrait a
+# emboiter le depot dans lui-meme. Le worktree S49 y vit aujourd'hui ; il est
+# enregistre dans git (`git worktree list`), ce qui suffit a le retrouver.
+/.claude/

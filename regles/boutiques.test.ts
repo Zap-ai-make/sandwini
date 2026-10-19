@@ -117,12 +117,24 @@ describe("lecture", () => {
     await assertSucceeds(getDoc(doc(gerant(), "boutiques/PTG")));
   });
 
-  it("un gérant ne lit pas la boutique d’à côté", async () => {
-    await assertFails(getDoc(doc(gerant(), "boutiques/KDG")));
+  /**
+   * **La lecture s’est ouverte à tout compte connecté en S17.**
+   *
+   * Un gérant ne lisait que la sienne, et ne pouvait donc pas choisir où
+   * envoyer une moto. Firestore ne masque pas un champ — un document lisible
+   * l’est en entier — donc c’était tout ou rien. Ce qu’un document boutique
+   * porte, c’est l’enseigne au-dessus de la porte : nom, code, métiers,
+   * adresse, téléphone, état d’ouverture.
+   *
+   * Ces deux témoins disaient l’inverse jusqu’à S17. Ils ne sont pas supprimés :
+   * ils sont retournés, pour que le dépôt dise ce qu’il fait aujourd’hui.
+   */
+  it("un gérant lit la boutique d’à côté — il doit pouvoir y envoyer une moto (S17)", async () => {
+    await assertSucceeds(getDoc(doc(gerant(), "boutiques/KDG")));
   });
 
-  it("un gérant ne parcourt pas la liste des boutiques", async () => {
-    await assertFails(getDocs(collection(gerant(), "boutiques")));
+  it("un gérant parcourt la liste des boutiques — c’est son choix de destination", async () => {
+    await assertSucceeds(getDocs(collection(gerant(), "boutiques")));
   });
 
   it("un anonyme ne lit rien", async () => {
@@ -131,9 +143,19 @@ describe("lecture", () => {
     await assertFails(getDocs(collection(anonyme, "boutiques")));
   });
 
-  it("un gérant dont le claim vise une boutique inexistante n’ouvre rien d’autre", async () => {
+  /**
+   * Un claim qui vise une boutique fantôme n’ouvre toujours rien de sérieux.
+   *
+   * Depuis S17 ce compte lit la liste des boutiques, comme tout compte
+   * connecté — des noms et des adresses. Ce qui compte n’a pas bougé : son
+   * `boutiqueId` ne correspond à aucune boutique, donc `estGerantDe` est faux
+   * partout, et ni les motos, ni les ventes, ni la caisse ne s’ouvrent.
+   */
+  it("un gérant dont le claim vise une boutique inexistante n’ouvre aucune donnée", async () => {
     const errant = gerant("ger-3", "ZZZ");
-    await assertFails(getDoc(doc(errant, "boutiques/PTG")));
+    await assertSucceeds(getDoc(doc(errant, "boutiques/PTG")));
+    await assertFails(getDocs(collection(errant, "motos")));
+    await assertFails(getDocs(collection(errant, "ventesMotos")));
   });
 });
 

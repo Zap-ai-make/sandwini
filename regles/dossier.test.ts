@@ -59,7 +59,7 @@ const traceMaj = {
 
 const chemin = (type: string) => `ventesMotos/vente-ptg/documents/${type}`;
 
-/** Pose les quatre documents dans le statut voulu, hors règles. */
+/** Pose les trois documents dans le statut voulu, hors règles. */
 async function poser(statuts: Record<string, Record<string, unknown>>) {
   await env.withSecurityRulesDisabled(async (contexte) => {
     const base = contexte.firestore();
@@ -103,12 +103,32 @@ beforeEach(async () => {
   });
 });
 
-describe("la quittance et le CMC, qui arrivent déjà faits", () => {
-  it("vont directement au magasin, sans passer par un prestataire", async () => {
+describe("la quittance et le CMC déjà en base, qui ne se créent plus", () => {
+  /* **S53 leur a retiré leurs étapes ; le 16 octobre 2026 leur retire leur
+     document.** Une vente neuve n'ouvre plus que la carte grise — la
+     création des deux autres est refusée par la règle, et c'est le dernier
+     `it` de ce bloc qui le fige.
+
+     Les trois premiers portent donc sur les documents **déjà écrits**, que
+     `poser` sème avec les droits du serveur : il y en a sur la préversion, ils
+     ne s'effacent pas (`allow delete: if false`), et ils doivent rester aussi
+     contraints qu'avant. Un appareil modifié ne doit pas pouvoir y écrire un
+     statut que plus personne ne lit (D27). */
+  it("n’ont plus qu’un passage : celui qui les écarte", async () => {
     await poser({ quittance: {}, cmc: {} });
     const base = gerant();
     for (const type of ["quittance", "cmc"]) {
       await assertSucceeds(
+        updateDoc(doc(base, chemin(type)), { statut: "non_applicable", ...traceMaj }),
+      );
+    }
+  });
+
+  it("ne vont plus au magasin : ce n’est plus leur statut qui les clôt", async () => {
+    await poser({ quittance: {}, cmc: {} });
+    const base = gerant();
+    for (const type of ["quittance", "cmc"]) {
+      await assertFails(
         updateDoc(doc(base, chemin(type)), { statut: "revenu_magasin", ...traceMaj }),
       );
     }
@@ -129,15 +149,15 @@ describe("la quittance et le CMC, qui arrivent déjà faits", () => {
   });
 });
 
-describe("la carte grise et la plaque, qui passent par un prestataire", () => {
-  it("ne sautent pas le dépôt", async () => {
-    await poser({ carte_grise: {}, plaque: {} });
-    const base = gerant();
-    for (const type of ["carte_grise", "plaque"]) {
-      await assertFails(
-        updateDoc(doc(base, chemin(type)), { statut: "revenu_magasin", ...traceMaj }),
-      );
-    }
+describe("la carte grise, qui passe par un prestataire", () => {
+  it("ne saute pas le dépôt", async () => {
+    await poser({ carte_grise: {} });
+    await assertFails(
+      updateDoc(doc(gerant(), chemin("carte_grise")), {
+        statut: "revenu_magasin",
+        ...traceMaj,
+      }),
+    );
   });
 
   it("se déposent avec le prestataire, la date et l’avance", async () => {
@@ -181,6 +201,66 @@ describe("la carte grise et la plaque, qui passent par un prestataire", () => {
         }),
       );
     }
+  });
+});
+
+describe("la case du comptoir ouvre la carte grise à « sans objet » (S53)", () => {
+  /* **Arbitrage 5 de la spec.** Decocher « Carte grise » au comptoir laissait
+     un document « a faire » que personne n'allait jamais faire, et qui bloquait
+     la cloture : le recu imprimait « non inclus » pendant que le dossier la
+     reclamait. */
+  it("accepte non_applicable à la création, pour la carte grise seule", async () => {
+    const base = gerant();
+    await assertSucceeds(
+      setDoc(doc(base, chemin("carte_grise")), {
+        boutiqueId: "PTG",
+        venteId: "vente-ptg",
+        type: "carte_grise",
+        statut: "non_applicable",
+        ...traceCreation,
+      }),
+    );
+  });
+
+  /* **Et les deux autres ne se créent plus du tout** (16 octobre 2026). Depuis
+     S53bis, rien ne lit un document `quittance` ou `cmc` : les trois lecteurs
+     filtrent par `passeParUnPrestataire`. Les écrire à chaque vente, c'est
+     accumuler de la donnée morte — deux documents par vente que personne
+     n'ouvrira jamais.
+
+     On ferme la porte d'entrée, pas celle de la réparation :
+     `documentDossierMaj` ne revalide pas le type, donc les documents déjà en
+     base restent lisibles et corrigeables. Meme asymétrie que `typesACreer`
+     pour les prestataires, et que la note de S48 sur `plaque`. */
+  it.each(["a_faire", "non_applicable"])(
+    "refuse de CRÉER une quittance ou un CMC, même à %s",
+    async (statut) => {
+      const base = gerant();
+      for (const type of ["quittance", "cmc"]) {
+        await assertFails(
+          setDoc(doc(base, chemin(type)), {
+            boutiqueId: "PTG",
+            venteId: "vente-ptg",
+            type,
+            statut,
+            ...traceCreation,
+          }),
+        );
+      }
+    },
+  );
+
+  it("refuse tout autre statut initial", async () => {
+    const base = gerant();
+    await assertFails(
+      setDoc(doc(base, chemin("carte_grise")), {
+        boutiqueId: "PTG",
+        venteId: "vente-ptg",
+        type: "carte_grise",
+        statut: "revenu_magasin",
+        ...traceCreation,
+      }),
+    );
   });
 });
 
@@ -239,11 +319,11 @@ describe("ce qu’aucun document ne peut faire", () => {
 
   it("ne change ni de boutique, ni de vente, ni de type", async () => {
     const base = gerant();
-    for (const fraude of [{ boutiqueId: "KDG" }, { venteId: "vente-kdg" }, { type: "plaque" }]) {
+    for (const fraude of [{ boutiqueId: "KDG" }, { venteId: "vente-kdg" }, { type: "carte_grise" }]) {
       await poser({ quittance: {} });
       await assertFails(
         updateDoc(doc(base, chemin("quittance")), {
-          statut: "revenu_magasin",
+          statut: "non_applicable",
           ...fraude,
           ...traceMaj,
         }),
@@ -259,12 +339,17 @@ describe("ce qu’aucun document ne peut faire", () => {
   });
 });
 
+/* Ces trois cas portent sur QUI a le droit d'agir, pas sur quel passage est
+   permis. Ils pilotaient `quittance -> revenu_magasin`, que S53 supprime : ils
+   passent sur `non_applicable`, le seul passage qui reste a ces papiers. Les
+   laisser sur l'ancien aurait rendu les deux refus verts pour la mauvaise
+   raison — la transition invalide, et non le perimetre. */
 describe("qui a le droit de faire avancer un document", () => {
   it("laisse passer le responsable, qui voit toutes les boutiques", async () => {
     await poser({ quittance: {} });
     await assertSucceeds(
       updateDoc(doc(responsable(), chemin("quittance")), {
-        statut: "revenu_magasin",
+        statut: "non_applicable",
         updatedAt: serverTimestamp(),
         updatedBy: "resp-1",
         updatedByName: "Responsable",
@@ -276,7 +361,7 @@ describe("qui a le droit de faire avancer un document", () => {
     await poser({ quittance: {} });
     await assertFails(
       updateDoc(doc(gerant("ger-2", "KDG"), chemin("quittance")), {
-        statut: "revenu_magasin",
+        statut: "non_applicable",
         updatedAt: serverTimestamp(),
         updatedBy: "ger-2",
         updatedByName: "Gérant KDG",
@@ -287,7 +372,7 @@ describe("qui a le droit de faire avancer un document", () => {
   it("refuse une modification qui ne laisse pas sa trace", async () => {
     await poser({ quittance: {} });
     await assertFails(
-      updateDoc(doc(gerant(), chemin("quittance")), { statut: "revenu_magasin" }),
+      updateDoc(doc(gerant(), chemin("quittance")), { statut: "non_applicable" }),
     );
   });
 });

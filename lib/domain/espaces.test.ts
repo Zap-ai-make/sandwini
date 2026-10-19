@@ -4,6 +4,7 @@ import {
   accedeEspace,
   accueilDuRole,
   ecranCourant,
+  destinationApresPerimetre,
   ecransVisibles,
   espaceDuChemin,
   espacesVisibles,
@@ -101,18 +102,22 @@ describe("accueilDuRole", () => {
 });
 
 describe("le second niveau de navigation", () => {
-  it("met les huit écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
+  /* Huit depuis S54 : les reçus n'ont plus d'entrée à eux — ils s'ouvrent
+     dans le panneau de l'écran des ventes, d'où ils sortent déjà. Neuf depuis
+     S55 : l'Inventaire s'ouvre au gérant. */
+  it("met les neuf écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
     const ecrans = ecransVisibles("motos", "gerant");
-    expect(ecrans).toHaveLength(8);
+    expect(ecrans).toHaveLength(9);
     expect(ecrans.map((e) => e.href)).toEqual(
       expect.arrayContaining([
         "/motos",
         "/motos/nouvelle",
+        "/motos/arrivages",
         "/motos/ventes",
-        "/motos/ventes/nouvelle",
+        "/motos/ventes?nouvelle=1",
         "/motos/paiements",
         "/motos/dossiers",
-        "/motos/recus",
+        "/motos/inventaire",
       ]),
     );
     /* Les titres sont ceux de `maquettes/b1-rail-gerant.html`, et non les trois
@@ -140,10 +145,10 @@ describe("le second niveau de navigation", () => {
       "Ma journée",
       "Ce qui m’attend",
     ]);
+    /* Un seul groupe depuis S54 : « Le catalogue » est descendu dans l'espace
+       motos, et « Cet appareil » a disparu avec l'écran de synchronisation. */
     expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
       "L’entreprise",
-      "Le catalogue",
-      "Cet appareil",
     ]);
   });
 
@@ -153,7 +158,12 @@ describe("le second niveau de navigation", () => {
    * « L'entreprise » suivi de rien.
    */
   it("retire les groupes que les droits ont vidés", () => {
-    expect(groupesVisibles("reglages", "gerant").map((g) => g.titre)).toEqual(["Cet appareil"]);
+    /* Tous les écrans des paramètres exigent un droit que le gérant n'a pas :
+       sa colonne « Paramètres » n'a plus aucun groupe, plutôt qu'un titre nu. */
+    expect(groupesVisibles("reglages", "gerant")).toEqual([]);
+    expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
+      "L’entreprise",
+    ]);
   });
 
   /*
@@ -163,8 +173,12 @@ describe("le second niveau de navigation", () => {
    * le premier — et le gérant lisant sa file verrait la colonne de son accueil
    * au lieu de celle des motos.
    *
-   * Le responsable, lui, n'a pas de renvoi : sa maquette `b2` garde la colonne
-   * de supervision en affichant les ventes.
+   * **Le responsable suit désormais la même règle (S54).** Cette assertion
+   * disait auparavant l'inverse — `/motos/ventes` appartenait à la supervision,
+   * qui le déclarait en double. C'était le comportement dont le commanditaire
+   * s'est plaint : « quand on est dans l'onglet moto et qu'on va dans vente,
+   * ça s'ouvre en repartant dans l'onglet supervision. » Le test figeait le
+   * défaut ; il fige maintenant la règle, qui ne connaît plus d'exception.
    */
   it("ne laisse pas un renvoi voler l’espace de l’écran qu’il mentionne", () => {
     const gerant = espacesVisibles("gerant", ["motos"]);
@@ -172,14 +186,19 @@ describe("le second niveau de navigation", () => {
     expect(ecranCourant("accueil", "gerant", "/motos/dossiers")).toBeNull();
 
     const responsable = espacesVisibles("responsable", ["motos"]);
-    expect(espaceDuChemin("/motos/ventes", responsable)).toBe("supervision");
-    expect(ecranCourant("supervision", "responsable", "/motos/ventes")).toBe("/motos/ventes");
+    expect(espaceDuChemin("/motos/ventes", responsable)).toBe("motos");
+    expect(ecranCourant("supervision", "responsable", "/motos/ventes")).toBeNull();
   });
 
   it("cache au gérant les écrans d’administration qu’une garde lui refuserait", () => {
+    /* Plus rien du tout depuis S54 : les quatre écrans des paramètres
+       demandent un droit que le gérant n'a pas, et « Synchronisation » — la
+       seule entrée qui lui restait — a été retirée. Le groupe vide disparaît,
+       donc l'espace aussi : c'est bien ce qu'on veut dire par « un titre sans
+       entrée sous lui est un rangement qui ment ». */
     const hrefs = ecransVisibles("reglages", "gerant").map((e) => e.href);
-    expect(hrefs).toEqual(["/diagnostic"]);
-    expect(ecransVisibles("reglages", "responsable").length).toBeGreaterThan(6);
+    expect(hrefs).toEqual([]);
+    expect(ecransVisibles("reglages", "responsable").length).toBe(4);
   });
 
   it("désigne l’écran le plus précis, pas le préfixe le plus court", () => {
@@ -213,9 +232,15 @@ describe("ecranCourant", () => {
   it("n’allume qu’une entrée, la plus précise", () => {
     expect(ecranCourant("motos", "gerant", "/motos/dossiers")).toBe("/motos/dossiers");
     expect(ecranCourant("motos", "gerant", "/motos")).toBe("/motos");
-    expect(ecranCourant("motos", "gerant", "/motos/ventes/nouvelle")).toBe(
-      "/motos/ventes/nouvelle",
-    );
+  });
+
+  /* Depuis S44, l'ancienne adresse de la vente n'est plus qu'une redirection, et
+     « Nouvelle vente » un renvoi vers `/motos/ventes`. La colonne allume donc
+     « Ventes » des deux côtés du renvoi : pendant la redirection, et une fois la
+     modale ouverte. Deux chemins, un seul repère — c'est la règle de ce test. */
+  it("allume « Ventes » quand la vente s’ouvre, quel que soit le chemin", () => {
+    expect(ecranCourant("motos", "gerant", "/motos/ventes/nouvelle")).toBe("/motos/ventes");
+    expect(ecranCourant("motos", "gerant", "/motos/ventes")).toBe("/motos/ventes");
   });
 
   it("n’allume rien quand le chemin ne fait partie d’aucun écran de l’espace", () => {
@@ -246,20 +271,205 @@ describe("les écrans d’administration", () => {
     }
   });
 
+});
+
+/**
+ * La plaque jaune pilote l'interface.
+ *
+ * Le modèle savait déjà quels métiers porte le périmètre — c'est ce qui filtre
+ * le rail depuis D62. Ce que ces tests ajoutent, c'est que **la colonne le
+ * sache aussi**, et que choisir une boutique fasse descendre le responsable
+ * dans son espace au lieu de le laisser au-dessus.
+ */
+describe("le périmètre pilote la navigation", () => {
+  it("un responsable qui choisit une boutique prend le rail de son gérant", () => {
+    expect(espacesVisibles("responsable", ["motos"], "boutique")).toEqual([
+      "accueil",
+      "motos",
+      "caisse",
+      "reglages",
+    ]);
+  });
+
+  it("une boutique de pièces ne lui ouvre aucun espace motos", () => {
+    expect(espacesVisibles("responsable", ["pieces"], "boutique")).toEqual([
+      "accueil",
+      "pieces",
+      "caisse",
+      "reglages",
+    ]);
+  });
+
+  it("et il retrouve la supervision en revenant à toutes les boutiques", () => {
+    expect(espacesVisibles("responsable", ["motos", "pieces"], "toutes")).toEqual([
+      "supervision",
+      "motos",
+      "pieces",
+      "caisse",
+      "reglages",
+    ]);
+  });
+
+  /* Le gérant n'a jamais eu la supervision : son rail ne doit pas bouger d'un
+     cran, quel que soit ce qu'on passe en périmètre. */
+  it("ne change rien pour le gérant", () => {
+    expect(espacesVisibles("gerant", ["motos"], "boutique")).toEqual(
+      espacesVisibles("gerant", ["motos"], "toutes"),
+    );
+  });
+});
+
+/**
+ * S54 — la supervision ne porte plus le travail des boutiques.
+ *
+ * Le commanditaire : « dans la supervision, vente et paiement chacun des deux
+ * doit être rattaché aux onglets moto et pièce, ça devrait pas être accessible
+ * depuis supervision. »
+ */
+describe("la supervision ne porte que la vue d’ensemble", () => {
+  it("n’offre plus les ventes, les paiements ni les dossiers", () => {
+    const hrefs = ecransVisibles("supervision", "responsable").map((e) => e.href);
+    expect(hrefs).toEqual(["/supervision"]);
+  });
+
   /*
-   * « Synchronisation » n'est pas une administration : elle ne demande aucun
-   * droit, elle décrit l'état de l'appareil — ce qui attend ici n'attend pas
-   * ailleurs. S29 tranche autrement que S28 : au lieu de l'écarter du hub, on
-   * l'y range sous son propre titre, « Cet appareil » (maquette A9). L'écarter
-   * la laissait dans la colonne seule, et un écran qu'un hub ne mentionne pas
-   * est un écran qu'on croit disparu.
-   *
-   * Ce qui reste vrai, et que ce test garde : elle n'exige aucune capacité, donc
-   * elle ne se range pas avec ce qui en exige une.
+   * Le doublon n'était pas qu'un encombrement : il décidait mal.
+   * `espaceDuChemin` départage par la longueur du chemin, et `/motos/ventes`
+   * déclaré des deux côtés donnait deux longueurs égales — le premier espace
+   * de la liste gagnait, donc la supervision. Ouvrir les ventes depuis
+   * l'espace motos ramenait la colonne de la supervision, ce que le
+   * commanditaire a vu avant nous.
    */
-  it("rangent la synchronisation à part : une phrase, mais aucun droit exigé", () => {
-    const diagnostic = ECRANS_DE.reglages.find(({ href }) => href === "/diagnostic");
-    expect(diagnostic?.quoi).toBeTruthy();
-    expect(diagnostic?.capacite).toBeUndefined();
+  it("laisse les ventes à l’espace motos, même pour un responsable qui surveille", () => {
+    const ouverts = espacesVisibles("responsable", ["motos"], "toutes");
+    expect(ouverts[0]).toBe("supervision");
+    expect(espaceDuChemin("/motos/ventes", ouverts)).toBe("motos");
+    expect(espaceDuChemin("/motos/paiements", ouverts)).toBe("motos");
+    expect(espaceDuChemin("/motos/dossiers", ouverts)).toBe("motos");
+  });
+});
+
+/**
+ * S54 — ce qui exige une boutique ne s'affiche pas sans boutique.
+ *
+ * Le commanditaire : « quand on est dans l'espace toutes les boutiques,
+ * supprime tout ce qui n'est pas faisable depuis cet espace, tout ce qu'il
+ * faut forcément passer par une boutique. »
+ */
+describe("la portée du périmètre filtre les gestes", () => {
+  it("retire les gestes qui réclament une boutique sur « toutes les boutiques »", () => {
+    const hrefs = ecransVisibles("motos", "responsable", "toutes").map((e) => e.href);
+    expect(hrefs).not.toContain("/motos/nouvelle");
+    expect(hrefs).not.toContain("/motos/ventes?nouvelle=1");
+    /* Ce qui se consulte reste : on peut regarder le stock des trois
+       boutiques sans en choisir une. */
+    expect(hrefs).toContain("/motos");
+    expect(hrefs).toContain("/motos/ventes");
+  });
+
+  it("les rend dès qu’une boutique est choisie", () => {
+    const hrefs = ecransVisibles("motos", "responsable", "boutique").map((e) => e.href);
+    expect(hrefs).toContain("/motos/nouvelle");
+    expect(hrefs).toContain("/motos/ventes?nouvelle=1");
+  });
+
+  /* Le groupe « Vendre » n'a que ces deux entrées : vidé, il doit disparaître
+     plutôt que laisser un titre suivi de rien. Même règle que pour les droits. */
+  it("fait disparaître le groupe « Vendre », vidé par la portée", () => {
+    expect(groupesVisibles("motos", "responsable", "toutes").map((g) => g.titre)).not.toContain(
+      "Vendre",
+    );
+    expect(groupesVisibles("motos", "responsable", "boutique").map((g) => g.titre)).toContain(
+      "Vendre",
+    );
+  });
+
+  /* Le gérant est toujours dans sa boutique : ce filtre ne doit jamais lui
+     retirer le geste principal de sa journée. */
+  it("ne retire rien au gérant, qui a toujours une boutique", () => {
+    const hrefs = ecransVisibles("motos", "gerant").map((e) => e.href);
+    expect(hrefs).toContain("/motos/nouvelle");
+    expect(hrefs).toContain("/motos/ventes?nouvelle=1");
+  });
+});
+
+describe("les écrans réservés descendent dans l’espace motos", () => {
+  it("le responsable y trouve le prix d’achat et les chiffres", () => {
+    const hrefs = ecransVisibles("motos", "responsable").map((e) => e.href);
+    expect(hrefs).toContain("/motos/inventaire");
+  });
+
+  /**
+   * **L'Inventaire a changé de camp en S55, et ce témoin le fige.**
+   *
+   * Il affirmait l'inverse : le gérant ne devait pas voir l'Inventaire.
+   * La demande du commanditaire l'a renversé — « l'inventaire doit se faire à
+   * deux niveaux, pour chaque gérant et pour le superviseur qui agrège tout ».
+   * Un gérant range les motos dans la cour ; lui cacher ce qu'il détient et
+   * depuis quand privait d'information la seule personne en mesure d'agir
+   * dessus le jour même.
+   *
+   * **Ce qui reste fermé le reste**, et c'est ce que vérifie la seconde
+   * moitié : les référentiels du catalogue demandent toujours
+   * `gerer_referentiels`, donc le groupe « Réservé au responsable » n'apparaît
+   * pas chez le gérant. La garde d'affichage ne décide toujours de rien — les
+   * règles Firestore restent seules juges (D27) et les coûts vivent en
+   * sous-collection `prive/` (D2). Ce test dit seulement que la colonne ne
+   * propose aucune porte qui claquerait au nez.
+   */
+  it("le gérant voit l’inventaire, mais pas les référentiels du responsable", () => {
+    const hrefs = ecransVisibles("motos", "gerant").map((e) => e.href);
+    expect(hrefs).toContain("/motos/inventaire");
+    expect(hrefs).not.toContain("/parametres/catalogue");
+    expect(hrefs).not.toContain("/parametres/referentiels");
+    expect(groupesVisibles("motos", "gerant").map((g) => g.titre)).toEqual([
+      "Vendre",
+      "Suivre",
+      "Le fichier",
+    ]);
+  });
+
+  it("et la supervision ne les porte plus en double", () => {
+    const hrefs = ecransVisibles("supervision", "responsable").map((e) => e.href);
+    expect(hrefs).toEqual(["/supervision"]);
+  });
+});
+
+/**
+ * Où l'on atterrit quand la plaque change d'avis.
+ *
+ * Sans cette règle, choisir une boutique depuis la vue d'ensemble laissait un
+ * état bancal : l'écran de supervision restait ouvert alors que son entrée
+ * venait de quitter le rail. On ne peut pas revenir là où l'on est.
+ */
+describe("la destination après un changement de périmètre", () => {
+  it("quitte la supervision pour l’accueil de la boutique choisie", () => {
+    expect(destinationApresPerimetre("/supervision", "responsable", "boutique")).toBe("/dashboard");
+  });
+
+  /* L'Inventaire a longtemps porté `/supervision/chiffres` tout en vivant dans
+     l'espace motos, ce qui obligeait à l'excepter de cette règle. Depuis S55 il
+     s'appelle `/motos/inventaire` et l'exception a disparu — mais le témoin
+     reste : c'est en mode boutique que cet écran sert le plus, et l'en chasser
+     fermerait celui qu'on vient d'ouvrir. */
+  it("ne chasse pas l’inventaire, qui sert surtout en mode boutique", () => {
+    expect(destinationApresPerimetre("/motos/inventaire", "responsable", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/parametres/catalogue", "responsable", "boutique")).toBeNull();
+  });
+
+  it("ramène à la supervision quand on revient à toutes les boutiques", () => {
+    expect(destinationApresPerimetre("/dashboard", "responsable", "toutes")).toBe("/supervision");
+  });
+
+  it("laisse tranquille un écran qui existe des deux côtés", () => {
+    expect(destinationApresPerimetre("/motos/ventes", "responsable", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/motos/ventes", "responsable", "toutes")).toBeNull();
+  });
+
+  /* Le gérant ne choisit pas son périmètre : la question ne se pose pas, et une
+     redirection le renverrait d'un écran légitime. */
+  it("ne déplace jamais un gérant", () => {
+    expect(destinationApresPerimetre("/dashboard", "gerant", "boutique")).toBeNull();
+    expect(destinationApresPerimetre("/supervision", "gerant", "toutes")).toBeNull();
   });
 });

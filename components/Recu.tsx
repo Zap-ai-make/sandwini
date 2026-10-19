@@ -1,10 +1,16 @@
-import { formaterTelephone, type Client } from "@/lib/domain/client";
+import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
 import { IDENTITE } from "@/lib/domain/entreprise";
 import { formaterDate, formaterHeure, formaterMontant } from "@/lib/domain/format";
 import type { Boutique } from "@/lib/domain/boutique";
 import type { Moto } from "@/lib/domain/moto";
 import { LIBELLE_TYPE_RECU, type ContenuRecu } from "@/lib/domain/recu";
-import { LIBELLE_MODE, LIBELLE_MOYEN } from "@/lib/domain/vente";
+import {
+  LIBELLE_MODE,
+  LIBELLE_MOYEN,
+  inclusionsDeVente,
+  papiersEmportesDeVente,
+  type Vente,
+} from "@/lib/domain/vente";
 import { Monogramme } from "@/components/Monogramme";
 
 /**
@@ -140,7 +146,7 @@ export function Recu({
           numéro de châssis en le lisant à voix haute. */}
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-sm">
         <Fait titre="Reçu de">
-          {client?.nom ?? "Client inconnu"}
+          {nomDuClient(client)}
           {client && (
             <>
               {" · "}
@@ -207,12 +213,7 @@ export function Recu({
         </Fait>
       </dl>
 
-      {(vente.inclus.length > 0 || vente.nonInclus.length > 0) && contenu.type === "vente" && (
-        <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2 print:grid-cols-2">
-          <Convenu titre="Inclus" valeurs={vente.inclus} />
-          <Convenu titre="Non inclus" valeurs={vente.nonInclus} />
-        </div>
-      )}
+      {contenu.type === "vente" && <CeQuiPart vente={vente} />}
 
       {/* Les deux signatures, sur l'écran comme sur le papier (`c4:76-86`).
           Elles n'apparaissaient qu'à l'impression, au nom de « un écran ne se
@@ -295,6 +296,68 @@ function Fait({
         {children}
       </dd>
     </>
+  );
+}
+
+/**
+ * Ce qui part avec la moto, sur le papier.
+ *
+ * **Deux formes, et la seconde n'est pas une transition** : une vente d'avant
+ * S44 portait deux listes de texte libre, et son reçu se réimprime avec ce que
+ * le gérant avait écrit ce jour-là. Traduire ces lignes en cases fabriquerait
+ * une donnée que personne n'a saisie, sur un document qui prétend faire foi
+ * (D61). Les deux formes cohabitent donc, pour de bon.
+ */
+function CeQuiPart({ vente }: { vente: Vente }) {
+  const inclusions = inclusionsDeVente(vente);
+  /* **Ce que le client a emporté, sur le reçu comme sur la fiche** (S53). Les
+     deux lisent `papiersEmportesDeVente` et rien d'autre : la spec exige qu'ils
+     disent la même chose, et une seule lecture est la seule façon de le
+     garantir.
+
+     Un reçu réimprimé montre donc l'état du jour de la réimpression, et non
+     celui de la vente. C'est juste ici, à l'inverse des deux listes de texte
+     libre juste en dessous : « ce que le client a pris » est un fait sur la
+     vente qui se complète dans les semaines qui suivent, pas une phrase écrite
+     une fois au comptoir. */
+  const emportes = papiersEmportesDeVente(vente);
+
+  const papiers = emportes.length > 0 && (
+    <p className="mt-2 text-sm text-encre">
+      Papiers emportés : <span className="font-medium">{emportes.join(", ")}</span>
+    </p>
+  );
+
+  if (inclusions) {
+    return (
+      <>
+      <ul className="mt-5 flex flex-wrap gap-x-6 gap-y-1 text-sm">
+        {inclusions.map(({ libelle, inclus }) => (
+          <li key={libelle} className="flex items-center gap-2">
+            {/* Le mot porte l'information, le signe ne fait que la doubler :
+                « Casque » et « Casque : non » ne se confondent pas, même sur
+                une photocopie où la coche a pâli (`DESIGN.md` §5). */}
+            <span aria-hidden="true" className={inclus ? "text-encre" : "text-encre-doux"}>
+              {inclus ? "✓" : "—"}
+            </span>
+            <span className={inclus ? "text-encre" : "text-encre-doux"}>
+              {libelle}
+              {inclus ? "" : " : non inclus"}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {papiers}
+      </>
+    );
+  }
+
+  if (vente.inclus.length === 0 && vente.nonInclus.length === 0) return null;
+  return (
+    <div className="mt-5 grid gap-4 text-sm sm:grid-cols-2 print:grid-cols-2">
+      <Convenu titre="Inclus" valeurs={vente.inclus} />
+      <Convenu titre="Non inclus" valeurs={vente.nonInclus} />
+    </div>
   );
 }
 

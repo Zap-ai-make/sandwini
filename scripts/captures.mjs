@@ -94,8 +94,220 @@ async function semerLeGerant() {
     { merge: true },
   );
   await semerLeStock(base, FieldValue, code);
+  await semerDesArrivages(base, FieldValue, code);
   await semerLesPieces(base, FieldValue, code);
+  await semerUneBoutiqueDePieces(base, FieldValue);
+  await semerDesVentes(base, FieldValue, code);
   return code;
+}
+
+/**
+ * Deux ventes qui ne se ressemblent pas — et c'est tout l'enjeu de S48.
+ *
+ * **Sans elles, trois écrans se photographiaient à vide.** Les émulateurs
+ * démarrent sans rien : `/motos/ventes`, `/motos/paiements` et
+ * `/motos/dossiers` montraient leur état vide, et la campagne prétendait avoir
+ * regardé le filtre de période, la liste unique des paiements et le dossier à
+ * trois documents. *Un écran vide ne prouve pas qu'on a regardé, il prouve
+ * qu'on n'avait rien à voir.*
+ *
+ * L'une est **à crédit** — la moto est partie, le client doit l'argent ; l'autre
+ * en **tranches** — la moto dort au magasin, qui détient ce qui est versé.
+ * `AGENTS.md` appelle la confusion de ces deux notions la plus coûteuse du
+ * projet, et S48 vient précisément de les réunir dans une seule liste : la
+ * campagne doit donc pouvoir montrer les deux côte à côte, avec leur colonne
+ * « Mode » et leurs deux totaux qu'on ne somme jamais.
+ *
+ * On écrit **ce que le produit écrit**, et rien de plus : la vente, ses trois
+ * documents de dossier, son versement, son encaissement. Pas d'agrégat calculé
+ * à la main — `totalPaye` et `resteDu` sont posés parce que le client les pose
+ * aussi (`enregistrerVente`), et les déclencheurs feront le reste sur
+ * l'émulateur, comme en vrai. C'est la règle de D84, déjà suivie par
+ * `semerLesPieces` : semer ce que le produit n'écrit pas, c'est semer un décor
+ * qui ne vérifie rien.
+ *
+ * Les motos vendues sont **les siennes**, et pas celles de `semerLeStock` :
+ * celles-là servent à `/supervision/couts`, qui a besoin de motos *en stock*.
+ * Les vendre viderait l'écran qu'elles existent pour garnir.
+ */
+async function semerDesVentes(base, FieldValue, code) {
+  const trace = () => ({
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: "captures",
+    createdByName: "Captures",
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: "captures",
+    updatedByName: "Captures",
+  });
+
+  await base.doc("clients/client-captures").set({
+    nom: "Ouédraogo",
+    prenom: "Salif",
+    nip: "",
+    nomNormalise: "ouedraogo salif",
+    telephone: "70 11 22 33",
+    telephoneNormalise: "70112233",
+    telephone2: "",
+    adresse: "Pouytenga",
+    note: "",
+    ...trace(),
+  });
+
+  /* Le jour du mois courant, pour que « Ce mois-ci » ne rende pas une liste
+     vide : c'est la pastille que la campagne engage pour S46. */
+  const date = new Date();
+
+  const ventes = [
+    {
+      id: "vente-captures-credit",
+      numero: `${code}-CAP-0001`,
+      moto: "moto-captures-vendue-1",
+      chassis: "LC6PCJ1A9K0000333",
+      mode: "credit",
+      prix: 1_100_000,
+      verse: 300_000,
+    },
+    {
+      id: "vente-captures-tranches",
+      numero: `${code}-CAP-0002`,
+      moto: "moto-captures-vendue-2",
+      chassis: "LC6PCJ1A9K0000444",
+      mode: "tranches",
+      prix: 950_000,
+      verse: 400_000,
+    },
+  ];
+
+  for (const { id, numero, moto, chassis, mode, prix, verse } of ventes) {
+    /* La moto d'abord : une vente qui désigne un `motoId` introuvable donne
+       une ligne sans modèle ni châssis, et la capture montrerait un tiret là
+       où l'écran montre une moto. */
+    await base.doc(`motos/${moto}`).set({
+      boutiqueId: code,
+      etat: "neuve",
+      marqueId: "marque-captures",
+      modeleId: "modele-captures",
+      couleur: "Noire",
+      annee: 2025,
+      numeroChassis: chassis,
+      numeroMoteur: "",
+      prixVenteConseille: prix,
+      provenanceId: "provenance-captures",
+      papiersFournis: [],
+      photos: [],
+      /* En tranches la moto n'est pas partie : elle est *réservée*, et c'est
+         la moitié visible de la distinction que S48 devait préserver. */
+      statut: mode === "tranches" ? "reservee" : "vendue",
+      dateEntree: new Date("2026-09-02T09:00:00Z"),
+      quittanceChemin: null,
+      cmcChemin: null,
+      ...trace(),
+    });
+
+    const motoRemise = mode !== "tranches";
+    await base.doc(`ventesMotos/${id}`).set({
+      numero,
+      numeroInitial: numero,
+      boutiqueId: code,
+      motoId: moto,
+      clientId: "client-captures",
+      date,
+      prixConvenu: prix,
+      modePaiement: mode,
+      carteGrise: true,
+      casque: true,
+      totalPaye: verse,
+      resteDu: prix - verse,
+      statutPaiement: "partiel",
+      dernierVersementAt: date,
+      motoRemise,
+      dateRemiseMoto: motoRemise ? date : null,
+      tokenSuivi: `captures-${id}`,
+      lienSuiviEnvoyeAt: null,
+      statutDossier: "ouvert",
+      dateClotureDossier: null,
+      ...trace(),
+    });
+
+    /* Trois documents depuis S48, et leur type est leur identifiant — c'est ce
+       qui interdit structurellement deux cartes grises dans un dossier. */
+    for (const type of ["quittance", "cmc", "carte_grise"]) {
+      await base.doc(`ventesMotos/${id}/documents/${type}`).set({
+        boutiqueId: code,
+        venteId: id,
+        type,
+        statut: "a_faire",
+        ...trace(),
+      });
+    }
+
+    /* Le versement est un vrai sous-document, et pas un champ de la vente :
+       c'est lui que le filtre de période des paiements interroge depuis S46 —
+       « si c'est un versement de la période, on l'affiche ». */
+    await base.doc(`ventesMotos/${id}/versements/versement-1`).set({
+      boutiqueId: code,
+      venteId: id,
+      numeroRecu: numero,
+      date,
+      montant: verse,
+      moyenPaiement: "especes",
+      reference: "",
+      encaissementId: `encaissement-${id}`,
+      ...trace(),
+    });
+
+    await base.doc(`encaissements/encaissement-${id}`).set({
+      boutiqueId: code,
+      date,
+      sens: "entree",
+      montant: verse,
+      moyenPaiement: "especes",
+      origine: "vente_moto",
+      origineRefId: id,
+      libelle: `Vente ${numero}`,
+      /* L'argent d'une vente en tranches est un engagement, pas une recette :
+         la moto dort au magasin et cet argent peut revenir au client. Le champ
+         existe pour que la caisse n'ait pas à le redécouvrir, et l'omettre
+         ici sèmerait une recette là où le produit écrit une dette. */
+      categorieTranches: mode === "tranches" && !motoRemise,
+      ...trace(),
+    });
+  }
+}
+
+/**
+ * Une boutique qui ne vend **que** des pièces — le sujet de S47.
+ *
+ * La boutique des captures porte les deux métiers, et sa carte de supervision
+ * montre donc les deux groupes de faits. C'est un cas à regarder, mais ce n'est
+ * pas *celui-là* : le défaut signalé par le commanditaire était une boutique de
+ * pièces détachées qui annonçait « Motos en stock : 0 » et « Reste dû : — ».
+ * Zéro moto n'est pas un chiffre bas, c'est une question mal posée.
+ *
+ * Sans cette boutique-ci, la campagne ne peut pas montrer la correction : elle
+ * photographierait une rangée de cartes à deux métiers et conclurait que tout
+ * va bien. Elle reste vide de stock — une boutique de pièces sans référence
+ * annonce « Aucune pièce à réapprovisionner », et c'est déjà la bonne phrase,
+ * posée au bon métier.
+ */
+async function semerUneBoutiqueDePieces(base, FieldValue) {
+  const trace = {
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: "captures",
+    createdByName: "Captures",
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: "captures",
+    updatedByName: "Captures",
+  };
+  await base.doc("boutiques/PCS").set({
+    nom: "Pièces Pouytenga",
+    code: "PCS",
+    metiers: ["pieces"],
+    adresse: "Pouytenga",
+    telephone: "70 00 00 01",
+    actif: true,
+    ...trace,
+  });
 }
 
 /**
@@ -112,6 +324,88 @@ async function semerLeGerant() {
  * Rien n'est écrasé si le décor est déjà là — relancer la campagne ne doit pas
  * multiplier les motos.
  */
+/**
+ * Un fournisseur et ses lots (S50).
+ *
+ * L'historique d'un fournisseur se photographiait sur une base sans aucun
+ * arrivage : l'ecran rendait son etat vide, et la revue aurait cru avoir
+ * regarde une liste de lots. Il faut donc de quoi voir ce que l'ecran doit
+ * montrer -- plusieurs lots, des dates differentes, un ecoulement partiel, et
+ * un lot annule, qui reste dans l'histoire precisement parce qu'on l'a pris.
+ *
+ * L'identifiant du fournisseur est fixe : la prise vise son adresse
+ * directement, sans avoir a cliquer dans un tableau pour la decouvrir.
+ */
+const FOURNISSEUR_CAPTURES = "fournisseur-captures";
+
+async function semerDesArrivages(base, FieldValue, code) {
+  const trace = () => ({
+    createdAt: FieldValue.serverTimestamp(),
+    createdBy: "captures",
+    createdByName: "Captures",
+    updatedAt: FieldValue.serverTimestamp(),
+    updatedBy: "captures",
+    updatedByName: "Captures",
+  });
+
+  await base.doc(`fournisseurs/${FOURNISSEUR_CAPTURES}`).set({
+    nom: "HAOJUE Import",
+    telephone: "70 11 22 33",
+    localite: "Lomé",
+    actif: true,
+    ...trace(),
+  });
+
+  const marque = "marque-captures-haojue";
+  const modele = "modele-captures-a7";
+  const provenance = "provenance-captures";
+
+  const lots = [
+    { id: "lot-captures-1", nom: "Lot de septembre", date: new Date("2026-09-12T09:00:00Z"), annule: false, motos: 3, vendues: 1 },
+    { id: "lot-captures-2", nom: "Lot de juin", date: new Date("2026-06-04T09:00:00Z"), annule: false, motos: 2, vendues: 2 },
+    { id: "lot-captures-3", nom: "Lot saisi en double", date: new Date("2026-05-02T09:00:00Z"), annule: true, motos: 1, vendues: 0 },
+  ];
+
+  let n = 400;
+  for (const lot of lots) {
+    await base.doc(`arrivages/${lot.id}`).set({
+      nom: lot.nom,
+      fournisseurId: FOURNISSEUR_CAPTURES,
+      boutiqueId: code,
+      date: lot.date,
+      description: "",
+      annule: lot.annule,
+      ...trace(),
+    });
+    for (let i = 0; i < lot.motos; i += 1) {
+      n += 1;
+      await base.doc(`motos/moto-lot-${n}`).set({
+        boutiqueId: code,
+        etat: "neuve",
+        marqueId: marque,
+        /* La derniere moto de chaque lot n'a pas de modele : c'est le cas que
+           S50 a ouvert, et il doit se voir ici aussi. */
+        modeleId: i === lot.motos - 1 ? "" : modele,
+        couleur: "Bleu",
+        annee: 2026,
+        numeroChassis: `LC6PCJ1A9K0000${n}`,
+        numeroMoteur: "",
+        prixVenteConseille: 900_000,
+        provenanceId: provenance,
+        arrivageId: lot.id,
+        papiersFournis: [],
+        photos: [],
+        statut: i < lot.vendues ? "vendue" : "en_stock",
+        dateEntree: lot.date,
+        quittanceChemin: null,
+        cmcChemin: null,
+        cmcRecu: i % 2 === 0,
+        ...trace(),
+      });
+    }
+  }
+}
+
 async function semerLeStock(base, FieldValue, code) {
   const marque = "marque-captures";
   const modele = "modele-captures";
@@ -130,6 +424,59 @@ async function semerLeStock(base, FieldValue, code) {
     .doc(`modeles/${modele}`)
     .set({ nom: "AP 125", marqueId: marque, actif: true, ...trace() });
   await base.doc(`provenances/${provenance}`).set({ nom: "Lomé", actif: true, ...trace() });
+
+  /* Deux marques de plus, et une moto sans modele (S50).
+     La repartition par marque se photographiait sur un stock a une marque et
+     un modele : elle montrait une ligne egale a son propre total, ce qui ne
+     prouve rien. Il faut un ecart a voir -- plusieurs marques, des modeles
+     inegaux, et surtout le cas que S50 vient d'ouvrir : une moto dont le
+     modele n'a pas ete saisi, qui doit se lire « Modele non precise » et non
+     disparaitre du compte. */
+  const marqueYamaha = "marque-captures-yamaha";
+  const marqueHaojue = "marque-captures-haojue";
+  const modeleCrypton = "modele-captures-crypton";
+  const modeleA7 = "modele-captures-a7";
+
+  await base.doc(`marques/${marqueYamaha}`).set({ nom: "Yamaha", actif: true, ...trace() });
+  await base.doc(`marques/${marqueHaojue}`).set({ nom: "Haojue", actif: true, ...trace() });
+  await base
+    .doc(`modeles/${modeleCrypton}`)
+    .set({ nom: "Crypton", marqueId: marqueYamaha, actif: true, ...trace() });
+  await base
+    .doc(`modeles/${modeleA7}`)
+    .set({ nom: "A7", marqueId: marqueHaojue, actif: true, ...trace() });
+
+  const varietes = [
+    { id: "moto-rep-1", chassis: "LC6PCJ1A9K0000301", marqueId: marqueYamaha, modeleId: modeleCrypton },
+    { id: "moto-rep-2", chassis: "LC6PCJ1A9K0000302", marqueId: marqueYamaha, modeleId: modeleCrypton },
+    { id: "moto-rep-3", chassis: "LC6PCJ1A9K0000303", marqueId: marqueYamaha, modeleId: modeleCrypton },
+    /* Celle-ci n'a pas de modele : c'est le temoin visuel de S50. */
+    { id: "moto-rep-4", chassis: "LC6PCJ1A9K0000304", marqueId: marqueYamaha, modeleId: "" },
+    { id: "moto-rep-5", chassis: "LC6PCJ1A9K0000305", marqueId: marqueHaojue, modeleId: modeleA7 },
+    { id: "moto-rep-6", chassis: "LC6PCJ1A9K0000306", marqueId: marqueHaojue, modeleId: modeleA7 },
+  ];
+  for (const { id, chassis, marqueId, modeleId } of varietes) {
+    await base.doc(`motos/${id}`).set({
+      boutiqueId: code,
+      etat: "neuve",
+      marqueId,
+      modeleId,
+      couleur: "Noir",
+      annee: 2026,
+      numeroChassis: chassis,
+      numeroMoteur: "",
+      prixVenteConseille: 950_000,
+      provenanceId: provenance,
+      papiersFournis: [],
+      photos: [],
+      statut: "en_stock",
+      dateEntree: new Date("2026-09-15T09:00:00Z"),
+      quittanceChemin: null,
+      cmcChemin: null,
+      cmcRecu: false,
+      ...trace(),
+    });
+  }
 
   const motos = [
     { id: "moto-captures-1", chassis: "LC6PCJ1A9K0000111", cout: 850_000 },
@@ -300,9 +647,6 @@ const PRISES = [
   { nom: "motos-nouvelle-gerant-bas-mobile-sombre", chemin: "/motos/nouvelle", theme: "dark", mobile: true, gerant: true, bas: true },
   /* Les prix d'achat, l'écran que S39 crée pour que le responsable pose ce que
      le gérant ne saisit plus. */
-  { nom: "couts-mobile-clair", chemin: "/supervision/couts", theme: "light", mobile: true },
-  { nom: "couts-bureau-clair", chemin: "/supervision/couts", theme: "light", mobile: false },
-  { nom: "couts-bureau-sombre", chemin: "/supervision/couts", theme: "dark", mobile: false },
   /* L'espace pieces (S20). Le gerant est le vrai destinataire : le catalogue
      lui sert a vendre, et c'est lui qui fait bouger le stock. Le responsable
      le voit aussi, avec en plus le bouton de creation d'une reference. */
@@ -330,24 +674,79 @@ const PRISES = [
      base. Un écran de suivi photographié vide ne se revoit pas. */
   { nom: "paiements-mobile-clair", chemin: "/motos/paiements", theme: "light", mobile: true },
   { nom: "paiements-bureau-sombre", chemin: "/motos/paiements", theme: "dark", mobile: false },
+
+  /* **S46 — le filtre de période, engagé.** Les prises ci-dessus le montrent
+     au repos. Ce qui n'existe sur aucune d'elles : une période *choisie*, où
+     les quatre cartes de tête portent son nom, et la plage libre dépliée, qui
+     ajoute deux champs de date sous la rangée. À 390 px, c'est là qu'on
+     regarde si ces deux champs passent sur deux lignes plutôt que de rétrécir
+     sous la cible tactile. */
+  { nom: "ventes-periode-mois-bureau-clair", chemin: "/motos/ventes", theme: "light", mobile: false, periode: "Ce mois-ci" },
+  { nom: "ventes-periode-mois-mobile-sombre", chemin: "/motos/ventes", theme: "dark", mobile: true, periode: "Ce mois-ci" },
+  { nom: "ventes-periode-plage-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, periode: "Du… au…" },
+  { nom: "ventes-periode-plage-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, periode: "Du… au…" },
+  { nom: "paiements-periode-mois-bureau-clair", chemin: "/motos/paiements", theme: "light", mobile: false, periode: "Ce mois-ci" },
+
+  /* **S48 — la liste unique, filtrée.** Le bureau est à 1280 px, et ce n'est
+     pas un détail : la liste porte neuf colonnes, et c'est à cette largeur que
+     le dépôt a déjà vu « Action » sortir du cadre — c'est écrit dans
+     `paiements/page.tsx`, à propos du prix convenu qu'on y a retiré pour cette
+     raison. Deux pastilles engagées plutôt qu'une : « Crédit » dit où est la
+     moto, « Soldées » où en est l'argent — les deux axes que la rangée porte
+     depuis qu'elle a perdu « Tranches » et « Impayées », chacune doublant une
+     colonne déjà visible. « Soldées » est aussi la prise qui prouve que la
+     liste garde les ventes terminées : avant, elles en disparaissaient. */
+  { nom: "paiements-credit-bureau-clair", chemin: "/motos/paiements", theme: "light", mobile: false, filtrePaiement: "Crédit" },
+  { nom: "paiements-soldees-bureau-sombre", chemin: "/motos/paiements", theme: "dark", mobile: false, filtrePaiement: "Soldées" },
+  { nom: "paiements-credit-mobile-clair", chemin: "/motos/paiements", theme: "light", mobile: true, filtrePaiement: "Crédit" },
+
+  /* **Le dossier, que la campagne n'avait jamais photographié** — et c'est
+     l'écran que S48 change le plus : la plaque en est sortie, la carte grise
+     portant déjà l'immatriculation. Trois lignes de papier au lieu de quatre,
+     et c'est le débordement horizontal signalé par le commanditaire qui doit
+     avoir disparu. Un écran jamais regardé est un écran dont personne ne sait
+     rien, quel que soit le vert de sa suite. */
+  // L'historique d'un fournisseur (S50) : tous les lots pris avec lui.
+  { nom: "fournisseur-historique-bureau-clair", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "light", mobile: false },
+  { nom: "fournisseur-historique-mobile-sombre", chemin: "/motos/fournisseurs/fournisseur-captures", theme: "dark", mobile: true },
+  { nom: "arrivages-fournisseur-lien", chemin: "/motos/arrivages", theme: "light", mobile: false },
+  /* Pas de prise sur `/motos/inventaire`, et c'est volontaire : la campagne
+     y photographie « 0 boutique » et une lecture qui ne finit pas, alors qu'un
+     script jetable rend le meme ecran en trois secondes contre la meme base.
+     Le defaut est dans ce harnais et reste a trouver (S51, `specs/ROADMAP.md`).
+     Une prise qui rend une image fausse est pire qu'une prise absente : la
+     revue croit avoir regarde. */
+  // L'export par cochage (S50) : la barre ne dit quelque chose qu'une fois coche.
+  { nom: "stock-export-bureau-clair", chemin: "/motos", theme: "light", mobile: false, cocherMotos: 3 },
+  { nom: "stock-export-mobile-sombre", chemin: "/motos", theme: "dark", mobile: true, cocherMotos: 2 },
+  // La repartition par marque (S50), depliee : repliee elle ne montre qu'un titre.
+  { nom: "stock-repartition-bureau-clair", chemin: "/motos", theme: "light", mobile: false, ouvrirRepartition: true },
+  { nom: "stock-repartition-mobile-sombre", chemin: "/motos", theme: "dark", mobile: true, ouvrirRepartition: true },
+  { nom: "dossiers-bureau-clair", chemin: "/motos/dossiers", theme: "light", mobile: false },
+  { nom: "dossiers-bureau-sombre", chemin: "/motos/dossiers", theme: "dark", mobile: false },
+  { nom: "dossiers-mobile-clair", chemin: "/motos/dossiers", theme: "light", mobile: true },
   /* La fiche d'une vente n'a pas d'adresse fixe : c'est un panneau ouvert par
      `?vente=`. On ouvre donc la première de la liste, comme le ferait un
      gérant — sans quoi l'écran qui porte le formulaire de versement ne serait
      jamais regardé. */
   { nom: "vente-fiche-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, premiereVente: true },
   { nom: "vente-fiche-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, premiereVente: true },
-  { nom: "recus-mobile-clair", chemin: "/motos/recus", theme: "light", mobile: true },
-  { nom: "recus-bureau-sombre", chemin: "/motos/recus", theme: "dark", mobile: false },
+  { nom: "recus-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true },
+  { nom: "recus-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false },
   /* Le reçu lui-même : un panneau ouvert par `?recu=`, donc atteint en cliquant
      la première ligne de la liste, comme le ferait un gérant. */
-  { nom: "recu-mobile-clair", chemin: "/motos/recus", theme: "light", mobile: true, premierRecu: true },
-  { nom: "recu-bureau-sombre", chemin: "/motos/recus", theme: "dark", mobile: false, premierRecu: true },
+  { nom: "recu-mobile-clair", chemin: "/motos/ventes", theme: "light", mobile: true, premierRecu: true },
+  { nom: "recu-bureau-sombre", chemin: "/motos/ventes", theme: "dark", mobile: false, premierRecu: true },
   /* **Le rendu imprimé, qui est le vrai livrable de S10.** Un `@media print`
      cassé ne se voit sur aucune capture ordinaire : sans cette prise, la revue
      visuelle regarderait un écran et croirait avoir vu le papier. */
-  { nom: "recu-papier", chemin: "/motos/recus", theme: "light", mobile: false, premierRecu: true, impression: true },
-  { nom: "diagnostic-mobile-clair", chemin: "/diagnostic", theme: "light", mobile: true, boutique: true },
-  { nom: "diagnostic-bureau-sombre", chemin: "/diagnostic", theme: "dark", mobile: false, boutique: true },
+  { nom: "recu-papier", chemin: "/motos/ventes", theme: "light", mobile: false, premierRecu: true, impression: true },
+  /* L'écran de diagnostic a disparu en S54 : ses deux captures photographiaient
+     la page « introuvable » depuis, sans que la campagne s'en plaigne. Les deux
+     écrans de S55 prennent leur place — c'est la même règle, une route de plus
+     est une ligne de plus. */
+  { nom: "inventaire-bureau-clair", chemin: "/motos/inventaire", theme: "light", mobile: false, boutique: true },
+  { nom: "depenses-mobile-clair", chemin: "/caisse/depenses", theme: "light", mobile: true, boutique: true },
   { nom: "hors-ligne-mobile-clair", chemin: "/hors-ligne", theme: "light", mobile: true },
   // Le bandeau en alerte : l’état signature du produit.
   { nom: "supervision-mobile-coupe", chemin: "/supervision", theme: "light", mobile: true, coupe: true },
@@ -361,7 +760,18 @@ const filtre = process.argv[2] ? new RegExp(process.argv[2]) : null;
 const aPrendre = filtre ? PRISES.filter(({ nom }) => filtre.test(nom)) : PRISES;
 
 await mkdir(DOSSIER, { recursive: true });
-if (aPrendre.some((prise) => prise.gerant || /\/supervision\/couts|\/pieces/.test(prise.chemin))) {
+/* `/supervision` tout court est dans la liste depuis S47 : sa carte de boutique
+   montre désormais les faits du métier, et sans décor elle n'a aucun métier à
+   montrer. La garde ne visait que `/supervision/couts`, si bien que les prises
+   de supervision se prenaient sur une base vide.
+   `/motos` y entre en S50, et le constat est le même en pire : les prises
+   `motos-bureau-clair`, `motos-bureau-sombre` et `motos-mobile-clair` ne
+   semaient rien, donc photographiaient « Aucune boutique n'est déclarée ».
+   Trois prises du stock qui ne montraient aucun stock — exactement ce que le
+   commentaire de `semerDesVentes` reproche deux cents lignes plus bas : un
+   écran vide ne prouve pas qu'on a regardé, il prouve qu'on n'avait rien à
+   voir. */
+if (aPrendre.some((prise) => prise.gerant || /\/supervision|\/pieces|\/motos/.test(prise.chemin))) {
   const code = await semerLeGerant();
   console.log(`compte gérant prêt : ${GERANT.email} (boutique ${code})`);
 }
@@ -383,8 +793,13 @@ for (const {
   nouveauClient,
   bas,
   ouvrirPiece,
+  ouvrirCout,
+  ouvrirRepartition,
+  cocherMotos,
   lectureEnCours,
   hauteur,
+  periode,
+  filtrePaiement,
 } of aPrendre) {
   const contexte = await navigateur.newContext({
     ...(mobile
@@ -522,6 +937,49 @@ for (const {
       .first()
       .waitFor({ state: "detached", timeout: 30000 })
       .catch(() => {});
+    /* Et l'attente qui ne depend pas d'une formulation : `EtatChargement` porte
+       `role="status"`. Le filtre par texte ci-dessus ne voyait que les ecrans
+       qui disent litteralement « Chargement » -- l'historique d'un fournisseur
+       dit « Lecture des lots… », et se photographiait donc en plein vol.
+
+       **On attend qu'il apparaisse avant d'attendre qu'il parte**, et c'est
+       tout le piege : interroge trop tot, l'indicateur n'est pas encore monte,
+       Playwright le declare « deja detache » et rend la main aussitot. La page
+       etait alors photographiee a 1,5 s, pendant que les ecoutes Firestore
+       mettaient plusieurs secondes -- d'ou une capture de chargement prise pour
+       un ecran fini. */
+    /* **La quiescence applicative, pas le silence reseau.** Firestore tient une
+       requete `Listen/channel` ouverte en permanence, donc `networkidle` est
+       inatteignable ici. On interroge donc la page : la zone de travail a du
+       contenu, et plus rien n'y annonce une attente.
+
+       **Pourquoi pas `getByRole("status")`, qui serait le repere evident.** Il
+       est deja pris : c'est le canal des confirmations, le bandeau en porte un
+       en permanence, et `e2e/aide.ts` compte sur son unicite. `EtatChargement`
+       s'en abstient deliberement et le dit en toutes lettres — il annonce par
+       `aria-live` + `aria-atomic`, ce qui donne la meme annonce sans prendre le
+       nom. On ne lui ajoute donc pas ce role pour la commodite d'un script.
+
+       **Et pourquoi un `waitForFunction` plutot qu'un `waitFor` sur l'element.**
+       C'etait le vrai defaut : interroge avant que React ait hydrate,
+       `waitFor({ state: "detached" })` trouve un element absent et rend la main
+       aussitot — la page etait photographiee a 1,5 s pendant que les ecoutes
+       Firestore mettaient plusieurs secondes. Un `waitForFunction` reinterroge
+       jusqu'a ce que la condition tienne, ce qui est la seule forme correcte
+       ici. */
+    await page
+      .waitForFunction(
+        () => {
+          const travail = document.querySelector("main");
+          if (!travail) return false;
+          const texte = travail.innerText.trim();
+          if (texte.length === 0) return false;
+          return !/chargement|lecture des|lecture du/i.test(texte);
+        },
+        null,
+        { timeout: 30000 },
+      )
+      .catch(() => {});
     await page.waitForTimeout(1500);
   }
   /* « + Ajouter une marque… » remplace le select par un champ : c'est l'état
@@ -538,6 +996,29 @@ for (const {
     await page.getByRole("button", { name: "Nouveau client" }).click();
     await page.waitForTimeout(300);
   }
+  /* Le filtre de période, **engagé** (S46). Au repos, la rangée de pastilles
+     se voit déjà sur les prises ordinaires ; ce qui ne se voit nulle part,
+     c'est une période choisie — les quatre cartes de tête portent alors son
+     nom — et la plage libre dépliée, qui pousse deux champs de date sous la
+     rangée. C'est à 390 px que ces deux-là se jugent. */
+  if (periode) {
+    const groupe = page.getByRole("main").getByRole("group", { name: "Filtrer par période" });
+    await groupe.getByRole("button", { name: periode, exact: true }).click();
+    await page.waitForTimeout(800);
+  }
+
+  /* Les pastilles de la liste unique des paiements (S48). Les deux sections
+     d'avant — les dettes d'un côté, les tranches de l'autre — ont fusionné :
+     ce qui les distinguait passe par une colonne « Mode » et par deux totaux
+     qu'on ne somme jamais. Cette rangée-ci remplace les deux titres, et c'est
+     précisément ce qu'il faut regarder : se lit-elle comme un tri, ou comme un
+     formulaire à remplir avant d'avoir droit à la liste ? */
+  if (filtrePaiement) {
+    const groupe = page.getByRole("main").getByRole("group", { name: "Filtrer les paiements" });
+    await groupe.getByRole("button", { name: filtrePaiement, exact: true }).click();
+    await page.waitForTimeout(800);
+  }
+
   if (coupe) {
     await contexte.setOffline(true);
     await page.getByRole("status").getByText("Hors ligne").waitFor({ timeout: 5000 });
@@ -555,6 +1036,40 @@ for (const {
     await ligne.waitFor({ timeout: 20000 });
     await ligne.click();
     await page.getByRole("region", { name: /^Pièce / }).waitFor({ timeout: 20000 });
+    await page.waitForTimeout(600);
+  }
+
+  /* Le formulaire de prix d'achat, passé du panneau sous le tableau à une
+     modale. Il n'existait sur aucune prise, et c'est exactement le genre de
+     changement qui ne se juge pas au diff : un pied d'actions qui ne défile
+     plus, une feuille qui monte du bas sur téléphone, et le tableau rendu
+     inerte derrière. */
+  if (ouvrirCout) {
+    const ligne = page.locator("tbody tr").first().getByRole("button").first();
+    await ligne.waitFor({ timeout: 20000 });
+    await ligne.click();
+    await page.getByRole("dialog").waitFor({ timeout: 20000 });
+    await page.waitForTimeout(600);
+  }
+  /* Cocher quelques motos : la barre d'export affiche « Aucune moto cochee »
+     au repos, et c'est l'etat le moins interessant a regarder. On veut voir le
+     compte, le bouton actif et « Tout decocher » apparu. */
+  if (cocherMotos) {
+    const cases = page.getByRole("checkbox", { name: /Choisir la moto/ });
+    await cases.first().waitFor({ timeout: 20000 });
+    const combien = Math.min(cocherMotos, await cases.count());
+    for (let i = 0; i < combien; i += 1) await cases.nth(i).check();
+    await page.waitForTimeout(400);
+  }
+  /* La repartition par marque est un `<details>` replie par defaut : c'est
+     voulu, le tableau du stock repond a la question la plus frequente. Replie,
+     il ne se photographie qu'en titre -- on l'ouvre donc pour regarder ce que
+     la revue doit juger : les comptes, leur ordre, et la ligne « Modele non
+     precise » que S50 vient de rendre possible. */
+  if (ouvrirRepartition) {
+    const resume = page.getByText("Répartition par marque");
+    await resume.waitFor({ timeout: 20000 });
+    await resume.click();
     await page.waitForTimeout(600);
   }
   /* `bas` fait defiler jusqu'au dernier bouton du contenu : la coquille fixe

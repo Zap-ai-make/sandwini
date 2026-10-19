@@ -134,6 +134,13 @@ export function PanneauPiece({
               <label
                 key={type}
                 className={[
+                  /* `relative` garde le radio `sr-only` — donc absolu — dans
+                     l'étiquette qui le représente. Sans lui, il se place contre
+                     le premier ancêtre positionné et le focus fait défiler
+                     l'écran pour l'y rejoindre (D102). Ici le panneau défile à
+                     la main, donc le symptôme reste bénin ; dans la modale de
+                     vente, le même oubli vidait l'écran. On ferme les deux. */
+                  "relative",
                   "flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-plaque border font-medium",
                   saisie.type === type
                     ? "border-2 border-encre bg-papier font-semibold text-encre"

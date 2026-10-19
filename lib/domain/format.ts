@@ -155,3 +155,35 @@ export function formaterAnciennete(jours: number | null): string {
   if (jours === 1) return "hier";
   return `il y a ${jours} jours`;
 }
+
+/**
+ * Depuis quand, dit comme on le dit à voix haute : les jours d’abord, les mois
+ * ensuite.
+ *
+ * `formaterAnciennete` tient les jours proches ; au-delà d’une trentaine, un lot
+ * se compte en mois (« il y a 1 mois »), sans quoi « il y a 47 jours » demande un
+ * calcul mental que la liste devait éviter. Les jours sont **civils**, sur
+ * l’horloge de l’appareil (même raison que `memeJour`) : « hier » veut dire hier
+ * pour qui est au comptoir, pas à l’heure UTC.
+ */
+export function depuisQuand(date: Date | null, maintenant: Date = new Date()): string {
+  if (!date || Number.isNaN(date.getTime())) return "date inconnue";
+  const jourCivil = (d: Date) => Date.UTC(d.getFullYear(), d.getMonth(), d.getDate());
+  const jours = Math.floor((jourCivil(maintenant) - jourCivil(date)) / 86_400_000);
+  if (jours < 30) return formaterAnciennete(jours);
+  return `il y a ${Math.round(jours / 30)} mois`;
+}
+
+/**
+ * « 1 moto », « 3 motos », « 0 moto ».
+ *
+ * **Elle vivait en privé dans la navigation**, si bien que tout le reste du
+ * produit écrivait « 1 motos » : la répartition de l'inventaire le faisait sous
+ * les yeux du commanditaire. Une règle d'accord recopiée est une règle d'accord
+ * oubliée quelque part — elle descend donc ici, avec les autres mises en forme.
+ *
+ * Le zéro reste au singulier, comme en français : « 0 moto ».
+ */
+export function compter(nombre: number, singulier: string, pluriel?: string): string {
+  return `${formaterNombre(nombre)} ${nombre > 1 ? (pluriel ?? `${singulier}s`) : singulier}`;
+}

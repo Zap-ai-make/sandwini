@@ -1,7 +1,8 @@
 "use client";
 
+import { Chiffre } from "@/components/patrons/Chiffre";
 import { TitreSection } from "@/components/patrons/Page";
-import { formaterNombre } from "@/lib/domain/format";
+import { compter, formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { libelleMois, type ChiffresDuMois as Chiffres, type Mois, type Part } from "@/lib/domain/chiffres";
 
 /**
@@ -96,7 +97,9 @@ function Carte({ nom, valeur, detail }: { nom: string; valeur: string; detail: s
       <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">{nom}</p>
       {/* En Plex Mono et tabulaire : deux mois se comparent chiffre à chiffre,
           et des colonnes qui ne s'alignent pas obligent à relire (`socle.css:1125`). */}
-      <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">{valeur}</p>
+      <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
+        <Chiffre valeur={valeur} />
+      </p>
       <p className="text-legende text-encre-doux">{detail}</p>
     </div>
   );
@@ -119,22 +122,54 @@ function Deux({ terme, aide, valeur }: { terme: string; aide: string; valeur: st
  * **Les barres se rapportent à la plus grande part, pas au total** — la raison
  * est dans `lib/domain/chiffres.ts`. La valeur chiffrée est écrite à côté :
  * une longueur ne se lit pas, elle se compare.
+ *
+ * **À une seule part, la barre disparaît (S55).** Rapportée à la plus grande
+ * part, une barre est pleine par construction quand elle est seule : elle
+ * occupe toute la piste pour n'annoncer que « cette part est la plus grande des
+ * parts ». Le commanditaire l'a dit à sa façon — « je ne comprends rien » —
+ * devant deux sections n'ayant qu'une boutique et qu'un seul mode de paiement.
+ * Une barre sert à comparer ; sans rien à comparer, elle occupe la place d'une
+ * information qu'elle ne porte pas. On écrit alors la phrase que la barre
+ * essayait de dessiner.
  */
 export function Repartition({
   titre,
   id,
   parts,
   unite,
+  seule,
   children,
 }: {
   titre: string;
   id: string;
   parts: Part[];
-  /** Ce que compte la seconde valeur : « motos », « ventes ». */
+  /** Ce que compte la seconde valeur, **au singulier** : « moto », « vente ». */
   unite: string;
+  /** Ce qu'on dit à la place des barres quand il n'y a qu'une part. */
+  seule: string;
   children?: React.ReactNode;
 }) {
   if (parts.length === 0) return null;
+
+  if (parts.length === 1) {
+    const part = parts[0];
+    return (
+      <section aria-labelledby={id}>
+        <h2 id={id} className="mb-3 text-bloc font-bold tracking-tight text-encre">
+          {titre}
+        </h2>
+        <div className="cadre p-4 sm:p-5">
+          <p className="font-medium text-encre">{part.libelle}</p>
+          <p className="mt-1 font-code text-bloc tabular-nums text-encre">
+            {formaterMontant(part.montant)}{" "}
+            <span className="text-encre-doux">· {compter(part.compte, unite)}</span>
+          </p>
+          <p className="mt-1 text-legende text-encre-doux">{seule}</p>
+          {children}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section aria-labelledby={id}>
@@ -142,6 +177,10 @@ export function Repartition({
         {titre}
       </h2>
       <div className="cadre p-4 sm:p-5">
+        {/* L'unité se dit une fois en tête plutôt que sur chaque ligne : la
+            colonne des montants fait sept caractères et demi de large, et y
+            répéter « FCFA » la ferait passer à la ligne sur un téléphone. */}
+        <p className="mb-3 text-legende text-encre-doux">Montants en FCFA.</p>
         <ul className="grid gap-3">
           {parts.map((part) => (
             <li
@@ -162,7 +201,7 @@ export function Repartition({
                 {formaterNombre(part.montant)}
               </span>
               <span className="text-right text-legende text-encre-doux sm:text-left">
-                {formaterNombre(part.compte)} {unite}
+                {compter(part.compte, unite)}
               </span>
             </li>
           ))}

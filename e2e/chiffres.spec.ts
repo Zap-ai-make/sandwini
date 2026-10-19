@@ -1,7 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   attendreLaFileVide,
-  bandeauEtat,
   contenu,
   emailUnique,
   preparerTerrain,
@@ -82,7 +81,7 @@ test.describe("les chiffres du mois", () => {
        encore, `getDoc` levait `unavailable`, et le test mesurait la reprise de
        connexion du SDK (D50, S27) au lieu de mesurer les chiffres. C'est ce
        qu'attend aussi le test de marge de S8, pour la même raison. */
-    await expect(bandeauEtat(page)).toContainText("À jour", { timeout: 60_000 });
+    await attendreLaFileVide(page, 60_000);
 
     /* Par le lien de la supervision, et non par l'URL : c'est le chemin du
        responsable, et un écran qu'on n'atteint que par l'adresse n'est pas
@@ -124,7 +123,7 @@ test.describe("les chiffres du mois", () => {
 
   test("un mois sans rien l’écrit en une phrase, et n’aligne pas quatre zéros", async ({ page }) => {
     await seConnecterEtEntrer(page);
-    await page.goto("/supervision/chiffres", { waitUntil: "load" });
+    await page.goto("/motos/inventaire", { waitUntil: "load" });
 
     /* Six mois en arrière : aucune suite ne date une vente d'autre chose que
        du jour même, donc ce mois-là est vide quoi qu'aient fait les autres
@@ -137,7 +136,7 @@ test.describe("les chiffres du mois", () => {
     await expect(sectionDuMois(page)).toHaveCount(0);
   });
 
-  test("un gérant n’entre pas dans les chiffres, et on lui dit pourquoi", async ({
+  test("un gérant lit l’inventaire de sa boutique, sans voir la marge", async ({
     page,
     browser,
   }) => {
@@ -151,9 +150,8 @@ test.describe("les chiffres du mois", () => {
     await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
     const email = emailUnique("chiffres");
     const motDePasse = "gerant-chiffres-001";
-    const creation = page.locator("form").filter({
-      has: page.getByRole("button", { name: /Créer le compte/ }),
-    });
+    await page.getByRole("button", { name: "Créer un compte" }).click();
+    const creation = page.getByRole("dialog");
     await creation.getByLabel("Nom", { exact: true }).fill("Gérant des chiffres");
     await creation.getByLabel("Adresse e-mail").fill(email);
     await creation.getByLabel("Mot de passe provisoire").fill(motDePasse);
@@ -177,15 +175,23 @@ test.describe("les chiffres du mois", () => {
     await seConnecter(pageGerant, email, motDePasse);
     await pageGerant.waitForURL("**/dashboard");
 
-    /* Par l'adresse directe, parce que c'est le seul chemin qui lui reste : la
-       supervision ne figure pas dans sa coquille. Un lien reçu, un onglet
-       gardé ouvert — la garde doit tenir là aussi. */
-    await pageGerant.goto("/supervision/chiffres", { waitUntil: "load" });
-    await expect(contenu(pageGerant)).toContainText("Réservé au responsable", { timeout: 30_000 });
-    /* Ni la marge de l'entreprise, ni la moindre carte : le refus remplace
-       l'écran, il ne le voile pas. */
-    await expect(sectionDuMois(pageGerant)).toHaveCount(0);
+    /* **Ce témoin a changé de sens en S55, et c'est le cœur du lot.** Il
+       vérifiait que la porte claquait : le gérant arrivait sur « Réservé au
+       responsable ». Le commanditaire a demandé l'inverse — « l'inventaire doit
+       se faire à deux niveaux, pour chaque gérant et pour le superviseur qui
+       agrège tout ». Le gérant entre donc, et ce qui doit être vérifié n'est
+       plus la fermeture de l'écran mais la tenue du mur à l'intérieur. */
+    await pageGerant.goto("/motos/inventaire", { waitUntil: "load" });
+    await expect(contenu(pageGerant)).toContainText("Ce que vous détenez", { timeout: 30_000 });
+
+    /* Le mur de D2, là où il est réellement : la marge ne s'affiche pas, et
+       elle n'est pas seulement masquée — les documents `prive/cout` sont hors
+       de portée de ce compte dans la base. L'écran ne les demande même pas. */
     await expect(contenu(pageGerant)).not.toContainText("Marge brute");
+
+    /* Son niveau à lui : une seule boutique, donc pas de répartition. La
+       section n'existe que quand il y a plusieurs boutiques à comparer. */
+    await expect(contenu(pageGerant)).not.toContainText("Où il se trouve");
 
     await contexteGerant.close();
   });

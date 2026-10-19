@@ -232,6 +232,37 @@ describe("entrée en stock", () => {
     );
   });
 
+  /* S53 : les deux papiers en main et la plaque. Ils sont facultatifs — aucune
+     moto d'avant cette spec n'en porte — mais typés dès qu'ils sont là. */
+  it("le gérant fait entrer une moto avec sa quittance en main et sa plaque", async () => {
+    await assertSucceeds(
+      addDoc(
+        collection(gerant(), "motos"),
+        moto({ quittanceRecue: true, cmcRecu: true, plaque: "11 AA 1234" }),
+      ),
+    );
+  });
+
+  /* **Point de vigilance de la spec.** La plaque est une donnée de la moto :
+     elle suit le périmètre de la moto, et rien d'autre. */
+  it("le gérant ne pose pas de plaque sur une moto d’une autre boutique", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "motos"), moto({ boutiqueId: "KDG", plaque: "11 AA 1234" })),
+    );
+  });
+
+  /* La borne du domaine et celle des règles doivent dire le même nombre, sans
+     quoi `normaliserPlaque` laisserait passer ce que le serveur refuse. */
+  it("refuse une plaque plus longue que la borne", async () => {
+    await assertFails(
+      addDoc(collection(gerant(), "motos"), moto({ plaque: "A".repeat(21) })),
+    );
+  });
+
+  it("refuse une quittance en main qui ne soit pas un booléen", async () => {
+    await assertFails(addDoc(collection(gerant(), "motos"), moto({ quittanceRecue: "oui" })));
+  });
+
   it("le gérant n’entre pas une moto dans une autre boutique", async () => {
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ boutiqueId: "KDG" })));
   });
@@ -257,9 +288,31 @@ describe("entrée en stock", () => {
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ numeroChassis: "lc6p-123" })));
   });
 
-  it("exige un rattachement au référentiel", async () => {
+  /* La marque et la provenance, et **pas** le modèle : son absence de cette
+     liste est voulue, voir le témoin suivant. */
+  it("exige un rattachement au référentiel — la marque et la provenance", async () => {
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ marqueId: "" })));
     await assertFails(addDoc(collection(gerant(), "motos"), moto({ provenanceId: "" })));
+  });
+
+  /**
+   * Le modèle est facultatif, et la règle doit l'accepter vide.
+   *
+   * Le domaine a cessé de l'exiger — un lot se réceptionne caisses fermées, la
+   * marque se lit sur le carton, le modèle souvent pas. Mais un formulaire
+   * permissif devant une règle stricte ne donne pas un champ optionnel : il
+   * donne un `permission-denied` au comptoir, sur un geste que l'écran venait
+   * d'autoriser. Les deux doivent céder ensemble, et ce témoin est ce qui
+   * l'atteste.
+   *
+   * Le champ reste **écrit**, et reste dans `hasAll` : ce qui change est sa
+   * longueur permise, pas sa présence. Une moto sans modèle porte une chaîne
+   * vide, jamais un champ absent — c'est D101 pris par l'autre bout : le champ
+   * existe toujours, donc aucune migration ne sera nécessaire le jour où il se
+   * remplit.
+   */
+  it("accepte une moto sans modèle, pendant que la marque reste exigée", async () => {
+    await assertSucceeds(addDoc(collection(gerant(), "motos"), moto({ modeleId: "" })));
   });
 
   it("refuse un champ hors contrat — un prix d’achat glissé dans la moto, par exemple", async () => {

@@ -1,8 +1,9 @@
 "use client";
 
-import { Phone } from "lucide-react";
+import { Phone, Plus } from "lucide-react";
 import { useCallback, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { LienDeSuivi } from "@/components/LienDeSuivi";
 import {
   EtatChargement,
   EtatErreur,
@@ -10,10 +11,10 @@ import {
   EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
+import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
-  LIBELLE_TYPE_DOCUMENT,
   LONGUEUR_NOM_MAX,
   LONGUEUR_TELEPHONE_MAX,
   TYPES_DOCUMENTS,
@@ -21,7 +22,6 @@ import {
   validerPrestataire,
   type Prestataire,
   type SaisiePrestataire,
-  type TypeDocument,
 } from "@/lib/domain/prestataire";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import {
@@ -49,7 +49,17 @@ export default function PagePrestataires() {
   );
 }
 
-const VIDE: SaisiePrestataire = { nom: "", telephone: "", typesDocuments: [] };
+/* Le type est posé ici et nulle part ailleurs (S53) : tous les prestataires
+   traitent la carte grise, et c'est le seul type depuis S48. Le jour où un
+   second apparaît, c'est ce tableau qui redeviendra un choix à l'écran — pas
+   l'inverse. */
+const VIDE: SaisiePrestataire = {
+  nom: "",
+  telephone: "",
+  typesDocuments: [...TYPES_DOCUMENTS],
+};
+
+const FORMULAIRE_PRESTATAIRE = "creer-prestataire";
 
 function Prestataires() {
   const souscrire = useCallback(
@@ -61,16 +71,34 @@ function Prestataires() {
     souscrire,
     "La liste des prestataires n’a pas pu être chargée.",
   );
+  const [creation, setCreation] = useState(false);
 
   return (
     <div>
-      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Prestataires" />
+      {/* La liste d'abord, la création en modale (S54). Le formulaire occupait
+          le haut de l'écran en permanence : on venait presque toujours pour
+          consulter ou corriger, et il fallait le dépasser à chaque fois. Un
+          bouton en tête, et l'écran redevient ce qu'il est — une liste. */}
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Paramètres" }}
+        titre="Prestataires"
+        actions={
+          <button
+            type="button"
+            onClick={() => setCreation(true)}
+            className="bouton bouton-principal"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Ajouter un prestataire
+          </button>
+        }
+      />
       <p className="mt-2 max-w-prose text-encre-doux">
-        Ceux à qui vous confiez les cartes grises et les plaques. Ils apparaîtront au moment de
-        déposer un dossier, filtrés selon ce qu’ils traitent.
+        Ceux à qui vous confiez les cartes grises. Ils apparaîtront au moment de déposer un
+        dossier, filtrés selon ce qu’ils traitent.
       </p>
 
-      <Formulaire />
+      {creation && <Formulaire onFermer={() => setCreation(false)} />}
 
       <h2 className="mt-8 text-sm font-semibold tracking-wide text-encre-doux uppercase">
         Prestataires enregistrés
@@ -93,42 +121,6 @@ function Prestataires() {
         </ul>
       )}
     </div>
-  );
-}
-
-function ChoixTypes({
-  valeurs,
-  changer,
-  prefixe,
-}: {
-  valeurs: TypeDocument[];
-  changer: (types: TypeDocument[]) => void;
-  prefixe: string;
-}) {
-  return (
-    <fieldset className="mt-4">
-      <legend className="text-sm font-medium text-encre">Documents traités</legend>
-      <div className="mt-1.5 flex flex-wrap gap-4">
-        {TYPES_DOCUMENTS.map((type) => (
-          <label key={type} className="flex items-center gap-2 text-encre">
-            <input
-              type="checkbox"
-              id={`${prefixe}-${type}`}
-              checked={valeurs.includes(type)}
-              onChange={(evenement) =>
-                changer(
-                  evenement.target.checked
-                    ? [...valeurs, type]
-                    : valeurs.filter((autre) => autre !== type),
-                )
-              }
-              className="size-5 rounded-plaque border-bord accent-plaque"
-            />
-            {LIBELLE_TYPE_DOCUMENT[type]}
-          </label>
-        ))}
-      </div>
-    </fieldset>
   );
 }
 
@@ -167,25 +159,24 @@ function Champs({
         />
       </Champ>
 
-      <ChoixTypes
-        valeurs={saisie.typesDocuments}
-        changer={(typesDocuments) => changer({ typesDocuments })}
-        prefixe={prefixe}
-      />
+      {/* **Le groupe « Documents traités » a quitté ce formulaire** (S53). Il
+          proposait une seule case depuis S48, quand la plaque est sortie du
+          dossier : un choix à une seule option n'est pas un choix, c'est une
+          saisie obligatoire déguisée — et on la découvrait en voyant le
+          formulaire refusé sans comprendre pourquoi. Le type est désormais posé
+          implicitement par `VIDE`. */}
     </div>
   );
 }
 
-function Formulaire() {
+function Formulaire({ onFermer }: { onFermer: () => void }) {
   const session = useSession();
   const [saisie, setSaisie] = useState<SaisiePrestataire>(VIDE);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [succes, setSucces] = useState<string | null>(null);
 
   function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (session.statut !== "connecte") return;
-    setSucces(null);
 
     const probleme = validerPrestataire(saisie);
     if (probleme) {
@@ -194,19 +185,37 @@ function Formulaire() {
     }
 
     setErreur(null);
-    const nom = saisie.nom.trim();
+    /* Même raison que pour une boutique : l'écriture est locale d'abord
+       (D76), donc la ligne est déjà dans la liste derrière. */
     creerPrestataire(saisie, {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
     }).catch((cause) => setErreur(messageErreurReferentiel(cause)));
     setSaisie(VIDE);
-    setSucces(`${nom} est enregistré.`);
+    onFermer();
   }
 
   return (
-    <form onSubmit={soumettre} className="mt-6 cadre p-4" noValidate>
-      <h2 className="font-semibold text-encre">Ajouter un prestataire</h2>
-
+    <Modale
+      ouvert
+      onFermer={onFermer}
+      titre="Ajouter un prestataire"
+      pied={
+        <div className="flex flex-wrap gap-2">
+          <button type="submit" form={FORMULAIRE_PRESTATAIRE} className="bouton bouton-principal">
+            Enregistrer le prestataire
+          </button>
+          {/* « Annuler » et non « Fermer » : on abandonne une saisie, on ne
+              referme pas une consultation. Sur l'écran des boutiques, le mot
+              « Fermer » est déjà pris — il désigne la fermeture d'un point de
+              vente, à deux centimètres de là. */}
+          <button type="button" onClick={onFermer} className="bouton bouton-neutre">
+            Annuler
+          </button>
+        </div>
+      }
+    >
+    <form id={FORMULAIRE_PRESTATAIRE} onSubmit={soumettre} noValidate>
       <Champs
         saisie={saisie}
         changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
@@ -214,16 +223,8 @@ function Formulaire() {
       />
 
       <EtatErreurSaisie message={erreur} className="mt-3" />
-      {succes && (
-        <p role="status" aria-live="polite" className="text-sm text-solde">
-          {succes}
-        </p>
-      )}
-
-      <button type="submit" className="mt-3 bouton bouton-principal">
-        Enregistrer le prestataire
-      </button>
     </form>
+    </Modale>
   );
 }
 
@@ -277,9 +278,20 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
             <Phone aria-hidden="true" className="size-3.5 shrink-0" />
             {prestataire.telephone}
           </span>
-          <span className="block text-sm text-encre-doux">
-            {libelleTypes(prestataire.typesDocuments)}
-          </span>
+          {/* **Un prestataire sans type est signalé** (S53). Il n'apparaîtra
+              dans aucune liste de dépôt, et « Aucun type de document » en gris
+              doux ne le disait pas : c'était une phrase parmi d'autres, sur une
+              fiche qui a l'air complète. Le trou de S48 en a produit — des
+              fiches nées avec `plaque` seul, dont le type a cessé d'exister. */}
+          {prestataire.typesDocuments.length === 0 ? (
+            <span className="block text-sm font-medium text-alerte">
+              Aucun type de document : ce prestataire n’est proposé nulle part.
+            </span>
+          ) : (
+            <span className="block text-sm text-encre-doux">
+              {libelleTypes(prestataire.typesDocuments)}
+            </span>
+          )}
         </span>
 
         <span className="flex shrink-0 gap-2">
@@ -308,6 +320,13 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
       </div>
 
       <EtatErreur message={erreur} className="mt-2" />
+
+      {/* **Le lien de suivi vit sur la fiche, pas derriere le bouton
+          « Modifier »** (S56). On ne vient pas ici pour corriger un
+          prestataire quand on veut lui envoyer son lien : on vient pour le
+          lien. Le cacher dans le formulaire d'edition en ferait une option
+          d'un geste qui n'a rien a voir. */}
+      <LienDeSuivi prestataire={prestataire} />
 
       {edition && (
         <form

@@ -6,19 +6,21 @@ import {
   onSnapshot,
   query,
   Timestamp,
+  updateDoc,
   where,
   writeBatch,
   type DocumentData,
   type DocumentSnapshot,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
-import { db } from "@/lib/firebase/client";
-import { lireLignes } from "@/lib/domain/saisie";
+import { db, stockage } from "@/lib/firebase/client";
 import { engendrerToken } from "@/lib/domain/token";
 import {
+  PAPIERS_EMPORTES_VIDES,
   TYPES_DOCUMENT,
   agregatsPaiement,
   estEngagement,
+  lireEmporte,
   lireMontant,
   lireMontantEncaisse,
   motoRemiseA,
@@ -36,6 +38,7 @@ import {
   type Vente,
   type Versement,
 } from "@/lib/domain/vente";
+import { validerFichierPapier, type PapierMoto } from "@/lib/domain/moto";
 import { reserverNumero, type Numeroteur } from "@/lib/numerotation/compteur";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
@@ -50,9 +53,10 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * l'atomicité d'un `writeBatch` y compris hors ligne — il le garde entier dans
  * sa file et le rejoue tel quel au retour du réseau.
  *
- * Sept documents au maximum voyagent ensemble : la vente, ses quatre documents
- * de dossier, le versement du jour et son encaissement, plus la mise à jour du
- * statut de la moto.
+ * Quatre documents au maximum voyagent ensemble : la vente, **sa carte grise**,
+ * le versement du jour et son encaissement, plus la mise à jour du statut de la
+ * moto. Ils étaient six jusqu'au 16 octobre 2026, quand le dossier ouvrait
+ * aussi une quittance et un CMC que plus rien ne lisait.
  *
  * **Ce que ce lot n'écrit pas : le coût de la moto.** `coutMotoSnapshot` doit
  * être figé à la vente, mais il vit dans `motos/{id}/prive/cout` que le gérant
@@ -62,7 +66,14 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * seulement cachée, elle est infalsifiable.
  */
 
-function versDate(valeur: unknown): Date | null {
+/**
+ * Un `Timestamp` Firestore en `Date`, ou `null`.
+ *
+ * Exporté parce que chaque dépôt en avait recopié le sien : la cinquième copie
+ * est celle qui diverge, le jour où quelqu'un décide qu'une date absente vaut
+ * `new Date(0)` dans un fichier et pas dans les autres (`AGENTS.md` règle 1).
+ */
+export function versDate(valeur: unknown): Date | null {
   return valeur instanceof Timestamp ? valeur.toDate() : null;
 }
 
@@ -78,6 +89,17 @@ function lireVente(instantane: DocumentSnapshot<DocumentData>): Vente {
     date: versDate(donnees.date),
     prixConvenu: typeof donnees.prixConvenu === "number" ? donnees.prixConvenu : 0,
     modePaiement: (donnees.modePaiement as ModePaiement) ?? "comptant",
+    /* `null` et non `false` quand le champ manque : une vente d'avant S44 ne
+       disait pas « la carte grise n'est pas incluse », elle ne le disait pas
+       du tout. L'écran retombe alors sur les deux listes ci-dessous, qui sont
+       ce que le gérant avait réellement écrit. */
+    carteGrise: typeof donnees.carteGrise === "boolean" ? donnees.carteGrise : null,
+    casque: typeof donnees.casque === "boolean" ? donnees.casque : null,
+    /* `lireEmporte` comble les ventes d'avant S53, qui sont la majorité : elles
+       se lisent « rien d'emporté » et non `undefined`. */
+    emporte: lireEmporte(donnees.emporte),
+    carteGriseChemin:
+      typeof donnees.carteGriseChemin === "string" ? donnees.carteGriseChemin : null,
     inclus: Array.isArray(donnees.inclus) ? donnees.inclus : [],
     nonInclus: Array.isArray(donnees.nonInclus) ? donnees.nonInclus : [],
     totalPaye: typeof donnees.totalPaye === "number" ? donnees.totalPaye : 0,
@@ -127,7 +149,7 @@ export function ecouterVentes(
  * Les documents de dossier de tout le périmètre, en une seule écoute.
  *
  * Une requête de groupe de collections plutôt qu'une écoute par vente : la
- * liste des ventes affiche l'état des quatre documents de chaque ligne (§6.4),
+ * liste des ventes affiche l'état des documents de chaque ligne (§6.4),
  * et ouvrir un flux par vente ferait cinquante flux pour un écran. Le
  * `boutiqueId` est répété sur chaque document précisément pour rendre ce filtre
  * possible — une sous-collection ne connaît pas son grand-parent.
@@ -172,7 +194,7 @@ function lireDocumentDossier(instantane: QueryDocumentSnapshot<DocumentData>): D
 }
 
 /**
- * Les quatre documents d'un dossier précis.
+ * Les documents d'un dossier précis.
  *
  * Une écoute de chemin direct plutôt que le groupe de collections : sur une
  * fiche, on connaît la vente, et cette requête-là ne demande aucun index.
@@ -376,8 +398,8 @@ export function enregistrerVente(
     date: maintenant,
     prixConvenu,
     modePaiement: saisie.modePaiement,
-    inclus: lireLignes(saisie.inclus),
-    nonInclus: lireLignes(saisie.nonInclus),
+    carteGrise: saisie.carteGrise,
+    casque: saisie.casque,
     totalPaye,
     resteDu,
     statutPaiement,
@@ -388,26 +410,48 @@ export function enregistrerVente(
     lienSuiviEnvoyeAt: null,
     statutDossier: "ouvert",
     dateClotureDossier: null,
+    /* **La carte naît complète, et c'est une nécessité, pas une élégance.**
+       `marquerEmporte` écrit par chemin pointé (`emporte.cmc`) ; sur une vente
+       qui ne porterait pas le champ, cette écriture fabriquerait une carte à
+       une seule clé, et `emporteValide` la refuserait — elle exige les deux
+       booléens. Le geste du comptoir serait alors rejeté par le serveur sans
+       que l'écran sache dire pourquoi. Trouvé par le témoin e2e, pas déduit. */
+    emporte: PAPIERS_EMPORTES_VIDES,
+    carteGriseChemin: null,
     ...traceCreation(auteur),
   });
 
-  /* Le type du document est son identifiant : `documents/carte_grise`. C'est ce
-     qui rend l'écriture idempotente et interdit structurellement d'avoir deux
-     cartes grises dans un dossier — une contrainte que des règles ne sauraient
-     pas exprimer. */
-  for (const type of TYPES_DOCUMENT) {
-    lot.set(doc(reference, "documents", type), {
-      /* Répété ici pour la même raison qu'en S5 sur le coût : dans un lot, les
-         règles évaluent chaque document contre l'état d'AVANT, donc la vente
-         parente n'existe pas encore quand son dossier est validé. Ce champ est
-         aussi ce qui rend possible la lecture d'ensemble des dossiers. */
-      boutiqueId,
-      venteId: reference.id,
-      type,
-      statut: "a_faire" satisfies StatutDocument,
-      ...traceCreation(auteur),
-    });
-  }
+  /* **Un seul document, et c'est la carte grise** (16 octobre 2026).
+     Cette boucle en ouvrait trois. Depuis S53bis, rien ne lit un document
+     `quittance` ou `cmc` : leur disponibilité se coche sur la MOTO, leur remise
+     sur la VENTE, et les trois lecteurs du dossier filtrent par
+     `passeParUnPrestataire`. Les écrire quand même, c'était fabriquer deux
+     documents morts à chaque vente — que personne n'ouvrirait jamais, et que la
+     règle interdit d'effacer. La règle refuse désormais leur création.
+
+     Le type du document reste son identifiant : `documents/carte_grise`. C'est
+     ce qui rend l'écriture idempotente et interdit structurellement d'avoir
+     deux cartes grises dans un dossier — une contrainte que des règles ne
+     sauraient pas exprimer.
+
+     **La case du comptoir pilote le dossier** (S53, arbitrage 5). Décocher
+     « Carte grise » laissait jusqu'ici un document « à faire » que personne
+     n'allait jamais faire, et qui bloquait la clôture : le reçu imprimait
+     « non inclus » pendant que le dossier la réclamait. */
+  const statutCarteGrise: StatutDocument =
+    saisie.carteGrise === false ? "non_applicable" : "a_faire";
+
+  lot.set(doc(reference, "documents", "carte_grise"), {
+    /* Répété ici pour la même raison qu'en S5 sur le coût : dans un lot, les
+       règles évaluent chaque document contre l'état d'AVANT, donc la vente
+       parente n'existe pas encore quand son dossier est validé. Ce champ est
+       aussi ce qui rend possible la lecture d'ensemble des dossiers. */
+    boutiqueId,
+    venteId: reference.id,
+    type: "carte_grise",
+    statut: statutCarteGrise,
+    ...traceCreation(auteur),
+  });
 
   if (montantEncaisse > 0) {
     const versement = doc(collection(reference, "versements"));
@@ -604,4 +648,91 @@ export function messageErreurVersement(cause: unknown): string {
   if (code.includes("not-found")) return "Cette vente n’existe plus.";
   if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
   return "L’enregistrement du versement n’a pas abouti.";
+}
+
+/**
+ * Dit que le client a emporté un papier — ou qu'il ne l'a plus (S53).
+ *
+ * **C'est le seul geste de comptoir qui reste** pour la quittance et le CMC :
+ * leur disponibilité se coche sur la moto, souvent bien avant la vente. Le
+ * dossier n'a plus de statut à promener pour eux.
+ *
+ * Une écriture par chemin pointé (`emporte.quittance`) et non l'objet entier :
+ * deux appareils qui cochent chacun un papier au même moment ne s'effacent pas
+ * l'un l'autre, là où deux écritures de l'objet complet le feraient (D66).
+ *
+ * On n'attend pas le serveur (D76) : l'appelant reçoit la promesse et rend la
+ * main tout de suite.
+ */
+export function marquerEmporte(
+  venteId: string,
+  papier: PapierMoto,
+  emporte: boolean,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  return {
+    enregistre: suivreEcriture(
+      updateDoc(doc(db(), "ventesMotos", venteId), {
+        [`emporte.${papier}`]: emporte,
+        ...traceModification(auteur),
+      }),
+    ),
+  };
+}
+
+/**
+ * Envoie le scan de la carte grise et l'attache à la vente (S53).
+ *
+ * **Le fichier se range sous la MOTO, le chemin s'écrit sur la VENTE**, et ce
+ * croisement est délibéré. Côté Storage, `motos/{id}/papiers/` a déjà sa règle,
+ * vérifiée en type réel et en taille : y ajouter un préfixe `ventes/` serait
+ * élargir une surface d'écriture publique pour un fichier de même nature. Et la
+ * carte grise appartient bien à l'engin — une revente plus tard en déposera une
+ * autre à côté, horodatée, sans écraser la première.
+ *
+ * Côté Firestore, le chemin vit sur la vente parce que c'est la vente qui sait
+ * à qui cette carte a été remise. La moto, elle, survit à plusieurs
+ * propriétaires.
+ *
+ * L'attache suit l'envoi, jamais l'inverse : un chemin écrit vers un fichier
+ * qui n'est pas arrivé donnerait une pièce jointe morte, visible et inouvrable.
+ */
+export async function envoyerScanCarteGrise(
+  venteId: string,
+  motoId: string,
+  fichier: File,
+  auteur: Auteur,
+): Promise<string> {
+  const probleme = validerFichierPapier(fichier);
+  if (probleme) throw new Error(probleme);
+
+  const extension = fichier.type === "application/pdf" ? "pdf" : fichier.type.split("/")[1];
+  const chemin = `motos/${motoId}/papiers/carte_grise-${Date.now()}.${extension}`;
+
+  const { ref, uploadBytes } = await import("firebase/storage");
+  await uploadBytes(ref(stockage(), chemin), fichier, { contentType: fichier.type });
+
+  await poserScanCarteGrise(venteId, chemin, auteur).enregistre;
+  return chemin;
+}
+
+/**
+ * Dépose le chemin du scan de la carte grise sur la vente (S53).
+ *
+ * Le chemin Storage, pas l'URL : une URL de téléchargement se redemande à
+ * chaque lecture et finit par expirer. Même montage que les scans de la moto.
+ */
+export function poserScanCarteGrise(
+  venteId: string,
+  chemin: string | null,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  return {
+    enregistre: suivreEcriture(
+      updateDoc(doc(db(), "ventesMotos", venteId), {
+        carteGriseChemin: chemin,
+        ...traceModification(auteur),
+      }),
+    ),
+  };
 }

@@ -10,6 +10,7 @@ import {
   updateDoc,
   where,
   writeBatch,
+  type WriteBatch,
   type DocumentData,
   type DocumentSnapshot,
 } from "firebase/firestore";
@@ -19,6 +20,7 @@ import {
   lireEntier,
   lirePapiers,
   normaliserChassis,
+  normaliserPlaque,
   type CoutMoto,
   type EtatMoto,
   type Moto,
@@ -42,7 +44,7 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * Le commanditaire a tranché autrement : le gérant fait entrer la moto, la
  * supervision pose ce qu'elle a coûté. Une moto peut donc exister sans son
  * coût, et cette absence n'est pas un trou à boucher — c'est le signal que
- * l'écran `/supervision/couts` cherche.
+ * la fiche d'une moto cherche.
  *
  * Ce qui n'a pas bougé : une moto qui arrive au comptoir se saisit sans
  * attendre personne, réseau compris.
@@ -64,12 +66,19 @@ function lireMoto(instantane: DocumentSnapshot<DocumentData>): Moto {
     prixVenteConseille:
       typeof donnees.prixVenteConseille === "number" ? donnees.prixVenteConseille : null,
     provenanceId: donnees.provenanceId ?? "",
+    arrivageId: (donnees.arrivageId as string) ?? null,
     papiersFournis: Array.isArray(donnees.papiersFournis) ? donnees.papiersFournis : [],
     photos: Array.isArray(donnees.photos) ? donnees.photos : [],
     statut: (donnees.statut as StatutMoto) ?? "en_stock",
     dateEntree: dateEntree instanceof Timestamp ? dateEntree.toDate() : null,
     quittanceChemin: (donnees.quittanceChemin as string) ?? null,
     cmcChemin: (donnees.cmcChemin as string) ?? null,
+    cmcRecu: donnees.cmcRecu === true,
+    /* Une absence se lit `false`, jamais `undefined` : aucune moto d'avant
+       S53 ne porte ces champs, et une case à cocher pilotée par `undefined`
+       part non contrôlée puis saute d'état au premier clic. */
+    quittanceRecue: donnees.quittanceRecue === true,
+    plaque: typeof donnees.plaque === "string" ? donnees.plaque : null,
   };
 }
 
@@ -121,6 +130,19 @@ export function ecouterMoto(
 }
 
 /**
+ * « Cette moto n'a pas encore de prix d'achat », et non « on ne sait pas
+ * encore » (S54, D82).
+ *
+ * Les deux se disaient `null`, et l'abonnement part lui aussi de `null` : la
+ * fiche ne pouvait pas les distinguer et affichait « Chargement… » pour
+ * toujours sur une moto sans coût — c'est-à-dire précisément sur celle où il
+ * y a quelque chose à faire. Un marqueur explicite tranche, et `null` reprend
+ * son seul sens : la lecture n'est pas revenue.
+ */
+export const ABSENT = "absent" as const;
+export type LectureCout = CoutMoto | typeof ABSENT;
+
+/**
  * Le coût d'une moto — réservé au responsable.
  *
  * Pour un gérant, cet appel échoue par les règles, et c'est voulu : la
@@ -129,7 +151,7 @@ export function ecouterMoto(
  */
 export function ecouterCoutMoto(
   id: string,
-  auChangement: (cout: CoutMoto | null) => void,
+  auChangement: (cout: LectureCout) => void,
   enErreur: (cause: unknown) => void,
 ): () => void {
   return onSnapshot(
@@ -143,7 +165,7 @@ export function ecouterCoutMoto(
               fraisEntree: Array.isArray(donnees.fraisEntree) ? donnees.fraisEntree : [],
               coutTotal: donnees.coutTotal ?? 0,
             }
-          : null,
+          : ABSENT,
       );
     },
     enErreur,
@@ -165,32 +187,51 @@ export function ecouterCoutMoto(
  * horodatages d'audit, qui disent quand la donnée a été écrite, viennent du
  * serveur.
  */
-export function entrerEnStock(
-  saisie: SaisieMoto,
-  boutiqueId: string,
+export type ChampsMoto = {
+  boutiqueId: string;
+  etat: EtatMoto;
+  marqueId: string;
+  modeleId: string;
+  couleur: string;
+  annee: number | null;
+  numeroChassis: string;
+  numeroMoteur: string;
+  prixVenteConseille: number | null;
+  provenanceId: string;
+  arrivageId: string | null;
+  papiersFournis: string[];
+};
+
+/**
+ * Écrit une moto — et son coût s'il y en a un — dans un lot d'écriture déjà
+ * ouvert, et rend son identifiant. Un seul endroit connaît la forme du
+ * document : l'entrée à l'unité (S5) et l'arrivage par lot (S42) la partagent,
+ * pour qu'un champ ajouté ici (comme `arrivageId`) ne s'oublie pas là-bas.
+ *
+ * **Le coût n'est écrit que s'il y en a un** (S39, D82) : une moto sans coût
+ * n'est pas une erreur, c'est le signal que la supervision cherche. Un gérant
+ * n'en fournit jamais — sa moto part seule.
+ */
+export function ecrireMotoDansLot(
+  lot: WriteBatch,
+  champs: ChampsMoto,
+  cout: CoutMoto | null,
   auteur: Auteur,
-): { id: string; enregistre: Promise<void> } {
+): string {
   const reference = doc(collection(db(), "motos"));
-  const cout = construireCout(saisie);
-  const annee = saisie.annee.trim() ? lireEntier(saisie.annee) : null;
-  const conseille = saisie.prixVenteConseille.trim()
-    ? lireEntier(saisie.prixVenteConseille)
-    : null;
-
-  const lot = writeBatch(db());
-
   lot.set(reference, {
-    boutiqueId,
-    etat: saisie.etat,
-    marqueId: saisie.marqueId,
-    modeleId: saisie.modeleId,
-    couleur: saisie.couleur.trim(),
-    annee,
-    numeroChassis: normaliserChassis(saisie.numeroChassis),
-    numeroMoteur: normaliserChassis(saisie.numeroMoteur),
-    prixVenteConseille: conseille,
-    provenanceId: saisie.provenanceId,
-    papiersFournis: saisie.etat === "occasion" ? lirePapiers(saisie.papiersFournis) : [],
+    boutiqueId: champs.boutiqueId,
+    etat: champs.etat,
+    marqueId: champs.marqueId,
+    modeleId: champs.modeleId,
+    couleur: champs.couleur.trim(),
+    annee: champs.annee,
+    numeroChassis: normaliserChassis(champs.numeroChassis),
+    numeroMoteur: normaliserChassis(champs.numeroMoteur),
+    prixVenteConseille: champs.prixVenteConseille,
+    provenanceId: champs.provenanceId,
+    arrivageId: champs.arrivageId,
+    papiersFournis: champs.papiersFournis,
     /* Le champ existe dès maintenant et reste vide : l'envoi d'images demande
        une file d'attente hors ligne que Storage n'a pas (D14, S19). */
     photos: [],
@@ -198,19 +239,56 @@ export function entrerEnStock(
     dateEntree: Timestamp.fromDate(new Date()),
     ...traceCreation(auteur),
   });
+  if (cout) {
+    lot.set(doc(reference, "prive", "cout"), {
+      boutiqueId: champs.boutiqueId,
+      ...cout,
+      ...traceCout(auteur),
+    });
+  }
+  return reference.id;
+}
 
-  /* **Le coût n'est écrit que s'il y en a un** (S39). Un gérant n'en saisit
-     plus : sa moto part seule, et l'absence du document est ce que l'écran de
-     supervision cherche pour savoir quoi lui réclamer. L'écrire à zéro dirait
-     « acquise gratuitement » là où on ne sait pas encore (D82), et ferait
-     disparaître la moto de la liste qui devait la signaler. */
-  if (cout) lot.set(doc(reference, "prive", "cout"), { boutiqueId, ...cout, ...traceCout(auteur) });
+/**
+ * Fait entrer une moto en stock, à l'unité (S5).
+ *
+ * Une moto saisie ainsi tient son origine d'une provenance, pas d'un arrivage :
+ * `arrivageId` reste nul. Le coût suit S39 : écrit si le responsable l'a saisi,
+ * absent sinon.
+ */
+export function entrerEnStock(
+  saisie: SaisieMoto,
+  boutiqueId: string,
+  auteur: Auteur,
+): { id: string; enregistre: Promise<void> } {
+  const annee = saisie.annee.trim() ? lireEntier(saisie.annee) : null;
+  const conseille = saisie.prixVenteConseille.trim() ? lireEntier(saisie.prixVenteConseille) : null;
+
+  const lot = writeBatch(db());
+  const id = ecrireMotoDansLot(
+    lot,
+    {
+      boutiqueId,
+      etat: saisie.etat,
+      marqueId: saisie.marqueId,
+      modeleId: saisie.modeleId,
+      couleur: saisie.couleur,
+      annee,
+      numeroChassis: saisie.numeroChassis,
+      numeroMoteur: saisie.numeroMoteur,
+      prixVenteConseille: conseille,
+      provenanceId: saisie.provenanceId,
+      arrivageId: null,
+      papiersFournis: saisie.etat === "occasion" ? lirePapiers(saisie.papiersFournis) : [],
+    },
+    construireCout(saisie),
+    auteur,
+  );
 
   /* L'identifiant existe tout de suite, l'écriture se termine plus tard : hors
      ligne, la promesse ne se résout qu'au retour du réseau. L'appelant peut
-     donc afficher la moto immédiatement — elle est déjà dans le cache — sans
-     attendre un serveur qui n'est peut-être pas joignable. */
-  return { id: reference.id, enregistre: suivreEcriture(lot.commit()) };
+     afficher la moto immédiatement — elle est déjà dans le cache. */
+  return { id, enregistre: suivreEcriture(lot.commit()) };
 }
 
 /**
@@ -327,6 +405,68 @@ export async function envoyerPapierMoto(
   );
 
   return chemin;
+}
+
+/** Le champ qui porte « ce papier est en main » pour chaque papier. */
+const CHAMP_EN_MAIN: Record<PapierMoto, "quittanceRecue" | "cmcRecu"> = {
+  quittance: "quittanceRecue",
+  cmc: "cmcRecu",
+};
+
+/**
+ * Coche (ou décoche) un papier comme étant en main.
+ *
+ * **Un seul champ, deux écrans** (S53) : la fiche de la moto et l'inspection
+ * d'un lot écrivent ici tous les deux. C'est ce qui remplace la
+ * « synchronisation » demandée par le commanditaire — deux champs qu'on
+ * synchronise finissent par diverger, un seul champ ne le peut pas.
+ *
+ * Une mise à jour partielle, comme l'attache d'un scan : on ne réécrit pas toute
+ * la moto pour un booléen. Le cache local bascule aussitôt — la case suit le
+ * doigt, hors ligne compris — et l'écriture part quand le réseau revient. Le
+ * coût n'est jamais touché : il vit dans une sous-collection à part (D2).
+ */
+export function marquerPapierRecu(
+  motoId: string,
+  papier: PapierMoto,
+  recu: boolean,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  return {
+    enregistre: suivreEcriture(
+      updateDoc(doc(db(), "motos", motoId), {
+        [CHAMP_EN_MAIN[papier]]: recu,
+        ...traceModification(auteur),
+      }),
+    ),
+  };
+}
+
+/**
+ * Pose l'immatriculation au retour de la carte grise (S53).
+ *
+ * `normaliserPlaque` passe d'abord : une plaque se compare à l'œil avec celle
+ * qui est vissée sur la moto, et la borne évite un refus du serveur que le
+ * gérant ne saurait pas lire.
+ *
+ * Une saisie vide écrit `null` et non `""`. Le vide d'un champ texte veut dire
+ * « je ne sais pas encore », et c'est `null` qui porte ce sens dans tout ce
+ * dépôt (D82) — une chaîne vide ferait croire à une plaque connue et illisible.
+ */
+export function poserPlaque(
+  motoId: string,
+  plaque: string,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  const propre = normaliserPlaque(plaque);
+  return {
+    enregistre: suivreEcriture(
+      updateDoc(doc(db(), "motos", motoId), {
+        plaque: propre === "" ? null : propre,
+        ...traceModification(auteur),
+      }),
+    ),
+  };
 }
 
 /** L'URL de lecture d'un papier. Demande du réseau : le cache ne la fabrique pas. */

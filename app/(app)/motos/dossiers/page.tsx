@@ -3,33 +3,41 @@
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { ConfierPaquetModal } from "@/components/ConfierPaquetModal";
+import { PaquetsEnCours } from "@/components/PaquetsEnCours";
 import { RelaisDocument } from "@/components/RelaisDocument";
 import { Avis } from "@/components/patrons/Avis";
 import { ErreurDeLecture, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { normaliserNom } from "@/lib/domain/client";
+import { nomDuClient, normaliserNom } from "@/lib/domain/client";
 import {
   chercherDossiers,
   dossiersEnAttente,
+  LIBELLE_ETAT_PAPIER,
+  passeParUnPrestataire,
+  type EtatPapier,
+  type PapierDuDossier,
   FILTRES_ETAT,
   LIBELLE_FILTRE_ETAT,
   type DossierEnAttente,
   type FiltreEtat,
 } from "@/lib/domain/dossier";
-import { formaterDateCourte } from "@/lib/domain/format";
+import { compter, formaterDateCourte } from "@/lib/domain/format";
 import {
   LIBELLE_DOCUMENT,
-  LIBELLE_STATUT_DOCUMENT,
   TYPES_DOCUMENT,
   type DocumentDossier,
-  type StatutDocument,
   type TypeDocument,
   type Vente,
 } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
+import type { Moto } from "@/lib/domain/moto";
+import { cartesConfiables, type PaquetCartesGrises } from "@/lib/domain/paquet";
+import { ecouterStock } from "@/lib/repositories/motos";
+import { ecouterPaquets } from "@/lib/repositories/paquets";
 import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
 
 /**
@@ -40,12 +48,23 @@ import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
  * `lib/domain/dossier.ts`, en fonctions pures testées — l’écran ne fait que les
  * nourrir et les rendre.
  *
- * **Une colonne par document.** L’écran empilait des cartes qui listaient, en
- * petites lignes grises, les documents encore en cours d’une vente. La question
- * qu’on lui pose est « qui détient quel papier » : elle se compare d’un dossier
- * à l’autre, donc elle se range en colonnes. Les quatre documents y sont
- * toujours, réglés compris — c’est en voyant les trois premiers remis qu’on
- * comprend qu’il ne manque que le quatrième.
+ * **Une seule colonne de papier : la carte grise** (16 octobre 2026). La
+ * question que cet écran pose est « qui détient quel papier, et depuis quand ».
+ * Or un seul des trois part chez quelqu'un. La quittance et le CMC arrivent
+ * avec la moto et se cochent sur le lot à l'arrivée : ils n'attendent personne,
+ * et deux colonnes qui répétaient « À faire » sur chaque ligne noyaient la
+ * seule qu'on venait lire.
+ *
+ * Le commanditaire l'a tranché ainsi : « comme la quittance et le CMC sont
+ * directement cochables dans la liste du lot, on peut se contenter de cela ».
+ * La clôture a suivi dans le même mouvement (`dossierCloturable`) — sans quoi
+ * cette file aurait montré des dossiers à carte grise verte, toujours
+ * « ouverts », sans qu'une seule colonne ne dise pourquoi.
+ *
+ * Les colonnes ne se dérivent donc plus de `TYPES_DOCUMENT` mais des types qui
+ * **passent par un prestataire**. Ce n'est pas un cas particulier écrit à la
+ * main : la prochaine pièce confiée à l'extérieur reprendra cette colonne telle
+ * quelle, comme la plaque l'avait fait jusqu'à S48.
  *
  * **Et le papier avance sans quitter l’écran.** Cliquer un document ouvre son
  * relais sous le tableau : le chemin entier, et le geste suivant. Il fallait
@@ -81,6 +100,35 @@ export default function PageDossiers() {
     "Les ventes n’ont pas pu être chargées.",
   );
 
+  /* **L'écoute du stock est le coût de S53, et il est assumé.** L'état affiché
+     d'un papier se calcule sur trois sources dont la MOTO (`quittanceRecue`,
+     `cmcRecu`), que cet écran ne chargeait pas. C'est la même écoute que celle
+     de l'écran des motos — une requête de plus sur une collection déjà lue
+     ailleurs, pas une collection de plus — et c'est ce qui fait qu'une case
+     cochée à l'arrivage avance le dossier sans qu'on y touche. */
+  const souscrireStock = useCallback(
+    (auChangement: (motos: Moto[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterStock(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
+  );
+  const { valeur: motos } = useAbonnement(
+    souscrireStock,
+    "Le stock n’a pas pu être lu.",
+  );
+
+  /* Les paquets de la boutique. La liste est courte par construction — un
+     paquet vit quelques semaines — et le tri se fait en mémoire : un `orderBy`
+     demanderait un index composite pour quelques dizaines de lignes. */
+  const souscrirePaquets = useCallback(
+    (auChangement: (paquets: PaquetCartesGrises[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterPaquets(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
+  );
+  const { valeur: paquets } = useAbonnement(
+    souscrirePaquets,
+    "Les paquets de cartes grises n’ont pas pu être lus.",
+  );
+
   const souscrireDossiers = useCallback(
     (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) =>
       ecouterDossiers(boutiqueId, auChangement, enErreur),
@@ -93,12 +141,37 @@ export default function PageDossiers() {
 
   const parClient = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
 
+  /* **La sélection est un ensemble d'identifiants de VENTE**, pas de documents :
+     un document se recharge à chaque écriture du serveur, un identifiant non.
+     Cocher une ligne puis voir la sélection se vider parce qu'une autre
+     boutique a écrit serait incompréhensible. */
+  const [choisies, setChoisies] = useState<Set<string>>(new Set());
+  const [paquetOuvert, setPaquetOuvert] = useState(false);
+
+  const basculer = useCallback((venteId: string, choisi: boolean) => {
+    setChoisies((anciennes) => {
+      const suivantes = new Set(anciennes);
+      if (choisi) suivantes.add(venteId);
+      else suivantes.delete(venteId);
+      return suivantes;
+    });
+  }, []);
+
+  /* Ce qui peut partir, calculé UNE fois par `cartesConfiables` plutôt que relu
+     case par case : c'est elle qui porte la règle — une carte déjà dehors n'y
+     entre pas —, et la dupliquer dans le rendu la ferait diverger le jour où un
+     statut s'ajouterait. */
+  const confiables = useMemo(
+    () => new Set(cartesConfiables(documents ?? []).map((carte) => carte.venteId)),
+    [documents],
+  );
+
   /* La date du jour est figée au rendu : recalculée à chaque ligne, deux
      documents de la même liste pourraient être jugés à des instants
      différents. */
   const dossiers = useMemo(
-    () => dossiersEnAttente(ventes ?? [], documents ?? [], { etat }, new Date()),
-    [ventes, documents, etat],
+    () => dossiersEnAttente(ventes ?? [], documents ?? [], motos ?? [], { etat }, new Date()),
+    [ventes, documents, motos, etat],
   );
 
   const resultats = useMemo(
@@ -149,22 +222,53 @@ export default function PageDossiers() {
         cle: "client",
         titre: "Client",
         principal: true,
-        rendu: (dossier) => parClient.get(dossier.clientId)?.nom ?? "Client inconnu",
+        rendu: (dossier) => nomDuClient(parClient.get(dossier.clientId)),
       },
     ];
 
-    for (const type of TYPES_DOCUMENT) {
+    /* **Une seule colonne : la carte grise** (demande du commanditaire,
+       16 octobre 2026). La quittance et le CMC se cochent sur le lot à
+       l'arrivée, et cela suffit : ils ont quitté le dossier, et la clôture ne
+       les regarde plus non plus. Cette file ne montre désormais que ce qui est
+       VRAIMENT en attente de quelqu'un — un papier parti chez un prestataire.
+
+       Les colonnes se dérivaient de `TYPES_DOCUMENT` ; elles se dérivent
+       maintenant du seul type qui passe par un prestataire, ce qui n'est pas
+       un cas particulier écrit à la main : la prochaine pièce confiée à
+       l'extérieur reprendra cette colonne telle quelle. */
+    for (const type of TYPES_DOCUMENT.filter(passeParUnPrestataire)) {
       liste.push({
         cle: type,
         titre: LIBELLE_DOCUMENT[type],
+        /* **La cellule lit l'état calculé, pas le statut stocké** (S53). Elle
+           lisait `document.statut`, si bien qu'un CMC coché sur la moto
+           restait affiché « À faire » : la case du comptoir n'aurait rien fait
+           bouger ici, et c'est précisément ce que la spec exige. */
         rendu: (dossier) => (
-          <CelluleDocument
-            document={dossier.documents[type]}
-            numero={dossier.numero}
-            type={type}
-            ouvert={cleDe(dossier.documents[type]) === documentOuvert}
-            ouvrir={setDocumentOuvert}
-          />
+          <span className="inline-flex items-center">
+            {/* **La case ne s'affiche que sur ce qui peut partir** (S53). Une
+                case grisée sur une carte déjà dehors inviterait à verser une
+                seconde avance pour le même travail — et la base refuserait le
+                lot entier, sans dire laquelle des dix a fauté.
+                Et seulement en vue boutique : un paquet appartient à une
+                boutique, `confierPaquet` en exige une. */}
+            {type === "carte_grise" && boutiqueId !== null && confiables.has(dossier.venteId) && (
+              <input
+                type="checkbox"
+                checked={choisies.has(dossier.venteId)}
+                onChange={(evenement) => basculer(dossier.venteId, evenement.target.checked)}
+                aria-label={`Confier la carte grise de ${dossier.numero}`}
+                className="mr-2 size-4 accent-[var(--color-solde)]"
+              />
+            )}
+            <CellulePapier
+              papier={dossier.papiers.find((papier) => papier.type === type) ?? null}
+              numero={dossier.numero}
+              type={type}
+              ouvert={cleDe(dossier.documents[type]) === documentOuvert}
+              ouvrir={setDocumentOuvert}
+            />
+          </span>
         ),
       });
     }
@@ -182,7 +286,7 @@ export default function PageDossiers() {
        pour le responsable qui regarde toutes les boutiques. Le stock (A4) la
        garde : une moto n'a pas de numéro de pièce, donc rien ne la porte. */
     return liste;
-  }, [parClient, documentOuvert]);
+  }, [parClient, documentOuvert, boutiqueId, confiables, choisies, basculer]);
 
   const chargement = perimetreEnCours || ventes === null || documents === null;
   const enRetard = dossiers.filter((dossier) => dossier.enRetard);
@@ -201,7 +305,7 @@ export default function PageDossiers() {
       <TetePage
         surTitre={surTitre}
         titre="Dossiers en attente"
-        sousTitre="Les quatre documents ne suivent pas le même chemin. Un dossier se ferme quand les quatre sont remis, ou déclarés sans objet."
+        sousTitre="Les documents ne suivent pas le même chemin. Un dossier se ferme quand tous sont remis, ou déclarés sans objet."
       />
 
       {erreur && (
@@ -234,13 +338,69 @@ export default function PageDossiers() {
             <p key={dossier.venteId}>
               <span className="plaque-code">{dossier.numero}</span>
               {" · "}
-              {parClient.get(dossier.clientId)?.nom ?? "Client inconnu"}
+              {nomDuClient(parClient.get(dossier.clientId))}
               {" · "}
               {retardDe(dossier)}
             </p>
           ))}
           {enRetard.length > 3 && <p>et {enRetard.length - 3} autres.</p>}
         </Avis>
+      )}
+
+      <PaquetsEnCours
+        paquets={paquets}
+        documents={documents}
+        /* Lu sur les VENTES et non sur les dossiers : un paquet survit à la
+           clôture de ses dossiers — une carte revenue sort de la file — et son
+           numéro doit rester lisible dans le détail du paquet. */
+        numeroDe={(venteId) => ventes?.find((vente) => vente.id === venteId)?.numero ?? venteId}
+      />
+
+      {/* La barre n'existe que quand quelque chose est coché : un bandeau
+          permanent à zéro occuperait la place de la file sans rien dire. */}
+      {choisies.size > 0 && boutiqueId !== null && (
+        <div className="mb-5 cadre flex flex-wrap items-center justify-between gap-3 p-3">
+          <p className="text-encre">
+            {compter(choisies.size, "carte grise", "cartes grises")} sélectionnée
+            {choisies.size > 1 ? "s" : ""}
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setPaquetOuvert(true)}
+              className="bouton bouton-principal"
+            >
+              Confier {compter(choisies.size, "carte grise", "cartes grises")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setChoisies(new Set())}
+              className="bouton bouton-neutre"
+            >
+              Tout décocher
+            </button>
+          </div>
+        </div>
+      )}
+
+      {paquetOuvert && boutiqueId !== null && (
+        <ConfierPaquetModal
+          cartes={dossiers
+            .filter((dossier) => choisies.has(dossier.venteId))
+            .map((dossier) => dossier.documents.carte_grise)
+            .filter((document): document is DocumentDossier => document !== null)}
+          boutiqueId={boutiqueId}
+          numeroDe={(venteId) =>
+            dossiers.find((dossier) => dossier.venteId === venteId)?.numero ?? venteId
+          }
+          onFermer={() => setPaquetOuvert(false)}
+          onConfie={() => {
+            setPaquetOuvert(false);
+            /* La sélection se vide après le dépôt : les cartes ne sont plus
+               confiables, et les laisser cochées proposerait de les reconfier. */
+            setChoisies(new Set());
+          }}
+        />
       )}
 
       {rienNAttend ? (
@@ -328,7 +488,7 @@ export default function PageDossiers() {
               )
             ) : (
               <Tableau
-                legende="Dossiers ouverts : pour chaque vente, où en est chacun des quatre documents"
+                legende="Dossiers ouverts : pour chaque vente, où en est chacun des documents"
                 colonnes={colonnes}
                 lignes={resultats}
                 cleDe={(dossier) => dossier.venteId}
@@ -366,7 +526,7 @@ function FileVide({ className }: { className?: string }) {
  *
  * Un document vit en `ventesMotos/{venteId}/documents/{type}` : son identifiant
  * est donc « carte_grise », le même pour toutes les ventes du monde. S’en servir
- * seul marquait les quatre cartes grises de l’écran d’un coup et ouvrait le
+ * seul marquait toutes les cartes grises de l’écran d’un coup et ouvrait le
  * relais de la première venue — vu sur capture.
  */
 function cleDocument(document: DocumentDossier): string {
@@ -376,54 +536,83 @@ function cleDocument(document: DocumentDossier): string {
 const cleDe = (document: DocumentDossier | null) => (document ? cleDocument(document) : null);
 
 /**
- * Une case de document : le mot, et la porte vers son parcours.
+ * Une case de papier : son état, et la porte vers son parcours.
  *
- * Le mot est celui du domaine, jamais un raccourci — « Revenu au magasin » et
- * non « Revenu ». Un dossier dont le document n’est pas encore parvenu du
+ * **L'état est calculé, pas stocké** (S53, D61). La case lisait
+ * `document.statut` ; un CMC coché sur la moto restait alors affiché « À
+ * faire », et le geste du comptoir ne faisait rien bouger ici.
+ *
+ * Le mot est celui du domaine, jamais un raccourci — « Chez le prestataire » et
+ * non « Parti ». Un dossier dont le document n’est pas encore parvenu du
  * serveur laisse la case vide plutôt que d’afficher « À faire » : les deux ne
  * demandent pas le même geste.
+ *
+ * **Seule la carte grise ouvre un parcours.** Les deux autres papiers n'ont
+ * plus d'étapes à promener depuis S53 : il n'y a pas de relais à lire, et un
+ * bouton qui ouvre un panneau vide est une promesse non tenue. Ils s'affichent
+ * donc en pastille muette.
  */
-function CelluleDocument({
-  document,
+function CellulePapier({
+  papier,
   numero,
   type,
   ouvert,
   ouvrir,
 }: {
-  document: DocumentDossier | null;
+  papier: PapierDuDossier | null;
   numero: string;
   type: TypeDocument;
   ouvert: boolean;
   ouvrir: (id: string | null) => void;
 }) {
-  if (!document) return <span className="text-encre-doux">—</span>;
+  if (!papier || !papier.document) return <span className="text-encre-doux">—</span>;
+
+  const mot = LIBELLE_ETAT_PAPIER[papier.etat];
+  const classes = `pastille ${TON_PAPIER[papier.etat]}`;
+  const document = papier.document;
+
+  if (!passeParUnPrestataire(type)) {
+    return <span className={classes}>{mot}</span>;
+  }
 
   return (
     <button
       type="button"
       onClick={() => ouvrir(ouvert ? null : cleDocument(document))}
       aria-current={ouvert ? "true" : undefined}
-      /* Le nom accessible dit de quel document et de quelle pièce il s’agit :
+      /* Le nom accessible dit de quel papier et de quelle pièce il s’agit :
          replié en carte, le tableau n’a plus d’en-tête de colonne pour le
          dire, et vingt-huit boutons nommés « À faire » ne mènent nulle part. */
-      aria-label={`${LIBELLE_DOCUMENT[type]} de ${numero} : ${LIBELLE_STATUT_DOCUMENT[document.statut]}`}
-      className={`pastille pastille-bouton ${TON_DOCUMENT[document.statut]}`}
+      aria-label={`${LIBELLE_DOCUMENT[type]} de ${numero} : ${mot}`}
+      className={`${classes} pastille-bouton`}
     >
-      {LIBELLE_STATUT_DOCUMENT[document.statut]}
+      {mot}
     </button>
   );
 }
 
 /* Jamais la couleur seule : le mot est écrit, la pastille ne fait que le
-   doubler. Le vert dit réglé, le bleu de la goutte dit parti et pas revenu, le
-   gris dit qu’il n’y a rien encore. Le retard, lui, n’est pas un statut : il se
+   doubler. Le vert dit fini, le bleu de la goutte dit parti et pas revenu, le
+   gris dit qu’il n’y a rien encore. Le retard, lui, n’est pas un état : il se
    lit sur la colonne « Chez qui, depuis » et sur l’avis de tête. */
-const TON_DOCUMENT: Record<StatutDocument, string> = {
+/**
+ * Le ton de chaque état.
+ *
+ * **« Au magasin » est VERT** (demande du commanditaire, 16 octobre 2026).
+ * Depuis que cette file ne suit plus que la carte grise, son retour au magasin
+ * n'est pas une étape de transit : c'est la fin du parcours, le moment où le
+ * dossier se clot. Le bleu disait « ça bouge encore » d'un papier qui ne bouge
+ * plus. Le vert dit « c'est fait », et c'est ce qu'on vient chercher d'un coup
+ * d'œil sur une file qu'on vide.
+ *
+ * `chez_prestataire` garde le bleu : lui est bien en transit, chez quelqu'un.
+ */
+const TON_PAPIER: Record<EtatPapier, string> = {
   a_faire: "",
   chez_prestataire: "pastille-transit",
-  revenu_magasin: "pastille-solde",
-  remis_client: "pastille-solde",
-  non_applicable: "",
+  au_magasin: "pastille-solde",
+  emporte: "pastille-solde",
+  sans_objet: "",
 };
 
 /** Qui détient le dossier, et depuis combien de temps. */
@@ -432,7 +621,11 @@ function Detenteur({ dossier }: { dossier: DossierEnAttente }) {
   /* Rien n’est encore parti : les papiers restent à faire, et il n’y a
      personne à relancer. C’est une réponse à « chez qui », pas un blanc. */
   if (!detention) return <span className="text-encre-doux">personne</span>;
-  if (detention.chez === "magasin") return <span className="text-encre-doux">au magasin</span>;
+  /* **« au magasin » a quitté cette colonne** (16 octobre 2026). Elle désignait
+     une quittance ou un CMC dans le tiroir ; ces deux papiers ont quitté le
+     dossier, et la carte grise est finie dès son retour. La colonne répond
+     désormais par un prestataire, ou par personne — ce qui est exactement la
+     question qu'elle pose. */
 
   return (
     <span className={dossier.enRetard ? "font-semibold text-alerte" : undefined}>

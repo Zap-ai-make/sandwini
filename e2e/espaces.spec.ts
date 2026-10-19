@@ -36,9 +36,8 @@ async function ouvrirSessionGerant(
   await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
   const email = emailUnique(prefixe);
   const motDePasse = `gerant-${prefixe}-0001`;
-  const creation = page.locator("form").filter({
-    has: page.getByRole("button", { name: /Créer le compte/ }),
-  });
+  await page.getByRole("button", { name: "Créer un compte" }).click();
+  const creation = page.getByRole("dialog");
   await creation.getByLabel("Nom", { exact: true }).fill(`Gérant ${prefixe}`);
   await creation.getByLabel("Adresse e-mail").fill(email);
   await creation.getByLabel("Mot de passe provisoire").fill(motDePasse);

@@ -1,0 +1,57 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+import { describe, expect, it } from "vitest";
+
+/**
+ * Aucune phrase du produit n'est écrite en échappements Unicode (S53).
+ *
+ * **Ce que ce test a attrapé, et que rien d'autre ne voyait.** La barre
+ * d'action du dépôt groupé affichait, en clair, à l'écran :
+ *
+ *     2 cartes grises sélectionnées        Tout décocher
+ *
+ * Dans une **chaîne** JavaScript, `é` vaut « é ». Dans du **texte JSX**,
+ * il ne vaut rien du tout : c'est une suite de caractères, et React l'affiche
+ * telle quelle. Les deux s'écrivent pareil, et un seul des deux marche.
+ *
+ * Aucun test ne pouvait tomber dessus : la suite n'assertait pas cette phrase,
+ * `tsc` la trouve valide, `eslint` aussi. Elle n'est apparue qu'en regardant
+ * une capture d'écran, après que la fonction a été déclarée terminée.
+ *
+ * **Pourquoi l'interdire partout plutôt que dans le seul JSX.** Distinguer
+ * « texte JSX » de « chaîne » demanderait d'analyser la syntaxe, et un contrôle
+ * compliqué finit par être désactivé. Or l'interdiction ne coûte rien ici : ce
+ * dépôt est rédigé en français, accents compris, et un accent échappé n'y est
+ * jamais la bonne façon de l'écrire — au mieux du bruit, au pire ce défaut-ci.
+ */
+
+const RACINES = ["app", "components"];
+
+/* Les caractères de contrôle (U+0000 et voisins) restent permis : ce ne sont
+   pas des lettres, et `Tableau.tsx` s'en sert comme séparateur. */
+const ACCENT_ECHAPPE = /\\u00(?!00)[0-9a-fA-F]{2}|\\u2019/g;
+
+function fichiersDuProduit(racine: string): string[] {
+  return readdirSync(racine, { recursive: true })
+    .map(String)
+    .filter((chemin) => chemin.endsWith(".ts") || chemin.endsWith(".tsx"))
+    .map((chemin) => join(racine, chemin));
+}
+
+describe("les phrases du produit", () => {
+  it("n’écrivent aucune lettre accentuée en échappement Unicode", () => {
+    const fautifs: string[] = [];
+
+    for (const racine of RACINES) {
+      for (const fichier of fichiersDuProduit(racine)) {
+        const lignes = readFileSync(fichier, "utf8").split("\n");
+        lignes.forEach((ligne, index) => {
+          if (ACCENT_ECHAPPE.test(ligne)) fautifs.push(`${fichier}:${index + 1}`);
+          ACCENT_ECHAPPE.lastIndex = 0;
+        });
+      }
+    }
+
+    expect(fautifs, "écrivez la lettre accentuée directement : « é », pas « \\u00e9 »").toEqual([]);
+  });
+});

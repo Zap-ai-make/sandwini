@@ -2,9 +2,13 @@
 
 import { Plus, Search } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
+import { CartesVentes } from "@/components/CartesVentes";
 import { FicheVente } from "@/components/FicheVente";
+import { PanneauRecu } from "@/components/PanneauRecu";
+import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
+import { ModaleVente } from "@/components/ModaleVente";
 import {
   ErreurDeLecture,
   EtatSansResultat,
@@ -15,19 +19,28 @@ import {
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { normaliserNom, type Client } from "@/lib/domain/client";
+import { nomDuClient, normaliserNom, type Client } from "@/lib/domain/client";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
   LIBELLE_MODE,
   LIBELLE_STATUT_PAIEMENT,
   STATUTS_PAIEMENT,
+  bilanVentes,
   chercherVentes,
   comparerVentes,
   type StatutPaiement,
   type Vente,
   type VenteCherchable,
 } from "@/lib/domain/vente";
+import {
+  PLAGE_VIDE,
+  bornesPeriode,
+  dansLaPeriode,
+  libellePeriode,
+  type Periode,
+  type PlagePeriode,
+} from "@/lib/domain/periode";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -63,7 +76,19 @@ export default function PageVentes() {
 }
 
 function Ventes() {
-  const venteOuverte = useSearchParams().get("vente");
+  const parametres = useSearchParams();
+  const venteOuverte = parametres.get("vente");
+  /* Les reçus n'ont plus d'écran à eux (S54) : ils s'ouvrent dans le panneau
+     de cet écran-ci. Le reçu l'emporte sur la fiche quand les deux paramètres
+     sont là — on vient de cliquer dessus, c'est lui qu'on veut voir. */
+  const recuOuvert = parametres.get("recu");
+  /* La modale s'ouvre par un paramètre d'écran, comme les fiches : une route
+     `/motos/ventes/nouvelle` obligeait le navigateur à demander au serveur un
+     document que le service worker sert déjà sous `/motos/ventes` (D39). Le
+     paramètre `nouvelle` est donc ignoré par le cache de précharge — la ligne
+     est dans `app/sw.ts`, et l'oubli ne se verrait qu'en coupure. */
+  const modaleOuverte = parametres.get("nouvelle") === "1";
+  const router = useRouter();
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   /* Avant tout retour anticipé : un hook appelé sous condition change l'ordre
      des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
@@ -72,6 +97,11 @@ function Ventes() {
   const { clients } = useFichierClients();
   const [recherche, setRecherche] = useState("");
   const [statut, setStatut] = useState<StatutPaiement | "">("");
+  /* La période n'est pas un paramètre d'écran, à la différence de la vente
+     ouverte et de la modale : un lien « ce mois-ci » partagé ne veut plus dire
+     la même chose le mois suivant, et l'état local ne pose pas la question. */
+  const [periode, setPeriode] = useState<Periode>("tout");
+  const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
 
   const boutiqueId = perimetre.boutiqueId;
 
@@ -119,10 +149,25 @@ function Ventes() {
     });
   }, [ventes, clients, stock]);
 
+  /* `maintenant` est figé sur la durée du rendu : calculer les bornes et le
+     libellé sur deux `new Date()` différents ferait diverger l'un de l'autre à
+     la seconde près d'un changement de mois. */
+  const maintenant = useMemo(() => new Date(), []);
+
+  /* La période borne le périmètre : les cartes et le tableau lisent la même
+     liste. La recherche et le statut, eux, servent à retrouver une ligne dans
+     ce périmètre — ils ne redéfinissent pas ce dont on parle, et le comptage
+     « 3 ventes sur 12 » dit déjà leur effet. */
+  const duPerimetre = useMemo(() => {
+    const bornes = bornesPeriode(periode, maintenant, plage);
+    if (bornes === null) return cherchables;
+    return cherchables.filter((ligne) => dansLaPeriode(ligne.vente.date, bornes));
+  }, [cherchables, periode, plage, maintenant]);
+
   const resultats = useMemo(() => {
-    const trouves = chercherVentes(cherchables, recherche, normaliserNom);
+    const trouves = chercherVentes(duPerimetre, recherche, normaliserNom);
     return statut ? trouves.filter((ligne) => ligne.vente.statutPaiement === statut) : trouves;
-  }, [cherchables, recherche, statut]);
+  }, [duPerimetre, recherche, statut]);
 
   const colonnes = useMemo<Colonne<Cherchable>[]>(() => {
     const liste: Colonne<Cherchable>[] = [
@@ -144,7 +189,7 @@ function Ventes() {
         cle: "client",
         titre: "Client",
         principal: true,
-        rendu: (ligne) => ligne.client?.nom ?? "Client inconnu",
+        rendu: (ligne) => nomDuClient(ligne.client),
       },
       {
         /* Le modèle seul. Le châssis y a figuré une capture durant — la
@@ -194,25 +239,86 @@ function Ventes() {
       />
     );
 
+  /* Enregistrer une vente réclame un `boutiqueId` : le geste n'existe pas tant
+     qu'aucune boutique n'est choisie (S54). */
+  const dansUneBoutique = perimetre.type === "boutique";
+
+  /* Deux totaux, et la distinction compte. `total` est le registre entier :
+     c'est lui qui décide si la boutique n'a jamais rien vendu — une période
+     vide n'est pas un registre vide, et proposer « enregistrez la première
+     vente » à qui consulte le mois dernier serait faux. `retenues` est le
+     dénominateur du comptage, donc la période choisie. */
   const total = cherchables.length;
+  const retenues = duPerimetre.length;
   const enCours = resultats.filter((ligne) => ligne.vente.resteDu > 0).length;
   const chargement = ventes === null && !erreur;
+  const bilan = bilanVentes(duPerimetre.map((ligne) => ligne.vente));
+  const nomPeriode = libellePeriode(periode, maintenant, plage);
+
+  /* Ouvrir et fermer la modale ne perd pas la fiche ouverte derrière : les
+     deux paramètres d'écran cohabitent, et fermer l'une ne referme pas
+     l'autre. */
+  const adresse = (avecModale: boolean) => {
+    const parts = [
+      venteOuverte ? `vente=${venteOuverte}` : null,
+      avecModale ? "nouvelle=1" : null,
+    ].filter(Boolean);
+    return parts.length > 0 ? `/motos/ventes?${parts.join("&")}` : "/motos/ventes";
+  };
+  const ouvrirLaModale = () => router.push(adresse(true), { scroll: false });
+  const fermerLaModale = () => router.replace(adresse(false), { scroll: false });
 
   return (
-    <div>
+    <div className="ecran-plein">
       <TetePage
         surTitre={surTitre}
         titre="Ventes"
+        /* Une vente se fait dans une boutique (S54) : sur « Toutes les
+           boutiques », il n'y a pas de `boutiqueId` à inscrire dessus, et le
+           bouton n'ouvrait qu'une modale qui l'aurait réclamé. Absent plutôt
+           que grisé — un bouton grisé invite à chercher ce qui le débloque
+           (`DESIGN.md`), alors que la réponse est dans le bandeau du haut.
+           Même geste que sur `/pieces` et sur le stock. */
         actions={
-          <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
-            <Plus aria-hidden="true" className="size-4" />
-            Nouvelle vente
-          </Link>
+          dansUneBoutique ? (
+            <button type="button" onClick={ouvrirLaModale} className="bouton bouton-principal">
+              <Plus aria-hidden="true" className="size-4" />
+              Nouvelle vente
+            </button>
+          ) : null
         }
       />
 
+      {/* Lus des ventes déjà affichées, jamais stockés (D61), et sans marge
+          (D2). Ils portent le périmètre courant : « toutes boutiques » les
+          somme, une boutique les borne — c'est l'écoute qui en décide, pas
+          cette carte. */}
+      {/* Au-dessus des cartes, et non dans l'en-tête du tableau avec la
+          recherche : c'est lui qui décide ce que les quatre chiffres
+          additionnent. Rangé en bas avec les autres filtres, on l'actionnerait
+          à 390 px sans voir bouger ce qu'il change — les cartes seraient déjà
+          sorties de l'écran. La recherche et les statuts, eux, restent là où
+          ils agissent, sur le tableau. */}
+      <FiltrePeriode
+        periode={periode}
+        changer={setPeriode}
+        plage={plage}
+        changerPlage={setPlage}
+        className="mb-4"
+      />
+
+      <CartesVentes bilan={bilan} periode={nomPeriode} />
+
+      {modaleOuverte && <ModaleVente onFermer={fermerLaModale} />}
+
       <AvecPanneau
-        panneau={venteOuverte ? <FicheVente id={venteOuverte} /> : null}
+        panneau={
+          recuOuvert ? (
+            <PanneauRecu cle={recuOuvert} />
+          ) : venteOuverte ? (
+            <FicheVente id={venteOuverte} />
+          ) : null
+        }
       >
         {/* Une erreur avant toute donnée ne laisse rien à encadrer : le cadre
             vide, filtres compris, ferait croire à une boutique sans vente. */}
@@ -228,7 +334,11 @@ function Ventes() {
             lecture.
           </ErreurDeLecture>
         ) : !chargement && total === 0 ? (
-          <AucuneVente perimetreEnCours={perimetreEnCours} />
+          <AucuneVente
+            perimetreEnCours={perimetreEnCours}
+            dansUneBoutique={dansUneBoutique}
+            surCreation={ouvrirLaModale}
+          />
         ) : (
           <div className="cadre cadre-tableau">
             <div className="cadre-tete">
@@ -271,7 +381,7 @@ function Ventes() {
                     <strong className="font-semibold text-encre">
                       {resultats.length === 1 ? "1 vente" : `${resultats.length} ventes`}
                     </strong>
-                    {resultats.length !== total && ` sur ${total}`} · {enCours} en cours
+                    {resultats.length !== retenues && ` sur ${retenues}`} · {enCours} en cours
                   </>
                 )}
               </p>
@@ -348,20 +458,33 @@ function Recherche({
   );
 }
 
-function AucuneVente({ perimetreEnCours }: { perimetreEnCours: boolean }) {
+function AucuneVente({
+  perimetreEnCours,
+  dansUneBoutique,
+  surCreation,
+}: {
+  perimetreEnCours: boolean;
+  dansUneBoutique: boolean;
+  surCreation: () => void;
+}) {
   if (perimetreEnCours) return null;
   return (
     <EtatVide
       titre="Aucune vente enregistrée pour l’instant."
+      /* Même règle qu'en tête d'écran (S54) : sans boutique, le geste n'a pas
+         de destination, et le vide dit alors quoi faire d'abord. */
       action={
-        <Link href="/motos/ventes/nouvelle" className="bouton bouton-principal">
-          <Plus aria-hidden="true" className="size-4" />
-          Enregistrer la première
-        </Link>
+        dansUneBoutique ? (
+          <button type="button" onClick={surCreation} className="bouton bouton-principal">
+            <Plus aria-hidden="true" className="size-4" />
+            Enregistrer la première
+          </button>
+        ) : undefined
       }
     >
-      Une vente demande une moto en stock et un client. Le client peut se créer au moment de la
-      vente, sans quitter l’écran.
+      {dansUneBoutique
+        ? "Une vente demande une moto en stock et un client. Le client peut se créer au moment de la vente, sans quitter l’écran."
+        : "Aucune des boutiques n’a enregistré de vente. Choisissez-en une dans le bandeau pour y enregistrer la première."}
     </EtatVide>
   );
 }

@@ -1,8 +1,11 @@
+import { randomBytes } from "node:crypto";
 import { logger } from "firebase-functions";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-functions/v2/https";
 import { QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
+import { fermeLesSessions, lireModification } from "./gerants";
 import { resoudreCollision, type PieceNumerotee } from "./numerotation";
+import { construireSuivi } from "./suivi";
 
 /**
  * Les seules opérations du MVP qui passent par le serveur.
@@ -14,10 +17,10 @@ import { resoudreCollision, type PieceNumerotee } from "./numerotation";
  * §3.4). Ces fonctions-ci sont administratives : le responsable les utilise au
  * calme, connecté, jamais au comptoir en pleine vente.
  *
- * Une exception à la fin du fichier : `reconcilierNumeroVente` n'est appelée
- * par personne, elle réagit à une écriture. C'est la contrepartie serveur de
- * la numérotation hors-ligne — la seule chose qu'un appareil isolé ne peut pas
- * faire lui-même.
+ * Une exception à la fin du fichier : les deux réconciliations de numéro ne
+ * sont appelées par personne, elles réagissent à une écriture. C'est la
+ * contrepartie serveur de la numérotation hors-ligne — la seule chose qu'un
+ * appareil isolé ne peut pas faire lui-même.
  */
 
 type Role = "responsable" | "gerant";
@@ -266,6 +269,194 @@ export const attribuerBoutique = onCall({ region: REGION }, async (requete) => {
 });
 
 /**
+ * Corrige l'identité d'un gérant : nom affiché, adresse de connexion, mot de passe.
+ *
+ * **Une seule fonction pour les trois**, parce qu'elles partagent exactement les
+ * mêmes gardes et la même cible : les séparer tripliquerait ces gardes sans rien
+ * clarifier. Les champs absents ne sont pas touchés — `lireModification` tient
+ * cette distinction, et la vérifie sans émulateur.
+ *
+ * **Ce que la fonction ne corrige pas : l'histoire.** Les ventes déjà
+ * enregistrées portent `createdByName`, recopié au moment de la saisie. Elles
+ * gardent l'ancien nom, et c'est voulu — un journal ne se réécrit pas. L'écran
+ * le dit au responsable avant qu'il valide.
+ *
+ * La boutique de rattachement, elle, reste chez `attribuerBoutique` : elle
+ * déplace un périmètre de sécurité, pas une identité.
+ */
+export const modifierGerant = onCall({ region: REGION }, async (requete) => {
+  exigerResponsable(requete);
+
+  const uid = texteObligatoire(requete.data?.uid, "utilisateur", 128);
+  const lecture = lireModification(requete.data);
+  if ("invalide" in lecture) {
+    throw new HttpsError("invalid-argument", lecture.invalide);
+  }
+  const { modification } = lecture;
+
+  if (uid === requete.auth!.uid) {
+    throw new HttpsError("failed-precondition", "Vous ne pouvez pas modifier votre propre compte.");
+  }
+
+  const { auth, base, horodatage } = await admin();
+
+  const cible = await auth.getUser(uid).catch(() => null);
+  if (!cible) {
+    throw new HttpsError("not-found", "Ce compte n'existe pas.");
+  }
+  if (cible.customClaims?.role === "responsable") {
+    throw new HttpsError("permission-denied", "Un compte responsable ne se modifie pas ici.");
+  }
+  if (cible.customClaims?.role !== "gerant") {
+    throw new HttpsError("failed-precondition", "Ce compte n'est pas un compte de gérant.");
+  }
+
+  const versAuth: import("firebase-admin/auth").UpdateRequest = {};
+  /* Le miroir ne reçoit jamais le mot de passe : un secret n'a rien à faire
+     dans un document que l'interface lit. */
+  const versMiroir: Record<string, unknown> = {};
+  if (modification.nom !== null) {
+    versAuth.displayName = modification.nom;
+    versMiroir.nom = modification.nom;
+  }
+  if (modification.email !== null) {
+    versAuth.email = modification.email;
+    versMiroir.email = modification.email;
+  }
+  if (modification.motDePasse !== null) {
+    versAuth.password = modification.motDePasse;
+  }
+
+  try {
+    await auth.updateUser(uid, versAuth);
+  } catch (cause) {
+    const code = (cause as { code?: string }).code;
+    if (code === "auth/email-already-exists") {
+      throw new HttpsError("already-exists", "Cette adresse e-mail a déjà un compte.");
+    }
+    throw new HttpsError("internal", "Le compte n'a pas pu être modifié.");
+  }
+
+  const sessionsFermees = fermeLesSessions(modification);
+  if (sessionsFermees) await auth.revokeRefreshTokens(uid);
+
+  await base.doc(`users/${uid}`).update({
+    ...versMiroir,
+    updatedAt: horodatage,
+    updatedBy: requete.auth!.uid,
+    updatedByName: requete.auth!.token.name ?? "",
+  });
+
+  return { uid, sessionsFermees };
+});
+
+/**
+ * Les cinq collections où une écriture **engage** — de l'argent ou du stock.
+ *
+ * Ce sont elles qui décident si un compte s'efface ou se désactive. Toutes
+ * portent `createdBy == request.auth.uid`, imposé par `traceCreation` dans
+ * `firestore.rules` : la signature n'est pas déclarative, elle est vérifiée à
+ * l'écriture.
+ *
+ * **Les référentiels n'en font pas partie, et c'est un choix.** Avoir créé une
+ * entrée « Yamaha » n'est pas une signature : les inclure rendrait quasiment
+ * tout compte indéboulonnable et transformerait l'arbitrage du commanditaire —
+ * « effacer seulement si rien n'a été signé » — en interdiction pure. On mesure
+ * ce qui engage, pas ce qui a été tapé.
+ */
+const COLLECTIONS_SIGNEES = [
+  "ventesMotos",
+  "ventesPieces",
+  "encaissements",
+  "cloturesCaisse",
+  "mouvementsPieces",
+] as const;
+
+/**
+ * La première collection où ce compte a signé, ou `null` s'il n'a rien signé.
+ *
+ * Cinq requêtes au pire, une au mieux : la boucle s'arrête à la première
+ * trouvée, et un gérant qui a vendu quoi que ce soit s'arrête sur la première
+ * ligne. Chacune porte sur un seul champ en égalité — aucun index composite à
+ * déclarer.
+ */
+async function premiereSignature(
+  base: FirebaseFirestore.Firestore,
+  uid: string,
+): Promise<string | null> {
+  for (const nom of COLLECTIONS_SIGNEES) {
+    const lot = await base.collection(nom).where("createdBy", "==", uid).limit(1).get();
+    if (!lot.empty) return nom;
+  }
+  return null;
+}
+
+/**
+ * Efface pour de bon un compte de gérant — s'il n'a rien signé.
+ *
+ * **Elle est à part de `modifierGerant` parce qu'elle est irréversible.** La
+ * noyer dans un correctif partiel la rendrait atteignable par distraction ;
+ * elle mérite son nom, sa garde propre et ses témoins.
+ *
+ * **Le refus est la règle, l'effacement l'exception.**
+ * `changerActivationUtilisateur` dit depuis S2 qu'on ne supprime jamais un
+ * utilisateur, et pour une bonne raison : ses écritures passées portent son
+ * identifiant, et un historique qui pointe vers un compte disparu n'est plus un
+ * historique. Le commanditaire a tranché le cas que cette règle traitait trop
+ * large — le compte ouvert par erreur, qui n'a jamais rien enregistré.
+ * Celui-là ne tient aucun historique, et le garder n'est qu'une ligne de plus
+ * dans une liste à relire.
+ */
+export const supprimerGerant = onCall({ region: REGION }, async (requete) => {
+  exigerResponsable(requete);
+
+  const uid = texteObligatoire(requete.data?.uid, "utilisateur", 128);
+  if (uid === requete.auth!.uid) {
+    throw new HttpsError("failed-precondition", "Vous ne pouvez pas supprimer votre propre compte.");
+  }
+
+  const { auth, base } = await admin();
+  const miroir = base.doc(`users/${uid}`);
+  const [cible, vu] = await Promise.all([auth.getUser(uid).catch(() => null), miroir.get()]);
+
+  if (!cible && !vu.exists) {
+    throw new HttpsError("not-found", "Ce compte n'existe pas.");
+  }
+
+  /* Le rôle fait autorité dans le custom claim. Le miroir ne sert de source que
+     pour un compte dont l'authentification a déjà disparu — voir l'ordre des
+     deux effacements plus bas. */
+  const role = cible ? cible.customClaims?.role : vu.get("role");
+  if (role === "responsable") {
+    throw new HttpsError("permission-denied", "Un compte responsable ne se supprime pas ici.");
+  }
+  if (role !== "gerant") {
+    throw new HttpsError("failed-precondition", "Ce compte n'est pas un compte de gérant.");
+  }
+
+  const signature = await premiereSignature(base, uid);
+  if (signature) {
+    logger.info("Suppression refusée : le compte a signé", { uid, collection: signature });
+    throw new HttpsError(
+      "failed-precondition",
+      "Ce compte a déjà enregistré des opérations : il ne peut pas être effacé. " +
+        "Désactivez-le — son nom doit rester lisible dans l'historique.",
+    );
+  }
+
+  /* **Le compte d'authentification d'abord, le miroir ensuite.** Dans l'autre
+     ordre, un échec à mi-chemin laisserait un compte capable de se connecter et
+     absent de la liste : vivant et invisible, le pire des deux états. Ici
+     l'échec laisse au pire un miroir orphelin — que l'appel suivant achève,
+     puisqu'il accepte une cible que seul le miroir atteste. */
+  if (cible) await auth.deleteUser(uid);
+  await miroir.delete();
+
+  logger.info("Compte de gérant effacé", { uid });
+  return { uid };
+});
+
+/**
  * Répare les numéros en double, au moment où deux appareils se rejoignent.
  *
  * C'est la seule pièce du serveur qui ne soit pas appelée par quelqu'un : elle
@@ -284,11 +475,28 @@ export const attribuerBoutique = onCall({ region: REGION }, async (requete) => {
  * pouvoir est de corriger le numéro de la pièce arrivée en second, et
  * l'application le signale ensuite au gérant.
  */
-export const reconcilierNumeroVente = onDocumentCreated(
-  /* La région doit rester celle de la base Firestore : un déclencheur déployé
-     ailleurs ne se déclenche pas du tout. */
-  { region: REGION, document: "ventesMotos/{venteId}" },
-  async (evenement) => {
+/**
+ * Les deux collections qui puisent dans le **même** compteur (Q1).
+ *
+ * Un numéro dicté au téléphone désigne une seule pièce comptable, qu'elle porte
+ * une moto ou un jeu de plaquettes. La collision se cherche donc à travers les
+ * deux, sinon une vente de moto et une vente de pièces pourraient porter
+ * éternellement le même numéro sans que rien ne s'en aperçoive — le pire des
+ * doublons, puisqu'il est invisible des deux côtés.
+ */
+const COLLECTIONS_NUMEROTEES = ["ventesMotos", "ventesPieces"] as const;
+
+type CollectionNumerotee = (typeof COLLECTIONS_NUMEROTEES)[number];
+
+/**
+ * Le corps commun des deux déclencheurs, paramétré par la collection écrite.
+ *
+ * Un seul corps et deux déclencheurs, parce qu'un déclencheur Firestore ne
+ * surveille qu'un chemin. Les dupliquer laisserait les deux moitiés diverger,
+ * et c'est exactement la divergence qui vient d'être corrigée ici.
+ */
+function reconciliationDe(collectionCreee: CollectionNumerotee) {
+  return async (evenement: { data: QueryDocumentSnapshot | undefined }) => {
     const creee = evenement.data;
     if (!creee) return;
 
@@ -297,38 +505,64 @@ export const reconcilierNumeroVente = onDocumentCreated(
     if (typeof boutiqueId !== "string" || typeof numeroInitial !== "string") return;
 
     const { base } = await admin();
-    const memeNumero = await base
-      .collection("ventesMotos")
-      .where("boutiqueId", "==", boutiqueId)
-      .where("numeroInitial", "==", numeroInitial)
-      .get();
+    const parCollection = await Promise.all(
+      COLLECTIONS_NUMEROTEES.map(async (nom) => {
+        const lot = await base
+          .collection(nom)
+          .where("boutiqueId", "==", boutiqueId)
+          .where("numeroInitial", "==", numeroInitial)
+          .get();
+        return lot.docs.map((document) => versPiece(nom, document));
+      }),
+    );
+    const concurrentes = parCollection.flat();
 
     /* Le cas normal, et de très loin le plus fréquent : la pièce est seule à
        porter ce numéro. On sort sans écrire. */
-    if (memeNumero.size < 2) return;
+    if (concurrentes.length < 2) return;
 
-    const concurrentes = memeNumero.docs.map(versPiece);
-    const moi = concurrentes.find((piece) => piece.id === creee.id);
+    const moi = concurrentes.find((piece) => piece.id === `${collectionCreee}/${creee.id}`);
     if (!moi) return;
 
     const numero = resoudreCollision(moi, concurrentes);
     if (!numero) return;
 
-    await base.doc(`ventesMotos/${creee.id}`).update({ numero });
+    await base.doc(`${collectionCreee}/${creee.id}`).update({ numero });
     logger.info("Numéro en double réconcilié", {
+      collection: collectionCreee,
       boutiqueId,
       numeroInitial,
       numero,
       vente: creee.id,
     });
-  },
+  };
+}
+
+/* La région doit rester celle de la base Firestore : un déclencheur déployé
+   ailleurs ne se déclenche pas du tout. */
+export const reconcilierNumeroVente = onDocumentCreated(
+  { region: REGION, document: "ventesMotos/{venteId}" },
+  reconciliationDe("ventesMotos"),
 );
 
-/** Convertit un document de vente en ce que la règle de réconciliation attend, et rien de plus. */
-function versPiece(document: QueryDocumentSnapshot): PieceNumerotee {
+export const reconcilierNumeroVentePiece = onDocumentCreated(
+  { region: REGION, document: "ventesPieces/{venteId}" },
+  reconciliationDe("ventesPieces"),
+);
+
+/**
+ * Convertit un document de vente en ce que la règle de réconciliation attend,
+ * et rien de plus.
+ *
+ * L'identifiant est **préfixé de sa collection** : les concurrentes viennent
+ * maintenant de deux collections, et deux documents homonymes s'y
+ * confondraient — au mieux en départageant mal une égalité, au pire en faisant
+ * croire à un document qu'il est l'autre.
+ */
+function versPiece(collection: CollectionNumerotee, document: QueryDocumentSnapshot): PieceNumerotee {
   const cree = document.get("createdAt");
   return {
-    id: document.id,
+    id: `${collection}/${document.id}`,
     numeroInitial: document.get("numeroInitial"),
     /* `createdAt` est un horodatage serveur : au moment où ce déclencheur
        s'exécute, il est déjà résolu. S'il manquait malgré tout, l'identifiant
@@ -714,7 +948,10 @@ export const amorcerResponsable = onRequest({ region: REGION, cors: false }, asy
 
 /* --- Clôture automatique du dossier (§7.1) -------------------------------- */
 
-const TYPES_DOCUMENT = ["quittance", "cmc", "carte_grise", "plaque"] as const;
+/* La liste des types a disparu d'ici le 16 octobre 2026 : la cloture ne regarde
+   plus qu'un seul document, la carte grise. Un dossier ancien qui porte encore
+   un `plaque` ou une quittance a `a_faire` se cloture donc desormais — c'est
+   l'effet voulu, et c'est ce que le commanditaire a demande. */
 
 /**
  * Le dossier est-il fini ?
@@ -732,12 +969,24 @@ async function dossierFini(
 ): Promise<boolean> {
   if (vente.statutPaiement !== "solde" || vente.motoRemise !== true) return false;
 
+  /* **Le dossier, c'est la carte grise** (demande du 16 octobre 2026). La
+     quittance et le CMC se cochent sur le lot a l'arrivee, et cela suffit : ils
+     ont quitte le dossier. Ce que le client a emporte reste ecrit sur la vente
+     et s'imprime sur son recu, mais ne decide plus de la cloture.
+
+     **La cloture ne lit toujours jamais la moto**, et c'est la propriete qui
+     rend ce declencheur econome : rien a reveiller quand une case est cochee
+     sur un arrivage. */
   const documents = await base.collection(`ventesMotos/${venteId}/documents`).get();
-  const parType = new Map(documents.docs.map((doc) => [doc.get("type"), doc.get("statut")]));
-  return TYPES_DOCUMENT.every((type) => {
-    const statut = parType.get(type);
-    return statut === "remis_client" || statut === "non_applicable";
-  });
+  const carteGrise = documents.docs.find((document) => document.get("type") === "carte_grise");
+
+  /* Une carte grise absente compte `a_faire` : un dossier dont les documents ne
+     sont pas encore ecrits ne doit pas passer pour un dossier complet. */
+  const statut = carteGrise?.get("statut") ?? "a_faire";
+  if (statut === "non_applicable") return true;
+  /* `remis_client` ne s'ecrit plus, mais la preversion en porte : l'ignorer
+     laisserait les dossiers les plus anciens ouverts pour toujours. */
+  return statut === "revenu_magasin" || statut === "remis_client";
 }
 
 /**
@@ -783,4 +1032,190 @@ export const cloturerSurDocument = onDocumentWritten(
 export const cloturerSurVente = onDocumentWritten(
   { region: REGION, document: "ventesMotos/{venteId}" },
   async (evenement) => cloturerSiFini(evenement.params.venteId),
+);
+
+/* --- Le portail du prestataire (S56) -------------------------------------- */
+
+/**
+ * La taille de l'aléa d'un jeton de suivi.
+ *
+ * Même valeur que `OCTETS_JETON` dans `lib/domain/jeton-suivi.ts`, recopiée
+ * parce que `functions/` ne peut pas importer `lib/` — son `tsconfig` a
+ * `rootDir: "src"`, donc le paquet déployé ne compile rien d'extérieur. C'est la
+ * situation de `numerotation`, et la réponse est la même : les deux moitiés sont
+ * nouées par un test, pas par un import.
+ */
+const OCTETS_JETON = 32;
+
+/** La forme d'un jeton écrit : 32 octets en base64url, sans remplissage. */
+const FORME_JETON = /^[A-Za-z0-9_-]{43}$/;
+
+/**
+ * Le refus unique du portail.
+ *
+ * **Un jeton inconnu, révoqué ou malformé rend exactement ceci.** Les
+ * distinguer dirait à qui essaie des liens au hasard lequel a existé — et
+ * « ce prestataire n'a pas de lien » renseignerait déjà sur l'existence du
+ * prestataire. Du point de vue de celui qui consulte, les trois situations sont
+ * de toute façon la même : il n'y a rien à lire.
+ */
+const REFUS_PORTAIL = { erreur: "Ce lien n’est plus valide." };
+
+/**
+ * Émet le lien de suivi d'un prestataire, et révoque le précédent.
+ *
+ * **Un secret ne se fabrique pas dans un navigateur** (`SECURITY.md` §4), et
+ * c'est la seule raison pour laquelle cette fonction existe : `randomBytes` n'a
+ * pas d'équivalent de confiance côté client, et les règles Firestore interdisent
+ * d'écrire `jetonSuivi` depuis l'application.
+ *
+ * **La révocation est l'écrasement.** Il n'y a jamais deux liens valides pour un
+ * même prestataire parce qu'il n'y a jamais deux champs : réémettre efface. Rien
+ * à expirer, rien à balayer, aucune liste de jetons morts à tenir.
+ */
+export const emettreJetonSuivi = onCall({ region: REGION }, async (requete) => {
+  exigerResponsable(requete);
+
+  const prestataireId = String(requete.data?.prestataireId ?? "").trim();
+  if (!prestataireId) {
+    throw new HttpsError("invalid-argument", "Indiquez le prestataire.");
+  }
+
+  const { base, horodatage } = await admin();
+  const reference = base.doc(`prestataires/${prestataireId}`);
+  if (!(await reference.get()).exists) {
+    throw new HttpsError("not-found", "Ce prestataire n'existe pas.");
+  }
+
+  /* `base64url` : le jeton vit dans un segment d'URL, où `+`, `/` et `=` ne
+     survivent pas. Trente-deux octets rendent quarante-trois caractères. */
+  const jeton = randomBytes(OCTETS_JETON).toString("base64url");
+
+  await reference.update({
+    jetonSuivi: jeton,
+    jetonEmisLe: horodatage,
+    updatedAt: horodatage,
+    /* Le responsable a décidé d'ouvrir un lien, mais c'est le serveur qui a
+       fabriqué le secret. Lui attribuer l'écriture laisserait croire qu'il a
+       choisi la valeur. */
+    updatedBy: "systeme",
+    updatedByName: "Émission d'un lien de suivi",
+  });
+
+  logger.info("Lien de suivi émis", { prestataire: prestataireId });
+  return { jeton };
+});
+
+/** Un `Timestamp` Firestore en millisecondes. La préversion porte parfois des `Date` nues. */
+function horodatageEnMillisecondes(valeur: unknown): number | null {
+  if (valeur instanceof Timestamp) return valeur.toMillis();
+  if (valeur instanceof Date) return valeur.getTime();
+  return null;
+}
+
+/**
+ * Répond à un lien de suivi.
+ *
+ * **La seule porte du portail.** Aucune règle Firestore n'est assouplie par
+ * S56 : un visiteur non authentifié ne lit rien de la base, et un test de règles
+ * le prouve. Tout passe par ici, avec les droits du serveur, et ce qui sort est
+ * exactement la charge utile que `construireSuivi` fabrique.
+ *
+ * **Le jeton arrive dans le CORPS, jamais dans l'URL de la fonction.** Une URL
+ * se retrouve dans les journaux d'accès ; un corps non. Le lien du prestataire,
+ * lui, porte forcément le jeton dans son URL — mais cette URL est servie par le
+ * produit, et c'est justement le rendu côté serveur qui évite de le faire
+ * traverser une seconde fois.
+ *
+ * `cors: false`, comme `amorcerResponsable` : cette fonction n'est appelée que
+ * par le serveur Next, jamais par un navigateur. Lui ouvrir CORS serait ouvrir
+ * une porte dont personne n'a l'usage.
+ */
+export const suiviPrestataire = onRequest(
+  { region: REGION, cors: false },
+  async (requete, reponse) => {
+    if (requete.method !== "POST") {
+      reponse.status(405).json({ erreur: "Méthode non autorisée." });
+      return;
+    }
+
+    const jeton: unknown = requete.body?.jeton;
+
+    /* **La forme se vérifie AVANT toute lecture**, et ce n'est pas une
+       optimisation. Sans ce filtre, n'importe quelle valeur trouvée dans une URL
+       partirait en requête — une lecture offerte par essai à qui tape au hasard.
+       Et surtout : une fiche jamais émise n'a pas de `jetonSuivi`, donc
+       `where('jetonSuivi', '==', null)` rendrait TOUTES ces fiches. Un portail
+       devenu annuaire, par un appel sans argument. */
+    if (typeof jeton !== "string" || !FORME_JETON.test(jeton)) {
+      reponse.status(404).json(REFUS_PORTAIL);
+      return;
+    }
+
+    const { base } = await admin();
+    const fiches = await base
+      .collection("prestataires")
+      .where("jetonSuivi", "==", jeton)
+      .limit(1)
+      .get();
+
+    if (fiches.empty) {
+      reponse.status(404).json(REFUS_PORTAIL);
+      return;
+    }
+
+    const fiche = fiches.docs[0];
+
+    /* **Une seule requête pour les cartes, sur `prestataireId` seul.** Le type
+       n'est pas filtré : seule une carte grise part chez un prestataire, donc ce
+       champ ne vaut jamais rien d'autre. Ajouter `type` ferait deux égalités sur
+       un groupe de collections, c'est-à-dire un index composite de plus pour un
+       filtre qui ne retire aucune ligne.
+
+       Cette requête exige en revanche un index de portée « groupe de
+       collections » sur `prestataireId`, déclaré dans `firestore.indexes.json`.
+       L'émulateur crée ses index tout seul et ne l'aurait jamais signalé : c'est
+       en production que l'oubli se serait vu. */
+    const cartes = await base
+      .collectionGroup("documents")
+      .where("prestataireId", "==", fiche.id)
+      .get();
+
+    const lignes = await Promise.all(
+      cartes.docs.map(async (carte) => {
+        const venteId = carte.ref.parent.parent?.id ?? "";
+        const vente = venteId ? await base.doc(`ventesMotos/${venteId}`).get() : null;
+
+        const motoId = vente?.get("motoId");
+        const clientId = vente?.get("clientId");
+        /* Les deux lectures partent ensemble : une par ligne suffirait à rendre
+           un prestataire de deux cents cartes désagréable à consulter. */
+        const [moto, client] = await Promise.all([
+          motoId ? base.doc(`motos/${motoId}`).get() : null,
+          clientId ? base.doc(`clients/${clientId}`).get() : null,
+        ]);
+
+        /* Une vente, une moto ou un client devenu illisible ne fait pas tomber
+           le portail : la ligne se construit et dit ce qu'elle ne sait pas.
+           `construireSuivi` porte les replis de libellé. */
+        return {
+          venteId,
+          statut: String(carte.get("statut") ?? ""),
+          deposeLe: horodatageEnMillisecondes(carte.get("deposeLe")),
+          remisLe: horodatageEnMillisecondes(carte.get("remisLe")),
+          avance: typeof carte.get("avance") === "number" ? (carte.get("avance") as number) : null,
+          numeroVente: String(vente?.get("numero") ?? ""),
+          client: String(client?.get("nom") ?? ""),
+          moto: [moto?.get("marqueNom"), moto?.get("modeleNom")].filter(Boolean).join(" "),
+          chassis: String(moto?.get("chassis") ?? ""),
+        };
+      }),
+    );
+
+    /* **La vente n'est jamais lue au-delà de son numéro, et `prive/` n'est
+       jamais ouverte.** Ce n'est pas une précaution qu'il faudrait maintenir :
+       c'est l'absence de code pour le faire. Le mur de D2 tient par
+       construction, et un test de déclencheur sème un coût pour le prouver. */
+    reponse.status(200).json(construireSuivi(String(fiche.get("nom") ?? ""), lignes, Date.now()));
+  },
 );

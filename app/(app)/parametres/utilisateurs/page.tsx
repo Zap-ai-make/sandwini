@@ -1,9 +1,11 @@
 "use client";
 
-import { CircleAlert, LoaderCircle, UserCheck, UserX } from "lucide-react";
+import { CircleAlert, LoaderCircle, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
+import { ModifierGerantModal } from "@/components/ModifierGerantModal";
+import { SupprimerGerantModal } from "@/components/SupprimerGerantModal";
 import {
   EtatChargement,
   EtatErreur,
@@ -11,6 +13,7 @@ import {
   EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
+import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
@@ -34,10 +37,14 @@ export default function PageUtilisateurs() {
   );
 }
 
+const FORMULAIRE_GERANT = "creer-gerant";
+
 function Utilisateurs() {
   const session = useSession();
   const { boutiques } = usePerimetre();
   const [liste, setListe] = useState<FicheUtilisateur[] | null>(null);
+  const [creation, setCreation] = useState(false);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
   const [erreurLecture, setErreurLecture] = useState<string | null>(null);
 
   useEffect(
@@ -54,9 +61,45 @@ function Utilisateurs() {
 
   return (
     <div>
-      <TetePage retour={{ href: "/parametres", libelle: "Réglages" }} titre="Utilisateurs" />
+      {/* La liste d'abord, la création en modale (S54). Même raison que pour
+          les boutiques : on vient presque toujours consulter ou corriger. */}
+      <TetePage
+        retour={{ href: "/parametres", libelle: "Paramètres" }}
+        titre="Utilisateurs"
+        actions={
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmation(null);
+              setCreation(true);
+            }}
+            className="bouton bouton-principal"
+          >
+            <Plus aria-hidden="true" className="size-4" />
+            Créer un compte
+          </button>
+        }
+      />
 
-      <FormulaireGerant boutiques={ouvertes} />
+      {/* La confirmation vit SUR LA PAGE et non dans la modale, qui se ferme.
+          Elle porte une consigne — communiquer le mot de passe de vive voix —
+          et une phrase qui disparaît avec sa fenêtre n'est pas lue. */}
+      {confirmation && (
+        <p role="status" aria-live="polite" className="mt-4 cadre p-3 text-corps text-solde">
+          {confirmation}
+        </p>
+      )}
+
+      {creation && (
+        <FormulaireGerant
+          boutiques={ouvertes}
+          onCree={(message) => {
+            setConfirmation(message);
+            setCreation(false);
+          }}
+          onFermer={() => setCreation(false)}
+        />
+      )}
 
       <h2 className="mt-8 text-sm font-semibold tracking-wide text-encre-doux uppercase">
         Comptes existants
@@ -97,6 +140,9 @@ function LigneUtilisateur({
 }) {
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  /* Les modales ne sont montees que lorsqu'elles sont ouvertes : leur etat part
+     donc du compte tel qu'il est, sans effet de remise a zero. */
+  const [modale, setModale] = useState<"modifier" | "supprimer" | null>(null);
 
   async function basculer() {
     setErreur(null);
@@ -110,7 +156,10 @@ function LigneUtilisateur({
     }
   }
 
-  const desactivable = !estMoi && utilisateur.role !== "responsable";
+  /* Exactement ce que le serveur autorise : il exige une cible de role
+     « gerant », et refuse que le responsable se gere lui-meme. Offrir un geste
+     plus large qu'il n'aboutit, c'est promettre un refus. */
+  const gerable = !estMoi && utilisateur.role === "gerant";
   const boutique = boutiques.find((candidate) => candidate.id === utilisateur.boutiqueId);
 
   return (
@@ -143,7 +192,7 @@ function LigneUtilisateur({
           {erreur && <span className="mt-1 block text-sm text-alerte">{erreur}</span>}
         </span>
 
-        {desactivable && (
+        {gerable && (
           <button
             type="button"
             onClick={basculer}
@@ -164,6 +213,38 @@ function LigneUtilisateur({
 
       {utilisateur.role === "gerant" && (
         <Rattachement utilisateur={utilisateur} boutiques={boutiques} />
+      )}
+
+      {/* Des liens, pas des boutons : trois boutons de plus par ligne auraient
+          fait de la liste des comptes un mur d'actions, alors que la question
+          qu'on vient y poser est « qui travaille ou » (DESIGN.md §14). Meme
+          traitement que « Changer de boutique » juste au-dessus. */}
+      {gerable && (
+        <div className="mt-1 flex flex-wrap gap-x-4">
+          <button
+            type="button"
+            onClick={() => setModale("modifier")}
+            className="inline-flex items-center gap-1.5 text-sm text-encre-doux underline hover:text-encre"
+          >
+            <Pencil aria-hidden="true" className="size-3.5" />
+            Modifier le compte
+          </button>
+          <button
+            type="button"
+            onClick={() => setModale("supprimer")}
+            className="inline-flex items-center gap-1.5 text-sm text-alerte underline hover:text-encre"
+          >
+            <Trash2 aria-hidden="true" className="size-3.5" />
+            Effacer le compte
+          </button>
+        </div>
+      )}
+
+      {modale === "modifier" && (
+        <ModifierGerantModal utilisateur={utilisateur} ouvert onFermer={() => setModale(null)} />
+      )}
+      {modale === "supprimer" && (
+        <SupprimerGerantModal utilisateur={utilisateur} ouvert onFermer={() => setModale(null)} />
       )}
     </li>
   );
@@ -336,7 +417,15 @@ function Rattachement({
   );
 }
 
-function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
+function FormulaireGerant({
+  boutiques,
+  onCree,
+  onFermer,
+}: {
+  boutiques: Boutique[];
+  onCree: (message: string) => void;
+  onFermer: () => void;
+}) {
   const acheminement = useAcheminementBoutiques();
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
@@ -344,13 +433,11 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
   const [boutiqueId, setBoutiqueId] = useState("");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
-  const [succes, setSucces] = useState<string | null>(null);
 
   async function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (envoi) return;
     setErreur(null);
-    setSucces(null);
     setEnvoi(true);
     try {
       await creerGerant({
@@ -359,7 +446,7 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
         motDePasse,
         boutiqueId: boutiqueId || null,
       });
-      setSucces(`Compte créé pour ${nom.trim()}. Communiquez-lui son mot de passe de vive voix.`);
+      onCree(`Compte créé pour ${nom.trim()}. Communiquez-lui son mot de passe de vive voix.`);
       setNom("");
       setEmail("");
       setMotDePasse("");
@@ -372,12 +459,38 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
   }
 
   return (
-    <form onSubmit={soumettre} className="mt-6 cadre p-4" noValidate>
-      <h2 className="font-semibold text-encre">Créer un gérant</h2>
-      <p className="mt-1 flex gap-2 text-sm text-encre-doux">
-        <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        <span>Cette action demande du réseau, contrairement au reste de l’application.</span>
-      </p>
+    <Modale
+      ouvert
+      onFermer={onFermer}
+      titre="Créer un gérant"
+      description={
+        <span className="flex gap-2">
+          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
+          <span>Cette action demande du réseau, contrairement au reste de l’application.</span>
+        </span>
+      }
+      pied={
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="submit"
+            form={FORMULAIRE_GERANT}
+            disabled={envoi || (acheminement !== null && boutiqueId !== "")}
+            className="bouton bouton-principal disabled:opacity-60"
+          >
+            {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
+            {envoi ? "Création…" : "Créer le compte"}
+          </button>
+          {/* « Annuler » et non « Fermer » : on abandonne une saisie, on ne
+              referme pas une consultation. Sur l'écran des boutiques, le mot
+              « Fermer » est déjà pris — il désigne la fermeture d'un point de
+              vente, à deux centimètres de là. */}
+          <button type="button" onClick={onFermer} className="bouton bouton-neutre">
+            Annuler
+          </button>
+        </div>
+      }
+    >
+    <form id={FORMULAIRE_GERANT} onSubmit={soumettre} noValidate>
 
       <div className="colonne-formulaire mt-4 max-w-[40rem] space-y-4">
         <Champ id="nom" libelle="Nom">
@@ -452,24 +565,11 @@ function FormulaireGerant({ boutiques }: { boutiques: Boutique[] }) {
       </div>
 
       <EtatErreurSaisie message={erreur} className="mt-3" />
-      {succes && (
-        <p role="status" aria-live="polite" className="text-sm text-solde">
-          {succes}
-        </p>
-      )}
 
       {acheminement && boutiqueId !== "" && (
         <p className="mt-3 text-sm text-encre-doux">{acheminement}</p>
       )}
-
-      <button
-        type="submit"
-        disabled={envoi || (acheminement !== null && boutiqueId !== "")}
-        className="bouton bouton-principal mt-3 justify-center disabled:opacity-60"
-      >
-        {envoi && <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />}
-        {envoi ? "Création…" : "Créer le compte"}
-      </button>
     </form>
+    </Modale>
   );
 }

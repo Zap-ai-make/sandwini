@@ -1,4 +1,5 @@
 import { jourLocal } from "./format";
+import { dansLaPeriode, type BornesPeriode } from "./periode";
 import type { MoyenPaiement } from "./vente";
 
 /**
@@ -69,6 +70,15 @@ export type Mouvement = {
   libelle: string;
   /** Vrai si l'argent correspond à un engagement de tranches (§6.2). */
   categorieTranches: boolean;
+  /**
+   * Le poste de dépense d'une sortie, vide partout ailleurs (S55).
+   *
+   * Il désigne une entrée du référentiel `postesDepense`, que chaque maison
+   * déclare elle-même — le commanditaire a été net : « on ne sait pas comment
+   * ils gèrent leurs flux monétaires ». Vide sur toutes les sorties d'avant
+   * S55, et sur les entrées, qui n'ont pas de poste par nature.
+   */
+  posteId: string;
   /** Qui l'a saisi, tel qu'on le lit dans le journal. */
   operateur: string;
 };
@@ -93,6 +103,215 @@ export function mouvementsDuJour(
   return mouvements
     .filter((mouvement) => mouvement.date !== null && jourLocal(mouvement.date) === jour)
     .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0));
+}
+
+/**
+ * Les mouvements d'un intervalle — la lecture comptable (S55).
+ *
+ * **Une caisse se tient au jour, une comptabilité se lit au mois.** Le journal
+ * répond à « qu'est-ce qui s'est passé aujourd'hui » et garde son sélecteur de
+ * journée ; celle-ci répond à « combien ce mois-ci », qui est la seule échelle
+ * à laquelle « combien de carburant » veut dire quelque chose.
+ *
+ * `null` ne borne rien et laisse tout passer, comme ailleurs dans
+ * `lib/domain/periode.ts` : c'est l'état « toutes périodes », pas une absence
+ * de réponse.
+ *
+ * **Le test d'appartenance est `dansLaPeriode`, et non une comparaison écrite
+ * ici.** La borne de fin rendue par `bornesPeriode` est **exclusive** — « ce
+ * mois-ci » finit au premier jour du mois suivant, à minuit. Une comparaison
+ * `<= fin` recopiée de mémoire ferait donc entrer le 1er du mois d'après dans
+ * le total du mois courant. C'est le genre d'écart qu'un œil ne voit pas sur
+ * un écran et qu'un comptable trouve trois mois plus tard.
+ *
+ * Elle laisse aussi passer les mouvements **sans date**, et c'est voulu : une
+ * sortie saisie hors ligne n'a pas encore l'horodatage du serveur, et la
+ * cacher du total au moment précis où l'on vérifie qu'elle est passée serait
+ * le contraire de ce que promet D66.
+ */
+export function mouvementsDeLaPeriode(
+  mouvements: readonly Mouvement[],
+  bornes: BornesPeriode,
+): Mouvement[] {
+  return (
+    mouvements
+      .filter((mouvement) => dansLaPeriode(mouvement.date, bornes))
+      /* Une écriture sans date est la plus récente de toutes : elle n'a pas
+         encore atteint le serveur. `Infinity` la range en fin de liste, là où
+         le journal la montre — et non en tête, où un `?? 0` l'aurait mise. */
+      .sort((a, b) => (a.date?.getTime() ?? Infinity) - (b.date?.getTime() ?? Infinity))
+  );
+}
+
+/* --------------------------------------------------------------------------
+   Le bilan de toutes les boutiques
+   -------------------------------------------------------------------------- */
+
+/** Une boutique du bilan, telle que l'écran la nomme. */
+export type LigneBilan = {
+  boutiqueId: string;
+  code: string;
+  nom: string;
+  entrees: number;
+  sorties: number;
+  /** `entrees - sorties`, tous moyens confondus : ce que la boutique a gagné ce jour. */
+  solde: number;
+  /**
+   * Le net du **tiroir** : entrées en espèces moins sorties en espèces.
+   *
+   * `solde` et `especes` ne disent pas la même chose, et c'est tout l'intérêt.
+   * Le premier est ce que la boutique a gagné ; le second est le seul des deux
+   * qu'on puisse aller compter dans un meuble. Les confondre faisait annoncer
+   * au superviseur un solde dont un tiers vivait sur Orange Money.
+   */
+  especes: number;
+};
+
+/**
+ * Ce que chaque tiroir a fait ce jour-là, une ligne par boutique.
+ *
+ * **La réserve que cet écran portait reste tenue.** Il refusait le périmètre
+ * « Toutes les boutiques » parce qu'« un tiroir se compte là où il est », et
+ * c'était juste : on ne compte pas trois tiroirs ensemble, on ne va pas
+ * vérifier un solde consolidé dans un meuble. Ce bilan ne fond donc rien — il
+ * **range** : une ligne par boutique, et le total n'est que la somme de lignes
+ * qui restent lisibles à côté de lui.
+ *
+ * **Il reçoit des mouvements déjà bornés** — par journée ou par période (S55).
+ * Il découpait lui-même le temps, et le même agrégat ne savait donc répondre
+ * qu'à « aujourd'hui ». Séparer la tranche de temps du calcul fait servir le
+ * même code aux deux lectures sans qu'aucune des deux ne se dédouble.
+ *
+ * **Une boutique sans mouvement n'y figure pas.** Trois zéros alignés se
+ * liraient comme une journée vide alors que personne n'a seulement ouvert le
+ * tiroir — c'est la faute que D63 relève sur les compteurs à zéro, transposée
+ * à une ligne de tableau.
+ *
+ * **Une boutique inconnue du référentiel garde son argent.** Si un mouvement
+ * porte un `boutiqueId` qu'aucune boutique ne réclame — supprimée, ou pas
+ * encore lue —, sa ligne paraît quand même, sous son identifiant brut. La
+ * faire disparaître retirerait de l'argent réel d'un total, en silence, et
+ * c'est le seul défaut qu'un bilan n'a pas le droit d'avoir.
+ */
+export function bilanParBoutique(
+  mouvements: readonly Mouvement[],
+  boutiques: readonly { id: string; code: string; nom: string }[],
+): LigneBilan[] {
+  const lignes = new Map<string, LigneBilan>();
+
+  for (const mouvement of mouvements) {
+    const connue = boutiques.find((boutique) => boutique.id === mouvement.boutiqueId);
+    const ligne = lignes.get(mouvement.boutiqueId) ?? {
+      boutiqueId: mouvement.boutiqueId,
+      code: connue?.code ?? mouvement.boutiqueId,
+      nom: connue?.nom ?? "Boutique inconnue",
+      entrees: 0,
+      sorties: 0,
+      solde: 0,
+      especes: 0,
+    };
+
+    if (mouvement.sens === "sortie") ligne.sorties += mouvement.montant;
+    else ligne.entrees += mouvement.montant;
+    ligne.solde = ligne.entrees - ligne.sorties;
+    /* La condition porte sur le moyen, pas sur le sens : une sortie est
+       toujours en espèces aujourd'hui, mais l'écrire ainsi garderait la ligne
+       juste le jour où un remboursement partirait par mobile. */
+    if (mouvement.moyenPaiement === "especes") {
+      ligne.especes += mouvement.sens === "sortie" ? -mouvement.montant : mouvement.montant;
+    }
+
+    lignes.set(mouvement.boutiqueId, ligne);
+  }
+
+  return [...lignes.values()];
+}
+
+/** La somme des lignes du bilan — rien de plus, et surtout rien d'autre. */
+export function totalDuBilan(lignes: readonly LigneBilan[]): {
+  entrees: number;
+  sorties: number;
+  solde: number;
+  especes: number;
+} {
+  return lignes.reduce(
+    (total, ligne) => ({
+      entrees: total.entrees + ligne.entrees,
+      sorties: total.sorties + ligne.sorties,
+      solde: total.solde + ligne.solde,
+      especes: total.especes + ligne.especes,
+    }),
+    { entrees: 0, sorties: 0, solde: 0, especes: 0 },
+  );
+}
+
+/** Ce qu'un poste de dépense a coûté sur la période regardée. */
+export type DepenseParPoste = { posteId: string; libelle: string; montant: number };
+
+/**
+ * Le nom sous lequel ranger une sortie, par ordre de précision décroissante.
+ *
+ * **Trois cas, et aucun ne jette d'argent.** Un poste déclaré donne son nom.
+ * Sans poste, une sortie qui porte déjà sa nature — l'avance prestataire d'un
+ * dossier — est rangée sous cette nature : elle est structurelle, et la forcer
+ * dans un référentiel que la maison déclare serait lui inventer un sens.
+ * Restent les sorties libres d'avant S55, sans rien : « Sans poste » les
+ * nomme. Les écarter retirerait de l'argent réel d'un total, en silence — le
+ * seul défaut qu'un livre de caisse n'a pas le droit d'avoir.
+ */
+/**
+ * Exporté pour que le tableau de l'historique et le bloc « Où l'argent est
+ * parti » nomment un même mouvement de la même façon.
+ *
+ * Ils divergeaient : le tableau affichait « Sans poste » pour une avance
+ * prestataire, que le bloc juste au-dessus appelait « Avance prestataire ». Le
+ * lecteur avait deux noms pour une ligne, sur un même écran, à trois
+ * centimètres d'écart.
+ */
+export function libelleDuPoste(
+  posteId: string,
+  origine: OrigineMouvement,
+  nomDuPoste: (id: string) => string,
+): string {
+  if (posteId) return nomDuPoste(posteId);
+  if (origine !== "depense") return LIBELLE_ORIGINE[origine];
+  return "Sans poste";
+}
+
+/**
+ * Où l'argent est parti, poste par poste — le livre de caisse analytique (S55).
+ *
+ * **C'est le pas qui sépare un journal d'une comptabilité.** Un journal dit
+ * « sortie 15 000, carburant » ligne à ligne ; une comptabilité répond à
+ * « combien de carburant ce mois-ci ». Un livre de caisse tenu correctement a
+ * une colonne par poste, et c'est ce que cette fonction fabrique.
+ *
+ * **Elle reçoit des mouvements déjà bornés**, par journée ou par période : le
+ * découpage du temps appartient à l'appelant, et le même calcul sert aux deux
+ * écrans sans se dédoubler.
+ *
+ * Le plus lourd en tête — on regarde ce bloc pour savoir ce qui coûte, et la
+ * réponse doit être la première ligne.
+ */
+export function depensesParPoste(
+  mouvements: readonly Mouvement[],
+  nomDuPoste: (id: string) => string,
+): DepenseParPoste[] {
+  const parPoste = new Map<string, number>();
+  for (const mouvement of mouvements) {
+    if (mouvement.sens !== "sortie") continue;
+    /* La clé porte les deux, parce que le repli sur l'origine en dépend : deux
+       sorties sans poste mais d'origines différentes ne se confondent pas. */
+    const cle = `${mouvement.posteId || ""}\u0000${mouvement.origine}`;
+    parPoste.set(cle, (parPoste.get(cle) ?? 0) + mouvement.montant);
+  }
+
+  return [...parPoste.entries()]
+    .map(([cle, montant]) => {
+      const [posteId, origine] = cle.split("\u0000") as [string, OrigineMouvement];
+      return { posteId, libelle: libelleDuPoste(posteId, origine, nomDuPoste), montant };
+    })
+    .sort((a, b) => b.montant - a.montant || a.libelle.localeCompare(b.libelle, "fr"));
 }
 
 /* --------------------------------------------------------------------------

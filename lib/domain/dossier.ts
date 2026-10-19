@@ -1,14 +1,14 @@
 /**
  * Le dossier documents — sa machine à états (`prompt.md` §7).
  *
- * Un dossier est l'ensemble vente + paiements + quatre documents (§13). Ce
+ * Un dossier est l'ensemble vente + paiements + ses documents (§13). Ce
  * module ne sait rien de Firestore ni de React : il dit ce qu'un document a le
  * droit de devenir, et quand un dossier est fini. Ces règles sont réutilisées
  * telles quelles par la page client (S13) et la page prestataire (S15), qui les
  * appliqueront côté serveur — d'où le fait qu'elles vivent ici, en fonctions
  * pures, plutôt qu'en conditions dispersées dans des composants.
  *
- * **Les quatre documents ne suivent pas le même chemin** (`DECISIONS.md` D65).
+ * **Les documents ne suivent pas le même chemin** (`DECISIONS.md` D65).
  * Deux d'entre eux arrivent déjà faits, deux passent par un prestataire ; le
  * chemin dépend donc du type, pas seulement du statut de départ.
  */
@@ -19,46 +19,59 @@ import {
   TYPES_DOCUMENT,
   type DocumentDossier,
   type MoyenPaiement,
+  type PapiersEmportes,
   type StatutDocument,
   type StatutDossier,
   type TypeDocument,
 } from "./vente";
 
 /**
- * Ce qui arrive déjà fait : la **quittance** accompagne la moto, et le **CMC**
- * s'obtient au ministère avec elle — deux démarches qui se font hors de
- * l'entreprise. Le magasin reçoit le produit fini, puis le remet au client.
+ * Ce qui arrive avec la moto : la **quittance** et le **CMC**.
  *
- * `chez_prestataire` n'existe pas pour ces documents : aucun intervenant
- * externe n'en est jamais chargé, et le nom d'un prestataire inscrit en face
- * serait faux dans la liste des dossiers en attente (§7.3).
+ * **Ils n'ont plus d'étapes depuis S53.** Leur disponibilité vit sur la moto
+ * (`quittanceRecue`, `cmcRecu`) et leur remise sur la vente (`emporte`) : le
+ * dossier n'a plus rien à stocker pour eux, sinon le fait qu'ils soient
+ * écartés. Le seul passage qui subsiste est donc vers « sans objet ».
+ *
+ * Suivre deux fois le même papier était la contradiction B de la spec : une
+ * moto dont le CMC avait été coché à l'arrivage ouvrait quand même un document
+ * à `a_faire`, qu'il fallait repromener à la main jusqu'à `remis_client`.
  */
-const CHEMIN_ARRIVE_FAIT: Record<StatutDocument, readonly StatutDocument[]> = {
-  a_faire: ["revenu_magasin", "non_applicable"],
+const CHEMIN_SANS_ETAPE: Record<StatutDocument, readonly StatutDocument[]> = {
+  a_faire: ["non_applicable"],
   chez_prestataire: [],
-  revenu_magasin: ["remis_client"],
+  revenu_magasin: [],
   remis_client: [],
   non_applicable: [],
 };
 
 /**
- * Ce qui passe par un prestataire : la **carte grise** et la **plaque**. Le
- * dépôt exige un prestataire, une date et une avance versée (§7.1), et l'étape
- * ne se saute pas — c'est elle qui dit qui détient le document.
+ * Ce qui passe par un prestataire : la **carte grise**. Le dépôt exige un
+ * prestataire, une date et une avance versée (§7.1), et l'étape ne se saute pas
+ * — c'est elle qui dit qui détient le document.
+ *
+ * La plaque suivait le même chemin jusqu'à S48 ; elle a quitté le dossier,
+ * l'immatriculation étant obtenue avec la carte grise et chez le même
+ * prestataire. Le chemin reste écrit à part : il n'a aucune raison d'être
+ * fondu dans son unique usage, et la prochaine pièce confiée à l'extérieur le
+ * reprendra tel quel.
  */
 const CHEMIN_PRESTATAIRE: Record<StatutDocument, readonly StatutDocument[]> = {
   a_faire: ["chez_prestataire", "non_applicable"],
   chez_prestataire: ["revenu_magasin"],
-  revenu_magasin: ["remis_client"],
+  /* **Le retour est le terme** (arbitrage 7 de la spec). La carte grise n'a que
+     deux gestes : partie chez le prestataire, revenue. Sa preuve de remise
+     n'est plus un troisième statut à promener, c'est le scan et la plaque
+     saisis sur la fiche de vente. */
+  revenu_magasin: [],
   remis_client: [],
   non_applicable: [],
 };
 
 const CHEMIN: Record<TypeDocument, Record<StatutDocument, readonly StatutDocument[]>> = {
-  quittance: CHEMIN_ARRIVE_FAIT,
-  cmc: CHEMIN_ARRIVE_FAIT,
+  quittance: CHEMIN_SANS_ETAPE,
+  cmc: CHEMIN_SANS_ETAPE,
   carte_grise: CHEMIN_PRESTATAIRE,
-  plaque: CHEMIN_PRESTATAIRE,
 };
 
 /** Ce document est-il confié à un intervenant externe ? */
@@ -85,6 +98,60 @@ export function estStatutTerminal(type: TypeDocument, statut: StatutDocument): b
   return CHEMIN[type][statut].length === 0;
 }
 
+/** Ce qu'un papier montre à l'écran, tous faits réunis. */
+export type EtatPapier = "sans_objet" | "emporte" | "au_magasin" | "chez_prestataire" | "a_faire";
+
+export const LIBELLE_ETAT_PAPIER: Record<EtatPapier, string> = {
+  sans_objet: "Sans objet",
+  emporte: "Emporté par le client",
+  au_magasin: "Au magasin",
+  chez_prestataire: "Chez le prestataire",
+  a_faire: "À faire",
+};
+
+/**
+ * L'état affiché d'un papier, **calculé et jamais stocké** (D61).
+ *
+ * Trois sources, une réponse : le document dit s'il est écarté, la moto dit si
+ * le papier est en main, la vente dit si le client l'a emporté. Les recoller à
+ * la lecture rend la contradiction B *inexprimable* — un CMC coché trois jours
+ * après la vente fait bouger l'écran du dossier sans qu'une seule écriture ne
+ * touche le dossier.
+ *
+ * La carte grise échappe à la règle : elle a une vie chez quelqu'un, que ni la
+ * moto ni la vente ne connaissent. Son statut stocké fait foi.
+ */
+export function etatPapier(entree: {
+  type: TypeDocument;
+  statut: StatutDocument;
+  /** La moto porte-t-elle ce papier ? Ignoré pour la carte grise. */
+  enMain: boolean;
+  /** Le client l'a-t-il emporté ? Ignoré pour la carte grise. */
+  emporte: boolean;
+}): EtatPapier {
+  if (entree.statut === "non_applicable") return "sans_objet";
+
+  if (passeParUnPrestataire(entree.type)) {
+    if (entree.statut === "chez_prestataire") return "chez_prestataire";
+    /* `remis_client` n'est plus écrit, mais la préversion en porte : une carte
+       grise ainsi marquée est revenue au magasin, et c'est tout ce qu'on peut
+       en dire sans inventer. */
+    if (entree.statut === "revenu_magasin" || entree.statut === "remis_client") {
+      return "au_magasin";
+    }
+    return "a_faire";
+  }
+
+  if (entree.emporte) return "emporte";
+  if (entree.enMain) return "au_magasin";
+  return "a_faire";
+}
+
+/* `resumerDossier` a disparu le 16 octobre 2026, avec les deux papiers qu'il
+   comptait. Réduit à la seule carte grise, il n'aurait fait que répéter en
+   prose la ligne affichée juste en dessous — « 1 chez le prestataire »
+   au-dessus de « Carte grise — Chez le prestataire ». */
+
 /** Ce que la clôture regarde. Rien d'autre n'entre en compte (§7.1). */
 export type EtatDossier = {
   documents: readonly { type: TypeDocument; statut: StatutDocument }[];
@@ -94,29 +161,46 @@ export type EtatDossier = {
   motoRemise: boolean;
 };
 
-/** Un document réglé : remis au client, ou écarté de la vente. */
-function estRegle(statut: StatutDocument): boolean {
-  return statut === "remis_client" || statut === "non_applicable";
-}
-
 /**
- * Le dossier peut-il se clore ? (§7.1)
+ * Le dossier peut-il se clore ? (§7.1, révisé par S53 puis par la demande du
+ * 16 octobre 2026)
  *
- * Les quatre documents réglés, la vente soldée, la moto partie. Les trois à la
- * fois : une vente en tranches entièrement payée dont la moto dort encore au
- * magasin n'est pas un dossier fini, et c'est précisément la confusion que le
- * cahier interdit entre crédit et tranches (§13).
+ * **Le dossier, c'est la carte grise.** Elle seule part chez quelqu'un, revient
+ * à une date qu'on annonce au client, et se fait attendre : c'est la seule
+ * d'entre les trois qui ait une file d'attente à vider.
  *
- * On exige les **quatre** types, pas « au moins zéro » : un dossier dont les
- * documents ne sont pas encore chargés passerait sinon pour un dossier complet.
+ * La quittance et le CMC se cochent sur le lot à l'arrivée, et le commanditaire
+ * a tranché que cela suffit. Les garder dans la clôture aurait produit
+ * exactement l'écran que sa demande vient supprimer : un dossier dont la carte
+ * grise est revenue, affichée verte, et qui reste pourtant « ouvert » sans
+ * qu'une seule colonne ne dise pourquoi.
+ *
+ * Ils ne disparaissent pas du produit pour autant — ce que le client a emporté
+ * reste écrit sur la vente et s'imprime sur son reçu. C'est un fait sur la
+ * remise, pas une étape de dossier.
+ *
+ * | Condition | Pourquoi |
+ * |-----------|----------|
+ * | Vente soldée | plus rien n'est dû |
+ * | Moto remise | une vente en tranches entièrement payée dont la moto dort au magasin n'est pas finie (§13) |
+ * | Carte grise revenue, **ou** sans objet | le seul papier que le dossier suit |
+ *
+ * `remis_client` continue de clore une carte grise : le statut ne s'écrit plus,
+ * mais la préversion en porte, et l'ignorer laisserait les dossiers les plus
+ * anciens ouverts pour toujours.
  */
 export function dossierCloturable(etat: EtatDossier): boolean {
   if (!etat.soldee || !etat.motoRemise) return false;
 
-  return TYPES_DOCUMENT.every((type) => {
-    const document = etat.documents.find((candidat) => candidat.type === type);
-    return document !== undefined && estRegle(document.statut);
-  });
+  const carteGrise = etat.documents.find((document) => document.type === "carte_grise");
+  /* Une carte grise absente compte `a_faire` : un dossier dont les documents ne
+     sont pas encore lus ne doit pas passer pour un dossier complet. */
+  const statut = carteGrise?.statut ?? "a_faire";
+
+  if (statut === "non_applicable") return true;
+  /* `remis_client` ne s'écrit plus, mais la préversion en porte : l'ignorer
+     laisserait les dossiers les plus anciens ouverts pour toujours. */
+  return statut === "revenu_magasin" || statut === "remis_client";
 }
 
 /**
@@ -216,17 +300,19 @@ export type EtapeRelais = {
 
 /* Les deux parcours, mis à plat. Ce sont les mêmes chemins que `CHEMIN`, lus
    dans l'autre sens : `CHEMIN` dit ce qu'un statut a le droit de devenir,
-   ceux-ci disent dans quel ordre on les traverse. */
-const PARCOURS_ARRIVE_FAIT: readonly StatutDocument[] = [
-  "a_faire",
-  "revenu_magasin",
-  "remis_client",
-];
+   ceux-ci disent dans quel ordre on les traverse.
+
+   **S53 les a raccourcis, et il a fallu un témoin e2e pour s'en apercevoir.**
+   Ces deux listes sont une seconde écriture des mêmes chemins : les retirer de
+   `CHEMIN` ne les retirait pas d'ici, et le relais continuait d'annoncer un
+   quatrième pas, « Remis au client », que plus aucun geste n'atteint. Un
+   parcours qui montre une étape inatteignable promet un retour que personne ne
+   fera. */
+const PARCOURS_SANS_ETAPE: readonly StatutDocument[] = ["a_faire"];
 const PARCOURS_PRESTATAIRE: readonly StatutDocument[] = [
   "a_faire",
   "chez_prestataire",
   "revenu_magasin",
-  "remis_client",
 ];
 
 /**
@@ -238,15 +324,17 @@ const PARCOURS_PRESTATAIRE: readonly StatutDocument[] = [
  * l'écran, la seule du produit (`DESIGN.md` §6), et ce qui répond d'un coup
  * d'œil à « où est ce papier, et qu'est-ce qui vient après ».
  *
- * **Le parcours dépend du type.** La quittance et le CMC n'ont pas d'étape chez
- * un prestataire ; en dessiner une, vide, ferait attendre un retour que
- * personne n'a promis (D65).
+ * **Le parcours dépend du type.** La quittance et le CMC n'ont plus d'étapes du
+ * tout depuis S53 — leur disponibilité vit sur la moto, leur remise sur la
+ * vente —, et la carte grise s'arrête à son retour (arbitrage 7). Dessiner une
+ * étape que rien n'atteint ferait attendre un retour que personne n'a promis
+ * (D65).
  *
  * Un document écarté n'a pas de parcours : la liste est vide, et l'écran dit
  * « Sans objet » plutôt que de tracer un chemin que rien n'empruntera.
  */
 export function etapesRelais(type: TypeDocument, statut: StatutDocument): EtapeRelais[] {
-  const parcours = passeParUnPrestataire(type) ? PARCOURS_PRESTATAIRE : PARCOURS_ARRIVE_FAIT;
+  const parcours = passeParUnPrestataire(type) ? PARCOURS_PRESTATAIRE : PARCOURS_SANS_ETAPE;
   const rang = parcours.indexOf(statut);
   if (rang === -1) return [];
 
@@ -286,7 +374,34 @@ export function joursEcoules(depuis: Date | null, aujourdhui: Date): number | nu
  * les documents sont tous à faire, et il n'y a personne à relancer.
  */
 export type Detention =
-  { chez: "prestataire"; nom: string; depuisJours: number | null } | { chez: "magasin" } | null;
+  { chez: "prestataire"; nom: string; depuisJours: number | null } | null;
+
+/** Un papier du dossier, avec son état recollé des trois sources (S53). */
+export type PapierDuDossier = {
+  type: TypeDocument;
+  etat: EtatPapier;
+  /** Le document stocké, `null` tant qu'il n'est pas parvenu du serveur. */
+  document: DocumentDossier | null;
+};
+
+/**
+ * Ce papier a-t-il fini son parcours ?
+ *
+ * **Exactement la condition de `dossierCloturable`, et ce n'est pas une
+ * coïncidence :** un papier qui a fini n'a plus rien à faire dans une file
+ * d'attente, et un dossier dont les trois papiers ont fini est un dossier que
+ * le serveur va clore. Deux définitions différentes feraient apparaître des
+ * dossiers vides dans la file, ou les en feraient sortir trop tôt.
+ *
+ * La carte grise finit à son RETOUR (arbitrage 7) : sa remise au client n'est
+ * plus un statut à promener, c'est le scan et la plaque saisis sur la fiche de
+ * vente.
+ */
+export function papierFini(type: TypeDocument, etat: EtatPapier): boolean {
+  if (etat === "sans_objet") return true;
+  if (type === "carte_grise") return etat === "au_magasin";
+  return etat === "emporte";
+}
 
 /** Un dossier ouvert, réduit à ce que la liste doit montrer. */
 export type DossierEnAttente = {
@@ -296,11 +411,18 @@ export type DossierEnAttente = {
   clientId: string;
   date: Date | null;
   /**
-   * Les quatre documents, par type. `null` tant que le document n'est pas
+   * Les documents du dossier, par type. `null` tant que le document n'est pas
    * parvenu du serveur : une colonne vide dit « on ne sait pas encore », ce qui
    * n'est pas la même chose que « rien à faire ».
    */
   documents: Readonly<Record<TypeDocument, DocumentDossier | null>>;
+  /**
+   * Les trois papiers avec leur état affiché, dans l'ordre de `TYPES_DOCUMENT`.
+   *
+   * C'est ce que l'écran montre depuis S53. `documents` reste à côté pour ce
+   * qui ne se calcule pas : le nom du prestataire, la date annoncée.
+   */
+  papiers: readonly PapierDuDossier[];
   /** Les documents qui restent à traiter, dans l'ordre de `TYPES_DOCUMENT`. */
   enCours: readonly DocumentDossier[];
   /** Au moins un document est chez un prestataire au-delà de la date annoncée. */
@@ -314,9 +436,24 @@ export type VenteDuDossier = {
   numero: string;
   boutiqueId: string;
   clientId: string;
+  /** Pour retrouver la moto qui porte les papiers en main (S53). */
+  motoId: string;
   date: Date | null;
   statutDossier: StatutDossier;
+  /** Ce que le client a emporté. `lireEmporte` comble les ventes anciennes. */
+  emporte: PapiersEmportes;
 };
+
+/**
+ * Ce que l'écran des dossiers a besoin de savoir d'une moto, et rien de plus.
+ *
+ * **Le vrai coût de ce modèle, et il faut le dire :** l'écran des dossiers ne
+ * chargeait pas les motos. Il lui faut désormais l'écoute du stock du
+ * périmètre, celle que l'écran des motos tient déjà : une requête de plus, pas
+ * une collection de plus. Le repli, si elle coûtait trop, serait de ne calculer
+ * l'état que sur la fiche de vente, où la moto est déjà chargée.
+ */
+export type MotoDuDossier = { id: string; quittanceRecue: boolean; cmcRecu: boolean };
 
 /**
  * Les trois questions qu'on pose à une file de dossiers.
@@ -325,13 +462,16 @@ export type VenteDuDossier = {
  * annoncée est à relancer, ce qui est chez un prestataire est à aller chercher,
  * ce qui est revenu au magasin est à remettre à son client aujourd'hui.
  */
-export const FILTRES_ETAT = ["en_retard", "chez_prestataire", "a_remettre"] as const;
+/* « A remettre » a disparu le 16 octobre 2026 : il designait un papier dans le
+   tiroir que le client n'avait pas encore pris, c'est-a-dire une quittance ou un
+   CMC. Ceux-ci ayant quitte le dossier, ce filtre n'avait plus rien a trouver et
+   aurait rendu « 0 dossier » quoi qu'on fasse. */
+export const FILTRES_ETAT = ["en_retard", "chez_prestataire"] as const;
 export type FiltreEtat = (typeof FILTRES_ETAT)[number];
 
 export const LIBELLE_FILTRE_ETAT: Record<FiltreEtat, string> = {
   en_retard: "En retard",
   chez_prestataire: "Chez un prestataire",
-  a_remettre: "À remettre",
 };
 
 export type FiltresDossiers = {
@@ -349,7 +489,7 @@ export const FILTRES_DOSSIERS_VIDES: FiltresDossiers = { etat: "" };
  * plus longtemps est ce qu'il faut traiter en premier — et c'est aussi le
  * client qui a le plus de raisons d'appeler.
  *
- * **Les quatre documents sortent ensemble, réglés compris.** La liste ne
+ * **Tous les documents sortent ensemble, réglés compris.** La liste ne
  * rendait que les documents en cours ; l'écran montre désormais une colonne par
  * document, où « Remis au client » compte autant que « À faire » — c'est en
  * voyant les trois premiers remis qu'on comprend qu'il ne manque que le
@@ -364,9 +504,11 @@ export const FILTRES_DOSSIERS_VIDES: FiltresDossiers = { etat: "" };
 export function dossiersEnAttente(
   ventes: readonly VenteDuDossier[],
   documents: readonly DocumentDossier[],
+  motos: readonly MotoDuDossier[],
   filtres: FiltresDossiers,
   aujourdhui: Date,
 ): DossierEnAttente[] {
+  const parMoto = new Map(motos.map((moto) => [moto.id, moto]));
   const parVente = new Map<string, DocumentDossier[]>();
   for (const document of documents) {
     const liste = parVente.get(document.venteId);
@@ -378,7 +520,17 @@ export function dossiersEnAttente(
     ventes
       .filter((vente) => vente.statutDossier === "ouvert")
       .map((vente) => {
-        const tous = parVente.get(vente.id) ?? [];
+        /* **Filtré sur les types connus, et ce filtre n'est pas décoratif.**
+           Un dossier ouvert avant S48 porte encore un document `plaque` en
+           base. `dossierCloturable` ne le regarde plus — il itère
+           `TYPES_DOCUMENT` —, mais tout ce qui suit lit la liste brute : sans
+           ce filtre, la plaque resterait « en cours », compterait dans la
+           détention et pourrait marquer le dossier en retard, sur un dossier
+           que le serveur vient de clore. Deux lectures contradictoires du même
+           dossier, à deux centimètres l'une de l'autre. */
+        const tous = (parVente.get(vente.id) ?? []).filter((document) =>
+          TYPES_DOCUMENT.includes(document.type),
+        );
         const parType = Object.fromEntries(
           TYPES_DOCUMENT.map((type) => [
             type,
@@ -386,9 +538,46 @@ export function dossiersEnAttente(
           ]),
         ) as Record<TypeDocument, DocumentDossier | null>;
 
-        const enCours = tous
-          .filter((document) => !estRegle(document.statut))
-          .sort((a, b) => TYPES_DOCUMENT.indexOf(a.type) - TYPES_DOCUMENT.indexOf(b.type));
+        /* **Une moto absente de la liste se lit comme ne portant rien.**
+           L'écoute du stock peut n'avoir pas encore répondu, ou la moto être
+           hors du périmètre courant. Le papier dit alors « à faire », ce qui est
+           le pire cas et donc le bon défaut : il garde le dossier dans la file
+           au lieu de l'en faire sortir sur une absence de données. */
+        const laMoto = parMoto.get(vente.motoId);
+        const enMain = (type: TypeDocument): boolean => {
+          if (type === "quittance") return laMoto?.quittanceRecue ?? false;
+          if (type === "cmc") return laMoto?.cmcRecu ?? false;
+          /* La carte grise ne se coche pas sur la moto : elle a une vie dehors
+             que la moto ne connaît pas, et `etatPapier` ignore ce drapeau pour
+             elle. */
+          return false;
+        };
+
+        /* **Seuls les papiers qui passent par un prestataire** (16 octobre
+           2026). La quittance et le CMC se cochent sur le lot a l'arrivee ; ils
+           n'attendent personne, et le commanditaire a tranche qu'ils n'avaient
+           plus rien a faire dans une file d'attente. */
+        const papiers: PapierDuDossier[] = TYPES_DOCUMENT.filter(passeParUnPrestataire).map((type) => ({
+          type,
+          document: parType[type],
+          etat: etatPapier({
+            type,
+            /* Un document pas encore lu compte `a_faire` : c'est le statut dans
+               lequel S8 l'ouvre, et le seul que l'on puisse supposer sans
+               inventer. */
+            statut: parType[type]?.statut ?? "a_faire",
+            enMain: enMain(type),
+            emporte: type === "carte_grise" ? false : vente.emporte[type],
+          }),
+        }));
+
+        /* `enCours` ne garde que les documents RÉELS des papiers non finis : la
+           détention et le retard se lisent sur le dépôt, qui n'existe que sur
+           un document écrit. */
+        const enCours = papiers
+          .filter((papier) => !papierFini(papier.type, papier.etat))
+          .map((papier) => papier.document)
+          .filter((document): document is DocumentDossier => document !== null);
 
         return {
           venteId: vente.id,
@@ -397,16 +586,30 @@ export function dossiersEnAttente(
           clientId: vente.clientId,
           date: vente.date,
           documents: parType,
+          papiers,
           enCours,
           enRetard: enCours.some((document) => estEnRetard(document.disponibleLe, aujourdhui)),
-          detention: detentionDe(enCours, aujourdhui),
+          detention: detentionDe(papiers, enCours, aujourdhui),
         };
       })
-      /* Un dossier sans document en cours n'a rien à faire dans une file
-       d'attente. Il n'est pas encore clos — la clôture demande aussi le
-       paiement soldé et la moto remise — mais côté documents, il n'attend
-       plus rien. */
-      .filter((dossier) => dossier.enCours.length > 0)
+      /* Un dossier dont tous les papiers ont fini n'a rien à faire dans une
+       file d'attente. Il n'est pas encore clos — la clôture demande aussi le
+       paiement soldé et la moto remise — mais côté papiers, il n'attend plus
+       rien.
+
+       Le filtre porte sur `papiers` et non sur `enCours` : un papier « à
+       faire » dont le document n'est pas encore lu doit retenir le dossier,
+       alors qu'il n'a aucun document à mettre dans `enCours`. */
+      /* **Plus d'exclusion sur les papiers** (16 octobre 2026). Le dossier
+         sortait de la file des que tous ses papiers etaient finis. Reduit a la
+         seule carte grise, ce filtre aurait fait disparaitre la ligne a
+         l'instant meme ou elle revient du prestataire — et le vert que le
+         commanditaire demande pour ce retour n'aurait jamais ete visible.
+
+         La file montre donc les dossiers OUVERTS, et c'est la cloture qui les
+         en sort : carte grise revenue, vente soldee, moto remise. Un dossier a
+         carte grise verte qui s'attarde attend l'argent ou la livraison, ce qui
+         est une information et non du bruit. */
       .filter((dossier) => correspondALEtat(dossier, filtres.etat))
       .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0))
   );
@@ -418,9 +621,13 @@ export function dossiersEnAttente(
  * Deux documents peuvent être chez deux prestataires différents. La colonne n'en
  * nomme qu'un, et c'est le plus ancien dépôt — celui dont le délai s'allonge,
  * pas celui qu'on vient de confier. Le détail des quatre est sur la même ligne,
- * dans les colonnes des documents.
+ * dans les colonnes des documents. Depuis S48 ils sont trois.
  */
-function detentionDe(enCours: readonly DocumentDossier[], aujourdhui: Date): Detention {
+function detentionDe(
+  papiers: readonly PapierDuDossier[],
+  enCours: readonly DocumentDossier[],
+  aujourdhui: Date,
+): Detention {
   const dehors = enCours
     .filter((document) => document.statut === "chez_prestataire")
     .sort((a, b) => (a.deposeLe?.getTime() ?? 0) - (b.deposeLe?.getTime() ?? 0));
@@ -434,11 +641,13 @@ function detentionDe(enCours: readonly DocumentDossier[], aujourdhui: Date): Det
     };
   }
 
-  /* Revenu au magasin, donc détenu par le magasin : c'est ce qui se remet au
-     client aujourd'hui, sans attendre personne. */
-  if (enCours.some((document) => document.statut === "revenu_magasin")) {
-    return { chez: "magasin" };
-  }
+  /* **Plus de « au magasin » ici** (16 octobre 2026). Cette valeur désignait
+     une quittance ou un CMC dans le tiroir, que le client n'avait pas encore
+     pris ; ces deux papiers ont quitté le dossier. La carte grise, elle, est
+     finie dès son retour — elle n'attend plus personne.
+
+     La colonne répond donc à « qui la détient » par un prestataire, ou par
+     personne. C'est exactement la question qu'elle pose. */
   return null;
 }
 
@@ -449,9 +658,7 @@ function correspondALEtat(dossier: DossierEnAttente, etat: FiltreEtat | ""): boo
     case "en_retard":
       return dossier.enRetard;
     case "chez_prestataire":
-      return dossier.enCours.some((document) => document.statut === "chez_prestataire");
-    case "a_remettre":
-      return dossier.enCours.some((document) => document.statut === "revenu_magasin");
+      return dossier.papiers.some((papier) => papier.etat === "chez_prestataire");
   }
 }
 
@@ -473,7 +680,7 @@ export type DossierCherchable = {
  *
  * C'est cette recherche qui remplace les listes déroulantes « Prestataire » et
  * « Document » de l'écran précédent : la première est ici, et la seconde n'a
- * plus lieu d'être puisque les quatre documents ont chacun leur colonne.
+ * plus lieu d'être puisque chaque document a sa colonne.
  */
 export function chercherDossiers<T extends DossierCherchable>(
   lignes: readonly T[],

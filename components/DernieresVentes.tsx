@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useCallback, useMemo } from "react";
 import { ErreurDeLecture, EtatChargement, PastillePaiement } from "@/components/patrons/Etats";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
+import { nomComplet } from "@/lib/domain/client";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import { comparerVentes, LIBELLE_MODE, type Vente } from "@/lib/domain/vente";
@@ -74,7 +75,7 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
   const { valeur: stock } = useAbonnement(souscrireStock, "Le stock n’a pas pu être lu.");
 
   const lignes = useMemo<Ligne[]>(() => {
-    const nomDuClient = new Map(clients.map((client) => [client.id, client.nom]));
+    const nomDuClient = new Map(clients.map((client) => [client.id, nomComplet(client)]));
     const parMoto = new Map((stock ?? []).map((moto) => [moto.id, moto]));
 
     return [...(ventes ?? [])]
@@ -159,7 +160,12 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
           Aucune vente enregistrée pour l’instant. La première apparaîtra ici.
         </p>
       ) : (
-        <div className="cadre cadre-tableau">
+        /* `lg:max-h-none` lève la borne de hauteur que `.cadre-tableau` pose
+           sur bureau. Elle est juste pour un écran de liste, où le tableau est
+           toute la page : il défile, pas elle. Ici le tableau est un bloc parmi
+           d'autres sur un tableau de bord qui défile déjà — la borne lui
+           fabriquait sa propre barre, et l'écran en montrait deux. */
+        <div className="cadre cadre-tableau lg:max-h-none">
           <Tableau
             legende="Les six dernières ventes, toutes boutiques"
             colonnes={colonnes}

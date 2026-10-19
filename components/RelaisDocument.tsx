@@ -5,7 +5,9 @@ import { useEffect, useRef } from "react";
 import {
   estEnRetard,
   etapesRelais,
+  etatPapier,
   joursEcoules,
+  papierFini,
   passeParUnPrestataire,
   type EtapeRelais,
 } from "@/lib/domain/dossier";
@@ -125,7 +127,17 @@ export function RelaisDocument({
           </ol>
         )}
 
-        <GestesDocument document={document} className="mt-5" />
+        {/* Seuls les papiers qui passent par un prestataire ouvrent un relais
+            (`CellulePapier`), et la carte grise est le seul : son état se lit
+            donc entièrement sur son statut, sans la moto ni la vente. */}
+        <GestesDocument
+          document={document}
+          fini={papierFini(
+            document.type,
+            etatPapier({ type: document.type, statut: document.statut, enMain: false, emporte: false }),
+          )}
+          className="mt-5"
+        />
       </div>
     </section>
   );
