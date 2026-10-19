@@ -1181,6 +1181,33 @@ export const suiviPrestataire = onRequest(
       .where("prestataireId", "==", fiche.id)
       .get();
 
+    /**
+     * Le nom d'une ligne de référentiel, lue une seule fois.
+     *
+     * **Une moto ne porte pas sa marque, elle porte `marqueId`** — et le
+     * portail affichait « Moto inconnue » sur toutes ses lignes parce qu'il
+     * demandait un `marqueNom` qui n'a jamais existé. Le défaut était muet : un
+     * champ absent rend une chaîne vide, et le repli de libellé faisait le
+     * reste.
+     *
+     * La promesse est mise en cache, pas son résultat : les lignes se
+     * construisent en parallèle, et deux motos de la même marque ne doivent
+     * déclencher qu'une lecture.
+     */
+    const nomsLus = new Map<string, Promise<string>>();
+    const nomDuReferentiel = (chemin: string | null): Promise<string> => {
+      if (!chemin) return Promise.resolve("");
+      const dejaLu = nomsLus.get(chemin);
+      if (dejaLu) return dejaLu;
+      const lecture = base
+        .doc(chemin)
+        .get()
+        .then((ligne) => String(ligne.get("nom") ?? ""))
+        .catch(() => "");
+      nomsLus.set(chemin, lecture);
+      return lecture;
+    };
+
     const lignes = await Promise.all(
       cartes.docs.map(async (carte) => {
         const venteId = carte.ref.parent.parent?.id ?? "";
@@ -1195,6 +1222,11 @@ export const suiviPrestataire = onRequest(
           clientId ? base.doc(`clients/${clientId}`).get() : null,
         ]);
 
+        const [marque, modele] = await Promise.all([
+          nomDuReferentiel(moto?.get("marqueId") ? `marques/${moto.get("marqueId")}` : null),
+          nomDuReferentiel(moto?.get("modeleId") ? `modeles/${moto.get("modeleId")}` : null),
+        ]);
+
         /* Une vente, une moto ou un client devenu illisible ne fait pas tomber
            le portail : la ligne se construit et dit ce qu'elle ne sait pas.
            `construireSuivi` porte les replis de libellé. */
@@ -1206,8 +1238,11 @@ export const suiviPrestataire = onRequest(
           avance: typeof carte.get("avance") === "number" ? (carte.get("avance") as number) : null,
           numeroVente: String(vente?.get("numero") ?? ""),
           client: String(client?.get("nom") ?? ""),
-          moto: [moto?.get("marqueNom"), moto?.get("modeleNom")].filter(Boolean).join(" "),
-          chassis: String(moto?.get("chassis") ?? ""),
+          moto: [marque, modele].filter(Boolean).join(" "),
+          /* `numeroChassis`, et non `chassis` : l'autre nom n'existe pas, et
+             le portail n'a donc jamais affiché le numéro gravé — celui-là
+             même qu'un prestataire dicte au téléphone pour lever un doute. */
+          chassis: String(moto?.get("numeroChassis") ?? ""),
         };
       }),
     );

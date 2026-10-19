@@ -100,16 +100,37 @@ const hotesEmulateurs =
    l'utilise pas du tout. On ouvre donc `unsafe-eval` uniquement en dev.
    Le test bout en bout vérifie que le build de production ne le contient pas :
    c'est le genre de tolérance qui, oubliée, se retrouve en ligne. */
-const scriptSrc = ["'self'", "'unsafe-inline'", ...(enDev ? ["'unsafe-eval'"] : [])].join(" ");
+/* **reCAPTCHA, et c'est App Check qui l'impose (S57).** Le navigateur a nommé
+   le refus sans ambiguïté : « Loading the script
+   https://www.google.com/recaptcha/enterprise.js violates script-src ». Sans
+   ces deux hôtes, App Check ne démarre pas, aucun jeton n'est émis, et Gemini
+   répond 401 — alors que tout le reste de l'application continue de marcher,
+   ce qui rend la panne particulièrement trompeuse.
+
+   Deux hôtes et pas un : `www.google.com` sert le script d'amorçage, et
+   `www.gstatic.com` les fragments qu'il charge ensuite. N'en déclarer qu'un
+   déplace l'erreur sans la résoudre. */
+const hotesRecaptcha = ["https://www.google.com", "https://www.gstatic.com"];
+
+const scriptSrc = [
+  "'self'",
+  "'unsafe-inline'",
+  ...hotesRecaptcha,
+  ...(enDev ? ["'unsafe-eval'"] : []),
+].join(" ");
 
 const csp = [
   "default-src 'self'",
   `script-src ${scriptSrc}`,
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://firebasestorage.googleapis.com",
+  /* `www.gstatic.com` : les images du widget reCAPTCHA. Sans elle, neuf refus
+     d'images par chargement polluent la console et masquent les vraies. */
+  "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://www.gstatic.com",
   "font-src 'self'",
   `connect-src 'self' ${hotesFirebase}${hotesEmulateurs}`,
-  "frame-src 'self' https://*.firebaseapp.com",
+  /* reCAPTCHA pose un cadre invisible pour son défi : sans lui, le jeton n'est
+     jamais émis, et l'échec est silencieux. */
+  `frame-src 'self' https://*.firebaseapp.com ${hotesRecaptcha.join(" ")}`,
   "object-src 'none'",
   "base-uri 'self'",
   "form-action 'self'",

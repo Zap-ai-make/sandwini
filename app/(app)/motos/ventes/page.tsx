@@ -9,6 +9,7 @@ import { FicheVente } from "@/components/FicheVente";
 import { PanneauRecu } from "@/components/PanneauRecu";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { ModaleVente } from "@/components/ModaleVente";
+import { lireVentePreparee } from "@/lib/ia/gestes";
 import {
   ErreurDeLecture,
   EtatSansResultat,
@@ -309,7 +310,12 @@ function Ventes() {
 
       <CartesVentes bilan={bilan} periode={nomPeriode} />
 
-      {modaleOuverte && <ModaleVente onFermer={fermerLaModale} />}
+      {modaleOuverte && (
+        /* L’assistant ouvre cette modale déjà remplie en passant par l’adresse
+           (S57). Un paramètre illisible est ignoré, pas repris : une adresse
+           se bricole à la main. */
+        <ModaleVente onFermer={fermerLaModale} depart={lireVentePreparee(parametres) ?? undefined} />
+      )}
 
       <AvecPanneau
         panneau={

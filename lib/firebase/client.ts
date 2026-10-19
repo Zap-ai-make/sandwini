@@ -1,4 +1,5 @@
 import { getApp, getApps, initializeApp, type FirebaseApp } from "firebase/app";
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
 import { connectAuthEmulator, getAuth, type Auth } from "firebase/auth";
 import {
   connectFirestoreEmulator,
@@ -34,8 +35,63 @@ let storage: FirebaseStorage | undefined;
 let functionsInstance: Functions | undefined;
 
 function application(): FirebaseApp {
-  if (!app) app = getApps().length ? getApp() : initializeApp(config);
+  if (!app) {
+    app = getApps().length ? getApp() : initializeApp(config);
+    activerAppCheck(app);
+  }
   return app;
+}
+
+/**
+ * App Check : la preuve que la requête vient de **notre** application.
+ *
+ * **Pourquoi il arrive maintenant, et pas avant.** Les identifiants Firebase du
+ * client sont publics — l'en-tête de ce fichier le dit depuis le premier jour, et
+ * c'est pour ça que les règles sont la seule protection réelle des *données*.
+ * Mais les règles ne protègent pas l'**accès** : n'importe qui peut recopier
+ * cette configuration et appeler l'API de Gemini à notre place, sur notre
+ * facture. Firebase AI Logic impose donc App Check depuis juillet 2026, et
+ * refuse de servir un modèle sans lui.
+ *
+ * **Le danger de ce fichier, nommé.** App Check s'applique au trafic Firebase
+ * de *toute* l'application, pas seulement à Gemini. Mal réglé — jeton absent,
+ * domaine non déclaré — il ne dégrade rien : il **bloque tout**, Firestore
+ * compris, et le produit s'ouvre sur un écran vide. D'où les trois gardes
+ * ci-dessous, et le fait qu'il ne s'active jamais de force.
+ */
+function activerAppCheck(application: FirebaseApp): void {
+  /* 1. Jamais sur les émulateurs. Ils n'ont pas de service App Check, et
+        l'activer y ferait échouer la suite bout en bout pour une raison qui
+        n'a rien à voir avec ce qu'elle teste. */
+  if (surEmulateurs) return;
+
+  /* 2. Jamais côté serveur. `/suivi/[jeton]` (S56) est rendu par Node, qui n'a
+        ni `document` ni reCAPTCHA — et ce portail ne touche de toute façon pas
+        au SDK client. */
+  if (typeof window === "undefined") return;
+
+  /* 3. Jamais sans clé déclarée. Tant que `NEXT_PUBLIC_APP_CHECK_CLE` est
+        absente, l'application tourne exactement comme avant : seul l'assistant
+        refusera de répondre. C'est l'inverse du réglage qui casse tout en
+        silence — ici l'absence se voit à un seul endroit, et nulle part
+        ailleurs. */
+  const cle = process.env.NEXT_PUBLIC_APP_CHECK_CLE;
+  if (!cle) return;
+
+  /* En développement, un jeton de débogage évite d'avoir à faire passer
+     reCAPTCHA sur `localhost`. Firebase l'imprime dans la console au premier
+     chargement ; il faut le coller dans la console Firebase une fois. */
+  if (process.env.NODE_ENV !== "production") {
+    (globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  }
+
+  initializeAppCheck(application, {
+    provider: new ReCaptchaEnterpriseProvider(cle),
+    /* Le jeton se renouvelle tout seul. Sans ça, une session ouverte toute la
+       journée au comptoir — le cas normal ici — verrait ses appels refusés au
+       bout d'une heure. */
+    isTokenAutoRefreshEnabled: true,
+  });
 }
 
 /**
