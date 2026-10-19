@@ -281,6 +281,55 @@ function texteSimple(valeur: unknown): string {
   return typeof valeur === "string" ? valeur.trim() : "";
 }
 
+/**
+ * Les motos du périmètre, **dites en mots** plutôt qu'en identifiants.
+ *
+ * Une moto ne porte pas sa marque : elle porte `marqueId`, qui désigne une
+ * ligne d'un référentiel. Rendre le document brut au modèle lui faisait lire
+ * `marqueId: "mrq_7f3a"` — et un modèle qui doit répondre finit par répéter ce
+ * qu'on lui a donné. Les noms se résolvent donc ici, une fois pour toute la
+ * liste, et les identifiants ne sortent pas.
+ */
+async function decrireMotos(
+  boutiqueId: string | null,
+): Promise<{ parId: Map<string, Record<string, unknown>>; toutes: Record<string, unknown>[] }> {
+  const [brutes, marques, modeles] = await Promise.all([
+    lire("motos", boutiqueId, LECTURE_MAX),
+    lire("marques", null, LECTURE_MAX),
+    lire("modeles", null, LECTURE_MAX),
+  ]);
+
+  const nomDe = (lignes: Record<string, unknown>[]) =>
+    new Map(lignes.map((ligne) => [String(ligne.id), String(ligne.nom ?? "")]));
+  const nomMarque = nomDe(marques.lignes);
+  const nomModele = nomDe(modeles.lignes);
+
+  const parId = new Map<string, Record<string, unknown>>();
+  const toutes = brutes.lignes.map((moto) => {
+    const decrite = {
+      id: moto.id,
+      marque: nomMarque.get(String(moto.marqueId ?? "")) ?? "",
+      modele: nomModele.get(String(moto.modeleId ?? "")) ?? "",
+      couleur: moto.couleur,
+      annee: moto.annee,
+      chassis: moto.numeroChassis,
+      prixVenteConseille: moto.prixVenteConseille,
+      statut: moto.statut,
+      dateEntree: moto.dateEntree,
+    };
+    parId.set(String(moto.id), decrite);
+    return decrite;
+  });
+
+  return { parId, toutes };
+}
+
+/** « Sanili SL125 », ou ce qu'on en sait. */
+function nommerMoto(moto: Record<string, unknown> | undefined): string {
+  if (!moto) return "";
+  return [moto.marque, moto.modele].filter(Boolean).join(" ");
+}
+
 /** Les dates Firestore ne se sérialisent pas en JSON : on les rend lisibles. */
 function aplatir(donnees: Record<string, unknown>): Record<string, unknown> {
   const plat: Record<string, unknown> = {};
@@ -321,17 +370,15 @@ export async function executerOutil(
   try {
     switch (nom) {
       case "motos_en_stock": {
-        const lu = await lire("motos", contexte.boutiqueId, LECTURE_MAX);
-        const motos = lu.lignes.filter((moto) => moto.statut === "en_stock").map(aplatir);
+        const lu = await decrireMotos(contexte.boutiqueId);
+        const motos = lu.toutes
+          .filter((moto) => moto.statut === "en_stock")
+          .map(({ statut: _statut, id: _id, ...reste }) => aplatir(reste));
         const recherche = reduire(arguments_.recherche);
         const retenues = recherche
           ? motos.filter((moto) => reduire(Object.values(moto).join(" ")).includes(recherche))
           : motos;
-        return {
-          motos: retenues.slice(0, PLAFOND),
-          combien: retenues.length,
-          ...(lu.tronque ? { partiel: "La liste a été coupée : dis-le au lieu de conclure." } : {}),
-        };
+        return { motos: retenues.slice(0, PLAFOND), combien: retenues.length };
       }
 
       case "chercher_client": {
@@ -357,15 +404,13 @@ export async function executerOutil(
            la seule question qu'on pose vraiment à une liste de ventes. */
         const [vendues, motos, gens, verses] = await Promise.all([
           lire("ventesMotos", contexte.boutiqueId, LECTURE_MAX),
-          lire("motos", contexte.boutiqueId, LECTURE_MAX),
+          decrireMotos(contexte.boutiqueId),
           lire("clients", null, LECTURE_MAX),
           lireVersements(contexte.boutiqueId),
         ]);
 
-        const parId = (lignes: Record<string, unknown>[]) =>
-          new Map(lignes.map((ligne) => [String(ligne.id), ligne]));
-        const lesMotos = parId(motos.lignes);
-        const lesGens = parId(gens.lignes);
+        const lesMotos = motos.parId;
+        const lesGens = new Map(gens.lignes.map((ligne) => [String(ligne.id), ligne]));
 
         const paye = new Map<string, number>();
         for (const versement of verses.lignes) {
@@ -384,7 +429,7 @@ export async function executerOutil(
               date: vente.date,
               client: client?.nom ?? "client inconnu",
               telephone: client?.telephone,
-              moto: moto ? `${moto.marque ?? ""} ${moto.modele ?? ""}`.trim() : "moto inconnue",
+              moto: nommerMoto(moto) || "moto inconnue",
               chassis: moto?.chassis,
               prixConvenu: prix,
               modePaiement: vente.modePaiement,
