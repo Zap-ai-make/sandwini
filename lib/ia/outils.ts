@@ -216,3 +216,19 @@ export async function executerOutil(
     };
   }
 }
+
+/**
+ * Ce qu'on affiche pendant qu'un outil travaille.
+ *
+ * Le nom technique (`motos_en_stock`) ne dit rien à un gérant, et une animation
+ * muette ne dit rien non plus. Nommer la lecture en cours transforme l'attente
+ * en information : on juge que l'assistant a compris la question avant même
+ * qu'il réponde.
+ */
+export const LIBELLE_OUTIL: Record<string, string> = {
+  motos_en_stock: "Lecture du stock de motos",
+  chercher_client: "Recherche du client",
+  ventes_recentes: "Lecture des ventes",
+  catalogue_pieces: "Lecture du catalogue de pièces",
+  mouvements_pieces: "Calcul du stock de pièces",
+};

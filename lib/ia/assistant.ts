@@ -59,9 +59,26 @@ const TOURS_MAX = 5;
 
 export type Tour = { de: "humain" | "assistant"; texte: string };
 
+/**
+ * Ce qui se passe pendant qu'on attend.
+ *
+ * Le premier rendu laissait l'écran muet jusqu'à la réponse entière, parfois
+ * dix secondes : le commanditaire a demandé qu'on voie l'assistant réfléchir.
+ * Mais une animation seule ne dit rien ; nommer la lecture en cours — « je
+ * regarde le stock » — transforme l'attente en information, et laisse juger si
+ * l'assistant a compris la question avant même qu'il réponde.
+ */
+export type Progres =
+  | { quoi: "outils"; noms: string[] }
+  /** Le texte **cumulé** depuis le début, pas le seul morceau qui vient d'arriver. */
+  | { quoi: "texte"; texte: string };
+
 export type Conversation = {
   /** Rend le texte de la réponse, et la liste des outils réellement employés. */
-  envoyer: (question: string) => Promise<{ texte: string; outils: string[] }>;
+  envoyer: (
+    question: string,
+    surProgres?: (progres: Progres) => void,
+  ) => Promise<{ texte: string; outils: string[] }>;
 };
 
 export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils): Conversation {
@@ -77,13 +94,37 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
   const discussion = modele.startChat();
 
   return {
-    async envoyer(question: string) {
+    async envoyer(question: string, surProgres?: (progres: Progres) => void) {
       const employes: string[] = [];
-      let reponse = await discussion.sendMessage(question);
+      let cumul = "";
+
+      /**
+       * Un tour en flux : le texte arrive par morceaux et part aussitôt à
+       * l'écran.
+       *
+       * `cumul` traverse les tours sans être remis à zéro : quand le modèle
+       * parle, lit un outil, puis reprend, les deux moitiés appartiennent à la
+       * même réponse. L'effacer entre les deux ferait disparaître sous les yeux
+       * ce qui venait d'être lu.
+       */
+      const tourEnFlux = async (envoi: Parameters<typeof discussion.sendMessageStream>[0]) => {
+        const flux = await discussion.sendMessageStream(envoi);
+        for await (const morceau of flux.stream) {
+          const texte = morceau.text();
+          if (!texte) continue;
+          cumul += texte;
+          surProgres?.({ quoi: "texte", texte: cumul });
+        }
+        return flux.response;
+      };
+
+      let reponse = { response: await tourEnFlux(question) };
 
       for (let tour = 0; tour < TOURS_MAX; tour += 1) {
         const appels = reponse.response.functionCalls() ?? [];
         if (appels.length === 0) break;
+
+        surProgres?.({ quoi: "outils", noms: appels.map((appel) => appel.name) });
 
         /* En parallèle : le modèle demande volontiers deux lectures d'un coup,
            et les enchaîner doublerait l'attente au comptoir. */
@@ -99,10 +140,10 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
           }),
         );
 
-        reponse = await discussion.sendMessage(resultats);
+        reponse = { response: await tourEnFlux(resultats) };
       }
 
-      const texte = reponse.response.text().trim();
+      const texte = cumul.trim();
       return {
         /* Un modèle qui ne rend rien est un cas réel — filtre de sécurité,
            plafond de tours atteint. Le silence serait pris pour une panne de
