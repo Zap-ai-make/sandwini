@@ -110,7 +110,10 @@ export function messageErreurAssistant(cause: unknown): string {
   const brut = `${(cause as { code?: string }).code ?? ""} ${(cause as Error)?.message ?? ""}`;
   console.error("[assistant] échec brut :", cause);
 
-  if (/app-?check|403|unauthorized|permission|appCheck/i.test(brut)) {
+  /* `401` autant que `403` : Firebase AI Logic rend 401 quand le jeton App
+     Check manque, et 403 quand il est refusé. Le premier essai du
+     commanditaire a rendu 401, que ce filtre ne reconnaissait pas. */
+  if (/app-?check|40[13]|unauthorized|permission|appCheck/i.test(brut)) {
     /* Le refus le plus probable au premier essai, et le plus déroutant : tout
        le reste de l'application marche. */
     return "L’assistant n’est pas encore autorisé sur cet appareil (App Check). Voir la console du navigateur pour le détail.";
