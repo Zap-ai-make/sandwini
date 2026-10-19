@@ -246,6 +246,7 @@ c'est le voir revenir sous un autre nom.
 | S54 | La supervision rend le travail aux espaces métier ; le prix d'achat se saisit sur la moto | S24, S39, S47 | post-MVP | terminée |
 | S55 | L'inventaire du stock, la caisse analytique et ses postes de dépense | S22, S24, S43, S46 | post-MVP | terminée |
 | S56 | Le portail du prestataire : un lien de suivi, et rien d'autre | S30, S53 | post-MVP | terminée le 16 oct., **déployée** sur `sandwini` (règles, index, fonctions) |
+| S53bis | Une vente n'ouvre plus qu'un document, et c'est la carte grise | S53, S11 | post-MVP | terminée le 18 oct., **déployée** sur `sandwini` (règles) |
 
 **S51, relevé le 8 octobre 2026.** Sur l'Inventaire (`/supervision/chiffres` alors,
 `/motos/inventaire` depuis S55), `scripts/captures.mjs`
