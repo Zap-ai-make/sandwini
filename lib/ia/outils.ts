@@ -1,5 +1,11 @@
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 
+import {
+  etatStock,
+  LIBELLE_ETAT_STOCK,
+  stockParPiece,
+  type MouvementPiece,
+} from "@/lib/domain/piece";
 import { db } from "@/lib/firebase/client";
 import { estRefus, lireProposition, resume } from "./propositions";
 
@@ -27,6 +33,19 @@ import { estRefus, lireProposition, resume } from "./propositions";
 
 /** Le plafond de lignes qu'un outil rend. Chaque ligne est facturée en jetons. */
 const PLAFOND = 50;
+
+/** Ce qu'on accepte de lire dans la base avant de filtrer. */
+const LECTURE_MAX = 200;
+
+/**
+ * Les mouvements se lisent **tous**, et non par tranche de deux cents.
+ *
+ * Ils ne partent pas au modèle : ils sont réduits ici en une quantité par
+ * pièce. Les plafonner serait donc gratuit en jetons et ruineux en justesse —
+ * c'est la seule lecture de ce fichier dont une coupure fausse un chiffre au
+ * lieu d'en cacher.
+ */
+const MOUVEMENTS_MAX = 5_000;
 
 export type ContexteOutils = {
   /** `null` veut dire « toutes les boutiques » : le responsable seul l'obtient. */
@@ -83,18 +102,20 @@ export const DECLARATIONS = [
   {
     name: "catalogue_pieces",
     description:
-      "Le catalogue des pièces détachées de la boutique, avec prix d'achat, prix de vente et " +
-      "seuil d'alerte. Le prix d'achat d'une pièce est visible du gérant, à l'inverse de celui " +
-      "d'une moto. Sert à répondre « à combien je vends », « qu'est-ce que ça m'a coûté ».",
-    parameters: { type: "object", properties: {} },
-  },
-  {
-    name: "mouvements_pieces",
-    description:
-      "Les mouvements de stock des pièces : entrées, sorties, ventes. La quantité en stock " +
-      "d'une référence est la somme de ses mouvements — il n'existe aucun compteur. Sert à " +
-      "répondre « combien il m'en reste », « qu'est-ce qui est en rupture ».",
-    parameters: { type: "object", properties: {} },
+      "Le catalogue des pièces détachées de la boutique : référence, désignation, prix d'achat, " +
+      "prix de vente, et **la quantité réellement en stock**, déjà calculée. Le prix d'achat " +
+      "d'une pièce est visible du gérant, à l'inverse de celui d'une moto. Répond à « combien " +
+      "il m'en reste », « qu'est-ce qui est en rupture », « à combien je vends ». Donne aussi " +
+      "l'identifiant à passer à `preparer_mouvement_piece`.",
+    parameters: {
+      type: "object",
+      properties: {
+        recherche: {
+          type: "string",
+          description: "Facultatif. Un mot à chercher dans la référence ou la désignation.",
+        },
+      },
+    },
   },
 
   /* --- Les deux gestes qui **préparent** une écriture, sans jamais l'écrire.
@@ -164,20 +185,32 @@ function reduire(texte: unknown): string {
     .toLowerCase();
 }
 
+/**
+ * Lit une collection, et **dit si elle a été coupée**.
+ *
+ * `tronque` n'est pas un détail de confort : une somme faite sur une liste
+ * tronquée rend un nombre faux qui a l'air juste. Le stock d'une pièce est
+ * précisément cela — la somme de ses mouvements — et un plafond silencieux
+ * annoncerait « il reste 12 bougies » à qui en a 40.
+ */
 async function lire(
   nomCollection: string,
   boutiqueId: string | null,
-): Promise<Record<string, unknown>[]> {
+  plafond: number,
+): Promise<{ lignes: Record<string, unknown>[]; tronque: boolean }> {
   const base = collection(db(), nomCollection);
   /* Le filtre par boutique part dans la requête, et non après la lecture : un
      gérant qui demanderait une autre boutique se verrait refuser par les règles,
      mais le responsable, lui, a le droit de tout lire — c'est le périmètre qui
      borne, pas le rôle. */
   const requete = boutiqueId
-    ? query(base, where("boutiqueId", "==", boutiqueId), limit(PLAFOND * 4))
-    : query(base, limit(PLAFOND * 4));
+    ? query(base, where("boutiqueId", "==", boutiqueId), limit(plafond))
+    : query(base, limit(plafond));
   const instantane = await getDocs(requete);
-  return instantane.docs.map((document) => ({ id: document.id, ...document.data() }));
+  return {
+    lignes: instantane.docs.map((document) => ({ id: document.id, ...document.data() })),
+    tronque: instantane.size >= plafond,
+  };
 }
 
 /** Les dates Firestore ne se sérialisent pas en JSON : on les rend lisibles. */
@@ -220,41 +253,87 @@ export async function executerOutil(
   try {
     switch (nom) {
       case "motos_en_stock": {
-        const motos = (await lire("motos", contexte.boutiqueId))
-          .filter((moto) => moto.statut === "en_stock")
-          .map(aplatir);
+        const lu = await lire("motos", contexte.boutiqueId, LECTURE_MAX);
+        const motos = lu.lignes.filter((moto) => moto.statut === "en_stock").map(aplatir);
         const recherche = reduire(arguments_.recherche);
         const retenues = recherche
           ? motos.filter((moto) => reduire(Object.values(moto).join(" ")).includes(recherche))
           : motos;
-        return { motos: retenues.slice(0, PLAFOND), combien: retenues.length };
+        return {
+          motos: retenues.slice(0, PLAFOND),
+          combien: retenues.length,
+          ...(lu.tronque ? { partiel: "La liste a été coupée : dis-le au lieu de conclure." } : {}),
+        };
       }
 
       case "chercher_client": {
         /* Les clients ne portent pas de boutique : une personne achète où elle
            veut, et couper son historique par magasin le rendrait faux. */
         const cherche = reduire(arguments_.nom);
-        const trouves = (await lire("clients", null))
+        const lu = await lire("clients", null, LECTURE_MAX);
+        const trouves = lu.lignes
           .map(aplatir)
           .filter((client) => reduire(Object.values(client).join(" ")).includes(cherche));
-        return { clients: trouves.slice(0, PLAFOND), combien: trouves.length };
+        return {
+          clients: trouves.slice(0, PLAFOND),
+          combien: trouves.length,
+          ...(lu.tronque ? { partiel: "La recherche n’a pas vu tout le fichier clients." } : {}),
+        };
       }
 
       case "ventes_recentes": {
-        const ventes = (await lire("ventes", contexte.boutiqueId))
+        const lu = await lire("ventes", contexte.boutiqueId, LECTURE_MAX);
+        const ventes = lu.lignes
           .map(aplatir)
           .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
         return { ventes: ventes.slice(0, PLAFOND), combien: ventes.length };
       }
 
       case "catalogue_pieces": {
-        const pieces = (await lire("pieces", contexte.boutiqueId)).map(aplatir);
-        return { pieces: pieces.slice(0, PLAFOND), combien: pieces.length };
-      }
+        /* **Le catalogue arrive avec son stock déjà fait.**
 
-      case "mouvements_pieces": {
-        const mouvements = (await lire("mouvementsPieces", contexte.boutiqueId)).map(aplatir);
-        return { mouvements: mouvements.slice(0, PLAFOND * 2), combien: mouvements.length };
+           Avant, le modèle recevait cent lignes de mouvements bruts et devait
+           les additionner lui-même : lent à transmettre, cher en jetons, et
+           faux dès qu'une ligne manquait. La somme est un calcul, pas une
+           opinion — elle se fait ici, avec la fonction que les écrans emploient
+           déjà (`stockParPiece`), donc avec le même résultat qu'à l'écran. */
+        const [cataloguee, bouges] = await Promise.all([
+          lire("pieces", contexte.boutiqueId, LECTURE_MAX),
+          lire("mouvementsPieces", contexte.boutiqueId, MOUVEMENTS_MAX),
+        ]);
+
+        const quantites = stockParPiece(
+          bouges.lignes as unknown as readonly MouvementPiece[],
+        );
+        const recherche = reduire(arguments_.recherche);
+        const pieces = cataloguee.lignes
+          .map(aplatir)
+          .filter((piece) =>
+            recherche ? reduire(Object.values(piece).join(" ")).includes(recherche) : true,
+          )
+          .map((piece) => {
+            const quantite = quantites.get(String(piece.id)) ?? 0;
+            return {
+              ...piece,
+              quantite,
+              etat: LIBELLE_ETAT_STOCK[etatStock(quantite, Number(piece.seuilAlerte ?? 0))],
+            };
+          });
+
+        return {
+          pieces: pieces.slice(0, PLAFOND),
+          combien: pieces.length,
+          /* Une somme tronquée rend un stock faux qui a l'air juste : on refuse
+             de le donner plutôt que de le donner avec une réserve que le modèle
+             pourrait oublier de répéter. */
+          ...(bouges.tronque
+            ? {
+                erreur:
+                  "Trop de mouvements pour recalculer le stock ici. Les quantités ne sont pas " +
+                  "sûres : renvoie vers l’espace Pièces.",
+              }
+            : {}),
+        };
       }
 
       case "preparer_depense":
@@ -304,6 +383,10 @@ export const LIBELLE_OUTIL: Record<string, string> = {
   motos_en_stock: "Lecture du stock de motos",
   chercher_client: "Recherche du client",
   ventes_recentes: "Lecture des ventes",
-  catalogue_pieces: "Lecture du catalogue de pièces",
-  mouvements_pieces: "Calcul du stock de pièces",
+  catalogue_pieces: "Lecture du catalogue et du stock de pièces",
+  /* Les deux gestes qui préparent sont nommés ici aussi : sans entrée, le
+     rendu retombait sur la clé technique et affichait « lu : preparer_depense »
+     sous la réponse — du code montré à un gérant. */
+  preparer_depense: "Préparation d’une dépense",
+  preparer_mouvement_piece: "Préparation d’un mouvement de stock",
 };

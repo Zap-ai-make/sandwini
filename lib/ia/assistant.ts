@@ -1,6 +1,6 @@
 "use client";
 
-import { AgentPlatformBackend, getAI, getGenerativeModel } from "firebase/ai";
+import { AgentPlatformBackend, getAI, getGenerativeModel, ThinkingLevel } from "firebase/ai";
 import { getApp } from "firebase/app";
 
 import { DECLARATIONS, executerOutil, type ContexteOutils } from "./outils";
@@ -11,6 +11,7 @@ import {
   OUTILS_QUI_PREPARENT,
   type Proposition,
 } from "./propositions";
+import { attenteAvantReessai, estSurcharge, statutHttp } from "./reessai";
 
 /**
  * La conversation avec Gemini, par Firebase AI Logic.
@@ -55,6 +56,35 @@ const MODELE = "gemini-3.8-flash";
 const BACKEND = () => new AgentPlatformBackend();
 
 /**
+ * **Le réglage qui décide de l'attente ressentie.**
+ *
+ * Par défaut, un modèle de la série 3 choisit lui-même combien réfléchir avant
+ * d'écrire son premier mot — et il réfléchit beaucoup. C'est ce silence, et non
+ * le réseau, qui faisait patienter plusieurs secondes devant un écran vide sur
+ * des questions aussi simples que « qu'est-ce qu'on a en stock ».
+ *
+ * `LOW` plutôt que `MINIMAL` : il reste un vrai choix à faire — quel outil
+ * appeler, avec quels arguments — et couper net la réflexion dégraderait ce
+ * choix, ce qui coûterait un aller-retour de plus. On la raccourcit, on ne la
+ * supprime pas.
+ *
+ * Si un modèle futur refuse `thinkingLevel`, c'est ici que ça se verra : la
+ * série 2.5 ne connaissait que `thinkingBudget`.
+ */
+const REFLEXION = ThinkingLevel.LOW;
+
+/**
+ * Une réponse de comptoir est courte. Ce plafond ne sert pas à tailler dans le
+ * texte, mais à borner le pire cas — une boucle qui réciterait le catalogue.
+ *
+ * **Large exprès** : les jetons de réflexion se comptent dans ce budget. Le
+ * serrer trop ferait dépenser le plafond à réfléchir et rendrait une réponse
+ * coupée au milieu d'une phrase — une panne silencieuse, pire que la verbosité
+ * qu'on cherchait à éviter.
+ */
+const REPONSE_MAX = 4096;
+
+/**
  * Le nombre d'allers-retours d'outils qu'un tour s'autorise.
  *
  * Sans plafond, un modèle qui boucle sur un outil en erreur consommerait des
@@ -79,6 +109,11 @@ export type Progres =
   /** Le texte **cumulé** depuis le début, pas le seul morceau qui vient d'arriver. */
   | { quoi: "texte"; texte: string }
   /**
+   * Le serveur était occupé, on reprend. Dit plutôt que caché : trois secondes
+   * de silence inexpliqué se lisent comme une panne.
+   */
+  | { quoi: "attente"; reprise: number }
+  /**
    * Une écriture **préparée**, que l'écran va faire confirmer.
    *
    * Elle remonte par ce chemin plutôt que dans la réponse finale : la carte
@@ -100,6 +135,10 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
   const modele = getGenerativeModel(ia, {
     model: MODELE,
     systemInstruction: promptSysteme(quiParle),
+    generationConfig: {
+      thinkingConfig: { thinkingLevel: REFLEXION },
+      maxOutputTokens: REPONSE_MAX,
+    },
     tools: [{ functionDeclarations: DECLARATIONS as unknown as [] }],
   });
 
@@ -120,16 +159,36 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
        * parle, lit un outil, puis reprend, les deux moitiés appartiennent à la
        * même réponse. L'effacer entre les deux ferait disparaître sous les yeux
        * ce qui venait d'être lu.
+       *
+       * **Et il reprend tout seul quand le serveur est occupé.** Voir
+       * `reessai.ts` : un 429 n'est pas un forfait dépassé, c'est une file
+       * pleine à l'instant T. Le SDK n'ajoute la question à son historique
+       * qu'en cas de succès — on l'a vérifié dans sa source — donc renvoyer le
+       * même message est sans effet de bord, et c'est ce qui rend cette boucle
+       * sûre.
        */
       const tourEnFlux = async (envoi: Parameters<typeof discussion.sendMessageStream>[0]) => {
-        const flux = await discussion.sendMessageStream(envoi);
-        for await (const morceau of flux.stream) {
-          const texte = morceau.text();
-          if (!texte) continue;
-          cumul += texte;
-          surProgres?.({ quoi: "texte", texte: cumul });
+        for (let reprise = 0; ; reprise += 1) {
+          /* Ce qui est déjà parti à l'écran ne se rejoue pas : reprendre après
+             un flux entamé réécrirait le début de la phrase. */
+          const dejaDit = cumul;
+          try {
+            const flux = await discussion.sendMessageStream(envoi);
+            for await (const morceau of flux.stream) {
+              const texte = morceau.text();
+              if (!texte) continue;
+              cumul += texte;
+              surProgres?.({ quoi: "texte", texte: cumul });
+            }
+            return flux.response;
+          } catch (cause) {
+            const attente =
+              cumul === dejaDit && estSurcharge(cause) ? attenteAvantReessai(reprise) : null;
+            if (attente === null) throw cause;
+            surProgres?.({ quoi: "attente", reprise: reprise + 1 });
+            await new Promise((resoudre) => setTimeout(resoudre, attente));
+          }
         }
-        return flux.response;
       };
 
       let reponse = { response: await tourEnFlux(question) };
@@ -194,28 +253,34 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
  */
 export function messageErreurAssistant(cause: unknown): string {
   const brut = `${(cause as { code?: string }).code ?? ""} ${(cause as Error)?.message ?? ""}`;
+  const statut = statutHttp(cause);
   console.error("[assistant] échec brut :", cause);
 
   /* `401` autant que `403` : Firebase AI Logic rend 401 quand le jeton App
      Check manque, et 403 quand il est refusé. Le premier essai du
      commanditaire a rendu 401, que ce filtre ne reconnaissait pas. */
-  if (/app-?check|40[13]|unauthorized|permission|appCheck/i.test(brut)) {
+  if (statut === 401 || statut === 403 || /app-?check|unauthorized|appCheck/i.test(brut)) {
     /* Le refus le plus probable au premier essai, et le plus déroutant : tout
        le reste de l'application marche. */
     return "L’assistant n’est pas encore autorisé sur cet appareil (App Check). Voir la console du navigateur pour le détail.";
   }
   /* **Deux refus portent le même 429, et ils n'appellent pas le même geste.**
-     Une limite de débit se dissipe en attendant ; des crédits épuisés, jamais.
-     Dire « réessayez dans quelques minutes » à qui doit payer l'envoie
-     attendre un retour qui n'arrivera pas — c'est la faute que ce commentaire
-     existe pour empêcher de refaire. */
+     Une file pleine se vide en quelques secondes ; des crédits épuisés,
+     jamais. Dire « réessayez » à qui doit payer l'envoie attendre un retour
+     qui n'arrivera pas — c'est la faute que ce commentaire existe pour
+     empêcher de refaire. */
   if (/credits? (are )?depleted|billing|prepayment|out of credits/i.test(brut)) {
     return "Les crédits Gemini du projet sont épuisés. Rechargez la facturation du projet Firebase — attendre ne suffira pas.";
   }
-  if (/quota|429|resource-exhausted|rate.?limit/i.test(brut)) {
-    return "L’assistant a atteint sa limite d’appels pour le moment. Réessayez dans quelques minutes.";
+  /* On n'arrive ici qu'**après** les reprises automatiques de `reessai.ts` :
+     le service était occupé plusieurs secondes d'affilée. Le message ne parle
+     donc plus de « limite d'appels », qui laissait croire à un forfait
+     dépassé, et qui envoyait chercher un quota à relever là où il n'y en a
+     aucun — la capacité est partagée, pas achetée. */
+  if (statut === 429 || statut === 503 || /quota|resource-exhausted|rate.?limit/i.test(brut)) {
+    return "Le service Gemini est saturé en ce moment, et les reprises automatiques n’ont pas suffi. Reposez la question dans un instant : ce n’est pas un dépassement de forfait.";
   }
-  if (/not.?enabled|disabled|SERVICE_DISABLED|has not been used|404/i.test(brut)) {
+  if (statut === 404 || /not.?enabled|disabled|SERVICE_DISABLED|has not been used/i.test(brut)) {
     /* L'API Gemini pas encore activée sur le projet : le cas du premier jour,
        et il n'a rien d'un problème de réseau. */
     return "L’API Gemini n’est pas activée sur ce projet Firebase. Console Firebase → AI Logic.";

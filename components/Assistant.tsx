@@ -16,7 +16,7 @@ import {
   type Discussion,
 } from "@/lib/ia/historique";
 import { LIBELLE_OUTIL } from "@/lib/ia/outils";
-import { resume, type Proposition } from "@/lib/ia/propositions";
+import { OUTILS_QUI_PREPARENT, resume, type Proposition } from "@/lib/ia/propositions";
 import { trouverParNom } from "@/lib/domain/referentiel";
 import { enregistrerSortieEspeces } from "@/lib/repositories/caisse";
 import { usePostesDepense } from "@/lib/repositories/catalogue";
@@ -45,6 +45,25 @@ import { useEtatReseau } from "@/lib/reseau/etat-reseau";
  *   pas Firestore.
  */
 
+/**
+ * Ce que l'assistant a lu pour répondre.
+ *
+ * Un chiffre sans sa source se croit ou ne se croit pas ; avec elle, il se
+ * vérifie. **Les gestes qui préparent une écriture n'en sont pas** : ils ne
+ * lisent rien, et les ranger là affichait « lu : préparation d'une dépense »
+ * sous une réponse qui n'avait rien lu du tout.
+ */
+function SourcesLues({ outils }: { outils: readonly string[] }) {
+  const lectures = [...new Set(outils)].filter((nom) => !OUTILS_QUI_PREPARENT.has(nom));
+  if (lectures.length === 0) return null;
+
+  return (
+    <p className="mt-2 text-xs text-encre-doux">
+      lu&nbsp;: {lectures.map((nom) => LIBELLE_OUTIL[nom] ?? "données").join(", ").toLowerCase()}
+    </p>
+  );
+}
+
 /** Les trois points de la réflexion. Décalés pour que l'œil lise un mouvement. */
 function Reflexion({ quoi }: { quoi: string }) {
   return (
@@ -65,7 +84,7 @@ function Reflexion({ quoi }: { quoi: string }) {
 
 export function Assistant() {
   const session = useSession();
-  const { perimetre } = usePerimetre();
+  const { perimetre, boutiques, choisir } = usePerimetre();
   const { enLigne } = useEtatReseau();
 
   /* L'historique est cloisonné par compte : deux personnes qui se relaient sur
@@ -193,6 +212,10 @@ export function Assistant() {
       setDiscussion(enTete);
       setSaisie("");
       setEnFlux("");
+      /* **La carte de la question précédente s'efface ici.** Laissée en place,
+         elle survivait à la question suivante : on lisait une nouvelle réponse
+         avec, dessous, un « Enregistrer » qui engageait l'ancienne dépense. */
+      setProposition(null);
       setEnCours("Réflexion…");
 
       try {
@@ -217,8 +240,16 @@ export function Assistant() {
             setEcriture("attente");
             return;
           }
+          if (progres.quoi === "attente") {
+            /* Le serveur était occupé et on reprend tout seul. Le dire : trois
+               secondes de silence après « Réflexion… » se lisent comme une
+               panne, et le gérant renverrait sa question par-dessus. */
+            setEnFlux("");
+            setEnCours(`Le service est occupé, nouvelle tentative (${progres.reprise})…`);
+            return;
+          }
           setEnCours(
-            progres.noms.map((nom) => LIBELLE_OUTIL[nom] ?? "Lecture").join(" · ") + "…",
+            progres.noms.map((nom: string) => LIBELLE_OUTIL[nom] ?? "Lecture").join(" · ") + "…",
           );
         });
 
@@ -368,18 +399,7 @@ export function Assistant() {
                   ) : (
                     <>
                       <AssistantTexte texte={bulle.texte} />
-                      {bulle.outils && bulle.outils.length > 0 && (
-                        /* Ce qu'il a lu pour répondre. Un chiffre sans sa source
-                           se croit ou ne se croit pas ; avec elle, il se
-                           vérifie. */
-                        <p className="mt-2 text-xs text-encre-doux">
-                          lu&nbsp;:{" "}
-                          {[...new Set(bulle.outils)]
-                            .map((nom) => LIBELLE_OUTIL[nom] ?? nom)
-                            .join(", ")
-                            .toLowerCase()}
-                        </p>
-                      )}
+                      {bulle.outils && <SourcesLues outils={bulle.outils} />}
                     </>
                   )}
                 </div>
@@ -391,61 +411,98 @@ export function Assistant() {
                 </div>
               )}
 
-              {proposition !== null && (
-                /* **La carte qui engage.** Elle redit en toutes lettres ce qui
-                   sera écrit : les règles Firestore refusent une écriture mal
-                   formée, elles ne peuvent rien contre une écriture valide et
-                   fausse. Seul quelqu'un qui connaît sa journée voit que la
-                   sortie de 15 000 était de 1 500. */
-                <section
-                  aria-label="Écriture à valider"
-                  className="mt-4 cadre border-accent p-4"
-                >
-                  <p className="font-semibold text-encre">À valider</p>
-                  <p className="mt-1 text-encre">{resume(proposition)}</p>
-
-                  {!perimetre.boutiqueId ? (
-                    <p className="mt-3 text-sm text-encre-doux">
-                      Une écriture appartient à une boutique. Choisissez-en une dans le bandeau
-                      avant de valider.
-                    </p>
-                  ) : ecriture === "faite" ? (
-                    <p className="mt-3 text-sm text-encre">
-                      Enregistré. La ligne apparaît dans {proposition.quoi === "depense"
-                        ? "le journal de caisse"
-                        : "le stock de la pièce"}.
-                    </p>
-                  ) : (
-                    <>
-                      {typeof ecriture === "string" &&
-                        ecriture !== "attente" &&
-                        ecriture !== "en_cours" && (
-                          <p className="mt-2 text-sm text-encre">{ecriture}</p>
-                        )}
-                      <div className="mt-3 flex gap-2">
-                        <button
-                          type="button"
-                          onClick={() => void confirmer()}
-                          disabled={ecriture === "en_cours"}
-                          className="bouton bouton-principal"
-                        >
-                          {ecriture === "en_cours" ? "Enregistrement…" : "Enregistrer"}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setProposition(null)}
-                          className="bouton bouton-neutre"
-                        >
-                          Annuler
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </section>
-              )}
-
               {enCours !== null && <Reflexion quoi={enCours} />}
             </div>
+
+            {proposition !== null && (
+              /* **La carte qui engage, et elle vit hors du fil.**
+
+                 Dans le fil, elle défilait avec la conversation : une réponse
+                 un peu longue la poussait sous le bord de l'écran, et le geste
+                 le plus important du panneau devenait celui qu'on ne voyait
+                 plus. Posée au-dessus de la barre de saisie, elle reste là tant
+                 qu'on n'a pas tranché.
+
+                 Elle redit en toutes lettres ce qui sera écrit : les règles
+                 Firestore refusent une écriture mal formée, elles ne peuvent
+                 rien contre une écriture valide et fausse. Seul quelqu'un qui
+                 connaît sa journée voit que la sortie de 15 000 était de
+                 1 500. */
+              <section
+                aria-label="Écriture à valider"
+                className="border-t border-accent bg-accent-doux/40 p-4"
+              >
+                <p className="font-semibold text-encre">À valider</p>
+                <p className="mt-1 text-encre">{resume(proposition)}</p>
+
+                {!perimetre.boutiqueId ? (
+                  /* **Le cul-de-sac d'avant.** La carte disait d'aller choisir
+                     une boutique dans le bandeau — derrière le panneau, donc
+                     invisible — et ne laissait aucun geste. On pose le choix
+                     ici : c'est la même fonction que le bandeau appelle, donc
+                     le même périmètre pour toute l'application. */
+                  <div className="mt-3">
+                    <p className="text-sm text-encre-doux">
+                      Une écriture appartient à une boutique. Dans laquelle&nbsp;?
+                    </p>
+                    {boutiques.filter((boutique) => boutique.actif).length === 0 ? (
+                      <p className="mt-2 text-sm text-encre-doux">
+                        Aucune boutique ouverte n’est disponible sur ce compte.
+                      </p>
+                    ) : (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {boutiques
+                          .filter((boutique) => boutique.actif)
+                          .map((boutique) => (
+                            <button
+                              key={boutique.id}
+                              type="button"
+                              onClick={() => choisir(boutique.id)}
+                              className="bouton bouton-neutre"
+                            >
+                              {boutique.nom}
+                            </button>
+                          ))}
+                      </div>
+                    )}
+                  </div>
+                ) : ecriture === "faite" ? (
+                  <p className="mt-3 text-sm text-encre">
+                    Enregistré. La ligne apparaît dans{" "}
+                    {proposition.quoi === "depense"
+                      ? "le journal de caisse"
+                      : "le stock de la pièce"}
+                    .
+                  </p>
+                ) : (
+                  <>
+                    {typeof ecriture === "string" &&
+                      ecriture !== "attente" &&
+                      ecriture !== "en_cours" && (
+                        <p className="mt-2 text-sm text-encre">{ecriture}</p>
+                      )}
+                    <p className="mt-2 text-sm text-encre-doux">Dans {perimetre.nom}.</p>
+                    <div className="mt-3 flex gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void confirmer()}
+                        disabled={ecriture === "en_cours"}
+                        className="bouton bouton-principal"
+                      >
+                        {ecriture === "en_cours" ? "Enregistrement…" : "Enregistrer"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setProposition(null)}
+                        className="bouton bouton-neutre"
+                      >
+                        Annuler
+                      </button>
+                    </div>
+                  </>
+                )}
+              </section>
+            )}
 
             <form
               onSubmit={(evenement) => {

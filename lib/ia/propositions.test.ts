@@ -127,7 +127,11 @@ describe("le résumé que l’utilisateur relit avant de valider", () => {
       poste: "Carburant",
       libelle: "Groupe",
     });
-    expect(phrase).toContain("15000");
+    /* **Espacé comme partout ailleurs dans le produit.** C'est l'écran où l'on
+       doit voir un zéro de trop : « 15000 » s'y lisait moins bien que
+       « 15 000 », et c'était le seul endroit à l'écrire ainsi. */
+    expect(phrase.replace(/[  ]/g, " ")).toContain("15 000 FCFA");
+    expect(phrase).not.toContain("15000");
     expect(phrase).toContain("Carburant");
     expect(phrase).toContain("Groupe");
   });

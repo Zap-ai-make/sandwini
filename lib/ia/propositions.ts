@@ -23,6 +23,8 @@
  * que le modèle propose en une intention vérifiée, ou en un refus qui se lit.
  */
 
+import { formaterMontant } from "../domain/format";
+
 export type Proposition =
   | { quoi: "depense"; montant: number; libelle: string; poste: string }
   | {
@@ -120,11 +122,18 @@ export function estRefus(valeur: Proposition | Refus): valeur is Refus {
   return "erreur" in valeur;
 }
 
-/** La phrase que le modèle redit à l'utilisateur, pour qu'il sache quoi vérifier. */
+/**
+ * La phrase que l'utilisateur relit avant de valider.
+ *
+ * **Le montant passe par le formateur du produit**, et pas par une
+ * interpolation. La carte affichait « 15000 FCFA » pendant que tout le reste
+ * de l'application écrit « 15 000 FCFA » : sur le seul écran où l'on doit
+ * repérer un zéro de trop, c'était l'écriture la moins lisible du produit.
+ */
 export function resume(proposition: Proposition): string {
   if (proposition.quoi === "depense") {
     const detail = proposition.libelle ? ` — ${proposition.libelle}` : "";
-    return `Sortie de ${proposition.montant} FCFA, rangée au poste « ${proposition.poste} »${detail}.`;
+    return `Sortie de ${formaterMontant(proposition.montant)}, rangée au poste « ${proposition.poste} »${detail}.`;
   }
   const geste = proposition.sens === "entree" ? "Entrée" : "Sortie";
   const quoi = proposition.reference || "cette pièce";
