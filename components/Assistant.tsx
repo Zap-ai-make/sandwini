@@ -16,6 +16,12 @@ import {
   type Discussion,
 } from "@/lib/ia/historique";
 import { LIBELLE_OUTIL } from "@/lib/ia/outils";
+import { resume, type Proposition } from "@/lib/ia/propositions";
+import { trouverParNom } from "@/lib/domain/referentiel";
+import { enregistrerSortieEspeces } from "@/lib/repositories/caisse";
+import { usePostesDepense } from "@/lib/repositories/catalogue";
+import { enregistrerMouvement } from "@/lib/repositories/pieces";
+import { creerEntree } from "@/lib/repositories/referentiels";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 
@@ -77,6 +83,12 @@ export function Assistant() {
   /* Le texte qui arrive, avant d'être figé en bulle. Séparé des bulles pour que
      chaque morceau ne réécrive pas toute la liste. */
   const [enFlux, setEnFlux] = useState("");
+  /* Ce que l'assistant propose d'écrire, en attente du geste humain. Une seule
+     à la fois : deux cartes empilées feraient valider la mauvaise. */
+  const [proposition, setProposition] = useState<Proposition | null>(null);
+  const [ecriture, setEcriture] = useState<"attente" | "en_cours" | "faite" | string>("attente");
+
+  const { postes } = usePostesDepense();
 
   const conversation = useRef<Conversation | null>(null);
   const filDeDiscussion = useRef<HTMLDivElement | null>(null);
@@ -100,8 +112,61 @@ export function Assistant() {
     conversation.current = null;
     setDiscussion(nouvelleDiscussion());
     setEnFlux("");
+    setProposition(null);
     setMontreHistorique(false);
   }, []);
+
+  /**
+   * Le geste qui engage, et le seul endroit de ce lot qui écrit.
+   *
+   * L'assistant a préparé ; ici c'est la personne qui valide, et les mêmes
+   * fonctions de dépôt que les écrans emploient. Rien d'un chemin parallèle :
+   * les règles Firestore valident cette écriture comme n'importe quelle autre,
+   * et une dépense faite par l'assistant est indistinguable d'une dépense
+   * saisie à la main — même forme, même audit, même journal.
+   */
+  const confirmer = useCallback(async () => {
+    if (proposition === null || session.statut !== "connecte" || !perimetre.boutiqueId) return;
+    const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
+    setEcriture("en_cours");
+
+    try {
+      if (proposition.quoi === "depense") {
+        /* On reconnaît le poste plutôt qu'on ne l'impose : « carburant »
+           retrouve « Carburant ». Même chemin qu'à l'écran des dépenses, pour
+           qu'un poste créé ici soit celui qu'on y retrouve. */
+        const existant = trouverParNom(proposition.poste, postes);
+        let posteId = existant?.id;
+        if (!posteId) {
+          const creation = creerEntree("postesDepense", proposition.poste, auteur);
+          posteId = creation.id;
+          creation.enregistre.catch(() => undefined);
+        }
+        /* L'écriture n'est pas attendue : hors ligne la promesse ne se résout
+           jamais, et le bouton resterait bloqué sur une écriture pourtant déjà
+           acquise au cache (D76). */
+        enregistrerSortieEspeces(
+          perimetre.boutiqueId,
+          { montant: String(proposition.montant), libelle: proposition.libelle, posteId },
+          auteur,
+        ).catch(() => undefined);
+      } else {
+        enregistrerMouvement(
+          {
+            pieceId: proposition.pieceId,
+            type: proposition.sens,
+            quantite: String(proposition.quantite),
+            note: proposition.note,
+          },
+          perimetre.boutiqueId,
+          auteur,
+        ).enregistre.catch(() => undefined);
+      }
+      setEcriture("faite");
+    } catch (cause) {
+      setEcriture((cause as Error)?.message ?? "L’enregistrement a échoué.");
+    }
+  }, [proposition, session, perimetre, postes]);
 
   const reprendre = useCallback((ancienne: Discussion) => {
     /* **La conversation repart à zéro côté modèle, et c'est assumé.** Relire
@@ -145,6 +210,11 @@ export function Assistant() {
           if (progres.quoi === "texte") {
             setEnFlux(progres.texte);
             setEnCours(null);
+            return;
+          }
+          if (progres.quoi === "proposition") {
+            setProposition(progres.proposition);
+            setEcriture("attente");
             return;
           }
           setEnCours(
@@ -319,6 +389,59 @@ export function Assistant() {
                 <div className="mt-4">
                   <AssistantTexte texte={enFlux} />
                 </div>
+              )}
+
+              {proposition !== null && (
+                /* **La carte qui engage.** Elle redit en toutes lettres ce qui
+                   sera écrit : les règles Firestore refusent une écriture mal
+                   formée, elles ne peuvent rien contre une écriture valide et
+                   fausse. Seul quelqu'un qui connaît sa journée voit que la
+                   sortie de 15 000 était de 1 500. */
+                <section
+                  aria-label="Écriture à valider"
+                  className="mt-4 cadre border-accent p-4"
+                >
+                  <p className="font-semibold text-encre">À valider</p>
+                  <p className="mt-1 text-encre">{resume(proposition)}</p>
+
+                  {!perimetre.boutiqueId ? (
+                    <p className="mt-3 text-sm text-encre-doux">
+                      Une écriture appartient à une boutique. Choisissez-en une dans le bandeau
+                      avant de valider.
+                    </p>
+                  ) : ecriture === "faite" ? (
+                    <p className="mt-3 text-sm text-encre">
+                      Enregistré. La ligne apparaît dans {proposition.quoi === "depense"
+                        ? "le journal de caisse"
+                        : "le stock de la pièce"}.
+                    </p>
+                  ) : (
+                    <>
+                      {typeof ecriture === "string" &&
+                        ecriture !== "attente" &&
+                        ecriture !== "en_cours" && (
+                          <p className="mt-2 text-sm text-encre">{ecriture}</p>
+                        )}
+                      <div className="mt-3 flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => void confirmer()}
+                          disabled={ecriture === "en_cours"}
+                          className="bouton bouton-principal"
+                        >
+                          {ecriture === "en_cours" ? "Enregistrement…" : "Enregistrer"}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setProposition(null)}
+                          className="bouton bouton-neutre"
+                        >
+                          Annuler
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </section>
               )}
 
               {enCours !== null && <Reflexion quoi={enCours} />}

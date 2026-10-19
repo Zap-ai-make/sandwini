@@ -5,6 +5,12 @@ import { getApp } from "firebase/app";
 
 import { DECLARATIONS, executerOutil, type ContexteOutils } from "./outils";
 import { promptSysteme, type QuiParle } from "./prompt";
+import {
+  estRefus,
+  lireProposition,
+  OUTILS_QUI_PREPARENT,
+  type Proposition,
+} from "./propositions";
 
 /**
  * La conversation avec Gemini, par Firebase AI Logic.
@@ -71,7 +77,15 @@ export type Tour = { de: "humain" | "assistant"; texte: string };
 export type Progres =
   | { quoi: "outils"; noms: string[] }
   /** Le texte **cumulé** depuis le début, pas le seul morceau qui vient d'arriver. */
-  | { quoi: "texte"; texte: string };
+  | { quoi: "texte"; texte: string }
+  /**
+   * Une écriture **préparée**, que l'écran va faire confirmer.
+   *
+   * Elle remonte par ce chemin plutôt que dans la réponse finale : la carte
+   * doit apparaître dès que le modèle la compose, pendant qu'il rédige encore
+   * sa phrase. L'utilisateur voit ce qui sera écrit avant d'avoir fini de lire.
+   */
+  | { quoi: "proposition"; proposition: Proposition };
 
 export type Conversation = {
   /** Rend le texte de la réponse, et la liste des outils réellement employés. */
@@ -125,6 +139,19 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
         if (appels.length === 0) break;
 
         surProgres?.({ quoi: "outils", noms: appels.map((appel) => appel.name) });
+
+        /* Les gestes qui préparent une écriture remontent à l'écran. La même
+           lecture pure sert deux fois — ici pour la carte, dans `executerOutil`
+           pour ce que le modèle redit — plutôt qu'un aller-retour d'état entre
+           les deux. */
+        for (const appel of appels) {
+          if (!OUTILS_QUI_PREPARENT.has(appel.name)) continue;
+          const proposition = lireProposition(
+            appel.name,
+            (appel.args ?? {}) as Record<string, unknown>,
+          );
+          if (!estRefus(proposition)) surProgres?.({ quoi: "proposition", proposition });
+        }
 
         /* En parallèle : le modèle demande volontiers deux lectures d'un coup,
            et les enchaîner doublerait l'attente au comptoir. */

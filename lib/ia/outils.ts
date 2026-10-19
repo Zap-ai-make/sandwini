@@ -1,6 +1,7 @@
 import { collection, getDocs, limit, query, where } from "firebase/firestore";
 
 import { db } from "@/lib/firebase/client";
+import { estRefus, lireProposition, resume } from "./propositions";
 
 /**
  * Les outils que l'assistant peut demander — et c'est **le navigateur qui les
@@ -94,6 +95,62 @@ export const DECLARATIONS = [
       "d'une référence est la somme de ses mouvements — il n'existe aucun compteur. Sert à " +
       "répondre « combien il m'en reste », « qu'est-ce qui est en rupture ».",
     parameters: { type: "object", properties: {} },
+  },
+
+  /* --- Les deux gestes qui **préparent** une écriture, sans jamais l'écrire.
+         L'assistant remplit, l'humain valide, les règles refusent : voir
+         `lib/ia/propositions.ts` pour pourquoi les trois, et pas seulement le
+         troisième. --- */
+  {
+    name: "preparer_depense",
+    description:
+      "Prépare une sortie d'espèces de la caisse, à faire valider par l'utilisateur. " +
+      "N'ENREGISTRE RIEN : l'utilisateur verra une carte et devra confirmer. Sers-toi en " +
+      "quand on te dit « note 15000 de carburant », « j'ai payé le loyer ». Demande le poste " +
+      "si on ne te l'a pas donné.",
+    parameters: {
+      type: "object",
+      properties: {
+        montant: { type: "number", description: "En francs CFA, entier et positif." },
+        poste: {
+          type: "string",
+          description:
+            "Où ranger la dépense : Carburant, Loyer, Salaires… Il se crée s'il n'existe pas.",
+        },
+        libelle: {
+          type: "string",
+          description: "Facultatif. Le détail, quand le poste ne suffit pas à dire laquelle.",
+        },
+      },
+      required: ["montant", "poste"],
+    },
+  },
+  {
+    name: "preparer_mouvement_piece",
+    description:
+      "Prépare une entrée ou une sortie de stock pour une pièce, à faire valider par " +
+      "l'utilisateur. N'ENREGISTRE RIEN. Sers-toi en quand on te dit « j'ai reçu 40 bougies », " +
+      "« retire 2 plaquettes cassées ». Appelle d'abord `catalogue_pieces` pour obtenir " +
+      "l'identifiant exact de la pièce — ne l'invente jamais.",
+    parameters: {
+      type: "object",
+      properties: {
+        pieceId: {
+          type: "string",
+          description: "L'identifiant rendu par `catalogue_pieces`, jamais un nom.",
+        },
+        reference: { type: "string", description: "La référence, pour l'afficher à l'utilisateur." },
+        sens: {
+          type: "string",
+          description:
+            "`entree` quand le stock monte, `sortie_autre` quand il descend sans vente " +
+            "(casse, usage interne). Une vente ne passe jamais par ici.",
+        },
+        quantite: { type: "number", description: "Toujours positive : le sens vient de `sens`." },
+        note: { type: "string", description: "Facultatif. Pourquoi ce mouvement." },
+      },
+      required: ["pieceId", "sens", "quantite"],
+    },
   },
 ] as const;
 
@@ -198,6 +255,24 @@ export async function executerOutil(
       case "mouvements_pieces": {
         const mouvements = (await lire("mouvementsPieces", contexte.boutiqueId)).map(aplatir);
         return { mouvements: mouvements.slice(0, PLAFOND * 2), combien: mouvements.length };
+      }
+
+      case "preparer_depense":
+      case "preparer_mouvement_piece": {
+        /* **Rien ne s'écrit ici.** On rend au modèle ce qu'il a compris, pour
+           qu'il le redise à l'utilisateur ; la carte de confirmation, elle, est
+           montée par `components/Assistant.tsx` à partir de la même lecture.
+           Un refus remonte tel quel : le modèle doit alors redemander ce qui
+           manque plutôt que de proposer une carte à moitié remplie. */
+        const proposition = lireProposition(nom, arguments_);
+        if (estRefus(proposition)) return proposition;
+        return {
+          prepare: true,
+          resume: resume(proposition),
+          consigne:
+            "Rien n'est enregistré. Annonce à l'utilisateur ce que tu proposes et dis-lui de " +
+            "valider la carte affichée sous ta réponse.",
+        };
       }
 
       default:

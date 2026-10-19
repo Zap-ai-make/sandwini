@@ -61,6 +61,24 @@ describe("le prompt système de l'assistant", () => {
     expect(prompt).toContain("Tu n’enregistres jamais rien toi-même");
   });
 
+  it("interdit d’annoncer un enregistrement que personne n’a validé", () => {
+    /* La phrase la plus dangereuse que l'assistant puisse écrire : « c'est
+       noté ». Le gérant passe à autre chose, la carte reste en attente, et la
+       dépense n'existe nulle part. */
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("Ne dis jamais que");
+    expect(prompt).toContain("Enregistrer");
+  });
+
+  it("nomme les deux gestes qu’il sait préparer, et renvoie aux écrans pour le reste", () => {
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("preparer_depense");
+    expect(prompt).toContain("preparer_mouvement_piece");
+    /* Sans cette dernière phrase, le modèle promet des ventes de motos qu'il
+       ne peut pas préparer. */
+    expect(prompt).toContain("n’a pas encore de geste");
+  });
+
   it("ne parle jamais de marge de moto à un gérant", () => {
     /* Le mur D2. Il tient par les règles de toute façon, mais un assistant qui
        annonce « je ne peux pas te le dire » est plus honnête qu'un assistant qui
