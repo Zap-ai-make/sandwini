@@ -118,7 +118,15 @@ export function messageErreurAssistant(cause: unknown): string {
        le reste de l'application marche. */
     return "L’assistant n’est pas encore autorisé sur cet appareil (App Check). Voir la console du navigateur pour le détail.";
   }
-  if (/quota|429|resource-exhausted/i.test(brut)) {
+  /* **Deux refus portent le même 429, et ils n'appellent pas le même geste.**
+     Une limite de débit se dissipe en attendant ; des crédits épuisés, jamais.
+     Dire « réessayez dans quelques minutes » à qui doit payer l'envoie
+     attendre un retour qui n'arrivera pas — c'est la faute que ce commentaire
+     existe pour empêcher de refaire. */
+  if (/credits? (are )?depleted|billing|prepayment|out of credits/i.test(brut)) {
+    return "Les crédits Gemini du projet sont épuisés. Rechargez la facturation du projet Firebase — attendre ne suffira pas.";
+  }
+  if (/quota|429|resource-exhausted|rate.?limit/i.test(brut)) {
     return "L’assistant a atteint sa limite d’appels pour le moment. Réessayez dans quelques minutes.";
   }
   if (/not.?enabled|disabled|SERVICE_DISABLED|has not been used|404/i.test(brut)) {
