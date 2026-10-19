@@ -255,6 +255,35 @@ export const DECLARATIONS = [
     },
   },
   {
+    name: "preparer_vente_moto",
+    description:
+      "Ouvre la saisie d'une vente de moto **déjà remplie**, à faire valider par " +
+      "l'utilisateur. N'ENREGISTRE RIEN : la vente ne part que s'il la valide à l'écran. " +
+      "Sers-toi en quand on te dit « vends la Sanili rouge à Ouédraogo à 1 200 000 ». " +
+      "Appelle d'abord `motos_en_stock` pour l'identifiant de la moto, et `chercher_client` " +
+      "pour celui du client : ne les invente jamais.",
+    parameters: {
+      type: "object",
+      properties: {
+        motoId: {
+          type: "string",
+          description: "L'identifiant rendu par `motos_en_stock`, jamais un modèle.",
+        },
+        clientId: {
+          type: "string",
+          description:
+            "Facultatif. L'identifiant rendu par `chercher_client`. Laisse vide si le client " +
+            "n'existe pas encore : il se crée à l'écran.",
+        },
+        prixConvenu: {
+          type: "number",
+          description: "Facultatif. Le prix de vente en francs CFA, entier.",
+        },
+      },
+      required: ["motoId"],
+    },
+  },
+  {
     name: "fermer_l_assistant",
     description:
       "Referme le panneau pour laisser voir l'écran. Sers-toi en quand on te dit « ferme », " +
@@ -600,7 +629,8 @@ export async function executerOutil(
 
       case "aller_a":
       case "choisir_la_boutique":
-      case "fermer_l_assistant": {
+      case "fermer_l_assistant":
+      case "preparer_vente_moto": {
         /* **Rien ne bouge ici.** Ce fichier n'a ni routeur ni périmètre : le
            geste est lu, validé, et remonte à `components/Assistant.tsx` qui
            seul peut l'exécuter. On rend au modèle de quoi l'annoncer. */
@@ -674,4 +704,5 @@ export const LIBELLE_OUTIL: Record<string, string> = {
   aller_a: "Ouverture de l’écran",
   choisir_la_boutique: "Changement de boutique",
   fermer_l_assistant: "Fermeture du panneau",
+  preparer_vente_moto: "Préparation d’une vente",
 };

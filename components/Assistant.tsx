@@ -14,7 +14,7 @@ import { useSession } from "@/lib/auth/session";
 import { trouverParNom } from "@/lib/domain/referentiel";
 import { messageErreurAssistant, ouvrirConversation, type Conversation } from "@/lib/ia/assistant";
 import { avancerDUnMot } from "@/lib/ia/flux-mot-a-mot";
-import type { Geste } from "@/lib/ia/gestes";
+import { cheminVentePreparee, type Geste } from "@/lib/ia/gestes";
 import {
   enregistrerDiscussion,
   lireDiscussions,
@@ -294,13 +294,15 @@ export function Assistant() {
       /* Une saisie a besoin d'une destination. Ouvrir le formulaire depuis
          « toutes les boutiques » poserait une vente sans magasin, et l'erreur
          ne se verrait qu'au moment d'enregistrer. */
-      if (geste.destination.exigeBoutique && !perimetre.boutiqueId) {
-        setAvis({ quoi: "boutique_requise", libelle: geste.destination.libelle });
+      const exigeBoutique = geste.quoi === "vente" || geste.destination.exigeBoutique;
+      const libelle = geste.quoi === "vente" ? "la vente" : geste.destination.libelle;
+      if (exigeBoutique && !perimetre.boutiqueId) {
+        setAvis({ quoi: "boutique_requise", libelle });
         return;
       }
 
-      router.push(geste.destination.chemin);
-      setAvis({ quoi: "ouvert", libelle: geste.destination.libelle });
+      router.push(geste.quoi === "vente" ? cheminVentePreparee(geste) : geste.destination.chemin);
+      setAvis({ quoi: "ouvert", libelle });
     },
     [boutiques, choisir, perimetre.boutiqueId, router],
   );
@@ -649,6 +651,7 @@ export function Assistant() {
                     <p className="flex-1 text-sm text-encre">
                       {avis.libelle.charAt(0).toUpperCase() + avis.libelle.slice(1)} vient de
                       s’ouvrir derrière ce panneau.
+                      {avis.libelle === "la vente" && " Rien n’est enregistré tant que vous n’avez pas validé."}
                     </p>
                     <button
                       type="button"

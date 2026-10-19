@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { lireGeste, OUTILS_QUI_AGISSENT, resumeGeste, type Geste } from "./gestes";
+import {
+  cheminVentePreparee,
+  lireGeste,
+  lireVentePreparee,
+  OUTILS_QUI_AGISSENT,
+  resumeGeste,
+  type Geste,
+} from "./gestes";
 import { estRefus } from "./propositions";
 
 function geste(nom: string, args: Record<string, unknown>): Geste {
@@ -69,8 +76,86 @@ describe("les garde-fous du registre", () => {
   it("déclare exactement les gestes qu’il sait lire", () => {
     /* Un nom présent dans l'ensemble mais absent de `lireGeste` remonterait à
        l'écran comme un geste `undefined`. */
+    const toutCe = { ecran: "caisse", nom: "Pouytenga", motoId: "m1" };
     for (const nom of OUTILS_QUI_AGISSENT) {
-      expect(estRefus(lireGeste(nom, { ecran: "caisse", nom: "Pouytenga" }))).toBe(false);
+      expect(estRefus(lireGeste(nom, toutCe)), nom).toBe(false);
     }
+  });
+});
+
+describe("une vente de moto pré-remplie", () => {
+  function vente(args: Record<string, unknown>) {
+    const lu = geste("preparer_vente_moto", args);
+    if (lu.quoi !== "vente") throw new Error("attendu une vente");
+    return lu;
+  }
+
+  it("retient la moto, le client et le prix", () => {
+    expect(vente({ motoId: "m1", clientId: "c1", prixConvenu: 1_200_000 })).toEqual({
+      quoi: "vente",
+      motoId: "m1",
+      clientId: "c1",
+      prix: "1200000",
+    });
+  });
+
+  it("se contente de la moto : une vente se saisit souvent dans cet ordre", () => {
+    /* Un formulaire à moitié rempli vaut mieux qu'un formulaire vide, et le
+       client peut ne pas exister encore — il se crée à l'écran. */
+    expect(vente({ motoId: "m1" })).toMatchObject({ clientId: "", prix: "" });
+  });
+
+  it("refuse une vente sans moto plutôt que d'ouvrir un formulaire vide", () => {
+    /* Ouvrir la saisie vide ferait croire qu'on a compris la demande. */
+    expect(estRefus(lireGeste("preparer_vente_moto", { clientId: "c1" }))).toBe(true);
+  });
+
+  it("ignore un prix qui n'en est pas un", () => {
+    /* Le modèle rend parfois « un million deux ». Mieux vaut un champ vide
+       qu'un montant inventé dans la case qui engage l'argent. */
+    for (const mauvais of ["environ 1200000", "1,5", "", null]) {
+      expect(vente({ motoId: "m1", prixConvenu: mauvais }).prix).toBe("");
+    }
+    expect(vente({ motoId: "m1", prixConvenu: "1 200 000" }).prix).toBe("1200000");
+  });
+
+  it("dit tout de suite que rien n'est enregistré", () => {
+    /* La phrase la plus dangereuse que l'assistant puisse écrire est « c'est
+       fait » : ici le formulaire s'ouvre, et personne n'a validé. */
+    expect(resumeGeste(vente({ motoId: "m1" }))).toContain("Rien n’est enregistré");
+  });
+});
+
+describe("l’adresse qui porte la vente pré-remplie", () => {
+  it("fait l’aller-retour sans rien perdre", () => {
+    const chemin = cheminVentePreparee({
+      quoi: "vente",
+      motoId: "m1",
+      clientId: "c1",
+      prix: "1200000",
+    });
+    const relu = lireVentePreparee(new URLSearchParams(chemin.split("?")[1]));
+    expect(relu).toEqual({ motoId: "m1", clientId: "c1", prixConvenu: "1200000" });
+  });
+
+  it("ouvre bien la modale, et pas seulement la page", () => {
+    /* `?nouvelle=1` est ce qui déclenche la modale depuis S44 : l'oublier
+       déposerait quelqu'un sur le registre des ventes sans formulaire. */
+    expect(cheminVentePreparee({ quoi: "vente", motoId: "m1", clientId: "", prix: "" })).toContain(
+      "nouvelle=1",
+    );
+  });
+
+  it("ignore ce qui est illisible plutôt que de le reprendre", () => {
+    /* Une adresse se bricole à la main : un prix de « abc » ne doit pas
+       atterrir dans un champ de montant. */
+    const parametres = new URLSearchParams({ nouvelle: "1", moto: "m1", prix: "abc" });
+    expect(lireVentePreparee(parametres)).toEqual({ motoId: "m1" });
+  });
+
+  it("rend null quand il n’y a rien à pré-remplir", () => {
+    /* La modale garde alors sa saisie vide habituelle : le bouton « Nouvelle
+       vente » de l'écran ne passe aucun de ces paramètres. */
+    expect(lireVentePreparee(new URLSearchParams({ nouvelle: "1" }))).toBe(null);
   });
 });

@@ -1,3 +1,4 @@
+import type { SaisieVente } from "../domain/vente";
 import { trouverDestination, type Destination } from "./destinations";
 import type { Refus } from "./propositions";
 
@@ -32,14 +33,36 @@ export type Geste =
   | { quoi: "aller"; destination: Destination }
   /** Le nom tel que prononcé ; c'est l'écran qui le rapproche de sa boutique. */
   | { quoi: "boutique"; nom: string }
-  | { quoi: "fermer" };
+  | { quoi: "fermer" }
+  /**
+   * Une vente de moto **pré-remplie**, pas enregistrée.
+   *
+   * C'est la même doctrine que `propositions.ts`, appliquée à un formulaire :
+   * l'assistant fait le travail lent — retrouver la moto au stock, le client
+   * au fichier, convertir « un million deux » en 1 200 000 — puis la modale
+   * s'ouvre remplie et **personne n'a rien validé**. Huit champs liés ne
+   * tiennent pas dans une carte de confirmation ; l'écran de vente, lui, les
+   * montre déjà tous, avec ses propres garde-fous.
+   */
+  | { quoi: "vente"; motoId: string; clientId: string; prix: string };
 
 /** Les outils qui agissent sur l'écran plutôt que de consulter des données. */
 export const OUTILS_QUI_AGISSENT = new Set([
   "aller_a",
   "choisir_la_boutique",
   "fermer_l_assistant",
+  "preparer_vente_moto",
 ]);
+
+/** Les noms des paramètres d'adresse, écrits une fois pour les deux sens. */
+const CLES_VENTE = { moto: "moto", client: "client", prix: "prix" } as const;
+
+/** Les chiffres, et rien d'autre : le FCFA ne se divise pas. */
+function chiffresSeuls(valeur: unknown): string {
+  const brut = typeof valeur === "string" ? valeur : typeof valeur === "number" ? String(valeur) : "";
+  const propre = brut.replace(/[\s .]/g, "");
+  return /^\d+$/.test(propre) ? propre : "";
+}
 
 export function lireGeste(nom: string, args: Record<string, unknown>): Geste | Refus {
   if (nom === "aller_a") {
@@ -62,6 +85,23 @@ export function lireGeste(nom: string, args: Record<string, unknown>): Geste | R
 
   if (nom === "fermer_l_assistant") return { quoi: "fermer" };
 
+  if (nom === "preparer_vente_moto") {
+    const motoId = typeof args.motoId === "string" ? args.motoId.trim() : "";
+    /* Sans moto, il n'y a pas de vente à préparer : ouvrir le formulaire vide
+       ferait croire qu'on a compris la demande. */
+    if (motoId === "") {
+      return { erreur: "Retrouve d’abord la moto au stock pour obtenir son identifiant." };
+    }
+    return {
+      quoi: "vente",
+      motoId,
+      /* Le client et le prix sont facultatifs : une vente se saisit souvent
+         moto d'abord, et un formulaire à moitié rempli vaut mieux que rien. */
+      clientId: typeof args.clientId === "string" ? args.clientId.trim() : "",
+      prix: chiffresSeuls(args.prixConvenu),
+    };
+  }
+
   return { erreur: `Geste inconnu : ${nom}.` };
 }
 
@@ -69,5 +109,46 @@ export function lireGeste(nom: string, args: Record<string, unknown>): Geste | R
 export function resumeGeste(geste: Geste): string {
   if (geste.quoi === "aller") return `J’ouvre ${geste.destination.libelle}.`;
   if (geste.quoi === "boutique") return `Je passe sur ${geste.nom}.`;
+  if (geste.quoi === "vente") return "J’ouvre la vente, déjà remplie. Rien n’est enregistré.";
   return "Je referme l’assistant.";
+}
+
+/**
+ * L'adresse qui ouvre la modale de vente déjà remplie.
+ *
+ * **Par l'adresse, et non par un état partagé.** La modale vit sur un autre
+ * écran que le panneau ; un état global devrait survivre à la navigation, se
+ * vider au bon moment, et ne pas rejouer au retour en arrière. L'adresse fait
+ * les trois gratuitement — et `?nouvelle=1` ouvrait déjà cette modale avant
+ * qu'on y pense.
+ */
+export function cheminVentePreparee(geste: Extract<Geste, { quoi: "vente" }>): string {
+  const parametres = new URLSearchParams({ nouvelle: "1" });
+  parametres.set(CLES_VENTE.moto, geste.motoId);
+  if (geste.clientId) parametres.set(CLES_VENTE.client, geste.clientId);
+  if (geste.prix) parametres.set(CLES_VENTE.prix, geste.prix);
+  return `/motos/ventes?${parametres.toString()}`;
+}
+
+/**
+ * Relit cette adresse, côté écran des ventes.
+ *
+ * Rend `null` quand il n'y a rien à pré-remplir, pour que la modale garde sa
+ * saisie vide habituelle. Tout ce qui est illisible est **ignoré** plutôt que
+ * repris : une adresse se bricole à la main, et un prix de « abc » ne doit pas
+ * atterrir dans un champ de montant.
+ */
+export function lireVentePreparee(
+  parametres: { get: (cle: string) => string | null },
+): Partial<SaisieVente> | null {
+  const depart: Partial<SaisieVente> = {};
+  const motoId = parametres.get(CLES_VENTE.moto)?.trim() ?? "";
+  const clientId = parametres.get(CLES_VENTE.client)?.trim() ?? "";
+  const prix = chiffresSeuls(parametres.get(CLES_VENTE.prix) ?? "");
+
+  if (motoId) depart.motoId = motoId;
+  if (clientId) depart.clientId = clientId;
+  if (prix) depart.prixConvenu = prix;
+
+  return Object.keys(depart).length === 0 ? null : depart;
 }

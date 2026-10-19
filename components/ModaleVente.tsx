@@ -116,7 +116,22 @@ const PREMIERS_RESULTATS = 8;
  * temps. Le démontage remet aussi la saisie à zéro sans qu'un effet ait à s'en
  * charger, comme pour les trois autres modals du produit.
  */
-export function ModaleVente({ onFermer }: { onFermer: () => void }) {
+export function ModaleVente({
+  onFermer,
+  depart,
+}: {
+  onFermer: () => void;
+  /**
+   * Des champs déjà remplis à l'ouverture (S57).
+   *
+   * L'assistant retrouve la moto au stock et le client au fichier, puis ouvre
+   * cette modale garnie — **sans rien enregistrer**. Tout le reste du
+   * formulaire est inchangé : mêmes vérifications, même bouton, même geste
+   * humain pour engager la vente. Absent, le formulaire s'ouvre vide comme
+   * toujours.
+   */
+  depart?: Partial<SaisieVente>;
+}) {
   const { perimetre } = usePerimetre();
   const session = useSession();
   const catalogue = useCatalogue();
@@ -165,7 +180,12 @@ export function ModaleVente({ onFermer }: { onFermer: () => void }) {
     [ventes, ventesPieces],
   );
 
-  const [saisie, setSaisie] = useState<SaisieVente>(SAISIE_VENTE_VIDE);
+  /* Le départ passe par `appliquerSaisieVente` et non par un étalement : c'est
+     lui qui tient la règle du montant reçu selon le mode de paiement, et la
+     contourner poserait un acompte incohérent avec le prix pré-rempli. */
+  const [saisie, setSaisie] = useState<SaisieVente>(() =>
+    depart ? appliquerSaisieVente(SAISIE_VENTE_VIDE, depart, false) : SAISIE_VENTE_VIDE,
+  );
   /* **La saisie du client vit ici, et pas dans un formulaire à part.** C'est ce
      que le commanditaire a demandé après essai : le client neuf n'a pas
      d'étape à lui. Le garder dans l'état de la modale a une seconde vertu, et
