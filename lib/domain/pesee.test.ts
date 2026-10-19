@@ -16,7 +16,19 @@ const vente = (partie: Partial<Vente> = {}): Vente =>
   ({ id: "v1", boutiqueId: "SDO", date: CE_MOIS, resteDu: 0, ...partie }) as Vente;
 
 const ventePiece = (partie: Partial<VentePiece> = {}): VentePiece =>
-  ({ id: "vp1", boutiqueId: "BCA", date: CE_MOIS, total: 0, ...partie }) as VentePiece;
+  ({ id: "vp1", boutiqueId: "BCA", date: CE_MOIS, total: 0, lignes: [], ...partie }) as VentePiece;
+
+/* Une ligne vendue : `prixAchatUnitaire` a `null` veut dire « cout inconnu »,
+   et la marge de la vente le reste aussi. */
+const ligneVendue = (prixUnitaire: number, prixAchatUnitaire: number | null, quantite = 1) => ({
+  pieceId: "p1",
+  reference: "REF",
+  designation: "Piece",
+  quantite,
+  prixUnitaire,
+  prixAchatUnitaire,
+  total: quantite * prixUnitaire,
+});
 
 const piece = (partie: Partial<Piece> = {}): Piece =>
   ({ id: "p1", actif: true, seuilAlerte: 2, ...partie }) as Piece;
@@ -102,6 +114,40 @@ describe("peserBoutiques — les pièces", () => {
     );
     expect(pesee.get("BCA")?.pieces.ventesDuMois).toBe(2);
     expect(pesee.get("BCA")?.pieces.recetteDuMois).toBe(35_000);
+  });
+
+  it("la marge du mois suit les lignes vendues, et ignore le mois dernier", () => {
+    const pesee = peserBoutiques(
+      {
+        ...RIEN,
+        ventesPieces: [
+          ventePiece({ id: "a", total: 10_000, lignes: [ligneVendue(10_000, 6_000)] }),
+          ventePiece({ id: "b", total: 4_000, lignes: [ligneVendue(2_000, 1_500, 2)] }),
+          ventePiece({
+            id: "c",
+            total: 99_000,
+            date: LE_MOIS_DERNIER,
+            lignes: [ligneVendue(99_000, 1)],
+          }),
+        ],
+      },
+      MAINTENANT,
+    );
+    expect(pesee.get("BCA")?.pieces.margeDuMois).toBe(5_000);
+  });
+
+  it("rend une marge inconnue quand aucune piece vendue ne porte son cout", () => {
+    /* Le cas d'une boutique qui n'a pas encore saisi ses prix d'achat : l'ecran
+       doit pouvoir ecrire un tiret, et non un zero qui se lirait « rien
+       gagne ». */
+    const pesee = peserBoutiques(
+      {
+        ...RIEN,
+        ventesPieces: [ventePiece({ total: 10_000, lignes: [ligneVendue(10_000, null)] })],
+      },
+      MAINTENANT,
+    );
+    expect(pesee.get("BCA")?.pieces.margeDuMois).toBeNull();
   });
 
   it("une vente de pièces ne touche jamais les chiffres motos", () => {
@@ -204,16 +250,53 @@ describe("additionnerPesees", () => {
   it("somme les deux métiers sans les mélanger", () => {
     const a = {
       motos: { enStock: 4, ventesDuMois: 1, resteDu: 100_000 },
-      pieces: { references: 10, ventesDuMois: 2, recetteDuMois: 5_000, aReapprovisionner: 1 },
+      pieces: {
+        references: 10,
+        ventesDuMois: 2,
+        recetteDuMois: 5_000,
+        margeDuMois: 2_000,
+        aReapprovisionner: 1,
+      },
     };
     const b = {
       motos: { enStock: 6, ventesDuMois: 2, resteDu: 615_000 },
-      pieces: { references: 32, ventesDuMois: 15, recetteDuMois: 380_000, aReapprovisionner: 3 },
+      pieces: {
+        references: 32,
+        ventesDuMois: 15,
+        recetteDuMois: 380_000,
+        margeDuMois: 90_000,
+        aReapprovisionner: 3,
+      },
     };
     expect(additionnerPesees(a, b)).toEqual({
       motos: { enStock: 10, ventesDuMois: 3, resteDu: 715_000 },
-      pieces: { references: 42, ventesDuMois: 17, recetteDuMois: 385_000, aReapprovisionner: 4 },
+      pieces: {
+        references: 42,
+        ventesDuMois: 17,
+        recetteDuMois: 385_000,
+        margeDuMois: 92_000,
+        aReapprovisionner: 4,
+      },
     });
+  });
+
+  /**
+   * **Une marge inconnue n'est pas une marge nulle, et l'addition doit le
+   * tenir.** Une boutique dont aucune piece ne porte son cout rend `null`.
+   * L'additionner comme un zero annoncerait « cette boutique n'a rien gagne »,
+   * ce qui est une affirmation ; et rendre `null` des qu'une seule boutique
+   * l'ignore effacerait la marge connue des autres.
+   */
+  it("ignore une marge inconnue sans effacer celle des autres", () => {
+    const connue = {
+      motos: PESEE_VIDE.motos,
+      pieces: { ...PESEE_VIDE.pieces, margeDuMois: 7_000 },
+    };
+    const inconnue = { motos: PESEE_VIDE.motos, pieces: { ...PESEE_VIDE.pieces } };
+
+    expect(additionnerPesees(connue, inconnue).pieces.margeDuMois).toBe(7_000);
+    expect(additionnerPesees(inconnue, connue).pieces.margeDuMois).toBe(7_000);
+    expect(additionnerPesees(inconnue, inconnue).pieces.margeDuMois).toBeNull();
   });
 
   /* La carte « Toutes les boutiques » part de `PESEE_VIDE` comme graine du
@@ -223,7 +306,13 @@ describe("additionnerPesees", () => {
     const depart = { motos: { ...PESEE_VIDE.motos }, pieces: { ...PESEE_VIDE.pieces } };
     additionnerPesees(PESEE_VIDE, {
       motos: { enStock: 3, ventesDuMois: 3, resteDu: 3 },
-      pieces: { references: 3, ventesDuMois: 3, recetteDuMois: 3, aReapprovisionner: 3 },
+      pieces: {
+        references: 3,
+        ventesDuMois: 3,
+        recetteDuMois: 3,
+        margeDuMois: 3,
+        aReapprovisionner: 3,
+      },
     });
     expect(PESEE_VIDE).toEqual(depart);
   });

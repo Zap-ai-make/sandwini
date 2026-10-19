@@ -122,6 +122,32 @@ export function PanneauPiece({
         )}
       </p>
 
+      {/* **Le prix d’achat est ici, et la marge avec lui.** Pour une moto, ces
+          deux nombres sont cloisonnés au responsable (D2). Le commanditaire a
+          tranché l’inverse pour les pièces : celui qui vend fixe le coût et
+          voit ce qu’il gagne. */}
+      <p className="mt-1 text-sm text-encre-doux">
+        Prix d’achat&nbsp;:{" "}
+        {piece.prixAchat === null ? (
+          <span className="font-medium text-encre">non saisi — la marge reste inconnue</span>
+        ) : (
+          <>
+            <span className="font-code font-medium text-encre">
+              {formaterMontant(piece.prixAchat)}
+            </span>
+            {piece.prixVente !== null && (
+              <>
+                {" — marge de "}
+                <span className="font-code font-medium text-encre">
+                  {formaterMontant(piece.prixVente - piece.prixAchat)}
+                </span>
+                {" par pièce"}
+              </>
+            )}
+          </>
+        )}
+      </p>
+
       {boutiqueId ? (
         <form onSubmit={soumettre} className="mt-4 border-t border-bord pt-4" noValidate>
           <span id="sens-mouvement" className="block text-sm font-medium text-encre">

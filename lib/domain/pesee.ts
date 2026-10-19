@@ -2,7 +2,7 @@ import { moisDe, memeMois } from "./chiffres";
 import type { Moto } from "./moto";
 import { etatStock, stockParPiece, type MouvementPiece, type Piece } from "./piece";
 import type { Vente } from "./vente";
-import type { VentePiece } from "./vente-piece";
+import { margeVentePiece, type VentePiece } from "./vente-piece";
 
 /**
  * Ce que chaque boutique pèse, pour sa carte de supervision (S24, A2.3, S47).
@@ -43,6 +43,18 @@ export type PeseePieces = {
   references: number;
   ventesDuMois: number;
   recetteDuMois: number;
+  /**
+   * Ce que le mois a **gagné**, et non seulement encaissé.
+   *
+   * `null` quand aucune pièce vendue ne portait son prix d'achat — une boutique
+   * qui n'a pas encore saisi ses coûts. L'écran écrit alors un tiret : `0`
+   * dirait « rien gagné », ce qui est une affirmation qu'on ne peut pas faire.
+   *
+   * La recette seule ne dit pas si le commerce gagne de l'argent ; elle dit
+   * qu'il bouge. C'est ce que le commanditaire a demandé en voulant que la
+   * vente de pièces « gonfle le chiffre d'affaires ».
+   */
+  margeDuMois: number | null;
   /** Références épuisées, sous leur seuil, ou en anomalie : ce qui demande une décision. */
   aReapprovisionner: number;
 };
@@ -55,7 +67,13 @@ export type PeseeBoutique = {
 /** Ce qu'on montre à une boutique dont on ne sait encore rien de chiffré. */
 export const PESEE_VIDE: PeseeBoutique = {
   motos: { enStock: 0, ventesDuMois: 0, resteDu: 0 },
-  pieces: { references: 0, ventesDuMois: 0, recetteDuMois: 0, aReapprovisionner: 0 },
+  pieces: {
+    references: 0,
+    ventesDuMois: 0,
+    recetteDuMois: 0,
+    margeDuMois: null,
+    aReapprovisionner: 0,
+  },
 };
 
 /** Additionne deux pesées — la carte « Toutes les boutiques » est leur somme. */
@@ -70,9 +88,24 @@ export function additionnerPesees(a: PeseeBoutique, b: PeseeBoutique): PeseeBout
       references: a.pieces.references + b.pieces.references,
       ventesDuMois: a.pieces.ventesDuMois + b.pieces.ventesDuMois,
       recetteDuMois: a.pieces.recetteDuMois + b.pieces.recetteDuMois,
+      margeDuMois: additionnerMarges(a.pieces.margeDuMois, b.pieces.margeDuMois),
       aReapprovisionner: a.pieces.aReapprovisionner + b.pieces.aReapprovisionner,
     },
   };
+}
+
+/**
+ * Deux marges dont l'une peut être inconnue.
+ *
+ * Une inconnue est **ignorée**, pas comptée pour zéro : l'additionner
+ * annoncerait qu'une boutique n'a rien gagné. Et le total ne devient inconnu
+ * que si les deux le sont — sinon une seule boutique sans prix d'achat
+ * effacerait la marge de toutes les autres.
+ */
+function additionnerMarges(a: number | null, b: number | null): number | null {
+  if (a === null) return b;
+  if (b === null) return a;
+  return a + b;
 }
 
 export type SourcesPesee = {
@@ -126,6 +159,7 @@ export function peserBoutiques(sources: SourcesPesee, maintenant: Date): Map<str
        entier au comptoir (S21). Ce qui la mesure est ce qu'elle a rapporté. */
     ligne.ventesDuMois += 1;
     ligne.recetteDuMois += vente.total;
+    ligne.margeDuMois = additionnerMarges(ligne.margeDuMois, margeVentePiece(vente));
   }
 
   compterLesRayons(sources, pour);

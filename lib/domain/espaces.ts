@@ -391,14 +391,16 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       titre: "Suivre",
       ecrans: [
         { href: "/pieces", libelle: "Catalogue" },
-        /* Créer une référence appartient au responsable : une référence porte
-           un prix (S20, réponse 4). Le gérant voit le catalogue et fait bouger
-           le stock depuis la ligne qu'il touche. */
+        /* Créer une référence appartenait au responsable (S20, réponse 4).
+           Le commanditaire l'a renversé pour les pièces : le gérant tient son
+           propre catalogue, prix d'achat compris, et le responsable regarde.
+           D'où `gerer_pieces` et non `gerer_referentiels`, qui garde les
+           marques et les modèles de motos. */
         {
           href: "/pieces/nouvelle",
           libelle: "Nouvelle référence",
-          capacite: "gerer_referentiels",
-          quoi: "Ajouter une pièce au catalogue commun à l’entreprise",
+          capacite: "gerer_pieces",
+          quoi: "Ajouter une pièce au catalogue de votre boutique",
         },
       ],
     },

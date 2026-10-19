@@ -63,6 +63,17 @@ export type LigneVentePiece = {
   designation: string;
   quantite: number;
   prixUnitaire: number;
+  /**
+   * Ce que la pièce avait coûté **ce jour-là**, recopié pour la même raison que
+   * la désignation : si la même bougie est rachetée plus cher le mois suivant,
+   * la marge des ventes passées ne doit pas changer derrière le dos de celui
+   * qui les a faites.
+   *
+   * Nul quand le catalogue ne portait pas encore de prix d'achat. La marge est
+   * alors inconnue, et `0` ne la remplace pas — ce serait affirmer que la pièce
+   * n'a rien coûté, et gonfler la marge d'autant.
+   */
+  prixAchatUnitaire: number | null;
   total: number;
 };
 
@@ -286,9 +297,50 @@ export function figerLignes(
       designation: piece?.designation ?? "",
       quantite,
       prixUnitaire,
+      /* `?? null` et non `?? 0` : une pièce absente de la carte, ou sans coût
+         connu, laisse la marge inconnue plutôt que de l'inventer. */
+      prixAchatUnitaire: piece?.prixAchat ?? null,
       total: quantite * prixUnitaire,
     };
   });
+}
+
+/**
+ * La marge d'une ligne : l'écart entre ce qu'on a encaissé et ce que la pièce
+ * avait coûté, multiplié par la quantité.
+ *
+ * `null` quand le coût est inconnu. Ce n'est pas la même chose que zéro, et
+ * c'est le même partage qu'au mois des motos (`lib/domain/chiffres.ts`) :
+ * *connu*, *connu et nul*, *pas su*. Les confondre transforme une ignorance en
+ * affirmation.
+ */
+export function margeLigne(ligne: LigneVentePiece): number | null {
+  if (ligne.prixAchatUnitaire === null) return null;
+  return (ligne.prixUnitaire - ligne.prixAchatUnitaire) * ligne.quantite;
+}
+
+/**
+ * La marge d'une vente : la somme des lignes dont on connaît le coût.
+ *
+ * Une ligne sans coût est **ignorée**, pas comptée à zéro. La vente dont
+ * aucune ligne n'est connue rend `null` : l'écran écrira alors un tiret, et
+ * non un chiffre qui mentirait par le bas.
+ */
+export function margeVentePiece(vente: { lignes: readonly LigneVentePiece[] }): number | null {
+  const connues = vente.lignes.filter((ligne) => ligne.prixAchatUnitaire !== null);
+  if (connues.length === 0) return null;
+  return connues.reduce((somme, ligne) => somme + (margeLigne(ligne) ?? 0), 0);
+}
+
+/** La marge d'un lot de ventes, `null` tant qu'aucune n'est connue. */
+export function margeDesVentesPieces(
+  ventes: readonly { lignes: readonly LigneVentePiece[] }[],
+): number | null {
+  const connues = ventes
+    .map((vente) => margeVentePiece(vente))
+    .filter((marge): marge is number => marge !== null);
+  if (connues.length === 0) return null;
+  return connues.reduce((somme, marge) => somme + marge, 0);
 }
 
 /**

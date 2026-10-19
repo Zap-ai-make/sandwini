@@ -59,6 +59,9 @@ const ligne = (partie: Record<string, unknown> = {}) => ({
   designation: "Plaquette de frein avant",
   quantite: 2,
   prixUnitaire: 3_500,
+  /* Le coût du jour, recopié dans la ligne : la marge d'une vente passée ne
+     doit pas bouger quand la même pièce est rachetée plus cher. */
+  prixAchatUnitaire: 2_000,
   total: 7_000,
   ...partie,
 });
@@ -101,7 +104,9 @@ beforeEach(async () => {
       reference: "PLQ-0142",
       designation: "Plaquette de frein avant",
       categorie: "Freinage",
+      boutiqueId: "PTG",
       prixVente: 3_500,
+      prixAchat: 2_000,
       seuilAlerte: 5,
       actif: true,
       createdAt: new Date("2026-01-01T08:00:00Z"),

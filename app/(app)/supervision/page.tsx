@@ -285,6 +285,22 @@ function CarteBoutique({
                 : formaterMontant(chiffres.pieces.recetteDuMois)
             }
           />
+          {/* **La marge, et pas seulement la recette.** Une recette dit que le
+              commerce bouge ; la marge dit s'il gagne. Le tiret couvre deux cas
+              qu'on ne cherche pas à distinguer ici : aucune vente, et des
+              ventes dont aucune pièce ne portait son prix d'achat. Dans les
+              deux, il n'y a rien à affirmer.
+
+              Visible du gérant, à l'inverse de la marge d'une moto (D2) : pour
+              les pièces, celui qui vend fixe le coût. */}
+          <Fait
+            titre="Marge du mois"
+            valeur={
+              chiffres.pieces.margeDuMois === null
+                ? "—"
+                : formaterMontant(chiffres.pieces.margeDuMois)
+            }
+          />
         </dl>
       )}
 

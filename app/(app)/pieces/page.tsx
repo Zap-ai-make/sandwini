@@ -71,8 +71,8 @@ function Catalogue() {
 
   const souscrireCatalogue = useCallback(
     (auChangement: (pieces: Piece[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterCatalogue(auChangement, enErreur),
-    [],
+      ecouterCatalogue(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
   );
   const souscrireMouvements = useCallback(
     (auChangement: (m: MouvementPiece[]) => void, enErreur: (cause: unknown) => void) =>

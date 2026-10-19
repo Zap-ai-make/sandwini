@@ -79,7 +79,7 @@ export function usePeseeDesBoutiques(avecPieces: boolean): {
 
   const souscrireCatalogue = useCallback(
     (auChangement: (pieces: Piece[]) => void, enErreur: (cause: unknown) => void) =>
-      globalPieces ? ecouterCatalogue(auChangement, enErreur) : () => {},
+      globalPieces ? ecouterCatalogue(null, auChangement, enErreur) : () => {},
     [globalPieces],
   );
   const { valeur: catalogue } = useAbonnement(

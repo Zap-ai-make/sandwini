@@ -48,6 +48,7 @@ function lireLigne(brut: DocumentData): LigneVentePiece {
     designation: (brut.designation as string) ?? "",
     quantite: typeof brut.quantite === "number" ? brut.quantite : 0,
     prixUnitaire: typeof brut.prixUnitaire === "number" ? brut.prixUnitaire : 0,
+    prixAchatUnitaire: typeof brut.prixAchatUnitaire === "number" ? brut.prixAchatUnitaire : null,
     total: typeof brut.total === "number" ? brut.total : 0,
   };
 }
