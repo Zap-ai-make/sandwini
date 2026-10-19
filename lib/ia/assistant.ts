@@ -96,20 +96,38 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
   };
 }
 
-/** Traduit les refus de Gemini en phrases qui disent quoi faire. */
+/**
+ * Traduit les refus de Gemini en phrases qui disent quoi faire.
+ *
+ * **Et laisse toujours l'erreur brute dans la console.** La première version
+ * n'affichait que la phrase traduite : un échec d'App Check s'y présentait
+ * comme un `fetch` raté, donc comme « le réseau est coupé » — dit à quelqu'un
+ * dont tout le reste de l'application fonctionnait. Un message rassurant posé
+ * sur un diagnostic faux coûte plus cher que pas de message du tout, et il a
+ * fallu le code brut pour s'en apercevoir.
+ */
 export function messageErreurAssistant(cause: unknown): string {
   const brut = `${(cause as { code?: string }).code ?? ""} ${(cause as Error)?.message ?? ""}`;
+  console.error("[assistant] échec brut :", cause);
 
-  if (/app-?check|403|unauthorized/i.test(brut)) {
+  if (/app-?check|403|unauthorized|permission|appCheck/i.test(brut)) {
     /* Le refus le plus probable au premier essai, et le plus déroutant : tout
        le reste de l'application marche. */
-    return "L’assistant n’est pas encore autorisé sur cet appareil (App Check). Prévenez l’administrateur.";
+    return "L’assistant n’est pas encore autorisé sur cet appareil (App Check). Voir la console du navigateur pour le détail.";
   }
   if (/quota|429|resource-exhausted/i.test(brut)) {
     return "L’assistant a atteint sa limite d’appels pour le moment. Réessayez dans quelques minutes.";
   }
-  if (/offline|unavailable|network|fetch/i.test(brut)) {
-    return "L’assistant a besoin du réseau, et il semble coupé. Le reste de l’application continue de fonctionner.";
+  if (/not.?enabled|disabled|SERVICE_DISABLED|has not been used|404/i.test(brut)) {
+    /* L'API Gemini pas encore activée sur le projet : le cas du premier jour,
+       et il n'a rien d'un problème de réseau. */
+    return "L’API Gemini n’est pas activée sur ce projet Firebase. Console Firebase → AI Logic.";
   }
-  return "L’assistant n’a pas répondu. Réessayez dans un instant.";
+  /* « Hors ligne » ne s'affirme que si le navigateur le dit lui-même. Le
+     déduire d'un `fetch` raté désignait le réseau pour toutes les pannes, et
+     envoyait chercher un défaut là où il n'y en avait pas. */
+  if (typeof navigator !== "undefined" && navigator.onLine === false) {
+    return "L’assistant a besoin du réseau, et il est coupé. Le reste de l’application continue de fonctionner.";
+  }
+  return "L’assistant n’a pas répondu. Le détail est dans la console du navigateur (touche F12).";
 }
