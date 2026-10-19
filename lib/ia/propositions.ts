@@ -118,7 +118,13 @@ export function lireProposition(nom: string, args: Record<string, unknown>): Pro
   return { erreur: `Geste inconnu : ${nom}.` };
 }
 
-export function estRefus(valeur: Proposition | Refus): valeur is Refus {
+/**
+ * Générique parce que les gestes de `gestes.ts` refusent de la même manière.
+ *
+ * Une seule notion de refus dans tout le lot : deux auraient divergé le jour
+ * où l'une aurait gagné un champ.
+ */
+export function estRefus<T extends object>(valeur: T | Refus): valeur is Refus {
   return "erreur" in valeur;
 }
 

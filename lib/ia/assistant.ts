@@ -11,6 +11,7 @@ import {
   OUTILS_QUI_PREPARENT,
   type Proposition,
 } from "./propositions";
+import { lireGeste, OUTILS_QUI_AGISSENT, type Geste } from "./gestes";
 import { attenteAvantReessai, estSurcharge, statutHttp } from "./reessai";
 
 /**
@@ -120,7 +121,16 @@ export type Progres =
    * doit apparaître dès que le modèle la compose, pendant qu'il rédige encore
    * sa phrase. L'utilisateur voit ce qui sera écrit avant d'avoir fini de lire.
    */
-  | { quoi: "proposition"; proposition: Proposition };
+  | { quoi: "proposition"; proposition: Proposition }
+  /**
+   * Un geste à faire **sur l'écran** : ouvrir une page, changer de boutique,
+   * refermer le panneau.
+   *
+   * Il remonte par ce chemin parce que ce fichier n'a ni routeur ni
+   * périmètre — et ne doit pas en avoir. Voir `gestes.ts` : l'assistant passe
+   * par la porte d'entrée de l'application, jamais par une souris simulée.
+   */
+  | { quoi: "geste"; geste: Geste };
 
 export type Conversation = {
   /** Rend le texte de la réponse, et la liste des outils réellement employés. */
@@ -203,6 +213,15 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
            lecture pure sert deux fois — ici pour la carte, dans `executerOutil`
            pour ce que le modèle redit — plutôt qu'un aller-retour d'état entre
            les deux. */
+        /* Les gestes d'écran partent tout de suite : attendre la fin de la
+           phrase ferait ouvrir la page après qu'on a fini de lire « j'ouvre
+           les paiements ». */
+        for (const appel of appels) {
+          if (!OUTILS_QUI_AGISSENT.has(appel.name)) continue;
+          const geste = lireGeste(appel.name, (appel.args ?? {}) as Record<string, unknown>);
+          if (!estRefus(geste)) surProgres?.({ quoi: "geste", geste });
+        }
+
         for (const appel of appels) {
           if (!OUTILS_QUI_PREPARENT.has(appel.name)) continue;
           const proposition = lireProposition(

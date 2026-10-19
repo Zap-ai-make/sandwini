@@ -1,6 +1,7 @@
 "use client";
 
 import { History, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
@@ -13,6 +14,7 @@ import { useSession } from "@/lib/auth/session";
 import { trouverParNom } from "@/lib/domain/referentiel";
 import { messageErreurAssistant, ouvrirConversation, type Conversation } from "@/lib/ia/assistant";
 import { avancerDUnMot } from "@/lib/ia/flux-mot-a-mot";
+import type { Geste } from "@/lib/ia/gestes";
 import {
   enregistrerDiscussion,
   lireDiscussions,
@@ -45,6 +47,19 @@ import { useEtatReseau } from "@/lib/reseau/etat-reseau";
  * un texte qui sursaute et un texte qui s'écrit.
  */
 
+/**
+ * Ce qu'un geste d'écran laisse derrière lui, affiché au-dessus de la saisie.
+ *
+ * **Le panneau ne se referme pas tout seul.** Il le pourrait — on verrait
+ * l'écran immédiatement — mais le geste part *avant* que le modèle ait écrit
+ * sa phrase : on perdrait la réponse en route. Une barre dit donc ce qui vient
+ * de s'ouvrir, et laisse le choix d'y aller.
+ */
+type Avis =
+  | { quoi: "ouvert"; libelle: string }
+  | { quoi: "boutique_requise"; libelle: string }
+  | { quoi: "boutique_introuvable"; nom: string };
+
 /** Un mot toutes les 40 ms, soit le rythme d'une main rapide. */
 const CADENCE = 40;
 
@@ -61,9 +76,50 @@ const SUGGESTIONS = [
   "Note 15 000 de carburant",
 ];
 
+/**
+ * Le choix d'une boutique, là où il manque.
+ *
+ * **Le bandeau est derrière le panneau**, donc invisible : y renvoyer, c'était
+ * désigner une porte qu'on ne voit pas. On pose le choix sur place, par la
+ * même fonction que le bandeau appelle — donc le même périmètre pour toute
+ * l'application.
+ */
+function ChoixBoutique({
+  boutiques,
+  choisir,
+}: {
+  boutiques: { id: string; nom: string; actif: boolean }[];
+  choisir: (boutiqueId: string) => void;
+}) {
+  const ouvertes = boutiques.filter((boutique) => boutique.actif);
+  if (ouvertes.length === 0) {
+    return (
+      <p className="mt-2 text-sm text-encre-doux">
+        Aucune boutique ouverte n’est disponible sur ce compte.
+      </p>
+    );
+  }
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {ouvertes.map((boutique) => (
+        <button
+          key={boutique.id}
+          type="button"
+          onClick={() => choisir(boutique.id)}
+          className="rounded-full border border-bord-fort bg-papier px-3 py-1.5 text-sm text-encre transition hover:bg-survol"
+        >
+          {boutique.nom}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function Assistant() {
   const session = useSession();
   const { perimetre, boutiques, choisir } = usePerimetre();
+  const router = useRouter();
   const { enLigne } = useEtatReseau();
 
   /* L'historique est cloisonné par compte : deux personnes qui se relaient sur
@@ -93,6 +149,7 @@ export function Assistant() {
      à la fois : deux cartes empilées feraient valider la mauvaise. */
   const [proposition, setProposition] = useState<Proposition | null>(null);
   const [ecriture, setEcriture] = useState<"attente" | "en_cours" | "faite" | string>("attente");
+  const [avis, setAvis] = useState<Avis | null>(null);
 
   const { postes } = usePostesDepense();
 
@@ -148,6 +205,7 @@ export function Assistant() {
     setMontre(0);
     setAFiger(null);
     setProposition(null);
+    setAvis(null);
     setMontreHistorique(false);
   }, []);
 
@@ -203,6 +261,50 @@ export function Assistant() {
     }
   }, [proposition, session, perimetre, postes]);
 
+  /**
+   * Exécuter un geste d'écran — **par la porte d'entrée**.
+   *
+   * `router.push` est ce que fait un lien de la navigation ; `choisir` est ce
+   * que fait le sélecteur du bandeau. Aucun clic simulé, aucun champ rempli
+   * dans le DOM : voir l'en-tête de `lib/ia/gestes.ts` pour les trois raisons
+   * qui excluent l'autre chemin.
+   */
+  const executerGeste = useCallback(
+    (geste: Geste) => {
+      if (geste.quoi === "fermer") {
+        setOuvert(false);
+        return;
+      }
+
+      if (geste.quoi === "boutique") {
+        /* Le rapprochement se fait ici parce que seul l'écran a la liste :
+           « gare routière » doit retrouver « Gare routière », comme un poste de
+           dépense retrouve le sien. */
+        const ouvertes = boutiques.filter((boutique) => boutique.actif);
+        const trouvee = trouverParNom(geste.nom, ouvertes);
+        if (!trouvee) {
+          setAvis({ quoi: "boutique_introuvable", nom: geste.nom });
+          return;
+        }
+        choisir(trouvee.id);
+        setAvis(null);
+        return;
+      }
+
+      /* Une saisie a besoin d'une destination. Ouvrir le formulaire depuis
+         « toutes les boutiques » poserait une vente sans magasin, et l'erreur
+         ne se verrait qu'au moment d'enregistrer. */
+      if (geste.destination.exigeBoutique && !perimetre.boutiqueId) {
+        setAvis({ quoi: "boutique_requise", libelle: geste.destination.libelle });
+        return;
+      }
+
+      router.push(geste.destination.chemin);
+      setAvis({ quoi: "ouvert", libelle: geste.destination.libelle });
+    },
+    [boutiques, choisir, perimetre.boutiqueId, router],
+  );
+
   const reprendre = useCallback((ancienne: Discussion) => {
     /* **La conversation repart à zéro côté modèle, et c'est assumé.** Relire
        une discussion d'hier sert à retrouver ce qui a été dit ; reconstruire
@@ -214,6 +316,7 @@ export function Assistant() {
     setMontre(0);
     setAFiger(null);
     setProposition(null);
+    setAvis(null);
     setMontreHistorique(false);
   }, []);
 
@@ -236,6 +339,7 @@ export function Assistant() {
          elle survivait à la question suivante : on lisait une nouvelle réponse
          avec, dessous, un « Enregistrer » qui engageait l'ancienne dépense. */
       setProposition(null);
+      setAvis(null);
       setEnCours("Réflexion…");
       /* Une nouvelle question se lit en bas : on y redescend même si on était
          remonté. */
@@ -261,6 +365,10 @@ export function Assistant() {
           if (progres.quoi === "proposition") {
             setProposition(progres.proposition);
             setEcriture("attente");
+            return;
+          }
+          if (progres.quoi === "geste") {
+            executerGeste(progres.geste);
             return;
           }
           if (progres.quoi === "attente") {
@@ -295,7 +403,7 @@ export function Assistant() {
         });
       }
     },
-    [session, perimetre, discussion],
+    [session, perimetre, discussion, executerGeste],
   );
 
   if (session.statut !== "connecte") return null;
@@ -485,26 +593,7 @@ export function Assistant() {
                     <p className="text-sm text-encre-doux">
                       Une écriture appartient à une boutique. Dans laquelle&nbsp;?
                     </p>
-                    {boutiques.filter((boutique) => boutique.actif).length === 0 ? (
-                      <p className="mt-2 text-sm text-encre-doux">
-                        Aucune boutique ouverte n’est disponible sur ce compte.
-                      </p>
-                    ) : (
-                      <div className="mt-2 flex flex-wrap gap-2">
-                        {boutiques
-                          .filter((boutique) => boutique.actif)
-                          .map((boutique) => (
-                            <button
-                              key={boutique.id}
-                              type="button"
-                              onClick={() => choisir(boutique.id)}
-                              className="bouton bouton-neutre"
-                            >
-                              {boutique.nom}
-                            </button>
-                          ))}
-                      </div>
-                    )}
+                    <ChoixBoutique boutiques={boutiques} choisir={choisir} />
                   </div>
                 ) : ecriture === "faite" ? (
                   <div className="mt-3 flex items-center gap-3">
@@ -551,6 +640,38 @@ export function Assistant() {
                   </>
                 )}
               </section>
+            )}
+
+            {avis !== null && (
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-bord bg-fond px-5 py-3">
+                {avis.quoi === "ouvert" ? (
+                  <>
+                    <p className="flex-1 text-sm text-encre">
+                      {avis.libelle.charAt(0).toUpperCase() + avis.libelle.slice(1)} vient de
+                      s’ouvrir derrière ce panneau.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOuvert(false);
+                        setAvis(null);
+                      }}
+                      className="bouton bouton-neutre"
+                    >
+                      Voir l’écran
+                    </button>
+                  </>
+                ) : (
+                  <div className="flex-1">
+                    <p className="text-sm text-encre">
+                      {avis.quoi === "boutique_requise"
+                        ? `Pour ouvrir ${avis.libelle}, il faut d’abord une boutique.`
+                        : `Je ne trouve pas de boutique « ${avis.nom} ».`}
+                    </p>
+                    <ChoixBoutique boutiques={boutiques} choisir={choisir} />
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="border-t border-bord bg-papier px-5 py-4">

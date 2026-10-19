@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { AssistantTexte } from "@/components/AssistantTexte";
 import { LIBELLE_OUTIL } from "@/lib/ia/outils";
+import { OUTILS_QUI_AGISSENT } from "@/lib/ia/gestes";
 import { OUTILS_QUI_PREPARENT } from "@/lib/ia/propositions";
 
 /**
@@ -82,10 +83,13 @@ export function MessageReflexion({ quoi }: { quoi: string }) {
  * Un chiffre sans sa source se croit ou ne se croit pas ; avec elle, il se
  * vérifie. **Les gestes qui préparent une écriture n'en sont pas** : ils ne
  * consultent rien, et les ranger là affichait « lu : preparer_depense » sous
- * une réponse qui n'avait rien lu du tout — du code montré à un gérant.
+ * une réponse qui n'avait rien lu du tout — du code montré à un gérant. Les
+ * gestes d'écran non plus : ouvrir une page n'est pas une source.
  */
 function SourcesLues({ outils }: { outils: readonly string[] }) {
-  const lectures = [...new Set(outils)].filter((nom) => !OUTILS_QUI_PREPARENT.has(nom));
+  const lectures = [...new Set(outils)].filter(
+    (nom) => !OUTILS_QUI_PREPARENT.has(nom) && !OUTILS_QUI_AGISSENT.has(nom),
+  );
   if (lectures.length === 0) return null;
 
   return (

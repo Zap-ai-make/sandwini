@@ -115,4 +115,18 @@ describe("le prompt système de l'assistant", () => {
        et c'est sur ce chiffre-là qu'on réclame de l'argent à un client. */
     expect(promptSysteme(BASE)).toContain("sans sa réserve");
   });
+  it("sait qu'il pilote l'écran, et que ça ne se demande pas", () => {
+    /* Trois gestes qui ne changent aucune donnée et se défont en un clic :
+       les faire confirmer coûterait plus cher que de les subir. La
+       confirmation reste réservée à ce qui engage de l'argent. */
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("ouvrir un écran");
+    expect(prompt).toContain("sans demander la permission");
+  });
+
+  it("exige le chiffre en plus de l'écran", () => {
+    /* Ouvrir les paiements et se taire, c'est renvoyer la question à
+       l'expéditeur : il fallait justement éviter de chercher. */
+    expect(promptSysteme(BASE)).toContain("donne le chiffre");
+  });
 });

@@ -7,6 +7,8 @@ import {
   type MouvementPiece,
 } from "@/lib/domain/piece";
 import { db } from "@/lib/firebase/client";
+import { clesDisponibles } from "./destinations";
+import { lireGeste, OUTILS_QUI_AGISSENT, resumeGeste } from "./gestes";
 import { estRefus, lireProposition, resume } from "./propositions";
 
 /**
@@ -215,6 +217,49 @@ export const DECLARATIONS = [
       },
       required: ["pieceId", "sens", "quantite"],
     },
+  },
+
+  /* --- Les gestes qui **agissent sur l'écran**.
+
+         Ils n'imitent pas une souris : ils appellent les mêmes fonctions que
+         l'écran appelle quand un humain clique. Voir l'en-tête de `gestes.ts`
+         pour les trois raisons qui excluent la simulation de clics. --- */
+  {
+    name: "aller_a",
+    description:
+      "Ouvre un écran de l'application. Sers-toi en dès qu'on te demande de montrer, " +
+      "d'ouvrir ou d'aller quelque part, et aussi quand ta réponse serait mieux lue sur " +
+      "l'écran concerné. Écrans possibles, et aucun autre : " +
+      clesDisponibles() +
+      ".",
+    parameters: {
+      type: "object",
+      properties: {
+        ecran: { type: "string", description: "Une clé de la liste, exactement." },
+      },
+      required: ["ecran"],
+    },
+  },
+  {
+    name: "choisir_la_boutique",
+    description:
+      "Bascule le travail sur une autre boutique, comme le fait le sélecteur du bandeau. " +
+      "Tout ce qui s'affiche ensuite parle de cette boutique-là. Un gérant n'en a qu'une : " +
+      "pour lui, ce geste échoue, et c'est normal.",
+    parameters: {
+      type: "object",
+      properties: {
+        nom: { type: "string", description: "Le nom de la boutique, tel qu'on te l'a dit." },
+      },
+      required: ["nom"],
+    },
+  },
+  {
+    name: "fermer_l_assistant",
+    description:
+      "Referme le panneau pour laisser voir l'écran. Sers-toi en quand on te dit « ferme », " +
+      "« c'est bon », « merci ça ira ».",
+    parameters: { type: "object", properties: {} },
   },
 ] as const;
 
@@ -553,6 +598,21 @@ export async function executerOutil(
         };
       }
 
+      case "aller_a":
+      case "choisir_la_boutique":
+      case "fermer_l_assistant": {
+        /* **Rien ne bouge ici.** Ce fichier n'a ni routeur ni périmètre : le
+           geste est lu, validé, et remonte à `components/Assistant.tsx` qui
+           seul peut l'exécuter. On rend au modèle de quoi l'annoncer. */
+        const geste = lireGeste(nom, arguments_);
+        if (estRefus(geste)) return geste;
+        return {
+          fait: true,
+          resume: resumeGeste(geste),
+          consigne: "Annonce-le en une phrase courte, sans répéter le nom de l'écran.",
+        };
+      }
+
       case "preparer_depense":
       case "preparer_mouvement_piece": {
         /* **Rien ne s'écrit ici.** On rend au modèle ce qu'il a compris, pour
@@ -611,4 +671,7 @@ export const LIBELLE_OUTIL: Record<string, string> = {
      sous la réponse — du code montré à un gérant. */
   preparer_depense: "Préparation d’une dépense",
   preparer_mouvement_piece: "Préparation d’un mouvement de stock",
+  aller_a: "Ouverture de l’écran",
+  choisir_la_boutique: "Changement de boutique",
+  fermer_l_assistant: "Fermeture du panneau",
 };
