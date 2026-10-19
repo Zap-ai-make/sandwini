@@ -1,4 +1,4 @@
-import { collection, getDocs, limit, query, where } from "firebase/firestore";
+import { collection, collectionGroup, getDocs, limit, query, where } from "firebase/firestore";
 
 import {
   etatStock,
@@ -47,6 +47,13 @@ const LECTURE_MAX = 200;
  */
 const MOUVEMENTS_MAX = 5_000;
 
+/**
+ * Même raison pour les versements : ils se somment par vente pour donner le
+ * reste dû, et une somme coupée annoncerait une dette plus grosse qu'elle
+ * n'est — à quelqu'un qui s'apprête à réclamer de l'argent.
+ */
+const VERSEMENTS_MAX = 5_000;
+
 export type ContexteOutils = {
   /** `null` veut dire « toutes les boutiques » : le responsable seul l'obtient. */
   boutiqueId: string | null;
@@ -94,10 +101,46 @@ export const DECLARATIONS = [
   {
     name: "ventes_recentes",
     description:
-      "Les ventes de motos du périmètre courant, de la plus récente à la plus ancienne : " +
-      "numéro, client, moto, prix, mode de paiement, reste dû. Sert à répondre « combien on a " +
-      "vendu », « qui me doit encore de l'argent ».",
-    parameters: { type: "object", properties: {} },
+      "Les ventes de motos du périmètre courant, de la plus récente à la plus ancienne, avec " +
+      "le **nom du client**, la moto, le prix convenu, le mode de paiement, ce qui a déjà été " +
+      "versé et **ce qui reste dû**. Répond à « combien on a vendu », « qui me doit encore de " +
+      "l'argent », « où en est la vente de monsieur Ouédraogo ».",
+    parameters: {
+      type: "object",
+      properties: {
+        recherche: {
+          type: "string",
+          description: "Facultatif. Un nom de client, un numéro de vente, une marque.",
+        },
+        impayees: {
+          type: "boolean",
+          description: "Vrai pour ne garder que les ventes où il reste de l'argent à percevoir.",
+        },
+      },
+    },
+  },
+  {
+    name: "argent_de_la_caisse",
+    description:
+      "Les entrées et les sorties d'argent de la boutique, de la plus récente à la plus " +
+      "ancienne : date, sens, montant, moyen de paiement, nature, poste de dépense. Donne " +
+      "aussi les totaux. Répond à « combien j'ai encaissé », « c'est quoi mes dépenses », " +
+      "« combien j'ai mis dans le carburant ce mois-ci ».",
+    parameters: {
+      type: "object",
+      properties: {
+        depuis: {
+          type: "string",
+          description:
+            "Facultatif, au format AAAA-MM-JJ. Ne garde que ce qui s'est passé à partir de " +
+            "ce jour-là. Pour « ce mois-ci », donne le premier du mois.",
+        },
+        sens: {
+          type: "string",
+          description: "Facultatif : `entree` pour les encaissements, `sortie` pour les dépenses.",
+        },
+      },
+    },
   },
   {
     name: "catalogue_pieces",
@@ -213,6 +256,31 @@ async function lire(
   };
 }
 
+/**
+ * Les versements, qui vivent sous chaque vente et non à la racine.
+ *
+ * Ils portent leur `boutiqueId` en double exactement pour ça : une requête de
+ * groupe ne sait filtrer que sur les champs du document lui-même.
+ */
+async function lireVersements(
+  boutiqueId: string | null,
+): Promise<{ lignes: Record<string, unknown>[]; tronque: boolean }> {
+  const base = collectionGroup(db(), "versements");
+  const requete = boutiqueId
+    ? query(base, where("boutiqueId", "==", boutiqueId), limit(VERSEMENTS_MAX))
+    : query(base, limit(VERSEMENTS_MAX));
+  const instantane = await getDocs(requete);
+  return {
+    lignes: instantane.docs.map((document) => ({ id: document.id, ...document.data() })),
+    tronque: instantane.size >= VERSEMENTS_MAX,
+  };
+}
+
+/** Un argument du modèle ramené à une chaîne propre, ou vide. */
+function texteSimple(valeur: unknown): string {
+  return typeof valeur === "string" ? valeur.trim() : "";
+}
+
 /** Les dates Firestore ne se sérialisent pas en JSON : on les rend lisibles. */
 function aplatir(donnees: Record<string, unknown>): Record<string, unknown> {
   const plat: Record<string, unknown> = {};
@@ -282,11 +350,115 @@ export async function executerOutil(
       }
 
       case "ventes_recentes": {
-        const lu = await lire("ventes", contexte.boutiqueId, LECTURE_MAX);
-        const ventes = lu.lignes
-          .map(aplatir)
+        /* **Trois lectures, et c'est le minimum.** Une vente ne porte que des
+           identifiants : sans la moto et le client, l'assistant répondrait
+           « la vente V-0012 de clt_a8f3 », ce qui ne se dit pas au comptoir.
+           Et sans les versements, « reste dû » n'existe pas — c'est pourtant
+           la seule question qu'on pose vraiment à une liste de ventes. */
+        const [vendues, motos, gens, verses] = await Promise.all([
+          lire("ventesMotos", contexte.boutiqueId, LECTURE_MAX),
+          lire("motos", contexte.boutiqueId, LECTURE_MAX),
+          lire("clients", null, LECTURE_MAX),
+          lireVersements(contexte.boutiqueId),
+        ]);
+
+        const parId = (lignes: Record<string, unknown>[]) =>
+          new Map(lignes.map((ligne) => [String(ligne.id), ligne]));
+        const lesMotos = parId(motos.lignes);
+        const lesGens = parId(gens.lignes);
+
+        const paye = new Map<string, number>();
+        for (const versement of verses.lignes) {
+          const cle = String(versement.venteId ?? "");
+          paye.set(cle, (paye.get(cle) ?? 0) + Number(versement.montant ?? 0));
+        }
+
+        const ventes = vendues.lignes
+          .map((vente) => {
+            const moto = lesMotos.get(String(vente.motoId ?? ""));
+            const client = lesGens.get(String(vente.clientId ?? ""));
+            const prix = Number(vente.prixConvenu ?? 0);
+            const verse = paye.get(String(vente.id)) ?? 0;
+            return aplatir({
+              numero: vente.numero,
+              date: vente.date,
+              client: client?.nom ?? "client inconnu",
+              telephone: client?.telephone,
+              moto: moto ? `${moto.marque ?? ""} ${moto.modele ?? ""}`.trim() : "moto inconnue",
+              chassis: moto?.chassis,
+              prixConvenu: prix,
+              modePaiement: vente.modePaiement,
+              dejaVerse: verse,
+              /* Jamais négatif : un trop-perçu est une anomalie de saisie, et
+                 l'afficher comme une dette à rebours embrouillerait plus que
+                 de montrer zéro. */
+              resteDu: Math.max(0, prix - verse),
+            });
+          })
           .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
-        return { ventes: ventes.slice(0, PLAFOND), combien: ventes.length };
+
+        const recherche = reduire(arguments_.recherche);
+        const retenues = ventes
+          .filter((vente) =>
+            recherche ? reduire(Object.values(vente).join(" ")).includes(recherche) : true,
+          )
+          .filter((vente) => (arguments_.impayees === true ? Number(vente.resteDu) > 0 : true));
+
+        return {
+          ventes: retenues.slice(0, PLAFOND),
+          combien: retenues.length,
+          ...(verses.tronque
+            ? { avertissement: "Tous les versements n’ont pas été lus : les restes dus sont des maximums." }
+            : {}),
+        };
+      }
+
+      case "argent_de_la_caisse": {
+        const [mouvements, postes] = await Promise.all([
+          lire("encaissements", contexte.boutiqueId, LECTURE_MAX * 2),
+          /* Les postes ne portent pas de boutique : ils sont déclarés une fois
+             pour la maison entière. */
+          lire("postesDepense", null, LECTURE_MAX),
+        ]);
+        const nomDuPoste = new Map(
+          postes.lignes.map((poste) => [String(poste.id), String(poste.nom ?? "")]),
+        );
+
+        const depuis = texteSimple(arguments_.depuis);
+        const sens = texteSimple(arguments_.sens);
+        const lignes = mouvements.lignes
+          .map((mouvement) =>
+            aplatir({
+              date: mouvement.date,
+              sens: mouvement.sens,
+              montant: mouvement.montant,
+              moyenPaiement: mouvement.moyenPaiement,
+              nature: mouvement.origine,
+              poste: nomDuPoste.get(String(mouvement.posteId ?? "")) ?? "",
+              libelle: mouvement.libelle,
+            }),
+          )
+          .filter((ligne) => (depuis ? String(ligne.date ?? "") >= depuis : true))
+          .filter((ligne) => (sens ? ligne.sens === sens : true))
+          .sort((a, b) => String(b.date ?? "").localeCompare(String(a.date ?? "")));
+
+        const totalDe = (quel: string) =>
+          lignes
+            .filter((ligne) => ligne.sens === quel)
+            .reduce((somme, ligne) => somme + Number(ligne.montant ?? 0), 0);
+
+        return {
+          mouvements: lignes.slice(0, PLAFOND),
+          combien: lignes.length,
+          /* Les totaux portent sur **tout** ce qui a été retenu, pas sur
+             l'extrait : sans eux, le modèle additionnerait les cinquante
+             premières lignes et appellerait ça le mois. */
+          totalEntrees: totalDe("entree"),
+          totalSorties: totalDe("sortie"),
+          ...(mouvements.tronque
+            ? { avertissement: "Le journal a été coupé : les totaux sont partiels, dis-le." }
+            : {}),
+        };
       }
 
       case "catalogue_pieces": {
@@ -359,14 +531,18 @@ export async function executerOutil(
     }
   } catch (cause) {
     const code = (cause as { code?: string }).code ?? "inconnu";
+    /* Le code technique va à la console, jamais au modèle : tout ce qu'on lui
+       donne, il peut le répéter à l'écran, et « permission-denied » n'est pas
+       une phrase qu'on dit à un gérant. */
+    console.error(`[assistant] ${nom} a échoué :`, cause);
     /* Nommer le refus plutôt que de rendre une liste vide : « je n'ai pas le
        droit de lire ça » et « il n'y a rien » sont deux réponses différentes, et
        les confondre ferait mentir l'assistant. */
     return {
       erreur:
         code === "permission-denied"
-          ? "Les droits de ce compte ne permettent pas de lire ces données."
-          : `La lecture a échoué (${code}). Le réseau est peut-être coupé.`,
+          ? "Ce compte n’a pas le droit de consulter ces informations."
+          : "La consultation n’a pas abouti. La connexion est peut-être coupée.",
     };
   }
 }
@@ -382,7 +558,8 @@ export async function executerOutil(
 export const LIBELLE_OUTIL: Record<string, string> = {
   motos_en_stock: "Lecture du stock de motos",
   chercher_client: "Recherche du client",
-  ventes_recentes: "Lecture des ventes",
+  ventes_recentes: "Lecture des ventes et des versements",
+  argent_de_la_caisse: "Lecture du journal de caisse",
   catalogue_pieces: "Lecture du catalogue et du stock de pièces",
   /* Les deux gestes qui préparent sont nommés ici aussi : sans entrée, le
      rendu retombait sur la clé technique et affichait « lu : preparer_depense »

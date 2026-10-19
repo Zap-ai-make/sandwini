@@ -262,7 +262,7 @@ export function messageErreurAssistant(cause: unknown): string {
   if (statut === 401 || statut === 403 || /app-?check|unauthorized|appCheck/i.test(brut)) {
     /* Le refus le plus probable au premier essai, et le plus déroutant : tout
        le reste de l'application marche. */
-    return "L’assistant n’est pas encore autorisé sur cet appareil (App Check). Voir la console du navigateur pour le détail.";
+    return "L’assistant n’est pas encore autorisé sur cet appareil. Signalez-le au responsable : c’est un réglage à faire une fois, pas une panne.";
   }
   /* **Deux refus portent le même 429, et ils n'appellent pas le même geste.**
      Une file pleine se vide en quelques secondes ; des crédits épuisés,
@@ -270,7 +270,7 @@ export function messageErreurAssistant(cause: unknown): string {
      qui n'arrivera pas — c'est la faute que ce commentaire existe pour
      empêcher de refaire. */
   if (/credits? (are )?depleted|billing|prepayment|out of credits/i.test(brut)) {
-    return "Les crédits Gemini du projet sont épuisés. Rechargez la facturation du projet Firebase — attendre ne suffira pas.";
+    return "L’assistant n’a plus de crédit pour répondre. Prévenez le responsable : attendre n’y changera rien.";
   }
   /* On n'arrive ici qu'**après** les reprises automatiques de `reessai.ts` :
      le service était occupé plusieurs secondes d'affilée. Le message ne parle
@@ -278,12 +278,12 @@ export function messageErreurAssistant(cause: unknown): string {
      dépassé, et qui envoyait chercher un quota à relever là où il n'y en a
      aucun — la capacité est partagée, pas achetée. */
   if (statut === 429 || statut === 503 || /quota|resource-exhausted|rate.?limit/i.test(brut)) {
-    return "Le service Gemini est saturé en ce moment, et les reprises automatiques n’ont pas suffi. Reposez la question dans un instant : ce n’est pas un dépassement de forfait.";
+    return "L’assistant est très demandé en ce moment et n’a pas pu répondre, malgré plusieurs tentatives. Reposez la question dans un instant.";
   }
   if (statut === 404 || /not.?enabled|disabled|SERVICE_DISABLED|has not been used/i.test(brut)) {
     /* L'API Gemini pas encore activée sur le projet : le cas du premier jour,
        et il n'a rien d'un problème de réseau. */
-    return "L’API Gemini n’est pas activée sur ce projet Firebase. Console Firebase → AI Logic.";
+    return "L’assistant n’est pas encore ouvert sur cette installation. Signalez-le au responsable.";
   }
   /* « Hors ligne » ne s'affirme que si le navigateur le dit lui-même. Le
      déduire d'un `fetch` raté désignait le réseau pour toutes les pannes, et
@@ -291,5 +291,5 @@ export function messageErreurAssistant(cause: unknown): string {
   if (typeof navigator !== "undefined" && navigator.onLine === false) {
     return "L’assistant a besoin du réseau, et il est coupé. Le reste de l’application continue de fonctionner.";
   }
-  return "L’assistant n’a pas répondu. Le détail est dans la console du navigateur (touche F12).";
+  return "L’assistant n’a pas répondu. Réessayez ; si cela se reproduit, signalez-le au responsable.";
 }

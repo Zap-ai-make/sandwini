@@ -3,9 +3,16 @@
 import { History, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { AssistantTexte } from "@/components/AssistantTexte";
+import {
+  MessageAssistant,
+  MessageHumain,
+  MessageReflexion,
+} from "@/components/AssistantMessage";
+import { AssistantSaisie } from "@/components/AssistantSaisie";
 import { useSession } from "@/lib/auth/session";
+import { trouverParNom } from "@/lib/domain/referentiel";
 import { messageErreurAssistant, ouvrirConversation, type Conversation } from "@/lib/ia/assistant";
+import { avancerDUnMot } from "@/lib/ia/flux-mot-a-mot";
 import {
   enregistrerDiscussion,
   lireDiscussions,
@@ -16,13 +23,12 @@ import {
   type Discussion,
 } from "@/lib/ia/historique";
 import { LIBELLE_OUTIL } from "@/lib/ia/outils";
-import { OUTILS_QUI_PREPARENT, resume, type Proposition } from "@/lib/ia/propositions";
-import { trouverParNom } from "@/lib/domain/referentiel";
+import { resume, type Proposition } from "@/lib/ia/propositions";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { enregistrerSortieEspeces } from "@/lib/repositories/caisse";
 import { usePostesDepense } from "@/lib/repositories/catalogue";
 import { enregistrerMouvement } from "@/lib/repositories/pieces";
 import { creerEntree } from "@/lib/repositories/referentiels";
-import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 
 /**
@@ -33,54 +39,27 @@ import { useEtatReseau } from "@/lib/reseau/etat-reseau";
  * du réseau l'annonce au lieu d'échouer en silence. Coupé, le bouton reste
  * visible et explique ; il ne disparaît pas, et il ne mange pas une question.
  *
- * **Trois choses que le premier rendu n'avait pas**, et que le commanditaire a
- * demandées en voyant sa première réponse :
- *
- * - le texte arrive **au fil de l'eau** au lieu de tomber d'un bloc après dix
- *   secondes de silence ;
- * - l'attente est **nommée** — « Lecture du stock de motos » — parce qu'une
- *   animation muette ne dit pas si l'assistant a compris la question ;
- * - les discussions se gardent, et on peut en ouvrir une nouvelle. Sur
- *   l'appareil seulement : voir `lib/ia/historique.ts` pour pourquoi ce n'est
- *   pas Firestore.
+ * **Le rendu est séparé de l'arrivée** (S57). Le réseau livre le texte par
+ * paquets très inégaux ; l'écran le reprend mot à mot, à cadence fixe. Voir
+ * `lib/ia/flux-mot-a-mot.ts` : c'est ce découplage qui fait la différence entre
+ * un texte qui sursaute et un texte qui s'écrit.
  */
+
+/** Un mot toutes les 40 ms, soit le rythme d'une main rapide. */
+const CADENCE = 40;
 
 /**
- * Ce que l'assistant a lu pour répondre.
+ * Ce qu'on propose quand la page est blanche.
  *
- * Un chiffre sans sa source se croit ou ne se croit pas ; avec elle, il se
- * vérifie. **Les gestes qui préparent une écriture n'en sont pas** : ils ne
- * lisent rien, et les ranger là affichait « lu : préparation d'une dépense »
- * sous une réponse qui n'avait rien lu du tout.
+ * Trois, pas six : une liste de possibilités se lit comme un mode d'emploi, et
+ * on referme. Elles disent surtout ce que l'assistant sait faire — consulter,
+ * calculer, préparer — plutôt que de couvrir les espaces du produit.
  */
-function SourcesLues({ outils }: { outils: readonly string[] }) {
-  const lectures = [...new Set(outils)].filter((nom) => !OUTILS_QUI_PREPARENT.has(nom));
-  if (lectures.length === 0) return null;
-
-  return (
-    <p className="mt-2 text-xs text-encre-doux">
-      lu&nbsp;: {lectures.map((nom) => LIBELLE_OUTIL[nom] ?? "données").join(", ").toLowerCase()}
-    </p>
-  );
-}
-
-/** Les trois points de la réflexion. Décalés pour que l'œil lise un mouvement. */
-function Reflexion({ quoi }: { quoi: string }) {
-  return (
-    <p role="status" className="mt-3 flex items-center gap-2 text-sm text-encre-doux">
-      <span aria-hidden="true" className="flex gap-1">
-        {[0, 1, 2].map((rang) => (
-          <span
-            key={rang}
-            className="size-1.5 animate-bounce rounded-full bg-encre-doux"
-            style={{ animationDelay: `${rang * 150}ms` }}
-          />
-        ))}
-      </span>
-      {quoi}
-    </p>
-  );
-}
+const SUGGESTIONS = [
+  "Qu’est-ce qu’on a en stock ?",
+  "Qui me doit encore de l’argent ?",
+  "Note 15 000 de carburant",
+];
 
 export function Assistant() {
   const session = useSession();
@@ -99,9 +78,17 @@ export function Assistant() {
   /* `null` = au repos. Une chaîne = ce qu'on est en train de faire, affiché tel
      quel : « Réflexion… », « Lecture du stock de motos ». */
   const [enCours, setEnCours] = useState<string | null>(null);
-  /* Le texte qui arrive, avant d'être figé en bulle. Séparé des bulles pour que
-     chaque morceau ne réécrive pas toute la liste. */
-  const [enFlux, setEnFlux] = useState("");
+
+  /* **Deux textes, et pas un seul.** `cible` est ce que le réseau a livré ;
+     `montre` est jusqu'où l'œil a suivi. Les confondre, c'est afficher les
+     paquets du réseau — trois mots, puis deux phrases d'un coup. */
+  const [cible, setCible] = useState("");
+  const [montre, setMontre] = useState(0);
+  /* La réponse terminée, en attente que le dévoilement la rattrape. La figer
+     tout de suite ferait apparaître d'un bloc la fin qu'on était en train de
+     lire arriver. */
+  const [aFiger, setAFiger] = useState<Discussion | null>(null);
+
   /* Ce que l'assistant propose d'écrire, en attente du geste humain. Une seule
      à la fois : deux cartes empilées feraient valider la mauvaise. */
   const [proposition, setProposition] = useState<Proposition | null>(null);
@@ -111,6 +98,12 @@ export function Assistant() {
 
   const conversation = useRef<Conversation | null>(null);
   const filDeDiscussion = useRef<HTMLDivElement | null>(null);
+  /* Vrai tant que l'utilisateur n'est pas remonté lire plus haut. Sans ça, le
+     fil le ramènerait en bas à chaque mot — on ne pourrait pas relire une
+     réponse pendant que la suivante s'écrit. */
+  const colleEnBas = useRef(true);
+
+  const occupe = enCours !== null || cible !== "" || aFiger !== null;
 
   /* La conversation tient l'historique côté SDK. Elle se refait quand le
      périmètre change, parce que le prompt système le nomme. */
@@ -123,14 +116,37 @@ export function Assistant() {
     if (ouvert) setDiscussions(lireDiscussions(uid));
   }, [ouvert, uid]);
 
+  /* Le battement du dévoilement. Un `setTimeout` par pas plutôt qu'un
+     intervalle : il s'arrête de lui-même quand la cible est rattrapée, et
+     repart tout seul au morceau suivant. */
   useEffect(() => {
+    if (montre >= cible.length) return;
+    const minuteur = setTimeout(() => setMontre((vu) => avancerDUnMot(cible, vu)), CADENCE);
+    return () => clearTimeout(minuteur);
+  }, [cible, montre]);
+
+  /* La réponse ne se fige en bulle qu'une fois entièrement dévoilée. */
+  useEffect(() => {
+    if (aFiger === null || montre < cible.length) return;
+    setDiscussion(aFiger);
+    enregistrerDiscussion(uid, aFiger);
+    setDiscussions(lireDiscussions(uid));
+    setAFiger(null);
+    setCible("");
+    setMontre(0);
+  }, [aFiger, montre, cible, uid]);
+
+  useEffect(() => {
+    if (!colleEnBas.current) return;
     filDeDiscussion.current?.scrollTo({ top: filDeDiscussion.current.scrollHeight });
-  }, [discussion.bulles, enFlux, enCours]);
+  }, [discussion.bulles, montre, enCours, proposition]);
 
   const demarrerUneNouvelle = useCallback(() => {
     conversation.current = null;
     setDiscussion(nouvelleDiscussion());
-    setEnFlux("");
+    setCible("");
+    setMontre(0);
+    setAFiger(null);
     setProposition(null);
     setMontreHistorique(false);
   }, []);
@@ -194,7 +210,10 @@ export function Assistant() {
        usage rare. La question suivante repart donc d'un fil neuf. */
     conversation.current = null;
     setDiscussion(ancienne);
-    setEnFlux("");
+    setCible("");
+    setMontre(0);
+    setAFiger(null);
+    setProposition(null);
     setMontreHistorique(false);
   }, []);
 
@@ -211,12 +230,16 @@ export function Assistant() {
       };
       setDiscussion(enTete);
       setSaisie("");
-      setEnFlux("");
+      setCible("");
+      setMontre(0);
       /* **La carte de la question précédente s'efface ici.** Laissée en place,
          elle survivait à la question suivante : on lisait une nouvelle réponse
          avec, dessous, un « Enregistrer » qui engageait l'ancienne dépense. */
       setProposition(null);
       setEnCours("Réflexion…");
+      /* Une nouvelle question se lit en bas : on y redescend même si on était
+         remonté. */
+      colleEnBas.current = true;
 
       try {
         conversation.current ??= ouvrirConversation(
@@ -231,7 +254,7 @@ export function Assistant() {
 
         const { texte, outils } = await conversation.current.envoyer(question, (progres) => {
           if (progres.quoi === "texte") {
-            setEnFlux(progres.texte);
+            setCible(progres.texte);
             setEnCours(null);
             return;
           }
@@ -244,40 +267,41 @@ export function Assistant() {
             /* Le serveur était occupé et on reprend tout seul. Le dire : trois
                secondes de silence après « Réflexion… » se lisent comme une
                panne, et le gérant renverrait sa question par-dessus. */
-            setEnFlux("");
             setEnCours(`Le service est occupé, nouvelle tentative (${progres.reprise})…`);
             return;
           }
           setEnCours(
-            progres.noms.map((nom: string) => LIBELLE_OUTIL[nom] ?? "Lecture").join(" · ") + "…",
+            progres.noms.map((nom: string) => LIBELLE_OUTIL[nom] ?? "Consultation").join(" · ") +
+              "…",
           );
         });
 
-        const complete: Discussion = {
-          ...enTete,
-          bulles: [...avecQuestion, { de: "assistant", texte, outils }],
-        };
-        setDiscussion(complete);
-        enregistrerDiscussion(uid, complete);
-        setDiscussions(lireDiscussions(uid));
+        setEnCours(null);
+        /* La cible prend le texte complet — le dévoilement finira de le
+           rattraper — et la bulle attend ce rattrapage. */
+        setCible(texte);
+        setAFiger({ ...enTete, bulles: [...avecQuestion, { de: "assistant", texte, outils }] });
       } catch (cause) {
         /* La conversation est jetée : une session de chat qui a échoué garde un
            historique incohérent côté SDK, et la question suivante repartirait
            sur un état cassé. */
         conversation.current = null;
+        setEnCours(null);
+        setCible("");
+        setMontre(0);
         setDiscussion({
           ...enTete,
           bulles: [...avecQuestion, { de: "assistant", texte: messageErreurAssistant(cause) }],
         });
-      } finally {
-        setEnFlux("");
-        setEnCours(null);
       }
     },
     [session, perimetre, discussion],
   );
 
   if (session.statut !== "connecte") return null;
+
+  const enTrainDEcrire = cible !== "";
+  const vide = discussion.bulles.length === 0 && !enTrainDEcrire && enCours === null;
 
   return (
     <>
@@ -295,16 +319,17 @@ export function Assistant() {
         <div
           role="dialog"
           aria-label="Assistant"
-          className="fixed inset-0 z-50 flex justify-end bg-encre/30"
+          className="fixed inset-0 z-50 flex justify-end bg-encre/40"
           onClick={(evenement) => {
             if (evenement.target === evenement.currentTarget) setOuvert(false);
           }}
         >
-          <section className="flex h-full w-full max-w-[34rem] flex-col border-l border-bord bg-fond">
-            <header className="flex items-center gap-2 border-b border-bord p-4">
+          <section className="flex h-full w-full max-w-[40rem] flex-col bg-papier shadow-2xl">
+            <header className="flex items-center gap-1 border-b border-bord px-4 py-3">
               <div className="min-w-0 flex-1">
-                <h2 className="truncate font-semibold text-encre">
-                  {discussion.bulles.length === 0 ? "Assistant" : discussion.titre}
+                <h2 className="flex items-center gap-2 font-semibold text-encre">
+                  <Sparkles aria-hidden="true" className="size-4 text-encre-doux" />
+                  Assistant
                 </h2>
                 <p className="truncate text-sm text-encre-doux">
                   {perimetre.nom}
@@ -316,17 +341,17 @@ export function Assistant() {
                 onClick={demarrerUneNouvelle}
                 aria-label="Nouvelle discussion"
                 title="Nouvelle discussion"
-                className="bouton bouton-neutre"
+                className="rounded-lg p-2 text-encre-doux transition hover:bg-survol hover:text-encre"
               >
                 <Plus aria-hidden="true" className="size-4" />
               </button>
               <button
                 type="button"
-                onClick={() => setMontreHistorique((montre) => !montre)}
+                onClick={() => setMontreHistorique((montreLa) => !montreLa)}
                 aria-expanded={montreHistorique}
                 aria-label="Discussions passées"
                 title="Discussions passées"
-                className="bouton bouton-neutre"
+                className="rounded-lg p-2 text-encre-doux transition hover:bg-survol hover:text-encre"
               >
                 <History aria-hidden="true" className="size-4" />
               </button>
@@ -334,14 +359,14 @@ export function Assistant() {
                 type="button"
                 onClick={() => setOuvert(false)}
                 aria-label="Fermer l’assistant"
-                className="bouton bouton-neutre"
+                className="rounded-lg p-2 text-encre-doux transition hover:bg-survol hover:text-encre"
               >
                 <X aria-hidden="true" className="size-4" />
               </button>
             </header>
 
             {montreHistorique && (
-              <div className="max-h-64 overflow-y-auto border-b border-bord p-2">
+              <div className="max-h-64 overflow-y-auto border-b border-bord bg-fond/60 p-2">
                 {discussions.length === 0 ? (
                   <p className="p-2 text-sm text-encre-doux">
                     Aucune discussion gardée. Elles restent sur cet appareil.
@@ -353,7 +378,7 @@ export function Assistant() {
                         <button
                           type="button"
                           onClick={() => reprendre(ancienne)}
-                          className="min-w-0 flex-1 truncate rounded px-2 py-2 text-left text-sm text-encre hover:bg-accent-doux"
+                          className="min-w-0 flex-1 truncate rounded-lg px-2 py-2 text-left text-sm text-encre transition hover:bg-papier"
                         >
                           {ancienne.titre}
                         </button>
@@ -364,7 +389,7 @@ export function Assistant() {
                             setDiscussions(lireDiscussions(uid));
                           }}
                           aria-label={`Oublier « ${ancienne.titre} »`}
-                          className="bouton bouton-neutre"
+                          className="rounded-lg p-2 text-encre-doux transition hover:bg-papier hover:text-encre"
                         >
                           <Trash2 aria-hidden="true" className="size-4" />
                         </button>
@@ -375,43 +400,56 @@ export function Assistant() {
               </div>
             )}
 
-            <div ref={filDeDiscussion} className="flex-1 overflow-y-auto p-4">
-              {discussion.bulles.length === 0 && enFlux === "" && (
-                <div className="encadre-vide">
-                  <p className="text-encre">Posez votre question sur vos données.</p>
-                  <p className="mt-1 text-sm text-encre-doux">
-                    « Qu’est-ce qu’on a en stock ? » · « Qui me doit encore de l’argent ? » ·
-                    « Combien il me reste de bougies ? »
+            <div
+              ref={filDeDiscussion}
+              onScroll={(evenement) => {
+                const fil = evenement.currentTarget;
+                colleEnBas.current = fil.scrollHeight - fil.scrollTop - fil.clientHeight < 80;
+              }}
+              className="flex-1 overflow-y-auto px-5 py-6"
+            >
+              {vide && (
+                <div className="flex h-full flex-col justify-center">
+                  <p className="text-xl font-semibold text-encre">
+                    Bonjour {session.utilisateur.nom.split(" ")[0]}.
                   </p>
-                  <p className="mt-3 text-sm text-encre-doux">
-                    L’assistant lit vos données avec vos propres droits : il ne voit rien que vous
-                    ne puissiez voir. Il n’enregistre rien tout seul.
+                  <p className="mt-1 text-encre-doux">
+                    Posez votre question sur vos motos, vos pièces, vos clients ou votre caisse.
+                  </p>
+
+                  <div className="mt-5 flex flex-col items-start gap-2">
+                    {SUGGESTIONS.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => void envoyer(suggestion)}
+                        className="rounded-full border border-bord bg-fond px-4 py-2 text-sm text-encre transition hover:border-bord-fort hover:bg-survol"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+
+                  <p className="mt-6 text-sm text-encre-doux">
+                    Il consulte vos données avec vos propres droits : il ne voit rien que vous ne
+                    puissiez voir. Il n’enregistre rien tout seul.
                   </p>
                 </div>
               )}
 
-              {discussion.bulles.map((bulle, rang) => (
-                <div key={rang} className={bulle.de === "humain" ? "mt-4 text-right" : "mt-4"}>
-                  {bulle.de === "humain" ? (
-                    <p className="inline-block max-w-[85%] rounded-lg bg-accent-doux px-3 py-2 text-left text-encre">
-                      {bulle.texte}
-                    </p>
-                  ) : (
-                    <>
-                      <AssistantTexte texte={bulle.texte} />
-                      {bulle.outils && <SourcesLues outils={bulle.outils} />}
-                    </>
-                  )}
-                </div>
-              ))}
-
-              {enFlux !== "" && (
-                <div className="mt-4">
-                  <AssistantTexte texte={enFlux} />
-                </div>
+              {discussion.bulles.map((bulle, rang) =>
+                bulle.de === "humain" ? (
+                  <MessageHumain key={rang} texte={bulle.texte} />
+                ) : (
+                  <MessageAssistant key={rang} texte={bulle.texte} outils={bulle.outils} />
+                ),
               )}
 
-              {enCours !== null && <Reflexion quoi={enCours} />}
+              {enTrainDEcrire && (
+                <MessageAssistant texte={cible.slice(0, montre)} enCours={montre < cible.length} />
+              )}
+
+              {enCours !== null && <MessageReflexion quoi={enCours} />}
             </div>
 
             {proposition !== null && (
@@ -430,9 +468,11 @@ export function Assistant() {
                  1 500. */
               <section
                 aria-label="Écriture à valider"
-                className="border-t border-accent bg-accent-doux/40 p-4"
+                className="border-t-2 border-encre bg-fond px-5 py-4"
               >
-                <p className="font-semibold text-encre">À valider</p>
+                <p className="text-xs font-semibold uppercase tracking-wide text-encre-doux">
+                  {ecriture === "faite" ? "Enregistré" : "À valider"}
+                </p>
                 <p className="mt-1 text-encre">{resume(proposition)}</p>
 
                 {!perimetre.boutiqueId ? (
@@ -467,13 +507,22 @@ export function Assistant() {
                     )}
                   </div>
                 ) : ecriture === "faite" ? (
-                  <p className="mt-3 text-sm text-encre">
-                    Enregistré. La ligne apparaît dans{" "}
-                    {proposition.quoi === "depense"
-                      ? "le journal de caisse"
-                      : "le stock de la pièce"}
-                    .
-                  </p>
+                  <div className="mt-3 flex items-center gap-3">
+                    <p className="flex-1 text-sm text-encre-doux">
+                      La ligne apparaît dans{" "}
+                      {proposition.quoi === "depense"
+                        ? "le journal de caisse"
+                        : "le stock de la pièce"}
+                      .
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => setProposition(null)}
+                      className="bouton bouton-neutre"
+                    >
+                      Fermer
+                    </button>
+                  </div>
                 ) : (
                   <>
                     {typeof ecriture === "string" &&
@@ -481,7 +530,7 @@ export function Assistant() {
                       ecriture !== "en_cours" && (
                         <p className="mt-2 text-sm text-encre">{ecriture}</p>
                       )}
-                    <p className="mt-2 text-sm text-encre-doux">Dans {perimetre.nom}.</p>
+                    <p className="mt-1 text-sm text-encre-doux">Dans {perimetre.nom}.</p>
                     <div className="mt-3 flex gap-2">
                       <button
                         type="button"
@@ -504,38 +553,29 @@ export function Assistant() {
               </section>
             )}
 
-            <form
-              onSubmit={(evenement) => {
-                evenement.preventDefault();
-                const question = saisie.trim();
-                if (question && enCours === null && enFlux === "") void envoyer(question);
-              }}
-              className="border-t border-bord p-4"
-            >
+            <div className="border-t border-bord bg-papier px-5 py-4">
               {!enLigne ? (
                 <p className="text-sm text-encre-doux">
                   L’assistant a besoin du réseau. Le reste de l’application continue de
                   fonctionner&nbsp;: vos saisies partiront au retour du signal.
                 </p>
               ) : (
-                <div className="flex gap-2">
-                  <input
-                    value={saisie}
-                    onChange={(evenement) => setSaisie(evenement.target.value)}
-                    aria-label="Votre question"
-                    placeholder="Votre question…"
-                    className="saisie flex-1"
+                <>
+                  <AssistantSaisie
+                    valeur={saisie}
+                    surChangement={setSaisie}
+                    surEnvoi={() => {
+                      const question = saisie.trim();
+                      if (question && !occupe) void envoyer(question);
+                    }}
+                    occupe={occupe}
                   />
-                  <button
-                    type="submit"
-                    disabled={enCours !== null || enFlux !== "" || saisie.trim() === ""}
-                    className="bouton bouton-principal"
-                  >
-                    Envoyer
-                  </button>
-                </div>
+                  <p className="mt-2 text-center text-xs text-encre-doux">
+                    L’assistant peut se tromper. Vérifiez ce qui engage de l’argent.
+                  </p>
+                </>
               )}
-            </form>
+            </div>
           </section>
         </div>
       )}

@@ -88,4 +88,31 @@ describe("le prompt système de l'assistant", () => {
       "Tu n’as pas accès au prix d’achat d’une moto",
     );
   });
+  it("interdit le vocabulaire du programme, mot par mot", () => {
+    /* **La demande du commanditaire, le 19 octobre 2026** : « pas de langage
+       technique de développeur (collection, firestore, api...) ». Ces mots
+       n'apprennent rien à un gérant sinon qu'il n'est pas chez lui. La liste
+       est figée ici parce qu'une phrase de prompt se perd à la retouche
+       suivante sans que rien ne le signale. */
+    const prompt = promptSysteme(BASE);
+    for (const interdit of ["collection", "base de données", "requête", "API", "cache"]) {
+      expect(prompt).toContain(interdit);
+    }
+    expect(prompt).toContain("jamais");
+  });
+
+  it("envoie chercher la réponse au lieu de réclamer une précision", () => {
+    /* Un assistant qui redemande « de quelle boutique parlez-vous » à chaque
+       question fait travailler celui qu'il devait soulager. Il regarde
+       d'abord, et ne demande que si deux réponses restent possibles. */
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("Va chercher, ne demande pas");
+    expect(prompt).toContain("Enchaîne les consultations");
+  });
+
+  it("exige qu'un chiffre parte avec sa réserve", () => {
+    /* Un total partiel recopié sans sa réserve devient un total tout court,
+       et c'est sur ce chiffre-là qu'on réclame de l'argent à un client. */
+    expect(promptSysteme(BASE)).toContain("sans sa réserve");
+  });
 });
