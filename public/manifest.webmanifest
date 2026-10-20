@@ -16,6 +16,8 @@
     { "src": "/icones/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "shortcuts": [
-    { "name": "Vérifier la synchronisation", "url": "/diagnostic" }
+    { "name": "Assistant", "short_name": "Assistant", "url": "/dashboard?assistant=1" },
+    { "name": "Nouvelle vente", "short_name": "Vente", "url": "/motos/ventes?nouvelle=1" },
+    { "name": "Journal de caisse", "short_name": "Caisse", "url": "/caisse" }
   ]
 }

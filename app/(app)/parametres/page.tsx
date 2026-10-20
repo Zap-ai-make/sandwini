@@ -2,6 +2,7 @@
 
 import { LogOut, Settings } from "lucide-react";
 import { useCallback, useState } from "react";
+import { BoutonInstaller } from "@/components/BoutonInstaller";
 import { IdentiteEntreprise } from "@/components/IdentiteEntreprise";
 import { ICONE_ECRAN } from "@/components/icones-ecrans";
 import { Avis } from "@/components/patrons/Avis";
@@ -214,6 +215,16 @@ export default function Reglages() {
           ))}
         </dl>
         <MiseAJour />
+        {/* **L'installation se propose ici, pas dans une bannière.** Le
+            navigateur sait poser l'application sur l'écran d'accueil, mais
+            range le geste au fond d'un menu que personne n'ouvre — et c'est ce
+            geste qui donne le plein écran et le travail hors ligne, promesse
+            centrale du produit (D40). Une bannière l'aurait dit plus fort et
+            se serait fait fermer ; la page des réglages est l'endroit où l'on
+            vient déjà pour son appareil. */}
+        <div className="mt-4">
+          <BoutonInstaller />
+        </div>
         <p className="mt-3 max-w-prose text-corps text-encre-doux">
           Cette page est propre à l’appareil du comptoir : ce qui est en attente ici n’est pas en
           attente ailleurs.

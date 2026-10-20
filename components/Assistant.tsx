@@ -180,6 +180,17 @@ export function Assistant() {
     if (ouvert) setDiscussions(lireDiscussions(uid));
   }, [ouvert, uid]);
 
+  /* **Ouvert directement depuis l'écran d'accueil.** Le manifeste propose un
+     raccourci « Assistant » : un appui long sur l'icône installée, et l'on
+     parle à l'assistant sans traverser l'application.
+
+     Lu sur `window` plutôt que par `useSearchParams` : ce composant vit dans
+     la coquille, et le crochet de Next ferait basculer en rendu dynamique
+     toutes les pages statiques qu'elle enveloppe. */
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("assistant") === "1") setOuvert(true);
+  }, []);
+
   /* Le battement du dévoilement. Un `setTimeout` par pas plutôt qu'un
      intervalle : il s'arrête de lui-même quand la cible est rattrapée, et
      repart tout seul au morceau suivant. */
@@ -435,15 +446,29 @@ export function Assistant() {
 
   return (
     <>
+      {/* Deux déclencheurs, et un seul visible à la fois. Sur grand écran il
+          prend sa place dans le bandeau ; sur téléphone il descend sous le
+          pouce, parce que c'est là qu'on travaille avec lui. */}
       <button
         type="button"
         onClick={() => setOuvert(true)}
         aria-expanded={ouvert}
-        className="bouton bouton-neutre gap-1.5"
+        className="bouton bouton-neutre gap-1.5 max-md:hidden"
       >
         <Sparkles aria-hidden="true" className="size-4" />
         Assistant
       </button>
+
+      {!ouvert && (
+        <button
+          type="button"
+          onClick={() => setOuvert(true)}
+          aria-label="Ouvrir l’assistant"
+          className="bouton-assistant-pouce flex size-14 items-center justify-center rounded-full bg-encre text-papier shadow-lg md:hidden"
+        >
+          <Sparkles aria-hidden="true" className="size-6" />
+        </button>
+      )}
 
       {ouvert && (
         <div
@@ -455,7 +480,10 @@ export function Assistant() {
           }}
         >
           <section className="flex h-full w-full max-w-[40rem] flex-col bg-papier shadow-2xl">
-            <header className="flex items-center gap-1 border-b border-bord px-4 py-3">
+            {/* Les zones sûres de l’iPhone : installée, l’application occupe
+                l’écran entier, et sans elles l’entête passe sous l’encoche
+                pendant que la saisie passe sous l’indicateur d’accueil. */}
+            <header className="flex items-center gap-1 border-b border-bord px-4 py-3 pt-[calc(0.75rem+env(safe-area-inset-top))]">
               <div className="min-w-0 flex-1">
                 <h2 className="flex items-center gap-2 font-semibold text-encre">
                   <Sparkles aria-hidden="true" className="size-4 text-encre-doux" />
@@ -701,7 +729,7 @@ export function Assistant() {
               </div>
             )}
 
-            <div className="border-t border-bord bg-papier px-5 py-4">
+            <div className="border-t border-bord bg-papier px-5 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
               {!enLigne ? (
                 <p className="text-sm text-encre-doux">
                   L’assistant a besoin du réseau. Le reste de l’application continue de
