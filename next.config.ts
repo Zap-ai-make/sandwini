@@ -307,7 +307,7 @@ const ECRANS_HORS_LIGNE = [
   "/parametres/entreprise",
   "/parametres/catalogue",
   "/parametres/referentiels",
-  "/parametres/prestataires",
+  "/prestataires",
 ];
 
 /* Une révision par build : elle change à chaque compilation pour qu'une

@@ -1,16 +1,18 @@
 "use client";
 
-import { Phone, Plus } from "lucide-react";
+import { Phone, Plus, Send } from "lucide-react";
 import { useCallback, useState } from "react";
-import { GardeCapacite } from "@/components/GardeSession";
+import { ConfierDepuisPrestataire } from "@/components/ConfierDepuisPrestataire";
+import { GardeEspace } from "@/components/GardeSession";
 import { LienDeSuivi } from "@/components/LienDeSuivi";
+import { Avis } from "@/components/patrons/Avis";
+import { Champ } from "@/components/patrons/Champ";
 import {
   EtatChargement,
   EtatErreur,
   EtatErreurSaisie,
   EtatSansResultat,
 } from "@/components/patrons/Etats";
-import { Champ } from "@/components/patrons/Champ";
 import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
@@ -23,6 +25,8 @@ import {
   type Prestataire,
   type SaisiePrestataire,
 } from "@/lib/domain/prestataire";
+import { peut } from "@/lib/domain/roles";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import {
   changerActivationPrestataire,
@@ -36,16 +40,30 @@ import { messageErreurReferentiel } from "@/lib/repositories/referentiels";
  * Les prestataires.
  *
  * Ce ne sont pas des noms dans une liste : on leur confie un dossier, on leur
- * verse une avance, et le client rappelle pour savoir où en est sa carte grise.
- * D'où le téléphone, obligatoire, et le type de document — proposer un
- * fabricant de plaques pour une carte grise est une erreur qui ne se voit
- * qu'une semaine plus tard.
+ * verse une avance, et le client rappelle pour savoir où en est sa carte
+ * grise. D'où le téléphone, obligatoire.
+ *
+ * **L'écran a quitté les paramètres** (20 octobre 2026, demande du client).
+ * Un paramètre se pose une fois et s'oublie ; on confie des cartes grises
+ * toutes les semaines. Il était rangé selon ce qu'il contient — une liste de
+ * noms — et non selon ce qu'on y fait.
+ *
+ * **Et il s'ouvre au gérant, ce qui est le vrai changement.** La garde était
+ * `gerer_referentiels`, c'est-à-dire le responsable seul. Or celui qui tend le
+ * paquet au prestataire est le gérant, et il le fait déjà depuis la file des
+ * dossiers : lui fermer cette porte-ci aurait laissé deux chemins vers le même
+ * dépôt, l'un ouvert et l'autre non.
+ *
+ * Ce qui reste au responsable vit **dans** l'écran : créer, renommer, retirer
+ * un prestataire, et son lien de suivi. Même partage que les dépenses (S55) —
+ * le geste du comptoir est ouvert, le mot que des mois d'écritures citent ne
+ * l'est pas.
  */
 export default function PagePrestataires() {
   return (
-    <GardeCapacite capacite="gerer_referentiels">
+    <GardeEspace espace="prestataires">
       <Prestataires />
-    </GardeCapacite>
+    </GardeEspace>
   );
 }
 
@@ -62,6 +80,8 @@ const VIDE: SaisiePrestataire = {
 const FORMULAIRE_PRESTATAIRE = "creer-prestataire";
 
 function Prestataires() {
+  const session = useSession();
+  const { perimetre } = usePerimetre();
   const souscrire = useCallback(
     (auChangement: (v: Prestataire[]) => void, enErreur: (c: unknown) => void) =>
       ecouterPrestataires(auChangement, enErreur),
@@ -73,6 +93,11 @@ function Prestataires() {
   );
   const [creation, setCreation] = useState(false);
 
+  if (session.statut !== "connecte") return null;
+  /* Administrer le référentiel reste au responsable ; confier est ouvert. */
+  const administre = peut(session.utilisateur.role, "gerer_referentiels");
+  const boutiqueId = perimetre.boutiqueId;
+
   return (
     <div>
       {/* La liste d'abord, la création en modale (S54). Le formulaire occupait
@@ -80,25 +105,33 @@ function Prestataires() {
           consulter ou corriger, et il fallait le dépasser à chaque fois. Un
           bouton en tête, et l'écran redevient ce qu'il est — une liste. */}
       <TetePage
-        retour={{ href: "/parametres", libelle: "Paramètres" }}
         titre="Prestataires"
+        sousTitre="Ceux à qui vous confiez les cartes grises. Depuis chaque fiche, vous pouvez leur remettre un paquet de dossiers en une fois."
         actions={
-          <button
-            type="button"
-            onClick={() => setCreation(true)}
-            className="bouton bouton-principal"
-          >
-            <Plus aria-hidden="true" className="size-4" />
-            Ajouter un prestataire
-          </button>
+          administre ? (
+            <button
+              type="button"
+              onClick={() => setCreation(true)}
+              className="bouton bouton-principal"
+            >
+              <Plus aria-hidden="true" className="size-4" />
+              Ajouter un prestataire
+            </button>
+          ) : undefined
         }
       />
-      <p className="mt-2 max-w-prose text-encre-doux">
-        Ceux à qui vous confiez les cartes grises. Ils apparaîtront au moment de déposer un
-        dossier, filtrés selon ce qu’ils traitent.
-      </p>
 
-      {creation && <Formulaire onFermer={() => setCreation(false)} />}
+      {/* **Un paquet appartient à une boutique**, et le responsable travaille
+          par défaut sur « toutes ». Le dire ici vaut mieux que de laisser
+          ouvrir une modale dont l'enregistrement serait refusé à la fin. */}
+      {boutiqueId === null && (
+        <Avis ton="transit" titre="Choisissez une boutique pour confier des cartes grises">
+          Un paquet part d’une boutique et son avance sort de sa caisse. La liste des
+          prestataires, elle, est la même partout.
+        </Avis>
+      )}
+
+      {creation && administre && <Formulaire onFermer={() => setCreation(false)} />}
 
       <h2 className="mt-8 text-sm font-semibold tracking-wide text-encre-doux uppercase">
         Prestataires enregistrés
@@ -116,7 +149,12 @@ function Prestataires() {
       ) : (
         <ul className="mt-3 cadre cadre-liste">
           {(valeur ?? []).map((prestataire) => (
-            <Ligne key={prestataire.id} prestataire={prestataire} />
+            <Ligne
+              key={prestataire.id}
+              prestataire={prestataire}
+              administre={administre}
+              boutiqueId={boutiqueId}
+            />
           ))}
         </ul>
       )}
@@ -215,22 +253,31 @@ function Formulaire({ onFermer }: { onFermer: () => void }) {
         </div>
       }
     >
-    <form id={FORMULAIRE_PRESTATAIRE} onSubmit={soumettre} noValidate>
-      <Champs
-        saisie={saisie}
-        changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
-        prefixe="nouveau"
-      />
+      <form id={FORMULAIRE_PRESTATAIRE} onSubmit={soumettre} noValidate>
+        <Champs
+          saisie={saisie}
+          changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
+          prefixe="nouveau"
+        />
 
-      <EtatErreurSaisie message={erreur} className="mt-3" />
-    </form>
+        <EtatErreurSaisie message={erreur} className="mt-3" />
+      </form>
     </Modale>
   );
 }
 
-function Ligne({ prestataire }: { prestataire: Prestataire }) {
+function Ligne({
+  prestataire,
+  administre,
+  boutiqueId,
+}: {
+  prestataire: Prestataire;
+  administre: boolean;
+  boutiqueId: string | null;
+}) {
   const session = useSession();
   const [edition, setEdition] = useState(false);
+  const [confie, setConfie] = useState(false);
   const [saisie, setSaisie] = useState<SaisiePrestataire>({
     nom: prestataire.nom,
     telephone: prestataire.telephone,
@@ -259,6 +306,14 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
     );
     setEdition(false);
   }
+
+  /* **On ne confie rien à un prestataire retiré des choix**, ni à un
+     prestataire sans type : la base refuserait le dépôt, après qu'on a saisi
+     l'avance. Le bouton n'existe donc pas plutôt que d'exister grisé. */
+  const peutRecevoir =
+    boutiqueId !== null &&
+    prestataire.actif &&
+    prestataire.typesDocuments.includes("carte_grise");
 
   return (
     <li className="px-4 py-3">
@@ -294,41 +349,71 @@ function Ligne({ prestataire }: { prestataire: Prestataire }) {
           )}
         </span>
 
-        <span className="flex shrink-0 gap-2">
-          <button
-            type="button"
-            onClick={() => setEdition((ouvert) => !ouvert)}
-            aria-expanded={edition}
-            className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-          >
-            {edition ? "Annuler" : "Modifier"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (!auteur) return;
-              setErreur(null);
-              changerActivationPrestataire(prestataire.id, !prestataire.actif, auteur).catch(
-                (cause) => setErreur(messageErreurReferentiel(cause)),
-              );
-            }}
-            className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-          >
-            {prestataire.actif ? "Retirer" : "Remettre"}
-          </button>
+        <span className="flex shrink-0 flex-wrap gap-2">
+          {/* **Le geste principal de l'écran, et il est en premier.** C'est
+              pour lui que le client a voulu sortir les prestataires des
+              paramètres : on part de la personne, et la modale montre tous les
+              dossiers en cours à cocher. */}
+          {peutRecevoir && (
+            <button
+              type="button"
+              onClick={() => setConfie(true)}
+              className="bouton bouton-principal"
+            >
+              <Send aria-hidden="true" className="size-4" />
+              Confier des cartes grises
+            </button>
+          )}
+          {administre && (
+            <>
+              <button
+                type="button"
+                onClick={() => setEdition((ouvert) => !ouvert)}
+                aria-expanded={edition}
+                className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
+              >
+                {edition ? "Annuler" : "Modifier"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (!auteur) return;
+                  setErreur(null);
+                  changerActivationPrestataire(prestataire.id, !prestataire.actif, auteur).catch(
+                    (cause) => setErreur(messageErreurReferentiel(cause)),
+                  );
+                }}
+                className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
+              >
+                {prestataire.actif ? "Retirer" : "Remettre"}
+              </button>
+            </>
+          )}
         </span>
       </div>
 
       <EtatErreur message={erreur} className="mt-2" />
 
+      {confie && boutiqueId !== null && (
+        <ConfierDepuisPrestataire
+          prestataire={prestataire}
+          boutiqueId={boutiqueId}
+          onFermer={() => setConfie(false)}
+        />
+      )}
+
       {/* **Le lien de suivi vit sur la fiche, pas derriere le bouton
           « Modifier »** (S56). On ne vient pas ici pour corriger un
           prestataire quand on veut lui envoyer son lien : on vient pour le
           lien. Le cacher dans le formulaire d'edition en ferait une option
-          d'un geste qui n'a rien a voir. */}
-      <LienDeSuivi prestataire={prestataire} />
+          d'un geste qui n'a rien a voir.
 
-      {edition && (
+          Il reste au responsable : l'ecran s'ouvre au gerant pour confier, ce
+          qui n'est pas une raison d'elargir au passage la diffusion d'un
+          jeton. */}
+      {administre && <LienDeSuivi prestataire={prestataire} />}
+
+      {edition && administre && (
         <form
           onSubmit={enregistrer}
           className="mt-3 rounded-plaque border border-bord bg-fond p-4"

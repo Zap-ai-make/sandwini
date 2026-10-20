@@ -141,7 +141,7 @@ export function CeQuiDemandeUneDecision({ className }: { className?: string } = 
             <p className="mt-2 text-corps text-encre-doux">
               {lignes.length - MAX_LIGNES} autres attendent aussi. Les dossiers se traitent dans{" "}
               <Link href="/motos/dossiers" className="underline">
-                Dossiers en attente
+                Dossiers en cours
               </Link>
               , les tranches dans{" "}
               <Link href="/motos/paiements" className="underline">

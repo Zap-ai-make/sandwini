@@ -1242,6 +1242,24 @@ service cloud.firestore {
       allow read: if peutVendrePour(resource.data.boutiqueId);
     }
 
+    // Le journal des passages, lu d'ensemble (20 octobre 2026). Meme raison que
+    // juste au-dessus : une requete de groupe de collections n'emprunte PAS la
+    // regle du chemin complet, il lui faut un chemin recursif.
+    //
+    // Ce qu'elle rend possible : l'historique des departs. Le produit
+    // n'enregistre nulle part le JOUR ou une carte grise revient du
+    // prestataire — seulement le fait qu'elle soit revenue. Cette date vit
+    // dans le journal, qui l'a toujours portee ; la lire ici evite d'ajouter
+    // un champ qui ne vaudrait que pour l'avenir et laisserait tout le passe
+    // sans date.
+    //
+    // La condition ne bouge pas : chacun ne lit que sa boutique. L'ecriture
+    // reste gouvernee par le chemin complet, qui l'interdit en modification
+    // comme en suppression.
+    match /{chemin=**}/historique/{entree} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+    }
+
     // Les versements. S8 écrit celui du jour de la vente dans le lot de la
     // vente ; S9 ajoute les suivants. Aucun ne se modifie ni ne se supprime,
     // pour personne : un reçu remis à un client ne se retouche pas depuis un

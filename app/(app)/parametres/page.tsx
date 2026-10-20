@@ -13,13 +13,11 @@ import type { Boutique } from "@/lib/domain/boutique";
 import { formaterTelephone } from "@/lib/domain/client";
 import { IDENTITE } from "@/lib/domain/entreprise";
 import { ecransVisibles } from "@/lib/domain/espaces";
-import type { Prestataire } from "@/lib/domain/prestataire";
 import { LIBELLE_ROLE, peut } from "@/lib/domain/roles";
 import { faitsDeVersion } from "@/lib/domain/version";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterBoutiques } from "@/lib/repositories/boutiques";
-import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 import { ecouterUtilisateurs, type FicheUtilisateur } from "@/lib/repositories/utilisateurs";
 import { VERSION_COURANTE } from "@/lib/version/courante";
 import { useMiseAJour } from "@/lib/version/mise-a-jour";
@@ -47,7 +45,7 @@ import { useMiseAJour } from "@/lib/version/mise-a-jour";
  * rien ne la remplace : le hub y redevient le seul chemin, et il reste.
  *
  * **Chaque destination annonce ce qu’on y trouvera**, là où elle s’affiche.
- * « 3 prestataires » et « aucun prestataire » ne demandent pas la même visite ;
+ * « 3 comptes » et « aucun compte » ne demandent pas la même visite ;
  * sur une installation neuve, ce compte est ce qui dit quel écran reste à
  * remplir.
  *
@@ -68,7 +66,6 @@ export default function Reglages() {
   const role = session.statut === "connecte" ? session.utilisateur.role : null;
   const litBoutiques = role !== null && peut(role, "gerer_boutiques");
   const litUtilisateurs = role !== null && peut(role, "gerer_utilisateurs");
-  const litReferentiels = role !== null && peut(role, "gerer_referentiels");
 
   const souscrireBoutiques = useCallback(
     (auChangement: (boutiques: Boutique[]) => void, enErreur: (cause: unknown) => void) =>
@@ -92,16 +89,6 @@ export default function Reglages() {
     "La liste des utilisateurs n’a pas pu être lue.",
   );
 
-  const souscrirePrestataires = useCallback(
-    (auChangement: (prestataires: Prestataire[]) => void, enErreur: (cause: unknown) => void) =>
-      litReferentiels ? ecouterPrestataires(auChangement, enErreur) : () => {},
-    [litReferentiels],
-  );
-  const { valeur: prestataires } = useAbonnement(
-    souscrirePrestataires,
-    "La liste des prestataires n’a pas pu être lue.",
-  );
-
   if (session.statut !== "connecte") return null;
   const { utilisateur } = session;
 
@@ -121,12 +108,9 @@ export default function Reglages() {
        n'ouvre plus dessus. Les quatre écoutes de `useCatalogue` restaient
        ouvertes sur cette page pour alimenter des cartes qui ne s'affichent
        plus. */
-    "/parametres/prestataires": compte(
-      prestataires?.filter((prestataire) => prestataire.actif).length,
-      "prestataire",
-      "prestataires",
-      "aucun prestataire",
-    ),
+    /* Plus de compte pour les prestataires : l'écran a quitté les paramètres
+       pour son propre onglet du rail (20 octobre 2026). L'écoute qui
+       l'alimentait restait ouverte ici pour une carte qui ne s'affiche plus. */
   };
 
   const visibles = ecransVisibles("reglages", utilisateur.role).filter((ecran) => ecran.quoi);
@@ -371,7 +355,7 @@ function Fait({ titre, children }: { titre: string; children: React.ReactNode })
 }
 
 /**
- * « 3 prestataires », « 1 boutique active », « aucun prestataire ».
+ * « 3 comptes », « 1 boutique active », « aucune boutique active ».
  *
  * Le zéro s’écrit en toutes lettres et se donne en entier : l’article ne se
  * devine pas d’un nom français — « compte » est masculin et finit par un e.

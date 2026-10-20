@@ -18,12 +18,20 @@
 import { type Metier } from "./boutique";
 import { peut, type Capacite, type Role } from "./roles";
 
-export type Espace = "supervision" | "accueil" | "motos" | "pieces" | "caisse" | "reglages";
+export type Espace =
+  | "supervision"
+  | "accueil"
+  | "motos"
+  | "prestataires"
+  | "pieces"
+  | "caisse"
+  | "reglages";
 
 export const ESPACES: Record<Espace, { href: string; libelle: string }> = {
   supervision: { href: "/supervision", libelle: "Supervision" },
   accueil: { href: "/dashboard", libelle: "Accueil" },
   motos: { href: "/motos", libelle: "Motos" },
+  prestataires: { href: "/prestataires", libelle: "Prestataires" },
   pieces: { href: "/pieces", libelle: "Pièces" },
   caisse: { href: "/caisse", libelle: "Caisse" },
   reglages: { href: "/parametres", libelle: "Paramètres" },
@@ -32,6 +40,10 @@ export const ESPACES: Record<Espace, { href: string; libelle: string }> = {
 /** L'espace qui porte un métier, et le métier qu'il demande. */
 const METIER_DE: Partial<Record<Espace, Metier>> = {
   motos: "motos",
+  /* Les cartes grises sont une affaire de motos : une boutique de pièces n'a
+     rien à confier, et lui montrer l'entrée promettrait un écran sans emploi.
+     L'axe existe déjà, on s'y branche plutôt que d'inventer une garde. */
+  prestataires: "motos",
   pieces: "pieces",
 };
 
@@ -66,8 +78,8 @@ export function espacesVisibles(
   perimetre: PortéeDuPerimetre = "toutes",
 ): Espace[] {
   const ordre: Espace[] = surveille(role, perimetre)
-    ? ["supervision", "motos", "pieces", "caisse", "reglages"]
-    : ["accueil", "motos", "pieces", "caisse", "reglages"];
+    ? ["supervision", "motos", "prestataires", "pieces", "caisse", "reglages"]
+    : ["accueil", "motos", "prestataires", "pieces", "caisse", "reglages"];
 
   return ordre.filter((espace) => accedeEspace(role, metiers, espace, perimetre));
 }
@@ -386,6 +398,46 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       ],
     },
   ],
+  /**
+   * Les prestataires, sortis des paramètres (20 octobre 2026).
+   *
+   * **La demande du client, mot pour mot : « il ne veut pas que ça soit logé
+   * dans les paramètres ».** Et il a raison sur le fond : un paramètre se pose
+   * une fois et s'oublie, alors qu'on confie des cartes grises toutes les
+   * semaines. L'écran était rangé selon ce qu'il *contient* — une liste de
+   * noms — et non selon ce qu'on y *fait*.
+   *
+   * **Il devient un espace du rail et non une entrée de colonne**, parce que
+   * la colonne n'existe pas sous 1024 px : rangé là, l'écran aurait été
+   * introuvable sur le téléphone, qui est désormais l'appareil de travail.
+   *
+   * La file des dossiers y est en renvoi : c'est la même matière vue de
+   * l'autre bout — ici la personne, là les papiers — et passer de l'une à
+   * l'autre est le geste naturel une fois le paquet tendu.
+   */
+  prestataires: [
+    {
+      titre: "Confier",
+      ecrans: [
+        {
+          href: "/prestataires",
+          libelle: "Prestataires",
+          quoi: "Qui traite les cartes grises, et ce qu’on leur confie",
+        },
+      ],
+    },
+    {
+      titre: "Suivre",
+      ecrans: [
+        {
+          href: "/motos/dossiers",
+          libelle: "Dossiers en cours",
+          compteur: "dossiers",
+          renvoi: true,
+        },
+      ],
+    },
+  ],
   pieces: [
     {
       titre: "Suivre",
@@ -445,12 +497,6 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
           libelle: "Utilisateurs",
           capacite: "gerer_utilisateurs",
           quoi: "Créer un gérant, désactiver un compte",
-        },
-        {
-          href: "/parametres/prestataires",
-          libelle: "Prestataires",
-          capacite: "gerer_referentiels",
-          quoi: "Qui traite les cartes grises",
         },
       ],
     },

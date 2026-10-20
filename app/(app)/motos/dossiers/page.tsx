@@ -4,10 +4,12 @@ import { Search } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { ConfierPaquetModal } from "@/components/ConfierPaquetModal";
+import { HistoriqueDesDeparts } from "@/components/HistoriqueDesDeparts";
 import { PaquetsEnCours } from "@/components/PaquetsEnCours";
 import { RelaisDocument } from "@/components/RelaisDocument";
 import { Avis } from "@/components/patrons/Avis";
 import { ErreurDeLecture, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { nomDuClient, normaliserNom } from "@/lib/domain/client";
@@ -35,10 +37,15 @@ import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import type { Moto } from "@/lib/domain/moto";
-import { cartesConfiables, type PaquetCartesGrises } from "@/lib/domain/paquet";
+import {
+  cartesAConfier,
+  cartesConfiables,
+  historiqueDesDeparts,
+  type PaquetCartesGrises,
+} from "@/lib/domain/paquet";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterPaquets } from "@/lib/repositories/paquets";
-import { ecouterDossiers, ecouterVentes } from "@/lib/repositories/ventes";
+import { ecouterDossiers, ecouterRetoursCartes, ecouterVentes } from "@/lib/repositories/ventes";
 
 /**
  * Les dossiers en attente (§7.3).
@@ -129,6 +136,20 @@ export default function PageDossiers() {
     "Les paquets de cartes grises n’ont pas pu être lus.",
   );
 
+  /* **Le jour où chaque carte est revenue, lu dans le journal des passages.**
+     Rien ne l'enregistre sur le document — seulement le fait qu'elle soit
+     revenue. Sans cette lecture, l'historique n'aurait de date de retour que
+     pour l'avenir, et resterait muet sur tout ce qui s'est déjà passé. */
+  const souscrireRetours = useCallback(
+    (auChangement: (retours: Map<string, Date>) => void, enErreur: (cause: unknown) => void) =>
+      ecouterRetoursCartes(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
+  );
+  const { valeur: retours, erreur: erreurRetours } = useAbonnement(
+    souscrireRetours,
+    "Les retours de cartes grises n’ont pas pu être lus.",
+  );
+
   const souscrireDossiers = useCallback(
     (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) =>
       ecouterDossiers(boutiqueId, auChangement, enErreur),
@@ -147,6 +168,10 @@ export default function PageDossiers() {
      boutique a écrit serait incompréhensible. */
   const [choisies, setChoisies] = useState<Set<string>>(new Set());
   const [paquetOuvert, setPaquetOuvert] = useState(false);
+  /* Deux vues du même sujet : ce qui attend, et ce qui est passé. Le client ne
+     veut plus d'une file d'attente seule — « juste dossiers en cours,
+     historiques de tout ce qui est parti ». */
+  const [vue, setVue] = useState<"cours" | "historique">("cours");
 
   const basculer = useCallback((venteId: string, choisi: boolean) => {
     setChoisies((anciennes) => {
@@ -173,6 +198,41 @@ export default function PageDossiers() {
     () => dossiersEnAttente(ventes ?? [], documents ?? [], motos ?? [], { etat }, new Date()),
     [ventes, documents, motos, etat],
   );
+
+  /* **Tout ce qui peut partir, pas seulement ce qui est coché.** La modale
+     laisse corriger la sélection sans fermer, ce qui demande qu'elle ait la
+     liste entière sous la main — et c'est la même liste que celle montée
+     depuis la fiche d'un prestataire, par la même fonction. */
+  const aConfier = useMemo(
+    () => cartesAConfier(dossiers, (clientId) => nomDuClient(parClient.get(clientId))),
+    [dossiers, parClient],
+  );
+
+  /* L'historique se nourrit des paquets ET des documents : une carte confiée
+     seule depuis le relais de son dossier ne crée aucun paquet, et l'oublier
+     effacerait un départ — avec l'argent qu'il a sorti de la caisse. */
+  const departs = useMemo(() => {
+    if (paquets === null || documents === null) return null;
+    /* **Un refus de lecture ne doit pas figer l'onglet sur « Lecture… ».** Le
+       journal est la seule des trois lectures qui puisse manquer seule — c'est
+       la plus récente, et celle dont la règle peut n'être pas encore déployée.
+       Sans dates de retour, l'historique dit encore qui, combien et quand
+       c'est parti : trois colonnes sur quatre valent mieux qu'un écran en
+       attente perpétuelle. */
+    if (retours === null && !erreurRetours) return null;
+    return historiqueDesDeparts(
+      paquets,
+      documents,
+      retours ?? new Map(),
+      (venteId) => ({
+        numero: ventes?.find((vente) => vente.id === venteId)?.numero ?? venteId,
+        client: nomDuClient(
+          parClient.get(ventes?.find((vente) => vente.id === venteId)?.clientId ?? ""),
+        ),
+      }),
+      new Date(),
+    );
+  }, [paquets, documents, retours, erreurRetours, ventes, parClient]);
 
   const resultats = useMemo(
     () =>
@@ -304,8 +364,8 @@ export default function PageDossiers() {
     <div>
       <TetePage
         surTitre={surTitre}
-        titre="Dossiers en attente"
-        sousTitre="Les documents ne suivent pas le même chemin. Un dossier se ferme quand tous sont remis, ou déclarés sans objet."
+        titre="Dossiers en cours"
+        sousTitre="Les cartes grises des ventes ouvertes. Un dossier s’en va quand la carte est revenue, la vente soldée et la moto remise."
       />
 
       {erreur && (
@@ -320,6 +380,21 @@ export default function PageDossiers() {
         </ErreurDeLecture>
       )}
 
+      {/* **Deux onglets plutôt qu'un empilement** (20 octobre 2026). Mis l'un
+          sous l'autre, l'historique aurait poussé la file hors de l'écran — et
+          c'est la file qu'on vient voir dix fois par jour. `Onglets` démonte le
+          panneau inactif ; les écoutes, elles, vivent ici et ne se rouvrent pas
+          en changeant de vue. */}
+      <Onglets
+        libelle="Les dossiers"
+        valeur={vue}
+        changer={setVue}
+        onglets={[
+          {
+            valeur: "cours",
+            libelle: "En cours",
+            contenu: (
+              <>
       {/* Ce qui dépasse la date annoncée se dit avant la liste, et se nomme :
           un compteur au-dessus d’un tableau se lit comme une décoration, un nom
           de client se lit comme un appel à passer. Pas de `role="alert"` — cet
@@ -385,14 +460,9 @@ export default function PageDossiers() {
 
       {paquetOuvert && boutiqueId !== null && (
         <ConfierPaquetModal
-          cartes={dossiers
-            .filter((dossier) => choisies.has(dossier.venteId))
-            .map((dossier) => dossier.documents.carte_grise)
-            .filter((document): document is DocumentDossier => document !== null)}
+          cartes={aConfier}
+          choisies={[...choisies]}
           boutiqueId={boutiqueId}
-          numeroDe={(venteId) =>
-            dossiers.find((dossier) => dossier.venteId === venteId)?.numero ?? venteId
-          }
           onFermer={() => setPaquetOuvert(false)}
           onConfie={() => {
             setPaquetOuvert(false);
@@ -435,7 +505,7 @@ export default function PageDossiers() {
                   aria-pressed={etat === ""}
                   onClick={() => setEtat("")}
                 >
-                  Ouverts
+                  Tous
                 </button>
                 {FILTRES_ETAT.map((valeur) => (
                   <button
@@ -462,8 +532,8 @@ export default function PageDossiers() {
                 ) : (
                   <strong className="font-semibold text-encre">
                     {resultats.length === 1
-                      ? "1 dossier ouvert"
-                      : `${resultats.length} dossiers ouverts`}
+                      ? "1 dossier en cours"
+                      : `${resultats.length} dossiers en cours`}
                   </strong>
                 )}
               </p>
@@ -488,7 +558,7 @@ export default function PageDossiers() {
               )
             ) : (
               <Tableau
-                legende="Dossiers ouverts : pour chaque vente, où en est chacun des documents"
+                legende="Dossiers en cours : pour chaque vente, où en est la carte grise"
                 colonnes={colonnes}
                 lignes={resultats}
                 cleDe={(dossier) => dossier.venteId}
@@ -508,15 +578,28 @@ export default function PageDossiers() {
           )}
         </div>
       )}
+              </>
+            ),
+          },
+          {
+            valeur: "historique",
+            libelle: "Historique",
+            contenu: (
+              <HistoriqueDesDeparts departs={departs} sansRetours={Boolean(erreurRetours)} />
+            ),
+          },
+        ]}
+      />
     </div>
   );
 }
 
-/** La file est vide, et c’est une bonne nouvelle : il n’y a rien à aller chercher. */
+/** La liste est vide, et c’est une bonne nouvelle : il n’y a rien à aller chercher. */
 function FileVide({ className }: { className?: string }) {
   return (
-    <EtatVide titre="Aucun dossier n’attend." className={className}>
-      Tous les documents des ventes en cours sont remis au client, ou déclarés sans objet.
+    <EtatVide titre="Aucun dossier en cours." className={className}>
+      Toutes les cartes grises des ventes ouvertes sont revenues au magasin, ou déclarées sans
+      objet.
     </EtatVide>
   );
 }

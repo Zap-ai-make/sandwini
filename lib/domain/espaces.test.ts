@@ -16,6 +16,7 @@ describe("espacesVisibles — le gérant", () => {
     expect(espacesVisibles("gerant", ["motos"])).toEqual([
       "accueil",
       "motos",
+      "prestataires",
       "caisse",
       "reglages",
     ]);
@@ -31,6 +32,7 @@ describe("espacesVisibles — le gérant", () => {
     expect(espacesVisibles("gerant", ["motos", "pieces"])).toEqual([
       "accueil",
       "motos",
+      "prestataires",
       "pieces",
       "caisse",
       "reglages",
@@ -54,6 +56,7 @@ describe("espacesVisibles — le responsable", () => {
     expect(espacesVisibles("responsable", ["motos", "pieces"])).toEqual([
       "supervision",
       "motos",
+      "prestataires",
       "pieces",
       "caisse",
       "reglages",
@@ -198,7 +201,7 @@ describe("le second niveau de navigation", () => {
        entrée sous lui est un rangement qui ment ». */
     const hrefs = ecransVisibles("reglages", "gerant").map((e) => e.href);
     expect(hrefs).toEqual([]);
-    expect(ecransVisibles("reglages", "responsable").length).toBe(4);
+    expect(ecransVisibles("reglages", "responsable").length).toBe(3);
   });
 
   it("désigne l’écran le plus précis, pas le préfixe le plus court", () => {
@@ -286,6 +289,7 @@ describe("le périmètre pilote la navigation", () => {
     expect(espacesVisibles("responsable", ["motos"], "boutique")).toEqual([
       "accueil",
       "motos",
+      "prestataires",
       "caisse",
       "reglages",
     ]);
@@ -304,6 +308,7 @@ describe("le périmètre pilote la navigation", () => {
     expect(espacesVisibles("responsable", ["motos", "pieces"], "toutes")).toEqual([
       "supervision",
       "motos",
+      "prestataires",
       "pieces",
       "caisse",
       "reglages",
@@ -471,5 +476,48 @@ describe("la destination après un changement de périmètre", () => {
   it("ne déplace jamais un gérant", () => {
     expect(destinationApresPerimetre("/dashboard", "gerant", "boutique")).toBeNull();
     expect(destinationApresPerimetre("/supervision", "gerant", "toutes")).toBeNull();
+  });
+});
+
+/**
+ * L'espace des prestataires (20 octobre 2026, demande du client).
+ *
+ * Il vivait dans les paramètres, derrière `gerer_referentiels`. Le client n'en
+ * voulait plus : « il ne veut pas que ça soit logé dans les paramètres ». Ce
+ * n'est pas un rangement malheureux, c'est une erreur de nature — on ne règle
+ * pas un prestataire une fois pour toutes, on lui confie des cartes grises
+ * toutes les semaines, et c'est un geste de comptoir.
+ *
+ * **Il porte le métier motos**, sur le même axe que l'espace du même nom : une
+ * boutique de pièces n'a pas de carte grise à confier, et lui montrer l'entrée
+ * serait promettre un écran sans emploi.
+ */
+describe("l’espace des prestataires", () => {
+  it("suit les motos dans le rail, et seulement là où l’on en vend", () => {
+    expect(espacesVisibles("gerant", ["motos"])).toContain("prestataires");
+    expect(espacesVisibles("gerant", ["pieces"])).not.toContain("prestataires");
+    expect(accedeEspace("gerant", ["pieces"], "prestataires")).toBe(false);
+  });
+
+  it("s’ouvre au gérant, qui est celui qui confie les cartes", () => {
+    /* La page était fermée au gérant tant qu'elle vivait dans les paramètres.
+       Or c'est lui qui tend le paquet au prestataire — il le fait déjà depuis
+       l'écran des dossiers. Ce qui reste au responsable vit DANS l'écran :
+       créer, renommer, retirer un prestataire. */
+    expect(accedeEspace("gerant", ["motos"], "prestataires")).toBe(true);
+    expect(groupesVisibles("prestataires", "gerant").length).toBeGreaterThan(0);
+  });
+
+  it("a quitté les paramètres, et n’y a pas laissé de double", () => {
+    /* Deux entrées pour un écran, c'est deux endroits où le chercher et un
+       `espaceDuChemin` qui doit départager. */
+    expect(ECRANS_DE.reglages.map((e) => e.href)).not.toContain("/prestataires");
+    expect(ECRANS_DE.reglages.map((e) => e.href)).not.toContain("/parametres/prestataires");
+  });
+
+  it("revendique son chemin plutôt que de le laisser aux paramètres", () => {
+    const ouverts = espacesVisibles("gerant", ["motos"]);
+    expect(espaceDuChemin("/prestataires", ouverts)).toBe("prestataires");
+    expect(ecranCourant("prestataires", "gerant", "/prestataires")).toBe("/prestataires");
   });
 });
