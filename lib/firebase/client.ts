@@ -37,7 +37,6 @@ let functionsInstance: Functions | undefined;
 function application(): FirebaseApp {
   if (!app) {
     app = getApps().length ? getApp() : initializeApp(config);
-    activerAppCheck(app);
   }
   return app;
 }
@@ -58,8 +57,29 @@ function application(): FirebaseApp {
  * domaine non déclaré — il ne dégrade rien : il **bloque tout**, Firestore
  * compris, et le produit s'ouvre sur un écran vide. D'où les trois gardes
  * ci-dessous, et le fait qu'il ne s'active jamais de force.
+ *
+ * **Et c'est arrivé.** Ce danger était écrit ici, et l'appel partait quand même
+ * au démarrage de l'application. Sur le site déployé, le script de reCAPTCHA
+ * n'a pas pu se charger — un `ERR_FAILED`, probablement une extension de
+ * navigateur — et **plus personne n'a pu se connecter** : Firebase Auth rendait
+ * `auth/network-request-failed`, c'est-à-dire un écran qui accusait le réseau.
+ * Invisible en local, où le jeton de débogage ne passe jamais par reCAPTCHA.
+ *
+ * **Il ne démarre donc plus tout seul.** Un seul produit l'exige vraiment —
+ * Firebase AI Logic, le seul en application forcée dans la console ; Auth et
+ * Firestore n'y sont qu'en surveillance. L'assistant l'allume quand on l'ouvre,
+ * et le reste du produit n'a plus rien à attendre de `www.google.com`.
+ *
+ * C'est la bonne portée de panne : si reCAPTCHA est injoignable, l'assistant se
+ * tait. La caisse, elle, continue d'ouvrir.
  */
-function activerAppCheck(application: FirebaseApp): void {
+let appCheckAllume = false;
+
+export function activerAppCheck(): void {
+  /* Idempotent : l'assistant s'ouvre et se referme vingt fois par jour, et
+     `initializeAppCheck` deux fois sur la même application lève. */
+  if (appCheckAllume) return;
+
   /* 1. Jamais sur les émulateurs. Ils n'ont pas de service App Check, et
         l'activer y ferait échouer la suite bout en bout pour une raison qui
         n'a rien à voir avec ce qu'elle teste. */
@@ -78,6 +98,8 @@ function activerAppCheck(application: FirebaseApp): void {
   const cle = process.env.NEXT_PUBLIC_APP_CHECK_CLE;
   if (!cle) return;
 
+  appCheckAllume = true;
+
   /* En développement, un jeton de débogage évite d'avoir à faire passer
      reCAPTCHA sur `localhost`. Firebase l'imprime dans la console au premier
      chargement ; il faut le coller dans la console Firebase une fois. */
@@ -85,7 +107,7 @@ function activerAppCheck(application: FirebaseApp): void {
     (globalThis as { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
   }
 
-  initializeAppCheck(application, {
+  initializeAppCheck(application(), {
     provider: new ReCaptchaEnterpriseProvider(cle),
     /* Le jeton se renouvelle tout seul. Sans ça, une session ouverte toute la
        journée au comptoir — le cas normal ici — verrait ses appels refusés au
