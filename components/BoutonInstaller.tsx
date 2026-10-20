@@ -1,7 +1,14 @@
 "use client";
 
 import { Download, Share } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+import {
+  dejaPosee,
+  ecouterInstallation,
+  lireInvite,
+  proposerInstallation,
+} from "@/lib/pwa/installation";
 
 /**
  * Poser l'application sur l'écran d'accueil.
@@ -18,13 +25,14 @@ import { useEffect, useState } from "react";
  * clic. iOS n'a pas d'équivalent — Apple ne l'expose pas — et il ne reste qu'à
  * montrer le geste. Inventer un bouton qui ne ferait rien y serait pire que la
  * phrase.
+ *
+ * **L'invite ne s'écoute pas ici.** Elle part une seule fois, quelques
+ * centaines de millisecondes après l'ouverture de la page — bien avant que cet
+ * écran ne soit monté. C'est pourquoi le bouton apparaissait puis
+ * disparaissait : il ne la captait que si l'on atterrissait droit sur les
+ * réglages. L'écoute vit désormais dans `lib/pwa/installation.ts`, posée dès
+ * le chargement de la coquille, et ce composant ne fait que la lire.
  */
-
-/** Le type n'existe pas encore dans les définitions du DOM. */
-type InviteInstallation = Event & {
-  prompt: () => Promise<void>;
-  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
-};
 
 function surIOS(): boolean {
   if (typeof navigator === "undefined") return false;
@@ -36,48 +44,20 @@ function surIOS(): boolean {
   );
 }
 
-/** Vrai quand l'application tourne déjà depuis l'écran d'accueil. */
-function dejaInstallee(): boolean {
-  if (typeof window === "undefined") return false;
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    /* Le drapeau propriétaire d'iOS, seul moyen de le savoir sur Safari. */
-    (navigator as { standalone?: boolean }).standalone === true
-  );
-}
-
 export function BoutonInstaller() {
-  const [invite, setInvite] = useState<InviteInstallation | null>(null);
-  const [posee, setPosee] = useState(false);
-  /* Rien n'est décidé au premier rendu : le serveur ne connaît ni le
-     navigateur ni le mode d'affichage, et trancher trop tôt ferait clignoter
-     la carte à l'hydratation. */
-  const [examine, setExamine] = useState(false);
-
-  useEffect(() => {
-    setPosee(dejaInstallee());
-    setExamine(true);
-
-    const retenir = (evenement: Event) => {
-      /* Sans ça, Chrome affiche sa propre bannière et la retire aussitôt. On
-         la garde pour la rejouer au moment choisi par l'utilisateur. */
-      evenement.preventDefault();
-      setInvite(evenement as InviteInstallation);
-    };
-    const installee = () => {
-      setPosee(true);
-      setInvite(null);
-    };
-
-    window.addEventListener("beforeinstallprompt", retenir);
-    window.addEventListener("appinstalled", installee);
-    return () => {
-      window.removeEventListener("beforeinstallprompt", retenir);
-      window.removeEventListener("appinstalled", installee);
-    };
-  }, []);
-
-  if (!examine) return null;
+  /* Au rendu serveur, on ne connaît ni le navigateur ni le mode d'affichage :
+     `null` fait rendre la phrase générique, et l'hydratation la remplace sans
+     clignoter puisque la valeur ne change qu'une fois. */
+  const invite = useSyncExternalStore(
+    ecouterInstallation,
+    () => lireInvite(),
+    () => null,
+  );
+  const posee = useSyncExternalStore(
+    ecouterInstallation,
+    () => dejaPosee(),
+    () => false,
+  );
 
   if (posee) {
     return (
@@ -93,13 +73,7 @@ export function BoutonInstaller() {
       <div>
         <button
           type="button"
-          onClick={() => {
-            void invite.prompt();
-            /* L'invite ne se rejoue pas : une fois consommée, le navigateur
-               la refuse. On la retire donc du bouton plutôt que de laisser
-               cliquer dans le vide. */
-            setInvite(null);
-          }}
+          onClick={proposerInstallation}
           className="bouton bouton-principal gap-1.5"
         >
           <Download aria-hidden="true" className="size-4" />
