@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy, Sparkles } from "lucide-react";
+import { Camera, Check, Copy, Mic, Sparkles } from "lucide-react";
 import { useState } from "react";
 
 import { AssistantTexte } from "@/components/AssistantTexte";
@@ -24,12 +24,41 @@ import { OUTILS_QUI_PREPARENT } from "@/lib/ia/propositions";
  * SDI plutôt que décalquée en gris.
  */
 
-export function MessageHumain({ texte }: { texte: string }) {
+export function MessageHumain({
+  texte,
+  jointes,
+}: {
+  texte: string;
+  /** Ce qui accompagnait la question : l'étiquette, le contenu ne se garde pas. */
+  jointes?: readonly ("photo" | "voix")[];
+}) {
   return (
     <div className="mt-6 flex justify-end first:mt-0">
-      <p className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-md bg-fond px-4 py-2.5 text-[0.975rem] leading-relaxed text-encre">
-        {texte}
-      </p>
+      <div className="max-w-[85%] rounded-2xl rounded-br-md bg-fond px-4 py-2.5">
+        {jointes && jointes.length > 0 && (
+          /* **Dit, parce qu'une question muette est incompréhensible à la
+             relecture.** Sans cette ligne, une discussion ouverte le lendemain
+             montrait une réponse sur un numéro de châssis sans qu'on voie d'où
+             il sortait — et le contenu, lui, n'est pas gardé. */
+          <p
+            className={`flex items-center gap-1.5 text-sm text-encre-doux ${texte ? "mb-1" : ""}`}
+          >
+            {jointes.map((quoi, rang) => (
+              <span key={rang} className="flex items-center gap-1">
+                {quoi === "photo" ? (
+                  <Camera aria-hidden="true" className="size-3.5" />
+                ) : (
+                  <Mic aria-hidden="true" className="size-3.5" />
+                )}
+                {quoi === "photo" ? "Photo" : "Message vocal"}
+              </span>
+            ))}
+          </p>
+        )}
+        {texte && (
+          <p className="whitespace-pre-wrap text-[0.975rem] leading-relaxed text-encre">{texte}</p>
+        )}
+      </div>
     </div>
   );
 }
