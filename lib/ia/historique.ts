@@ -19,7 +19,20 @@
  * comme elle efface déjà le cache Firestore.
  */
 
-export type Bulle = { de: "humain" | "assistant"; texte: string; outils?: string[] };
+export type Bulle = {
+  de: "humain" | "assistant";
+  texte: string;
+  outils?: string[];
+  /**
+   * Ce qui accompagnait la question — **une étiquette, jamais le contenu**.
+   *
+   * Une photo réduite pèse quelques centaines de kilooctets en base64. Vingt
+   * discussions en garderaient plusieurs mégaoctets, c'est-à-dire au-delà du
+   * quota de `localStorage` : l'écriture échouerait, et c'est tout l'historique
+   * qui disparaîtrait pour une photo de trop.
+   */
+  jointes?: ("photo" | "voix")[];
+};
 
 export type Discussion = {
   id: string;

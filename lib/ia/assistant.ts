@@ -14,6 +14,7 @@ import {
   type Proposition,
 } from "./propositions";
 import { lireGeste, OUTILS_QUI_AGISSENT, type Geste } from "./gestes";
+import type { PieceJointe } from "./media";
 import { attenteAvantReessai, estSurcharge, statutHttp } from "./reessai";
 
 /**
@@ -138,8 +139,21 @@ export type Conversation = {
   /** Rend le texte de la réponse, et la liste des outils réellement employés. */
   envoyer: (
     question: string,
+    pieces?: readonly PieceJointe[],
     surProgres?: (progres: Progres) => void,
   ) => Promise<{ texte: string; outils: string[] }>;
+};
+
+/**
+ * Ce qu'on dit au modèle quand la personne n'a rien tapé.
+ *
+ * Une photo ou une voix envoyée seule est une demande complète au comptoir :
+ * on tend son téléphone, on ne commente pas. Mais un message sans texte laisse
+ * le modèle décrire l'image au lieu d'agir, alors on dit l'intention.
+ */
+const CONSIGNE_SANS_MOTS: Record<PieceJointe["quoi"], string> = {
+  photo: "Voici une photo. Regarde-la et fais ce qu’elle appelle.",
+  voix: "Écoute ce message et fais ce qu’il demande.",
 };
 
 export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils): Conversation {
@@ -169,9 +183,27 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
   const discussion = modele.startChat();
 
   return {
-    async envoyer(question: string, surProgres?: (progres: Progres) => void) {
+    async envoyer(
+      question: string,
+      pieces?: readonly PieceJointe[],
+      surProgres?: (progres: Progres) => void,
+    ) {
       const employes: string[] = [];
       let cumul = "";
+
+      /* Les pièces d'abord, le texte ensuite : c'est l'ordre que Gemini lit le
+         mieux quand une question porte sur ce qu'on lui montre. */
+      const jointes = pieces ?? [];
+      const dit = question.trim() || (jointes[0] ? CONSIGNE_SANS_MOTS[jointes[0].quoi] : question);
+      const premier =
+        jointes.length === 0
+          ? dit
+          : [
+              ...jointes.map((piece) => ({
+                inlineData: { mimeType: piece.type, data: piece.donnees },
+              })),
+              { text: dit },
+            ];
 
       /**
        * Un tour en flux : le texte arrive par morceaux et part aussitôt à
@@ -213,7 +245,7 @@ export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils)
         }
       };
 
-      let reponse = { response: await tourEnFlux(question) };
+      let reponse = { response: await tourEnFlux(premier) };
 
       for (let tour = 0; tour < TOURS_MAX; tour += 1) {
         const appels = reponse.response.functionCalls() ?? [];

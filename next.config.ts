@@ -237,7 +237,16 @@ const nextConfig: NextConfig = {
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
+          /* **`microphone=(self)` et non `()`** : l'assistant prend des messages
+             vocaux depuis S57, et une politique fermée fait échouer
+             `getUserMedia` sans qu'aucune demande d'autorisation n'apparaisse
+             — l'utilisateur croit avoir refusé quelque chose qu'on ne lui a
+             jamais demandé. L'appareil photo, lui, reste fermé : on passe par
+             le sélecteur de fichier natif, qui n'en a pas besoin. */
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(self), geolocation=()",
+          },
           {
             key: "Strict-Transport-Security",
             value: "max-age=63072000; includeSubDomains; preload",

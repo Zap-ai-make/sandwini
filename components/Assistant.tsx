@@ -24,6 +24,7 @@ import {
   type Bulle,
   type Discussion,
 } from "@/lib/ia/historique";
+import type { PieceJointe } from "@/lib/ia/media";
 import { LIBELLE_OUTIL } from "@/lib/ia/outils";
 import { resume, type Proposition } from "@/lib/ia/propositions";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -57,6 +58,8 @@ import { useEtatReseau } from "@/lib/reseau/etat-reseau";
  */
 type Avis =
   | { quoi: "ouvert"; libelle: string }
+  /** Un refus de l'appareil : micro fermé, photo illisible. */
+  | { quoi: "souci"; texte: string }
   | { quoi: "boutique_requise"; libelle: string }
   | { quoi: "boutique_introuvable"; nom: string };
 
@@ -150,6 +153,10 @@ export function Assistant() {
   const [proposition, setProposition] = useState<Proposition | null>(null);
   const [ecriture, setEcriture] = useState<"attente" | "en_cours" | "faite" | string>("attente");
   const [avis, setAvis] = useState<Avis | null>(null);
+  /* Ce qu'on s'apprête à montrer ou à faire entendre. Vidé à l'envoi : une
+     photo renvoyée par mégarde à la question suivante coûte des jetons et
+     fait répondre à côté. */
+  const [pieces, setPieces] = useState<PieceJointe[]>([]);
 
   const { postes } = usePostesDepense();
 
@@ -323,18 +330,31 @@ export function Assistant() {
   }, []);
 
   const envoyer = useCallback(
-    async (question: string) => {
+    async (question: string, jointes: readonly PieceJointe[] = []) => {
       if (session.statut !== "connecte") return;
 
-      const avecQuestion: Bulle[] = [...discussion.bulles, { de: "humain", texte: question }];
+      const avecQuestion: Bulle[] = [
+        ...discussion.bulles,
+        {
+          de: "humain",
+          texte: question,
+          /* L'étiquette seule : voir `historique.ts`, garder les octets ferait
+             sauter le quota de l'appareil et emporterait tout l'historique. */
+          ...(jointes.length > 0 ? { jointes: jointes.map((piece) => piece.quoi) } : {}),
+        },
+      ];
       const enTete: Discussion = {
         ...discussion,
-        titre: discussion.bulles.length === 0 ? titreDe(question) : discussion.titre,
+        titre:
+          discussion.bulles.length === 0
+            ? titreDe(question) || (jointes[0]?.quoi === "voix" ? "Message vocal" : "Photo")
+            : discussion.titre,
         quand: new Date().toISOString(),
         bulles: avecQuestion,
       };
       setDiscussion(enTete);
       setSaisie("");
+      setPieces([]);
       setCible("");
       setMontre(0);
       /* **La carte de la question précédente s'efface ici.** Laissée en place,
@@ -358,7 +378,7 @@ export function Assistant() {
           { boutiqueId: perimetre.boutiqueId },
         );
 
-        const { texte, outils } = await conversation.current.envoyer(question, (progres) => {
+        const { texte, outils } = await conversation.current.envoyer(question, jointes, (progres) => {
           if (progres.quoi === "texte") {
             setCible(progres.texte);
             setEnCours(null);
@@ -549,7 +569,7 @@ export function Assistant() {
 
               {discussion.bulles.map((bulle, rang) =>
                 bulle.de === "humain" ? (
-                  <MessageHumain key={rang} texte={bulle.texte} />
+                  <MessageHumain key={rang} texte={bulle.texte} jointes={bulle.jointes} />
                 ) : (
                   <MessageAssistant key={rang} texte={bulle.texte} outils={bulle.outils} />
                 ),
@@ -667,11 +687,15 @@ export function Assistant() {
                 ) : (
                   <div className="flex-1">
                     <p className="text-sm text-encre">
-                      {avis.quoi === "boutique_requise"
-                        ? `Pour ouvrir ${avis.libelle}, il faut d’abord une boutique.`
-                        : `Je ne trouve pas de boutique « ${avis.nom} ».`}
+                      {avis.quoi === "souci"
+                        ? avis.texte
+                        : avis.quoi === "boutique_requise"
+                          ? `Pour ouvrir ${avis.libelle}, il faut d’abord une boutique.`
+                          : `Je ne trouve pas de boutique « ${avis.nom} ».`}
                     </p>
-                    <ChoixBoutique boutiques={boutiques} choisir={choisir} />
+                    {avis.quoi !== "souci" && (
+                      <ChoixBoutique boutiques={boutiques} choisir={choisir} />
+                    )}
                   </div>
                 )}
               </div>
@@ -690,9 +714,17 @@ export function Assistant() {
                     surChangement={setSaisie}
                     surEnvoi={() => {
                       const question = saisie.trim();
-                      if (question && !occupe) void envoyer(question);
+                      /* Une photo ou une voix se suffit : au comptoir on tend
+                         son téléphone sans commenter. */
+                      if ((question || pieces.length > 0) && !occupe) void envoyer(question, pieces);
                     }}
                     occupe={occupe}
+                    pieces={pieces}
+                    surPiece={(piece) => setPieces((dejaLà) => [...dejaLà, piece])}
+                    surRetirerPiece={(rang) =>
+                      setPieces((dejaLà) => dejaLà.filter((_, place) => place !== rang))
+                    }
+                    surErreur={(message) => setAvis({ quoi: "souci", texte: message })}
                   />
                   <p className="mt-2 text-center text-xs text-encre-doux">
                     L’assistant peut se tromper. Vérifiez ce qui engage de l’argent.

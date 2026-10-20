@@ -129,4 +129,25 @@ describe("le prompt système de l'assistant", () => {
        l'expéditeur : il fallait justement éviter de chercher. */
     expect(promptSysteme(BASE)).toContain("donne le chiffre");
   });
+  it("lit un châssis sans jamais compléter ce qu'il ne voit pas", () => {
+    /* La faute la plus chère du produit : un caractère deviné se découvre à
+       la préfecture, des semaines plus tard, sur un papier déjà payé. Le
+       prompt doit porter la règle des dix-sept caractères et l'interdit. */
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("dix-sept caractères");
+    expect(prompt).toContain("sans les lettres I, O ni Q");
+    expect(prompt).toContain("Ne devine jamais un caractère");
+  });
+
+  it("traite une photo et une voix comme des demandes, pas comme des pièces à décrire", () => {
+    /* Sans ça, le modèle répond « je vois une moto rouge » à quelqu'un qui
+       voulait savoir si elle est en stock. */
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("agis");
+    expect(prompt).toContain("Un message vocal se traite jusqu’au bout");
+  });
+
+  it("pousse à faire la suite évidente au lieu de la proposer", () => {
+    expect(promptSysteme(BASE)).toContain("Va au bout du geste");
+  });
 });
