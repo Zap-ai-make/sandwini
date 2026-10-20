@@ -548,6 +548,19 @@
          dans `app/layout.tsx` — c'est lui qui rend cette variable non nulle. */
       padding-bottom: env(safe-area-inset-bottom);
     }
+
+    /* **L'assistant sous le pouce.** Sur téléphone c'est par lui qu'on
+       travaille — on photographie un châssis, on dicte une vente — et son
+       bouton vivait dans le bandeau du haut, hors d'atteinte d'une main qui
+       tient déjà l'appareil. Il descend donc au-dessus de la barre d'espaces,
+       du côté du pouce, et garde la zone sûre que l'indicateur d'accueil
+       d'iPhone réserve. */
+    .bouton-assistant-pouce {
+      position: fixed;
+      right: 1rem;
+      bottom: calc(5rem + env(safe-area-inset-bottom));
+      z-index: 40;
+    }
   }
 
   /* Sur le papier, la coquille n'existe pas : il ne reste que le document. */
