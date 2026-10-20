@@ -5,6 +5,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { useId } from "react";
 import { PaletteCommandes } from "@/components/PaletteCommandes";
 import { Assistant } from "@/components/Assistant";
+/* Import pour son seul effet : il pose l’écoute de `beforeinstallprompt`
+   dès le chargement de la coquille. L’invite part une fois, tôt, et un
+   écouteur installé par l’écran des réglages arrivait après la bataille. */
+import "@/lib/pwa/installation";
 import { useSession } from "@/lib/auth/session";
 import { destinationApresPerimetre } from "@/lib/domain/espaces";
 import { usePerimetre } from "@/lib/perimetre/perimetre";

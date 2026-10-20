@@ -522,9 +522,14 @@
      dépende pas de l'ordre du DOM : la navigation vient en premier dans le
      document, où les lecteurs d'écran la cherchent. */
   @media (max-width: 767px) {
+    /* La hauteur de la barre d'espaces, écrite une fois : la zone de travail
+       s'en sert pour réserver la place, et le bouton de l'assistant pour se
+       poser juste au-dessus. Quatre rangées et demie — `max-md:h-14` plus les
+       marges du rail — et la zone sûre de l'iPhone par-dessus. */
     .appli {
+      --hauteur-rail: calc(4.5rem + env(safe-area-inset-bottom));
       grid-template-columns: minmax(0, 1fr);
-      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-rows: 100dvh;
     }
     /* Le masquage de la colonne vit sur l'élément (`max-md:hidden`) et non ici :
        une utilitaire Tailwind `flex` l'emporte sur la couche `components`, et
@@ -533,10 +538,18 @@
     .travail {
       grid-column: 1;
       grid-row: 1;
+      /* La barre est sortie du flux : sans cette réserve, les dernières lignes
+         d'un écran passent dessous et ne se lisent plus. */
+      padding-bottom: var(--hauteur-rail);
     }
+    /* **Fixée, et non posée en bas de la grille.** En rangée de grille elle
+       suivait les sautes de hauteur du navigateur mobile — la barre d'adresse
+       qui se rétracte change `100dvh` pendant qu'on fait défiler, et les
+       espaces glissaient sous le pouce au moment où l'on visait. */
     .rail {
-      grid-column: 1;
-      grid-row: 2;
+      position: fixed;
+      inset: auto 0 0 0;
+      z-index: 30;
       border-right: 0;
       border-top: 1px solid var(--color-nuit-filet);
       overflow-x: auto;
@@ -558,8 +571,38 @@
     .bouton-assistant-pouce {
       position: fixed;
       right: 1rem;
-      bottom: calc(5rem + env(safe-area-inset-bottom));
+      bottom: calc(var(--hauteur-rail) + 0.75rem);
       z-index: 40;
+    }
+
+    /* **Deux panneaux côte à côte plutôt que l'un sous l'autre.**
+
+       Sur téléphone, « à faire » et « la journée » s'empilaient : l'accueil
+       demandait un défilement interminable pour atteindre le second, qu'on ne
+       lisait donc jamais. Ils glissent maintenant sous le doigt, et la tranche
+       du suivant qui dépasse dit qu'il y en a un — c'est l'indice, il n'en
+       faut pas d'autre.
+
+       Les marges négatives rattrapent le `px-5` de la zone de travail, pour
+       que la carte parte du bord de l'écran et non d'un retrait. */
+    .carrousel {
+      display: flex;
+      gap: 1rem;
+      margin-inline: -1.25rem;
+      padding-inline: 1.25rem;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      /* Le défilement horizontal ne doit pas emporter la page derrière lui. */
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+    }
+    .carrousel::-webkit-scrollbar {
+      display: none;
+    }
+    .carrousel > * {
+      flex: 0 0 88%;
+      min-width: 0;
+      scroll-snap-align: start;
     }
   }
 

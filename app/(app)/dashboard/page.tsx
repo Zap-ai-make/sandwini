@@ -81,9 +81,11 @@ export default function Accueil() {
         <>
           <GesteDuJour />
 
-          {/* Deux colonnes sur un écran de comptoir, l’une sous l’autre sur un
-              téléphone : ce qui reste à faire d’abord, ce qui est fait ensuite. */}
-          <div className="mt-8 grid gap-8 lg:grid-cols-2">
+          {/* Deux colonnes sur un écran de comptoir ; sur téléphone, deux
+              panneaux qui glissent sous le doigt. Empilés, ils faisaient de
+              l’accueil un défilement interminable et le second ne se lisait
+              jamais — voir `.carrousel` dans `app/globals.css`. */}
+          <div className="carrousel mt-8 md:grid md:gap-8 lg:grid-cols-2">
             <AFaireAujourdhui />
             <JourneeDuGerant />
           </div>
