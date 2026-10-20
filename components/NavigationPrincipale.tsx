@@ -5,6 +5,7 @@ import {
   Bike,
   Building2,
   Coins,
+  HardHat,
   LayoutGrid,
   LogOut,
   PanelLeft,
@@ -62,6 +63,9 @@ const ICONE_ESPACE: Record<Espace, Icone> = {
   supervision: Building2,
   accueil: LayoutGrid,
   motos: Bike,
+  /* Le même pictogramme que l'écran portait déjà dans la colonne des
+     paramètres : l'entrée a déménagé, elle n'a pas changé de sens. */
+  prestataires: HardHat,
   pieces: Wrench,
   caisse: Coins,
   reglages: Settings,

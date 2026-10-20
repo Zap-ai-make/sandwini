@@ -111,7 +111,7 @@ test("les papiers d’une moto, en clair et en sombre, des deux rôles", async (
 
   // ── 1. Les prestataires : le formulaire allégé, et la fiche signalée ───────
   await page.setViewportSize(MOBILE);
-  await page.goto("/parametres/prestataires", { waitUntil: "load" });
+  await page.goto("/prestataires", { waitUntil: "load" });
   await expect(contenu(page).getByText(/n’est proposé nulle part/)).toBeVisible({
     timeout: 30_000,
   });

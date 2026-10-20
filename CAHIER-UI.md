@@ -253,7 +253,7 @@ Et **sous** ces espaces, des écrans qui n'apparaissent dans aucune navigation :
 /motos/ventes             Ventes                 /parametres/utilisateurs   Utilisateurs
 /motos/ventes/nouvelle    Nouvelle vente         /parametres/catalogue      Marques et modèles
 /motos/paiements          Paiements              /parametres/referentiels   Provenances et frais
-/motos/dossiers           Dossiers en attente    /parametres/prestataires   Prestataires
+/motos/dossiers           Dossiers en attente    /prestataires             Prestataires
 /motos/recus              Reçus                  /diagnostic                Synchronisation
 /clients                  Clients                /pieces  /caisse           à venir (S20-S22)
 ```

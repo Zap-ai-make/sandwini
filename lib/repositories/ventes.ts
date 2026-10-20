@@ -174,6 +174,54 @@ export function ecouterDossiers(
   );
 }
 
+/**
+ * Le jour où chaque carte grise est revenue au magasin (20 octobre 2026).
+ *
+ * **Pourquoi passer par le journal plutôt que par le document.** Rien
+ * n'enregistre cette date sur le document : `avancerDocument` note le nouveau
+ * statut, pas l'heure à laquelle il a été posé. Le journal des passages, lui,
+ * l'a toujours portée. La lire ici donne un historique complet dès le premier
+ * jour — ajouter un champ au document n'aurait daté que les retours à venir,
+ * et laissé tout le passé muet.
+ *
+ * **La même requête que `ecouterDossiers`**, sur l'autre sous-collection : un
+ * seul `where` sur la boutique, le reste trié en mémoire. C'est le motif qui
+ * tourne déjà en production, et il ne demande aucun index composite.
+ *
+ * **Ce qu'il faut savoir en la lisant.** Elle rapporte tous les passages de la
+ * boutique, pas seulement les retours — le filtre est en mémoire. Le journal
+ * grandit d'une ligne par geste et ne se purge jamais : à l'échelle de
+ * plusieurs années, cette lecture mériterait d'être bornée dans le temps.
+ *
+ * Le dernier retour fait foi : une carte peut repartir et revenir.
+ */
+export function ecouterRetoursCartes(
+  boutiqueId: string | null,
+  auChangement: (retours: Map<string, Date>) => void,
+  enErreur: (cause: unknown) => void,
+): () => void {
+  const base = collectionGroup(db(), "historique");
+  const requete = boutiqueId ? query(base, where("boutiqueId", "==", boutiqueId)) : query(base);
+
+  return onSnapshot(
+    requete,
+    (instantane) => {
+      const retours = new Map<string, Date>();
+      for (const entree of instantane.docs) {
+        const donnees = entree.data();
+        if (donnees.type !== "carte_grise" || donnees.vers !== "revenu_magasin") continue;
+        const venteId = typeof donnees.venteId === "string" ? donnees.venteId : "";
+        const le: Date | null = donnees.le?.toDate?.() ?? null;
+        if (!venteId || !le) continue;
+        const connu = retours.get(venteId);
+        if (!connu || le > connu) retours.set(venteId, le);
+      }
+      auChangement(retours);
+    },
+    enErreur,
+  );
+}
+
 function lireDocumentDossier(instantane: QueryDocumentSnapshot<DocumentData>): DocumentDossier {
   const donnees = instantane.data();
   return {

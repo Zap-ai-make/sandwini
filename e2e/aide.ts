@@ -451,7 +451,7 @@ export async function encaisser(page: Page, montant: string) {
  * et un prestataire encore dans la file d'écriture n'y apparaît pas (D64).
  */
 export async function creerPrestataire(page: Page, nom: string) {
-  await page.goto("/parametres/prestataires", { waitUntil: "load" });
+  await page.goto("/prestataires", { waitUntil: "load" });
   await page.getByRole("button", { name: "Ajouter un prestataire" }).click();
   const formulaire = page.getByRole("dialog");
   await formulaire.getByLabel("Nom", { exact: true }).fill(nom);

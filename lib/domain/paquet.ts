@@ -13,7 +13,7 @@
  * pour mot, et les écrans de dossier existants continuent de fonctionner.
  */
 
-import { estEnRetard, joursEcoules, lireJour } from "./dossier";
+import { estEnRetard, joursEcoules, lireJour, type DossierEnAttente } from "./dossier";
 import { lireMontant, MONTANT_MAX, type DocumentDossier, type MoyenPaiement } from "./vente";
 
 /**
@@ -186,7 +186,232 @@ export function etatPaquet(
 export function cartesConfiables(
   documents: readonly DocumentDossier[],
 ): readonly DocumentDossier[] {
-  return documents.filter(
-    (document) => document.type === "carte_grise" && document.statut === "a_faire",
+  return documents.filter(carteConfiable);
+}
+
+/**
+ * La règle, écrite une seule fois.
+ *
+ * Les deux portes d'entrée du dépôt — l'écran des dossiers et la fiche d'un
+ * prestataire — doivent répondre la même chose à « celle-ci peut-elle
+ * partir ? ». Deux prédicats auraient fini par diverger, et la divergence ne
+ * se verrait qu'au refus du lot.
+ */
+function carteConfiable(document: DocumentDossier): boolean {
+  return document.type === "carte_grise" && document.statut === "a_faire";
+}
+
+/**
+ * Une carte grise proposée au dépôt, avec de quoi la reconnaître.
+ *
+ * Le numéro et le client ne vivent pas sur le document : ils sont sur la vente
+ * et dans le fichier des clients. On les recopie ici parce que la liste doit
+ * se lire sans ouvrir une fiche — dix lignes « carte_grise » sans numéro ne
+ * désignent rien.
+ */
+export type CarteAConfier = {
+  venteId: string;
+  numero: string;
+  client: string;
+  /** La date de la vente : ce qui dit depuis quand le client attend. */
+  date: Date | null;
+  document: DocumentDossier;
+};
+
+/**
+ * Ce qu'on peut confier, vu depuis un prestataire (20 octobre 2026).
+ *
+ * **L'autre porte du même dépôt.** L'écran des dossiers part des dossiers et
+ * coche des lignes déjà affichées ; ici on part de la personne — « voici
+ * Ouédraogo, que lui donne-t-on aujourd'hui ? » — et la liste n'existe pas
+ * encore. C'est la demande du client : « depuis le prestataire, ça doit ouvrir
+ * une modale de tous les dossiers en cours à cocher ».
+ *
+ * **Du plus ancien au plus récent**, comme la file des dossiers : c'est une
+ * file qu'on vide, et ce qui traîne depuis le plus longtemps est ce qu'il faut
+ * sortir en premier.
+ *
+ * Un dossier dont le document n'est pas encore parvenu du serveur n'y figure
+ * pas : `null` ne veut pas dire « à faire » mais « on ne sait pas encore », et
+ * le proposer monterait un lot qui mettrait à jour un document inexistant.
+ */
+export function cartesAConfier(
+  dossiers: readonly DossierEnAttente[],
+  nomDuClient: (clientId: string) => string,
+): CarteAConfier[] {
+  return dossiers
+    .flatMap((dossier) => {
+      const carte = dossier.documents.carte_grise;
+      if (!carte || !carteConfiable(carte)) return [];
+      return [
+        {
+          venteId: dossier.venteId,
+          numero: dossier.numero,
+          client: nomDuClient(dossier.clientId),
+          date: dossier.date,
+          document: carte,
+        },
+      ];
+    })
+    .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0));
+}
+
+/* --- L'historique des départs --------------------------------------------- */
+
+/** Une carte dans un départ, avec ce qu'on sait de son retour. */
+export type CartePartie = {
+  venteId: string;
+  numero: string;
+  client: string;
+  /**
+   * Le jour où elle est revenue au magasin, lu dans le journal des passages.
+   *
+   * `null` ne veut pas dire « jamais revenue » : elle peut être encore dehors
+   * — `dehors` le dit —, ou son passage n'avoir pas encore été lu. Les deux se
+   * taisent plutôt que d'afficher une date qu'on n'a pas.
+   */
+  revenueLe: Date | null;
+  /** Chez le prestataire en ce moment même. */
+  dehors: boolean;
+};
+
+/**
+ * Un départ : ce qu'on a tendu à quelqu'un, en une fois.
+ *
+ * C'est un paquet dans le cas ordinaire, et une carte seule quand elle a été
+ * confiée depuis le relais de son dossier — un geste qui ne crée pas de paquet
+ * et qui sort pourtant de l'argent de la caisse.
+ */
+export type Depart = {
+  /** L'identifiant du paquet, ou `carte:<venteId>` pour un départ solitaire. */
+  cle: string;
+  prestataireNom: string;
+  deposeLe: Date | null;
+  /** La date annoncée au client. C'est elle qui alimente le retard. */
+  disponibleLe: Date | null;
+  avance: number;
+  cartes: readonly CartePartie[];
+  /** Combien sont encore chez le prestataire. */
+  dehors: number;
+  /**
+   * Le jour où la dernière est revenue, donc le jour où le départ est clos.
+   *
+   * `null` tant qu'une carte est dehors : une date de retour posée sur un
+   * paquet incomplet se recopierait dans une discussion avec le client, pour
+   * une carte qui n'est pas là.
+   */
+  soldeLe: Date | null;
+  enRetard: boolean;
+};
+
+/**
+ * Tout ce qui est parti chez un prestataire, du plus récent au plus ancien
+ * (20 octobre 2026, demande du client).
+ *
+ * **Ce que le produit ne savait pas montrer.** `PaquetsEnCours` fait
+ * disparaître un paquet à la dernière carte revenue : c'est juste pour une
+ * file d'attente — il n'attend plus rien — et faux pour une mémoire, puisque
+ * le travail s'efface au moment même où il se termine. La question « qu'a-t-on
+ * confié à Ouédraogo cette année, et combien lui a-t-on avancé » n'avait aucun
+ * écran pour répondre.
+ *
+ * **La date de retour ne vit pas sur le document.** Rien n'enregistre le jour
+ * où une carte revient — seulement le fait qu'elle soit revenue. Elle est donc
+ * lue dans le journal des passages, qui l'a toujours portée : c'est ce qui
+ * rend l'historique complet dès le premier jour, au lieu de commencer
+ * aujourd'hui.
+ *
+ * **Du plus récent d'abord, à l'inverse de la file des dossiers.** Une file se
+ * vide par le bas — le plus vieux d'abord ; un historique se lit par le haut,
+ * on y cherche ce qui vient de se passer.
+ */
+export function historiqueDesDeparts(
+  paquets: readonly PaquetCartesGrises[],
+  documents: readonly DocumentDossier[],
+  /** Le jour du retour, par vente, lu dans le journal des passages. */
+  retours: ReadonlyMap<string, Date>,
+  decrire: (venteId: string) => { numero: string; client: string },
+  aujourdhui: Date,
+): Depart[] {
+  const cartes = new Map(
+    documents.filter((document) => document.type === "carte_grise").map((d) => [d.venteId, d]),
   );
+
+  const decrireCarte = (venteId: string): CartePartie => {
+    const { numero, client } = decrire(venteId);
+    return {
+      venteId,
+      numero,
+      client,
+      revenueLe: retours.get(venteId) ?? null,
+      dehors: cartes.get(venteId)?.statut === "chez_prestataire",
+    };
+  };
+
+  const assembler = (
+    cle: string,
+    prestataireNom: string,
+    deposeLe: Date | null,
+    disponibleLe: Date | null,
+    avance: number,
+    venteIds: readonly string[],
+  ): Depart => {
+    const lignes = venteIds.map(decrireCarte);
+    const dehors = lignes.filter((ligne) => ligne.dehors).length;
+    /* Le retour du départ est celui de sa dernière carte. Tant qu'il en reste
+       dehors, il n'y a pas de retour à annoncer. */
+    const dates = lignes
+      .map((ligne) => ligne.revenueLe)
+      .filter((date): date is Date => date !== null);
+    return {
+      cle,
+      prestataireNom: prestataireNom || "un prestataire",
+      deposeLe,
+      disponibleLe,
+      avance,
+      cartes: lignes,
+      dehors,
+      soldeLe:
+        dehors === 0 && dates.length > 0
+          ? new Date(Math.max(...dates.map((date) => date.getTime())))
+          : null,
+      enRetard: dehors > 0 && disponibleLe !== null && estEnRetard(disponibleLe, aujourdhui),
+    };
+  };
+
+  const departs = paquets.map((paquet) =>
+    assembler(
+      paquet.id,
+      paquet.prestataireNom,
+      paquet.deposeLe,
+      paquet.disponibleLe,
+      paquet.avance,
+      paquet.venteIds,
+    ),
+  );
+
+  /* **Les cartes d'un paquet portent elles aussi leur dépôt** : les règles
+     l'exigent, parce qu'elles évaluent chaque écriture d'un lot contre l'état
+     d'avant le lot et ne peuvent pas lire un paquet créé dans le même lot.
+     Sans cette exclusion, chaque carte d'un paquet de dix ferait une onzième
+     ligne à elle seule, et l'avance paraîtrait versée deux fois. */
+  const enPaquet = new Set(paquets.flatMap((paquet) => [...paquet.venteIds]));
+
+  for (const document of cartes.values()) {
+    if (enPaquet.has(document.venteId)) continue;
+    /* Jamais partie : pas de dépôt, donc rien à raconter. */
+    if (document.deposeLe === null) continue;
+    departs.push(
+      assembler(
+        `carte:${document.venteId}`,
+        document.prestataireNom,
+        document.deposeLe,
+        document.disponibleLe,
+        document.avance ?? 0,
+        [document.venteId],
+      ),
+    );
+  }
+
+  return departs.sort((a, b) => (b.deposeLe?.getTime() ?? 0) - (a.deposeLe?.getTime() ?? 0));
 }

@@ -197,7 +197,7 @@ test.describe("prestataires", () => {
     page,
   }) => {
     await seConnecterEtEntrer(page);
-    await page.goto("/parametres/prestataires", { waitUntil: "load" });
+    await page.goto("/prestataires", { waitUntil: "load" });
     await page
       .getByRole("heading", { name: "Prestataires", level: 1 })
       .waitFor();
@@ -224,7 +224,7 @@ test.describe("prestataires", () => {
     page,
   }) => {
     await seConnecterEtEntrer(page);
-    await page.goto("/parametres/prestataires", { waitUntil: "load" });
+    await page.goto("/prestataires", { waitUntil: "load" });
 
     await page.getByRole("button", { name: "Ajouter un prestataire" }).click();
     const formulaire = page.getByRole("dialog");

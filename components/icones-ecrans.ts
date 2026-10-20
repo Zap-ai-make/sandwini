@@ -43,6 +43,7 @@ export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/motos/dossiers": FolderCheck,
   "/motos/inventaire": Boxes,
   "/clients": Users,
+  "/prestataires": HardHat,
   "/pieces": Wrench,
   "/caisse": Coins,
   /* Sans ces deux lignes, les écrans de S55 retombaient sur `Activity` —
@@ -54,5 +55,4 @@ export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/parametres/utilisateurs": UserCheck,
   "/parametres/catalogue": Tags,
   "/parametres/referentiels": Activity,
-  "/parametres/prestataires": HardHat,
 };

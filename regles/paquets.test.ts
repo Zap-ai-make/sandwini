@@ -8,6 +8,7 @@ import { readFileSync } from "node:fs";
 import {
   addDoc,
   collection,
+  collectionGroup,
   deleteDoc,
   doc,
   getDoc,
@@ -271,5 +272,82 @@ describe("le lot complet du dépôt groupé", () => {
     const { lot, reference } = depot(base, ["v1", "v2"]);
     lot.set(doc(collection(base, "encaissements")), sortie(150_000, reference.id, 2));
     await assertFails(lot.commit());
+  });
+});
+
+/**
+ * Le journal des passages, lu d'ensemble (20 octobre 2026).
+ *
+ * **Pourquoi cette lecture est ouverte.** Rien n'enregistre le JOUR où une
+ * carte grise revient du prestataire — seulement le fait qu'elle soit revenue.
+ * L'historique des départs va donc chercher la date dans ce journal, qui l'a
+ * toujours portée. Ajouter un champ au document n'aurait daté que les retours
+ * à venir, et laissé tout le passé muet.
+ *
+ * **Ce que ces tests figent.** Une requête de groupe de collections n'emprunte
+ * pas la règle du chemin complet : il lui faut un chemin récursif, qu'on vient
+ * d'ouvrir. Un chemin récursif est exactement le genre de règle qui élargit
+ * plus qu'on ne croit — d'où la preuve, ici, que la condition tient : chacun ne
+ * lit que sa boutique, et l'écriture ne bouge pas d'un pouce.
+ */
+describe("le journal des passages, en groupe de collections", () => {
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      const base = contexte.firestore();
+      const ligne = (boutiqueId: string, venteId: string) => ({
+        boutiqueId,
+        venteId,
+        type: "carte_grise",
+        de: "chez_prestataire",
+        vers: "revenu_magasin",
+        le: new Date("2026-10-12T10:00:00"),
+        ...audit(),
+      });
+      await setDoc(
+        doc(base, "ventesMotos/v1/documents/carte_grise/historique/e1"),
+        ligne("PTG", "v1"),
+      );
+      await setDoc(doc(base, "ventesMotos/vk"), { boutiqueId: "KDG", ...audit() });
+      await setDoc(
+        doc(base, "ventesMotos/vk/documents/carte_grise/historique/e1"),
+        ligne("KDG", "vk"),
+      );
+    });
+  });
+
+  it("le gérant lit le journal de sa boutique", async () => {
+    await assertSucceeds(
+      getDocs(query(collectionGroup(gerant(), "historique"), where("boutiqueId", "==", "PTG"))),
+    );
+  });
+
+  it("refuse le journal d’une autre boutique", async () => {
+    await assertFails(
+      getDocs(query(collectionGroup(gerant(), "historique"), where("boutiqueId", "==", "KDG"))),
+    );
+  });
+
+  /* Sans filtre, la requête ramènerait les deux boutiques : elle doit être
+     refusée en bloc, et non servie amputée. C'est ce qui empêche un appareil
+     modifié d'aspirer le journal de l'entreprise entière. */
+  it("refuse au gérant une requête qui ne nomme aucune boutique", async () => {
+    await assertFails(getDocs(query(collectionGroup(gerant(), "historique"))));
+  });
+
+  it("le responsable lit le journal de toutes les boutiques", async () => {
+    await assertSucceeds(getDocs(query(collectionGroup(responsable(), "historique"))));
+  });
+
+  /* L'ouverture porte sur la LECTURE seule. Une ligne de journal ne se retouche
+     pas : c'est la trace d'un geste, et une trace modifiable n'en est plus une. */
+  it("n’ouvre rien en écriture", async () => {
+    await assertFails(
+      updateDoc(doc(gerant(), "ventesMotos/v1/documents/carte_grise/historique/e1"), {
+        vers: "a_faire",
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(gerant(), "ventesMotos/v1/documents/carte_grise/historique/e1")),
+    );
   });
 });
