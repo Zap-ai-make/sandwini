@@ -3,6 +3,8 @@
 import { AgentPlatformBackend, getAI, getGenerativeModel, ThinkingLevel } from "firebase/ai";
 import { getApp } from "firebase/app";
 
+import { activerAppCheck } from "@/lib/firebase/client";
+
 import { DECLARATIONS, executerOutil, type ContexteOutils } from "./outils";
 import { promptSysteme, type QuiParle } from "./prompt";
 import {
@@ -141,6 +143,16 @@ export type Conversation = {
 };
 
 export function ouvrirConversation(quiParle: QuiParle, contexte: ContexteOutils): Conversation {
+  /* **App Check s'allume ici, et nulle part ailleurs.**
+
+     Firebase AI Logic est le seul produit du projet en application forcée : il
+     refuse de servir le modèle sans jeton. Auth et Firestore, eux, ne sont
+     qu'en surveillance. L'allumer au démarrage de l'application faisait donc
+     dépendre la **connexion** d'un script de Google — et le jour où ce script
+     n'a pas pu se charger sur le site déployé, plus personne n'a pu entrer.
+     Voir `lib/firebase/client.ts` : la panne y est racontée en entier. */
+  activerAppCheck();
+
   const ia = getAI(getApp(), { backend: BACKEND() });
   const modele = getGenerativeModel(ia, {
     model: MODELE,
