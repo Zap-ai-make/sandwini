@@ -127,7 +127,18 @@ const csp = [
      d'images par chargement polluent la console et masquent les vraies. */
   "img-src 'self' data: blob: https://firebasestorage.googleapis.com https://www.gstatic.com",
   "font-src 'self'",
-  `connect-src 'self' ${hotesFirebase}${hotesEmulateurs}`,
+  /* **reCAPTCHA parle aussi, et pas seulement en chargeant son script.**
+     `grecaptcha.enterprise.execute()` poste sur `https://www.google.com/
+     recaptcha/enterprise/...` pour obtenir le jeton. On avait ouvert
+     `script-src`, `img-src` et `frame-src` pour ce même hôte, et oublié
+     celui-ci : le script se chargeait, le cadre s'affichait, et l'appel qui
+     rapporte le jeton partait dans le mur.
+
+     **Et ce trou était invisible en développement.** Sur `localhost`, le SDK
+     emploie un jeton de débogage et ne passe jamais par reCAPTCHA — la panne
+     n'existait donc que sur le site déployé. C'est exactement le genre
+     d'écart qui fait chercher du côté du réseau ou des identifiants. */
+  `connect-src 'self' ${hotesFirebase} ${hotesRecaptcha.join(" ")}${hotesEmulateurs}`,
   /* reCAPTCHA pose un cadre invisible pour son défi : sans lui, le jeton n'est
      jamais émis, et l'échec est silencieux. */
   `frame-src 'self' https://*.firebaseapp.com ${hotesRecaptcha.join(" ")}`,
