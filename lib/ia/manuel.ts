@@ -83,7 +83,7 @@ export const FICHES: readonly Fiche[] = [
       "Cochez les papiers qui arrivent avec elle — quittance, CMC — s’ils sont dans le carton.",
     ],
     attention:
-      "Le châssis est l’identité de la moto, plus que sa plaque : dix-sept caractères, sans les lettres I, O ni Q. Une erreur ici ne se découvre qu’à la préfecture, des semaines plus tard, sur un dossier déjà payé.",
+      "Le châssis est l’identité de la moto, plus que sa plaque. Recopiez-le caractère par caractère, sans chercher à atteindre une longueur : selon la marque il en fait dix, douze, parfois plus. Une erreur ici ne se découvre qu’à la préfecture, des semaines plus tard, sur un dossier déjà payé.",
   },
   {
     cle: "voir_le_stock",

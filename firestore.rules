@@ -1233,6 +1233,92 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    // --- Les dossiers de carte grise (S59) ---------------------------------
+    //
+    // Ils vivaient sous `ventesMotos/{id}/documents`, donc il n'en existait pas
+    // sans vente — or le client en confie regulierement qui viennent du dehors.
+    // Ils prennent donc une collection a eux.
+    //
+    // **La porte la plus large du fichier, et il faut savoir pourquoi.** La
+    // personne qui traite les cartes grises ne fait que ca : elle a besoin de
+    // voir les dossiers de TOUTES les boutiques, ce qu'aucun gerant n'a le
+    // droit de faire ailleurs. Cette permission vient du METIER de sa boutique,
+    // pas d'un role nouveau : le produit en a deux, et c'est delibere.
+    //
+    // Elle ne doit apparaitre que dans ce `match`, jamais dans un chemin
+    // recursif, et jamais sur les ventes, le stock, la caisse ou les pieces.
+    // Des tests le prouvent.
+    function traiteLesCartesGrises() {
+      return connecte()
+             && role() == 'gerant'
+             && boutiqueDuCompte() != ''
+             && exists(/databases/$(database)/documents/boutiques/$(boutiqueDuCompte()))
+             && get(/databases/$(database)/documents/boutiques/$(boutiqueDuCompte()))
+                  .data.metiers.hasAny(['cartes_grises']);
+    }
+
+    function statutCarteGriseConnu(statut) {
+      return statut in ['a_faire', 'chez_prestataire', 'revenu_magasin', 'remis',
+                        'non_applicable'];
+    }
+
+    // Les memes chemins que `lib/domain/dossier-carte-grise.ts`, ecrits une
+    // seconde fois a dessein : ici c'est la seule verification qui compte.
+    function transitionCarteGriseAutorisee(de, vers) {
+      return de == vers
+             || (de == 'a_faire' && vers in ['chez_prestataire', 'non_applicable'])
+             || (de == 'chez_prestataire' && vers == 'revenu_magasin')
+             || (de == 'revenu_magasin' && vers == 'remis');
+    }
+
+    function champsDossierCarteGrise() {
+      return ['boutiqueId', 'venteId', 'origine', 'clientNom', 'motoLibelle',
+              'numeroChassis', 'statut', 'prestataireId', 'prestataireNom',
+              'deposeLe', 'avance', 'disponibleLe', 'immatriculation', 'revenuLe',
+              'remisLe', 'remisANom', 'remisATelephone'];
+    }
+
+    function dossierCarteGriseValide(donnees) {
+      return donnees.keys().hasOnly(champsDossierCarteGrise().concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'origine', 'clientNom',
+                                       'numeroChassis', 'statut'])
+             && donnees.origine in ['vente', 'exterieur']
+             && texteBorne(donnees.clientNom, 80)
+             && texteBorne(donnees.numeroChassis, 32)
+             && donnees.numeroChassis.size() > 0
+             && statutCarteGriseConnu(donnees.statut);
+    }
+
+    match /dossiersCarteGrise/{dossierId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId) || traiteLesCartesGrises();
+
+      // Un dossier naît a_faire, et rien d'autre : le faire naitre deja chez un
+      // prestataire sauterait le depot, donc la sortie d'argent qui va avec.
+      allow create: if (peutVendrePour(request.resource.data.boutiqueId)
+                        || traiteLesCartesGrises())
+                    && dossierCarteGriseValide(request.resource.data)
+                    && request.resource.data.statut == 'a_faire'
+                    && traceCreation(request.resource.data);
+
+      allow update: if (peutVendrePour(resource.data.boutiqueId) || traiteLesCartesGrises())
+                    && dossierCarteGriseValide(request.resource.data)
+                    // Ce qui identifie le dossier ne bouge jamais : une ligne
+                    // qui changerait de boutique ou de vente effacerait d'ou
+                    // elle vient.
+                    && request.resource.data.boutiqueId == resource.data.boutiqueId
+                    && request.resource.data.origine == resource.data.origine
+                    && request.resource.data.get('venteId', null)
+                       == resource.data.get('venteId', null)
+                    && transitionCarteGriseAutorisee(resource.data.statut,
+                                                     request.resource.data.statut)
+                    && traceModification(request.resource.data, resource.data);
+
+      // Un dossier ne se supprime pas : on l'ecarte en le passant « sans
+      // objet », ce qui laisse une trace. La migration elle-meme passe par le
+      // SDK Admin, hors de portee de ces regles.
+      allow delete: if false;
+    }
+
     // La lecture d'ensemble des dossiers, sur laquelle repose la liste des
     // ventes (§6.4). Une requête de groupe de collections n'emprunte PAS la
     // règle du chemin complet ci-dessus : il lui faut un chemin récursif, sinon

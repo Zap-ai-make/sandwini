@@ -132,10 +132,18 @@ describe("le prompt système de l'assistant", () => {
   it("lit un châssis sans jamais compléter ce qu'il ne voit pas", () => {
     /* La faute la plus chère du produit : un caractère deviné se découvre à
        la préfecture, des semaines plus tard, sur un papier déjà payé. Le
-       prompt doit porter la règle des dix-sept caractères et l'interdit. */
+       prompt doit porter la règle de lecture et l'interdit d'inventer.
+
+       **Et surtout pas une longueur fixe.** Les captures du fichier du client,
+       le 21 octobre 2026, montrent des châssis de dix à douze caractères —
+       10RY243294, 4140RY029597. Annoncer dix-sept au modèle le pousserait à
+       compléter ce qu'il ne voit pas pour atteindre le compte, ce qui est
+       exactement la faute qui se découvre à la préfecture. */
     const prompt = promptSysteme(BASE);
-    expect(prompt).toContain("dix-sept caractères");
-    expect(prompt).toContain("sans les lettres I, O ni Q");
+    expect(prompt).toContain("N’attends pas une longueur précise");
+    expect(prompt).toContain("complète jamais pour atteindre un nombre");
+    /* La longueur réelle, relevée sur le fichier du client. */
+    expect(prompt).toContain("dix à douze caractères");
     expect(prompt).toContain("Ne devine jamais un caractère");
   });
 
