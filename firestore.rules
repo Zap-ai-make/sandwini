@@ -1286,18 +1286,27 @@ service cloud.firestore {
              && texteBorne(donnees.clientNom, 80)
              && texteBorne(donnees.numeroChassis, 32)
              && donnees.numeroChassis.size() > 0
+             // Les champs qu'on remplit plus tard sont bornes aussi : facultatif
+             // ne veut pas dire libre. Sans cela, un compte legitime pourrait
+             // ranger un roman dans `remisANom` et le faire relire a chaque
+             // affichage de la liste.
+             && texteBorne(donnees.get('motoLibelle', ''), 80)
+             && texteBorne(donnees.get('immatriculation', ''), 24)
+             && texteBorne(donnees.get('remisANom', ''), 80)
+             && texteBorne(donnees.get('remisATelephone', ''), 32)
              && statutCarteGriseConnu(donnees.statut);
     }
 
     match /dossiersCarteGrise/{dossierId} {
       allow read: if peutVendrePour(resource.data.boutiqueId) || traiteLesCartesGrises();
 
-      // Un dossier naît a_faire, et rien d'autre : le faire naitre deja chez un
-      // prestataire sauterait le depot, donc la sortie d'argent qui va avec.
+      // Un dossier naît au debut de sa vie : « a faire », ou « sans objet »
+      // quand le client ne veut pas de carte grise. Le faire naitre deja chez
+      // un prestataire sauterait le depot, donc la sortie d'argent qui va avec.
       allow create: if (peutVendrePour(request.resource.data.boutiqueId)
                         || traiteLesCartesGrises())
                     && dossierCarteGriseValide(request.resource.data)
-                    && request.resource.data.statut == 'a_faire'
+                    && request.resource.data.statut in ['a_faire', 'non_applicable']
                     && traceCreation(request.resource.data);
 
       allow update: if (peutVendrePour(resource.data.boutiqueId) || traiteLesCartesGrises())
@@ -1317,6 +1326,38 @@ service cloud.firestore {
       // objet », ce qui laisse une trace. La migration elle-meme passe par le
       // SDK Admin, hors de portee de ces regles.
       allow delete: if false;
+    }
+
+    // Le journal des passages d'un dossier.
+    //
+    // **Un chemin explicite, et pas le chemin recursif de `historique`.** Ce
+    // dernier n'ouvre la lecture qu'a qui vend pour la boutique ; la personne
+    // des cartes grises n'y figure pas, et l'y ajouter etendrait sa permission
+    // a tous les journaux du produit. Elle est donc nommee ici, sur ce seul
+    // chemin.
+    //
+    // Le `get()` de `traiteLesCartesGrises()` est evalue par entree lue : c'est
+    // tenable parce qu'on lit le journal d'un dossier sur sa fiche, jamais la
+    // collection entiere.
+    match /dossiersCarteGrise/{dossierId}/historique/{entree} {
+      allow read: if peutVendrePour(resource.data.boutiqueId)
+                  || traiteLesCartesGrises();
+
+      // Le journal s'ecrit, ne se corrige pas, et ne s'effondre pas : c'est
+      // toute sa valeur de preuve (D27).
+      allow create: if (peutVendrePour(request.resource.data.boutiqueId)
+                        || traiteLesCartesGrises())
+                    && request.resource.data.keys()
+                         .hasOnly(['boutiqueId', 'dossierId', 'de', 'vers', 'le']
+                                    .concat(champsAudit()))
+                    && request.resource.data.keys()
+                         .hasAll(['boutiqueId', 'dossierId', 'de', 'vers', 'le'])
+                    && statutCarteGriseConnu(request.resource.data.de)
+                    && statutCarteGriseConnu(request.resource.data.vers)
+                    && request.resource.data.dossierId == dossierId
+                    && traceCreation(request.resource.data);
+
+      allow update, delete: if false;
     }
 
     // La lecture d'ensemble des dossiers, sur laquelle repose la liste des

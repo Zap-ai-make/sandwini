@@ -201,6 +201,24 @@ describe("écrire un dossier", () => {
     );
   });
 
+  it("naît aussi « sans objet » quand le client n’en veut pas", () => {
+    /* L'ancien modèle posait ce statut dès la vente, et c'est le bon moment :
+       écrire « à faire » pour l'écarter aussitôt ferait passer par la liste des
+       dossiers en cours une carte que personne n'a demandée. */
+    return assertSucceeds(
+      setDoc(
+        doc(gerantCartes(), "dossiersCarteGrise/d-sans-objet"),
+        dossier({
+          boutiqueId: "CGP",
+          venteId: null,
+          origine: "exterieur",
+          statut: "non_applicable",
+          ...audit("ger-cg"),
+        }),
+      ),
+    );
+  });
+
   it("refuse un dossier sans châssis", () => {
     return assertFails(
       setDoc(
@@ -272,5 +290,74 @@ describe("faire avancer un dossier", () => {
   it("ne supprime jamais un dossier", () => {
     /* On l'écarte en le passant « sans objet », ce qui laisse une trace. */
     return assertFails(deleteDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg")));
+  });
+});
+
+/**
+ * Le journal des passages d'un dossier.
+ *
+ * **Il est nommé sur un chemin explicite**, et non dans le chemin récursif de
+ * `historique` : ce dernier n'ouvre la lecture qu'à qui vend pour la boutique,
+ * et y ajouter la personne des cartes grises étendrait sa permission à tous les
+ * journaux du produit. Ces tests tiennent les deux bouts : elle lit celui-ci,
+ * et un gérant motos ne lit toujours que les siens.
+ */
+describe("le journal d’un dossier", () => {
+  const entree = (partie: Record<string, unknown> = {}) => ({
+    boutiqueId: "PTG",
+    dossierId: "d-ptg",
+    de: "a_faire",
+    vers: "chez_prestataire",
+    le: new Date("2026-08-18T12:00:00"),
+    ...audit("ger-cg"),
+    ...partie,
+  });
+
+  it("s’écrit avec le passage", () => {
+    return assertSucceeds(
+      setDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg/historique/h1"), entree()),
+    );
+  });
+
+  it("refuse une entrée posée sur un autre dossier", () => {
+    /* Sans cette égalité, on pourrait ranger le passage d'un dossier sous un
+       autre : le journal dirait alors le contraire de ce qui s'est passé. */
+    return assertFails(
+      setDoc(
+        doc(gerantCartes(), "dossiersCarteGrise/d-ptg/historique/h2"),
+        entree({ dossierId: "d-kdg" }),
+      ),
+    );
+  });
+
+  it("ne se corrige ni ne s’effondre", async () => {
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await setDoc(
+        doc(contexte.firestore(), "dossiersCarteGrise/d-ptg/historique/h0"),
+        entree(),
+      );
+    });
+    /* C'est toute sa valeur de preuve : un journal réinscriptible ne prouve rien. */
+    await assertFails(
+      updateDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg/historique/h0"), {
+        vers: "remis",
+      }),
+    );
+    await assertFails(deleteDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg/historique/h0")));
+  });
+
+  it("se lit par la personne des cartes grises, pas par le gérant d’une autre boutique", async () => {
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await setDoc(
+        doc(contexte.firestore(), "dossiersCarteGrise/d-kdg/historique/h0"),
+        entree({ boutiqueId: "KDG", dossierId: "d-kdg" }),
+      );
+    });
+    await assertSucceeds(
+      getDocs(collection(gerantCartes(), "dossiersCarteGrise/d-kdg/historique")),
+    );
+    /* Le gérant de Pouytenga n'a pas vendu cette moto : le journal de Koudougou
+       ne lui est pas plus ouvert que le dossier lui-même. */
+    await assertFails(getDocs(collection(gerantMotos(), "dossiersCarteGrise/d-kdg/historique")));
   });
 });
