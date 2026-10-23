@@ -1,19 +1,23 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { LONGUEUR_NOM_MAX, LONGUEUR_TELEPHONE_MAX } from "@/lib/domain/client";
 import {
   ENTETES_LIGNE,
+  estTerminal,
   LIGNE_VIDE,
   LONGUEUR_IMMATRICULATION_MAX,
   ligneDuDossier,
+  ORDRE_LIGNE,
   validerLigne,
+  type CleColonneLigne,
   type DossierCarteGrise,
   type SaisieLigne,
 } from "@/lib/domain/dossier-carte-grise";
+import { jourLocal } from "@/lib/domain/format";
 import { LONGUEUR_CHASSIS_MAX } from "@/lib/domain/moto";
 import type { Prestataire } from "@/lib/domain/prestataire";
 import {
@@ -32,15 +36,16 @@ import { type Auteur } from "@/lib/repositories/referentiels";
  * pour modification ». Même ligne, mêmes dix cases, même ordre : seul le titre
  * change. Deux formulaires auraient divergé au premier ajout de colonne.
  *
- * **Les cases sont en ligne et elles défilent de côté.** Dix colonnes ne
- * tiennent pas dans la largeur d'un pouce ; sur téléphone, on fait glisser. La
- * disposition est celle de son tableur, pas celle d'un formulaire empilé, parce
- * que c'est de son tableur qu'il recopie — l'œil suit la même route.
+ * **C'est un vrai tableau, et le premier essai ne l'était pas.** Dix champs
+ * posés côte à côte flottaient sans filets : l'œil ne savait pas où finissait
+ * une case, et la correspondance avec la ligne du tableau en dessous se
+ * perdait. « Fais ça en tableau » — donc `<table>`, entêtes en tête de
+ * colonne, et le champ qui remplit sa cellule sans rien dessiner lui-même.
  *
- * **Chaque case porte son entête en vrai texte au-dessus d'elle.** C'est à la
- * fois la ligne d'entêtes d'Excel et l'étiquette dont un lecteur d'écran a
- * besoin : dix valeurs annoncées sans leur nom ne disent rien (`CAHIER-UI.md`
- * §12).
+ * **La bande défile de côté.** Dix colonnes ne tiennent pas dans la largeur
+ * d'un pouce ; sur téléphone, on fait glisser. La disposition est celle de son
+ * tableur, pas celle d'un formulaire empilé, parce que c'est de son tableur
+ * qu'il recopie — l'œil suit la même route.
  *
  * **Elle n'attend pas le serveur** (D76). L'écriture est acquise au cache
  * local ; attendre l'accusé de réception bloquerait le geste au comptoir là où
@@ -48,18 +53,18 @@ import { type Auteur } from "@/lib/repositories/referentiels";
  * `catch`, et le bandeau dit ce qui reste à envoyer.
  */
 
-/** La largeur de chaque case, dans l'ordre de son classeur. */
-const LARGEURS: Record<keyof SaisieLigne, string> = {
-  client: "w-48",
-  moto: "w-32",
-  chassis: "w-40",
-  recu: "w-16",
-  credit: "w-32",
-  reception: "w-32",
-  retrait: "w-36",
-  depot: "w-36",
-  immatriculation: "w-40",
-  transite: "w-40",
+/** La largeur de chaque colonne, dans l'ordre de son classeur. */
+const LARGEURS: Record<CleColonneLigne, string> = {
+  client: "12rem",
+  moto: "8rem",
+  chassis: "9.5rem",
+  recu: "3.5rem",
+  credit: "7rem",
+  reception: "8rem",
+  retrait: "9rem",
+  depot: "9rem",
+  immatriculation: "9.5rem",
+  transite: "9.5rem",
 };
 
 export function LigneModale({
@@ -88,8 +93,8 @@ export function LigneModale({
     setErreur(null);
   }
 
-  function envoyer() {
-    const probleme = validerLigne(saisie);
+  function enregistrer(valeurs: SaisieLigne) {
+    const probleme = validerLigne(valeurs);
     if (probleme) {
       setErreur(probleme);
       return;
@@ -104,16 +109,145 @@ export function LigneModale({
       prestataires.find(
         (prestataire) =>
           prestataire.nom.trim().toLocaleLowerCase("fr") ===
-          saisie.transite.trim().toLocaleLowerCase("fr"),
+          valeurs.transite.trim().toLocaleLowerCase("fr"),
       ) ?? null;
 
     const ecriture = dossier
-      ? corrigerLigne(dossier, saisie, reconnu?.id ?? null, auteur)
-      : ouvrirLigne(saisie, boutiqueId, reconnu?.id ?? null, auteur);
+      ? corrigerLigne(dossier, valeurs, reconnu?.id ?? null, auteur)
+      : ouvrirLigne(valeurs, boutiqueId, reconnu?.id ?? null, auteur);
 
     ecriture.catch((cause) => setErreur(messageErreurDossierCarteGrise(cause)));
     onFermer();
   }
+
+  /**
+   * Terminer un dossier, c'est dater son retrait.
+   *
+   * **Le bouton ne pose pas un état à part.** Un dossier est fini quand le
+   * papier est reparti avec quelqu'un : c'est sa colonne `retrait`, et c'est
+   * elle que le bouton remplit — du jour même, s'il est vide. Poser « terminé »
+   * sans la date aurait fait une ligne que la moindre réouverture aurait
+   * défaite, puisque c'est le remplissage qui dit l'état.
+   *
+   * Une date déjà inscrite n'est pas écrasée : il l'a peut-être saisie à la
+   * main parce que le client est passé hier.
+   */
+  function terminer() {
+    enregistrer({ ...saisie, retrait: saisie.retrait || jourLocal(new Date()) });
+  }
+
+  /* Les cases, par colonne. Le tableau est monté en parcourant `ORDRE_LIGNE` :
+     l'entête et la cellule ne peuvent pas se décaler, et oublier une colonne
+     devient une erreur de compilation. */
+  const cases: Record<CleColonneLigne, ReactNode> = {
+    client: (
+      <input
+        aria-label={ENTETES_LIGNE.client}
+        value={saisie.client}
+        maxLength={LONGUEUR_NOM_MAX}
+        onChange={(evenement) => changer({ client: evenement.target.value })}
+        className="cellule"
+      />
+    ),
+    moto: (
+      <input
+        aria-label={ENTETES_LIGNE.moto}
+        value={saisie.moto}
+        maxLength={LONGUEUR_NOM_MAX}
+        onChange={(evenement) => changer({ moto: evenement.target.value })}
+        className="cellule"
+      />
+    ),
+    chassis: (
+      <input
+        aria-label={ENTETES_LIGNE.chassis}
+        value={saisie.chassis}
+        maxLength={LONGUEUR_CHASSIS_MAX}
+        onChange={(evenement) => changer({ chassis: evenement.target.value })}
+        className="cellule font-mono uppercase"
+      />
+    ),
+    /* `√` ou `OK` dans son fichier : deux façons d'écrire oui, donc une case à
+       cocher. Le commanditaire a confirmé que `Reci` est le reçu. */
+    recu: (
+      <div className="flex h-10 items-center justify-center">
+        <input
+          aria-label={ENTETES_LIGNE.recu}
+          type="checkbox"
+          checked={saisie.recu}
+          onChange={(evenement) => changer({ recu: evenement.target.checked })}
+          className="size-[18px] shrink-0 accent-encre"
+        />
+      </div>
+    ),
+    credit: (
+      <input
+        aria-label={ENTETES_LIGNE.credit}
+        inputMode="numeric"
+        value={saisie.credit}
+        onChange={(evenement) => changer({ credit: evenement.target.value })}
+        className="cellule text-right font-mono"
+      />
+    ),
+    reception: (
+      <input
+        aria-label={ENTETES_LIGNE.reception}
+        inputMode="tel"
+        value={saisie.reception}
+        maxLength={LONGUEUR_TELEPHONE_MAX}
+        onChange={(evenement) => changer({ reception: evenement.target.value })}
+        className="cellule font-mono"
+      />
+    ),
+    retrait: (
+      <input
+        aria-label={ENTETES_LIGNE.retrait}
+        type="date"
+        value={saisie.retrait}
+        onChange={(evenement) => changer({ retrait: evenement.target.value })}
+        className="cellule"
+      />
+    ),
+    depot: (
+      <input
+        aria-label={ENTETES_LIGNE.depot}
+        type="date"
+        value={saisie.depot}
+        onChange={(evenement) => changer({ depot: evenement.target.value })}
+        className="cellule"
+      />
+    ),
+    immatriculation: (
+      <input
+        aria-label={ENTETES_LIGNE.immatriculation}
+        value={saisie.immatriculation}
+        maxLength={LONGUEUR_IMMATRICULATION_MAX}
+        onChange={(evenement) => changer({ immatriculation: evenement.target.value })}
+        className="cellule font-mono"
+      />
+    ),
+    transite: (
+      <>
+        <input
+          aria-label={ENTETES_LIGNE.transite}
+          list={listeId}
+          value={saisie.transite}
+          maxLength={LONGUEUR_NOM_MAX}
+          onChange={(evenement) => changer({ transite: evenement.target.value })}
+          className="cellule"
+        />
+        {/* Les noms déjà connus sont proposés, sans être imposés : il confie
+            aussi à des gens qu'il n'a pas enregistrés. */}
+        <datalist id={listeId}>
+          {prestataires.map((prestataire) => (
+            <option key={prestataire.id} value={prestataire.nom} />
+          ))}
+        </datalist>
+      </>
+    ),
+  };
+
+  const fini = dossier !== null && estTerminal(dossier.statut);
 
   return (
     <Modale
@@ -128,155 +262,63 @@ export function LigneModale({
       }
       pied={
         <div className="flex flex-wrap gap-2">
-          <button type="button" onClick={envoyer} className="bouton bouton-principal">
-            {dossier ? "Enregistrer les corrections" : "Ajouter la ligne"}
+          <button
+            type="button"
+            onClick={() => enregistrer(saisie)}
+            className="bouton bouton-principal"
+          >
+            {dossier ? "Enregistrer" : "Ajouter la ligne"}
           </button>
+
+          {/* Un dossier déjà fini n'a rien à terminer : le bouton disparaît
+              plutôt que de se griser, parce qu'un bouton gris pose la question
+              de ce qu'il faudrait faire pour l'allumer. */}
+          {dossier !== null && !fini && (
+            <button type="button" onClick={terminer} className="bouton bouton-neutre">
+              Terminer
+            </button>
+          )}
+
           <button type="button" onClick={onFermer} className="bouton bouton-neutre">
             Annuler
           </button>
         </div>
       }
     >
-      {/* La bande qui défile de côté : c'est elle qui tient la disposition de
-          son tableur quand l'écran est plus étroit que la ligne. */}
+      {/* Le conteneur qui défile de côté : c'est lui qui tient la disposition du
+          tableur quand l'écran est plus étroit que la ligne. */}
       <div className="-mx-1 overflow-x-auto px-1 pb-2">
-        <div className="flex w-max items-start gap-3">
-          <Case cle="client" id={`${identifiant}-client`}>
-            <input
-              id={`${identifiant}-client`}
-              value={saisie.client}
-              maxLength={LONGUEUR_NOM_MAX}
-              onChange={(evenement) => changer({ client: evenement.target.value })}
-              className="saisie w-full"
-            />
-          </Case>
-
-          <Case cle="moto" id={`${identifiant}-moto`}>
-            <input
-              id={`${identifiant}-moto`}
-              value={saisie.moto}
-              maxLength={LONGUEUR_NOM_MAX}
-              onChange={(evenement) => changer({ moto: evenement.target.value })}
-              className="saisie w-full"
-            />
-          </Case>
-
-          <Case cle="chassis" id={`${identifiant}-chassis`}>
-            <input
-              id={`${identifiant}-chassis`}
-              value={saisie.chassis}
-              maxLength={LONGUEUR_CHASSIS_MAX}
-              onChange={(evenement) => changer({ chassis: evenement.target.value })}
-              className="saisie w-full font-mono uppercase"
-            />
-          </Case>
-
-          {/* `√` ou `OK` dans son fichier : deux façons d'écrire oui, donc une
-              case à cocher. Le commanditaire a confirmé que `Reci` est le reçu. */}
-          <Case cle="recu" id={`${identifiant}-recu`}>
-            <div className="flex h-10 items-center justify-center">
-              <input
-                id={`${identifiant}-recu`}
-                type="checkbox"
-                checked={saisie.recu}
-                onChange={(evenement) => changer({ recu: evenement.target.checked })}
-                className="size-[18px] shrink-0 accent-encre"
-              />
-            </div>
-          </Case>
-
-          <Case cle="credit" id={`${identifiant}-credit`}>
-            <input
-              id={`${identifiant}-credit`}
-              inputMode="numeric"
-              value={saisie.credit}
-              onChange={(evenement) => changer({ credit: evenement.target.value })}
-              className="saisie w-full text-right font-mono"
-            />
-          </Case>
-
-          <Case cle="reception" id={`${identifiant}-reception`}>
-            <input
-              id={`${identifiant}-reception`}
-              inputMode="tel"
-              value={saisie.reception}
-              maxLength={LONGUEUR_TELEPHONE_MAX}
-              onChange={(evenement) => changer({ reception: evenement.target.value })}
-              className="saisie w-full font-mono"
-            />
-          </Case>
-
-          <Case cle="retrait" id={`${identifiant}-retrait`}>
-            <input
-              id={`${identifiant}-retrait`}
-              type="date"
-              value={saisie.retrait}
-              onChange={(evenement) => changer({ retrait: evenement.target.value })}
-              className="saisie w-full"
-            />
-          </Case>
-
-          <Case cle="depot" id={`${identifiant}-depot`}>
-            <input
-              id={`${identifiant}-depot`}
-              type="date"
-              value={saisie.depot}
-              onChange={(evenement) => changer({ depot: evenement.target.value })}
-              className="saisie w-full"
-            />
-          </Case>
-
-          <Case cle="immatriculation" id={`${identifiant}-immat`}>
-            <input
-              id={`${identifiant}-immat`}
-              value={saisie.immatriculation}
-              maxLength={LONGUEUR_IMMATRICULATION_MAX}
-              onChange={(evenement) => changer({ immatriculation: evenement.target.value })}
-              className="saisie w-full font-mono"
-            />
-          </Case>
-
-          <Case cle="transite" id={`${identifiant}-transite`}>
-            <input
-              id={`${identifiant}-transite`}
-              list={listeId}
-              value={saisie.transite}
-              maxLength={LONGUEUR_NOM_MAX}
-              onChange={(evenement) => changer({ transite: evenement.target.value })}
-              className="saisie w-full"
-            />
-            {/* Les noms déjà connus sont proposés, sans être imposés : il confie
-                aussi à des gens qu'il n'a pas enregistrés. */}
-            <datalist id={listeId}>
-              {prestataires.map((prestataire) => (
-                <option key={prestataire.id} value={prestataire.nom} />
+        <table className="grille-saisie">
+          <caption className="sr-only">
+            Une ligne de dossier, colonne par colonne, dans l’ordre du classeur.
+          </caption>
+          <thead>
+            <tr>
+              {ORDRE_LIGNE.map((cle) => (
+                <th key={cle} scope="col" style={{ width: LARGEURS[cle] }}>
+                  {ENTETES_LIGNE[cle]}
+                </th>
               ))}
-            </datalist>
-          </Case>
-        </div>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {ORDRE_LIGNE.map((cle) => (
+                <td key={cle}>{cases[cle]}</td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
       </div>
+
+      {dossier !== null && !fini && (
+        <p className="mt-3 text-legende text-encre-doux">
+          « Terminer » date le retrait d’aujourd’hui et fait descendre la ligne dans l’onglet
+          Terminés.
+        </p>
+      )}
 
       <EtatErreurSaisie message={erreur} className="mt-3" />
     </Modale>
-  );
-}
-
-/** Une cellule : son entête au-dessus, en vrai texte, et la case en dessous. */
-function Case({
-  cle,
-  id,
-  children,
-}: {
-  cle: keyof SaisieLigne;
-  id: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className={`shrink-0 ${LARGEURS[cle]}`}>
-      <label htmlFor={id} className="block pb-1 text-legende text-encre-doux">
-        {ENTETES_LIGNE[cle]}
-      </label>
-      {children}
-    </div>
   );
 }

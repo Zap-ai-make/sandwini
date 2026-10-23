@@ -267,6 +267,9 @@ function Liste({
     <>
       <Tableau
         legende="Les dossiers de carte grise, ceux qui n’ont pas encore été confiés d’abord, puis du plus ancien dépôt. Le nom du propriétaire ouvre la ligne."
+        /* Ses noms gardent leur casse : les capitales de tableau feraient de
+           `Reci` et `Depot` d'autres mots à l'œil de celui qui les relit. */
+        entetesLitterales
         colonnes={colonnes}
         lignes={dossiers}
         cleDe={(dossier) => dossier.id}

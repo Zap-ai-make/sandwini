@@ -146,6 +146,7 @@ export function Tableau<T>({
   chargement,
   cleActive,
   enRetard,
+  entetesLitterales = false,
 }: {
   /**
    * Ce que le tableau montre, et dans quel ordre. Lu par les lecteurs d’écran
@@ -175,6 +176,15 @@ export function Tableau<T>({
    * balayer la liste, pas à la comprendre.
    */
   enRetard?: (ligne: T) => boolean;
+  /**
+   * Les entêtes gardent leur casse au lieu de passer en capitales.
+   *
+   * Posé pour les cartes grises (S59), dont les dix colonnes portent les noms
+   * du classeur du commanditaire — `client`, `Reci`, `Depot`, `CHASIS`. Les
+   * capitales en feraient d'autres mots à l'œil de celui qui les relit toute la
+   * journée, et c'est précisément ce qu'il a demandé d'éviter.
+   */
+  entetesLitterales?: boolean;
 }) {
   const arrivees = useArrivees(lignes.map(cleDe).join(SEPARATEUR), chargement === true);
 
@@ -183,7 +193,7 @@ export function Tableau<T>({
        prend la hauteur qui reste sous la barre de filtres ; sous 1024 px elle
        ne défile pas, c'est la page qui s'en charge. */
     <div className="tableau-defilant">
-      <table className="tableau">
+      <table className={entetesLitterales ? "tableau entetes-litterales" : "tableau"}>
         <caption className="sr-only">{legende}</caption>
         <thead>
           <tr>

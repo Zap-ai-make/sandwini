@@ -825,6 +825,72 @@
     border-bottom: 0;
   }
 
+  /* Les entêtes gardent leur casse d'origine.
+
+     Posé pour les cartes grises (S59), où les dix colonnes portent les noms du
+     classeur du commanditaire — `client`, `Reci`, `Depot`, `CHASIS`. Les
+     capitales de tableau les transformeraient en d'autres mots à l'œil de celui
+     qui les relit toute la journée, et c'est précisément ce qu'il a demandé
+     d'éviter. */
+  .tableau.entetes-litterales thead th {
+    text-transform: none;
+    letter-spacing: 0;
+  }
+
+  /* La grille de saisie d'une ligne : un tableur, pas un formulaire (S59).
+
+     Le commanditaire recopie depuis son classeur Excel — « fais ça en tableau,
+     les champs en horizontal ». Dix champs posés côte à côte ne suffisaient
+     pas : sans filets, l'œil ne sait pas où finit une case et où commence la
+     suivante, et la correspondance avec la ligne du tableau en dessous se perd.
+     Ici la cellule dessine, et le champ la remplit sans rien dessiner lui-même.
+
+     Elle déborde volontiers : dix colonnes ne tiennent pas dans la largeur d'un
+     pouce, et c'est le conteneur qui défile de côté. */
+  .grille-saisie {
+    width: max-content;
+    border-collapse: collapse;
+  }
+
+  .grille-saisie th {
+    padding: 0.375rem 0.5rem;
+    border: 1px solid var(--color-bord);
+    background: var(--color-survol);
+    text-align: left;
+    font-size: var(--text-legende);
+    font-weight: 600;
+    color: var(--color-encre-doux);
+    white-space: nowrap;
+  }
+
+  .grille-saisie td {
+    padding: 0;
+    border: 1px solid var(--color-bord);
+  }
+
+  /* Le champ remplit sa cellule et n'a pas de bord à lui : deux traits
+     parallèles à un millimètre l'un de l'autre font un dessin sale. */
+  .grille-saisie .cellule {
+    height: 2.5rem;
+    width: 100%;
+    padding-inline: 0.5rem;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
+
+  /* Le liseré de focus se pose à l'intérieur : posé dehors, il serait rogné par
+     le conteneur qui défile, et la case active deviendrait invisible au clavier. */
+  .grille-saisie .cellule:focus-visible {
+    outline: 2px solid var(--color-focus-trait);
+    outline-offset: -2px;
+  }
+
+  .grille-saisie td:focus-within {
+    background: var(--color-survol);
+  }
+
   /* La ligne ouverte dans le panneau. Le fond seul ne suffit pas — il disparaît
      au soleil sur un écran de comptoir, et il ne dit rien à qui ne voit pas les
      nuances : le filet à gauche le double (`DESIGN.md` §5). Le lien de la
