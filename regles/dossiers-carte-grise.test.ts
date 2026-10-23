@@ -154,24 +154,58 @@ describe("qui lit un dossier de carte grise", () => {
 
 /**
  * **La moitié qui compte.** Une permission qui élargit se juge sur ce qu'elle
- * laisse fermé. Si l'un de ces quatre passait, le cloisonnement du produit
+ * laisse fermé. Si l'un de ces refus passait, le cloisonnement du produit
  * serait percé par la porte des cartes grises.
+ *
+ * **Deux limites relevées en exécutant ce fichier, le 23 octobre 2026.** Ce
+ * bloc en affirmait deux de plus que le produit n'en a : le stock de sa propre
+ * boutique, et le catalogue des pièces. Les deux étaient ouvertes avant S59 et
+ * ne viennent pas de `traiteLesCartesGrises()`. Elles sont écrites ci-dessous
+ * telles qu'elles sont — un test qui affirme un cloisonnement que le produit
+ * n'a pas est pire qu'une limite connue, parce qu'il la cache.
  */
 describe("ce que la personne des cartes grises ne voit pas", () => {
-  it("ni les ventes, ni le stock, ni la caisse, ni les pièces", async () => {
+  it("ni les ventes, ni le stock, ni la caisse des boutiques qui vendent", async () => {
     await assertFails(getDoc(doc(gerantCartes(), "ventesMotos/v1")));
     await assertFails(getDoc(doc(gerantCartes(), "motos/m1")));
     await assertFails(getDoc(doc(gerantCartes(), "encaissements/e1")));
-    await assertFails(getDoc(doc(gerantCartes(), "pieces/p1")));
   });
 
-  it("pas même celles de sa propre boutique", async () => {
+  it("ni les coûts, ni les marges d’aucune moto", async () => {
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await setDoc(doc(contexte.firestore(), "motos/m1/prive/cout"), {
+        boutiqueId: "PTG",
+        ...audit(),
+      });
+    });
+    /* Le mur de D2 ne bouge pas : `prive/` est réservé au responsable, et elle
+       est gérante comme les autres. */
+    await assertFails(getDoc(doc(gerantCartes(), "motos/m1/prive/cout")));
+  });
+
+  it("lirait le stock de sa propre boutique — qui n’en a pas", async () => {
     await env.withSecurityRulesDisabled(async (contexte) => {
       await setDoc(doc(contexte.firestore(), "motos/m-cgp"), { boutiqueId: "CGP", ...audit() });
     });
-    /* Sa boutique ne porte pas le métier motos : lui ouvrir son stock
-       reviendrait à lui donner un magasin qu'elle n'a pas. */
-    await assertFails(getDoc(doc(gerantCartes(), "motos/m-cgp")));
+    /* **Limite connue.** La garde des motos porte sur la boutique, pas sur son
+       métier. Sa boutique ne vend pas de motos : l'ensemble est donc vide en
+       pratique. Le resserrer demanderait un `get()` de la boutique à chaque
+       lecture de la collection la plus lue du produit, pour fermer une porte
+       qui ne donne sur rien. */
+    await assertSucceeds(getDoc(doc(gerantCartes(), "motos/m-cgp")));
+  });
+
+  it("lit le catalogue des pièces, comme tout compte connecté", async () => {
+    /* **Limite connue, et la plus large des deux.** `match /pieces/{id}` ouvre
+       la lecture à `connecte()` : c'est l'arbitrage du commanditaire pour S20
+       (« le responsable ne fera que superviser — donc tout est fait par le
+       gérant »), et le filtre par boutique vit dans la requête, pas dans la
+       règle. Or le document porte `prixAchat`. N'importe quel gérant lit donc
+       le prix d'achat des pièces de n'importe quelle boutique, et cela n'a rien
+       à voir avec les cartes grises. À trancher ailleurs qu'ici. */
+    await assertSucceeds(getDoc(doc(gerantCartes(), "pieces/p1")));
+    /* Ce qui reste fermé à tout le monde, et le restera. */
+    await assertFails(getDoc(doc(gerantCartes(), "pieces/p1/prive/marge")));
   });
 });
 
