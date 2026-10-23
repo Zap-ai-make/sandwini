@@ -1,6 +1,6 @@
 "use client";
 
-import { Phone, Plus, Send } from "lucide-react";
+import { Link2, Phone, Plus, Send } from "lucide-react";
 import { useCallback, useState } from "react";
 import { ConfierDepuisPrestataire } from "@/components/ConfierDepuisPrestataire";
 import { GardeEspace } from "@/components/GardeSession";
@@ -277,6 +277,7 @@ function Ligne({
 }) {
   const session = useSession();
   const [edition, setEdition] = useState(false);
+  const [lien, setLien] = useState(false);
   const [confie, setConfie] = useState(false);
   const [saisie, setSaisie] = useState<SaisiePrestataire>({
     nom: prestataire.nom,
@@ -329,24 +330,29 @@ function Ligne({
               </span>
             )}
           </span>
-          <span className="flex items-center gap-1.5 text-sm text-encre-doux">
-            <Phone aria-hidden="true" className="size-3.5 shrink-0" />
-            {prestataire.telephone}
+          {/* **Le téléphone et les types tiennent sur une ligne** (23 octobre
+              2026). Ils en occupaient deux chacun, ce qui faisait une fiche de
+              quatre lignes pour trois informations — et une liste qu'on ne
+              parcourait plus du regard. */}
+          <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm text-encre-doux">
+            <span className="flex items-center gap-1.5">
+              <Phone aria-hidden="true" className="size-3.5 shrink-0" />
+              {prestataire.telephone}
+            </span>
+            {/* **Un prestataire sans type est signalé** (S53). Il n'apparaîtra
+                dans aucune liste de dépôt, et « Aucun type de document » en
+                gris doux ne le disait pas : c'était une phrase parmi d'autres,
+                sur une fiche qui a l'air complète. Le trou de S48 en a produit
+                — des fiches nées avec `plaque` seul, dont le type a cessé
+                d'exister. */}
+            {prestataire.typesDocuments.length === 0 ? (
+              <span className="font-medium text-alerte">
+                · Aucun type de document : proposé nulle part.
+              </span>
+            ) : (
+              <span>· {libelleTypes(prestataire.typesDocuments)}</span>
+            )}
           </span>
-          {/* **Un prestataire sans type est signalé** (S53). Il n'apparaîtra
-              dans aucune liste de dépôt, et « Aucun type de document » en gris
-              doux ne le disait pas : c'était une phrase parmi d'autres, sur une
-              fiche qui a l'air complète. Le trou de S48 en a produit — des
-              fiches nées avec `plaque` seul, dont le type a cessé d'exister. */}
-          {prestataire.typesDocuments.length === 0 ? (
-            <span className="block text-sm font-medium text-alerte">
-              Aucun type de document : ce prestataire n’est proposé nulle part.
-            </span>
-          ) : (
-            <span className="block text-sm text-encre-doux">
-              {libelleTypes(prestataire.typesDocuments)}
-            </span>
-          )}
         </span>
 
         <span className="flex shrink-0 flex-wrap gap-2">
@@ -366,11 +372,22 @@ function Ligne({
           )}
           {administre && (
             <>
+              {/* Le lien de suivi se demande, il ne s'étale plus. Voir
+                  l'explication au-dessus du panneau, plus bas. */}
+              <button
+                type="button"
+                onClick={() => setLien((ouvert) => !ouvert)}
+                aria-expanded={lien}
+                className="bouton bouton-neutre"
+              >
+                <Link2 aria-hidden="true" className="size-4" />
+                Lien de suivi
+              </button>
               <button
                 type="button"
                 onClick={() => setEdition((ouvert) => !ouvert)}
                 aria-expanded={edition}
-                className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
+                className="bouton bouton-neutre"
               >
                 {edition ? "Annuler" : "Modifier"}
               </button>
@@ -383,7 +400,7 @@ function Ligne({
                     (cause) => setErreur(messageErreurReferentiel(cause)),
                   );
                 }}
-                className="inline-flex h-11 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
+                className="bouton bouton-neutre"
               >
                 {prestataire.actif ? "Retirer" : "Remettre"}
               </button>
@@ -402,16 +419,20 @@ function Ligne({
         />
       )}
 
-      {/* **Le lien de suivi vit sur la fiche, pas derriere le bouton
-          « Modifier »** (S56). On ne vient pas ici pour corriger un
-          prestataire quand on veut lui envoyer son lien : on vient pour le
-          lien. Le cacher dans le formulaire d'edition en ferait une option
-          d'un geste qui n'a rien a voir.
+      {/* **Le lien de suivi garde son bouton à lui, et c'est le point de S56** :
+          on ne vient pas ici pour corriger un prestataire quand on veut lui
+          envoyer son lien, donc il n'est pas rangé dans « Modifier ».
 
-          Il reste au responsable : l'ecran s'ouvre au gerant pour confier, ce
-          qui n'est pas une raison d'elargir au passage la diffusion d'un
+          **Mais il est replié depuis le 23 octobre 2026.** Déployé en
+          permanence, il ajoutait un bloc de cinq lignes — jeton compris — sous
+          chaque nom : trois prestataires remplissaient l'écran, et la liste
+          cessait d'être une liste. On l'ouvre quand on en a besoin, ce qui est
+          rare, et on lit les autres noms le reste du temps.
+
+          Il reste au responsable : l'écran s'ouvre au gérant pour confier, ce
+          qui n'est pas une raison d'élargir au passage la diffusion d'un
           jeton. */}
-      {administre && <LienDeSuivi prestataire={prestataire} />}
+      {administre && lien && <LienDeSuivi prestataire={prestataire} />}
 
       {edition && administre && (
         <form

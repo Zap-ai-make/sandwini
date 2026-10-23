@@ -15,12 +15,11 @@ import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
   LONGUEUR_ADRESSE_MAX,
-  LONGUEUR_CODE,
   LONGUEUR_NOM_MAX,
   LONGUEUR_TELEPHONE_MAX,
   LIBELLE_METIER,
   METIERS,
-  normaliserCode,
+  engendrerCode,
   validerBoutique,
   type Boutique,
   type Metier,
@@ -195,16 +194,24 @@ function basculerMetier(actuels: Metier[], metier: Metier): Metier[] {
   return METIERS.filter((candidat) => suivants.includes(candidat));
 }
 
+/**
+ * Les champs d'une boutique.
+ *
+ * **Le code a disparu du formulaire le 23 octobre 2026**, à la demande du
+ * commanditaire. On demandait trois lettres dont il n'a que faire : elles
+ * n'existent que pour la numérotation des reçus et pour identifier le document.
+ * Un champ qu'on ne comprend pas se remplit au hasard, et ce hasard-là se
+ * retrouvait ensuite sur chaque reçu imprimé — définitivement, puisqu'un code
+ * ne se change pas. Il se déduit maintenant du nom.
+ */
 function ChampsBoutique({
   saisie,
   changer,
   prefixe,
-  codeModifiable,
 }: {
   saisie: SaisieBoutique;
   changer: (partie: Partial<SaisieBoutique>) => void;
   prefixe: string;
-  codeModifiable: boolean;
 }) {
   return (
     <div className="colonne-formulaire mt-4 max-w-[40rem] space-y-4">
@@ -216,31 +223,6 @@ function ChampsBoutique({
           value={saisie.nom}
           onChange={(e) => changer({ nom: e.target.value })}
           className="saisie"
-        />
-      </Champ>
-
-      {/* Le « (définitif) » qui suivait l’intitulé a rejoint la phrase d’aide,
-          qui dit déjà pourquoi : des reçus portent ce code. Un mot entre
-          parenthèses dans un intitulé se lit deux fois à voix haute et
-          n’explique rien. */}
-      <Champ
-        id={`${prefixe}-code`}
-        libelle="Code"
-        aide={
-          codeModifiable
-            ? "Trois lettres — PTG pour Pouytenga, par exemple. Elles ouvrent les numéros de reçus : PTG-2608-0042."
-            : "Définitif : des reçus portent déjà ce code, le changer rendrait leurs numéros faux."
-        }
-      >
-        <input
-          id={`${prefixe}-code`}
-          required
-          disabled={!codeModifiable}
-          maxLength={LONGUEUR_CODE}
-          value={saisie.code}
-          onChange={(e) => changer({ code: normaliserCode(e.target.value) })}
-          aria-describedby={`${prefixe}-code-aide`}
-          className="plaque-code saisie w-24 disabled:opacity-60"
         />
       </Champ>
 
@@ -329,12 +311,15 @@ function FormulaireCreation({
       return;
     }
 
-    /* L’unicité du code est garantie par la base — il est l’identifiant du
-       document. Le formulaire le dit avant, parce qu’un refus qui n’arrive
-       qu’à la synchronisation arrive trop tard. */
-    const code = normaliserCode(saisie.code);
-    if (existantes.some((boutique) => boutique.id === code)) {
-      setErreur(`Le code ${code} est déjà pris par une autre boutique.`);
+    /* **Le code se déduit du nom**, et son unicité est cherchée ici contre les
+       boutiques déjà déclarées. La base la garantit de toute façon — le code
+       est l'identifiant du document — mais un refus qui n'arriverait qu'à la
+       synchronisation arriverait trop tard. */
+    const code = engendrerCode(saisie.nom, new Set(existantes.map((boutique) => boutique.id)));
+    if (code === null) {
+      setErreur(
+        "Le nom de la boutique doit contenir au moins une lettre : c’est de lui qu’est tiré le code des reçus.",
+      );
       return;
     }
 
@@ -342,7 +327,7 @@ function FormulaireCreation({
     /* On ne guette pas l'accusé du serveur (D76) : Firestore écrit au cache
        local sur-le-champ, donc la boutique est déjà dans la liste derrière la
        modale. C'est elle, la confirmation — mieux qu'une phrase verte. */
-    creerBoutique(saisie, {
+    creerBoutique({ ...saisie, code }, {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
     }).catch((cause) => setErreur(messageErreurBoutique(cause)));
@@ -376,7 +361,6 @@ function FormulaireCreation({
         saisie={saisie}
         changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
         prefixe="nouvelle"
-        codeModifiable
       />
 
       <EtatErreurSaisie message={erreur} className="mt-3" />
@@ -426,7 +410,6 @@ function FormulaireEdition({ boutique, surFin }: { boutique: Boutique; surFin: (
         saisie={saisie}
         changer={(partie) => setSaisie((actuel) => ({ ...actuel, ...partie }))}
         prefixe={`edition-${boutique.id}`}
-        codeModifiable={false}
       />
 
       <EtatErreurSaisie message={erreur} className="mt-3" />

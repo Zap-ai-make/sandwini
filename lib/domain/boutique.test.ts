@@ -11,6 +11,7 @@ import {
   validerBoutique,
   type Boutique,
   type SaisieBoutique,
+  engendrerCode,
 } from "./boutique";
 
 const saisie = (partie: Partial<SaisieBoutique> = {}): SaisieBoutique => ({
@@ -61,10 +62,11 @@ describe("validerBoutique", () => {
     expect(validerBoutique(saisie({ nom: "   " }))).toMatch(/nom/i);
   });
 
-  it("exige un code utilisable dans un numéro de reçu", () => {
-    expect(validerBoutique(saisie({ code: "" }))).toMatch(/code/i);
-    expect(validerBoutique(saisie({ code: "PT" }))).toMatch(/3 lettres/);
-    expect(validerBoutique(saisie({ code: "PT1" }))).toMatch(/3 lettres/);
+  it("ne réclame plus de code : il se déduit du nom", () => {
+    /* Le champ a disparu du formulaire le 23 octobre 2026. Ce qui le
+       remplaçait — trois lettres tapées à la main — n'avait de sens que pour la
+       machine, et `engendrerCode` ne rend qu'une forme que la base accepte. */
+    expect(validerBoutique(saisie({ code: "" }))).toBeNull();
   });
 
   it("exige au moins un métier — sans quoi la boutique n’ouvre aucun espace", () => {
@@ -175,5 +177,62 @@ describe("le métier des cartes grises", () => {
     /* Deux boutiques aux mêmes métiers doivent porter le même tableau en base,
        sinon les comparer demande de les trier d'abord. */
     expect(normaliserMetiers(["cartes_grises", "motos"])).toEqual(["motos", "cartes_grises"]);
+  });
+});
+
+/**
+ * Le code n’est plus tapé : il se déduit du nom (23 octobre 2026).
+ *
+ * **Demande du commanditaire.** On lui demandait trois lettres dont il n'a que
+ * faire : elles n'existent que pour la numérotation des reçus et pour servir
+ * d'identifiant de document. Un champ qu'on ne comprend pas se remplit au
+ * hasard, et ce hasard-là se retrouve ensuite sur chaque reçu imprimé.
+ *
+ * **Il reste exactement aussi contraint qu'avant** — trois lettres, unique,
+ * définitif. Seule la saisie disparaît.
+ */
+describe("engendrerCode", () => {
+  it("prend les trois premières lettres du nom", () => {
+    expect(engendrerCode("Pouytenga", new Set())).toBe("POU");
+    expect(engendrerCode("Koudougou", new Set())).toBe("KOU");
+  });
+
+  it("ignore accents, espaces et ponctuation", () => {
+    expect(engendrerCode("  élaba-zon ", new Set())).toBe("ELA");
+    expect(engendrerCode("Carte grise et plaque", new Set())).toBe("CAR");
+  });
+
+  it("évite un code déjà pris en avançant dans le nom", () => {
+    /* Deux boutiques qui commencent pareil sont le cas ordinaire : « Pouytenga
+       centre » et « Pouytenga marché ». */
+    expect(engendrerCode("Pouytenga", new Set(["POU"]))).toBe("POY");
+    expect(engendrerCode("Pouytenga", new Set(["POU", "POY"]))).toBe("POT");
+  });
+
+  it("finit par parcourir l’alphabet quand le nom est épuisé", () => {
+    /* « Po » n'a pas de troisième lettre : elle est complétée par la première,
+       ce qui donne POP. L'alphabet ne prend le relais qu'ensuite. */
+    expect(engendrerCode("Po", new Set())).toBe("POP");
+    expect(engendrerCode("Po", new Set(["POP", "POA", "POB"]))).toBe("POC");
+  });
+
+  it("complète un nom trop court", () => {
+    /* Un nom d'une lettre reste un nom : il ne doit pas empêcher d'ouvrir une
+       boutique. */
+    expect(engendrerCode("A", new Set())).toBe("AAA");
+  });
+
+  it("rend null quand le nom ne porte aucune lettre", () => {
+    /* `validerBoutique` refuse déjà un nom vide ; ceci couvre un nom fait de
+       chiffres seuls, où il n'y a rien à dériver. */
+    expect(engendrerCode("2024", new Set())).toBeNull();
+  });
+
+  it("rend toujours un code que la base accepte", () => {
+    for (const nom of ["Pouytenga", "élaba", "A", "Zorgho Nord"]) {
+      const code = engendrerCode(nom, new Set());
+      expect(code).not.toBeNull();
+      expect(estCodeValide(code as string)).toBe(true);
+    }
   });
 });

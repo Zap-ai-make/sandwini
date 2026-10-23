@@ -96,6 +96,43 @@ export function lireDiscussions(uid: string): Discussion[] {
   }
 }
 
+/* --- L'historique vu comme une source extérieure --------------------------
+   Le stockage local est une source de vérité qui vit hors de React. Le lire
+   dans un effet et le recopier dans un état obligeait à resynchroniser les
+   deux à la main — et c'est exactement ce que le compilateur React refuse, à
+   raison : un `setState` dans un effet déclenche un second rendu pour une
+   donnée qui était déjà là.
+
+   `useSyncExternalStore` demande un instantané **stable** : rendre un tableau
+   neuf à chaque appel ferait boucler le rendu. D'où le cache, invalidé par les
+   seules fonctions qui écrivent. */
+
+const ecouteurs = new Set<() => void>();
+let cache: { uid: string; discussions: Discussion[] } | null = null;
+
+function signalerChangement(): void {
+  cache = null;
+  for (const ecouteur of ecouteurs) ecouteur();
+}
+
+export function souscrireAuxDiscussions(ecouteur: () => void): () => void {
+  ecouteurs.add(ecouteur);
+  return () => {
+    ecouteurs.delete(ecouteur);
+  };
+}
+
+/** Le même tableau tant que rien n'a été écrit — c'est ce que React exige. */
+export function instantaneDesDiscussions(uid: string): Discussion[] {
+  if (cache === null || cache.uid !== uid) {
+    cache = { uid, discussions: lireDiscussions(uid) };
+  }
+  return cache.discussions;
+}
+
+/** Côté serveur, il n'y a pas de stockage local : la liste est vide, et stable. */
+export const AUCUNE_DISCUSSION: Discussion[] = [];
+
 export function enregistrerDiscussion(uid: string, discussion: Discussion): void {
   if (typeof localStorage === "undefined" || !uid) return;
   /* Une discussion sans échange n'a rien à montrer dans une liste : on ouvre un
@@ -113,6 +150,7 @@ export function enregistrerDiscussion(uid: string, discussion: Discussion): void
     /* Quota dépassé : l'historique est un confort, et le perdre ne doit pas
        empêcher de poser la question suivante. */
   }
+  signalerChangement();
 }
 
 export function oublierDiscussion(uid: string, id: string): void {
@@ -123,6 +161,7 @@ export function oublierDiscussion(uid: string, id: string): void {
   } catch {
     /* Même raison que ci-dessus. */
   }
+  signalerChangement();
 }
 
 /**
@@ -146,6 +185,7 @@ export function oublierLesDiscussions(): void {
       if (nom?.startsWith(PREFIXE)) aEffacer.push(nom);
     }
     for (const nom of aEffacer) localStorage.removeItem(nom);
+    signalerChangement();
   } catch {
     /* Navigation privée, quota : ne jamais empêcher une déconnexion. */
   }

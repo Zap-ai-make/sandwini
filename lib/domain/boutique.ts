@@ -82,6 +82,42 @@ export function estCodeValide(code: string): boolean {
 }
 
 /**
+ * Le code, déduit du nom plutôt que tapé (23 octobre 2026).
+ *
+ * **Demande du commanditaire, et elle est juste.** On lui demandait trois
+ * lettres dont il n'a que faire : elles n'existent que pour la numérotation des
+ * reçus et pour servir d'identifiant de document. Un champ qu'on ne comprend
+ * pas se remplit au hasard — et ce hasard-là se retrouve ensuite sur chaque
+ * reçu imprimé, pour toujours, puisqu'un code ne se change pas.
+ *
+ * **Rien ne s'assouplit pour autant** : trois lettres, unique, définitif. Seule
+ * la saisie disparaît.
+ *
+ * L'unicité se cherche dans un ordre qui garde le code lisible : d'abord les
+ * trois premières lettres, puis les deux premières suivies de chaque lettre
+ * suivante du nom — « Pouytenga » donne POU, puis POY, puis POT — et enfin
+ * l'alphabet, quand le nom est épuisé. Un code reste ainsi reconnaissable par
+ * qui lit un numéro de reçu.
+ *
+ * Rend `null` si le nom ne porte aucune lettre : il n'y a alors rien à
+ * dériver, et inventer un code ferait apparaître des reçus que personne ne
+ * rattacherait à son magasin.
+ */
+export function engendrerCode(nom: string, pris: ReadonlySet<string>): string | null {
+  const lettres = normaliserCode(nom).replace(/[^A-Z]/g, "");
+  if (!lettres) return null;
+
+  const candidats: string[] = [];
+  const base = (lettres + lettres[0].repeat(LONGUEUR_CODE)).slice(0, LONGUEUR_CODE - 1);
+
+  candidats.push((lettres + lettres[0].repeat(LONGUEUR_CODE)).slice(0, LONGUEUR_CODE));
+  for (const lettre of lettres.slice(LONGUEUR_CODE - 1)) candidats.push(base + lettre);
+  for (const lettre of "ABCDEFGHIJKLMNOPQRSTUVWXYZ") candidats.push(base + lettre);
+
+  return candidats.find((candidat) => estCodeValide(candidat) && !pris.has(candidat)) ?? null;
+}
+
+/**
  * Range les métiers dans l'ordre de `METIERS` et retire les doublons.
  *
  * L'ordre vient de la déclaration, pas de l'ordre de clic : deux boutiques aux
@@ -105,11 +141,10 @@ export function validerBoutique(saisie: SaisieBoutique): string | null {
   if (!nom) return "Donnez un nom à la boutique.";
   if (nom.length > LONGUEUR_NOM_MAX) return `Le nom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
 
-  const code = normaliserCode(saisie.code);
-  if (!code) return "Le code est obligatoire : il apparaît sur chaque reçu.";
-  if (!estCodeValide(code)) {
-    return `Le code doit faire exactement ${LONGUEUR_CODE} lettres, sans chiffre ni accent.`;
-  }
+  /* **Le code n'est plus validé ici** : il n'est plus saisi. `engendrerCode`
+     le dérive du nom et ne rend qu'une forme que la base accepte. Le seul cas
+     qui reste est un nom sans aucune lettre — un numéro, par exemple — et
+     c'est l'écran de création qui le dit, là où il peut nommer le nom fautif. */
 
   /* Une boutique sans métier n'ouvre aucun espace : son gérant se connecterait
      sur une application vide, sans rien à corriger de son côté. */

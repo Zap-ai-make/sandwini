@@ -115,25 +115,27 @@ export function BandeauEtat() {
     >
       {peutChoisir ? (
         <span className="relative shrink-0">
-          {/* Le nom complet de la boutique est juste à côté ; il sert ici de
-              description au sélecteur, pour qu’un lecteur d’écran annonce
-              « Pouytenga » et pas seulement « PTG ». */}
+          {/* **Les boutiques se nomment, elles ne se codent plus**
+              (23 octobre 2026). Le sélecteur portait trois lettres — PTG, CGP —
+              qui n'existent que pour la numérotation des reçus. Le code a
+              quitté le formulaire de déclaration le même jour : le laisser ici
+              en aurait fait le seul endroit du produit où on le lit, et il
+              n'apprend rien à qui choisit un magasin. */}
           <select
             aria-label="Boutique affichée"
-            aria-describedby={idNom}
             value={perimetre.boutiqueId ?? ""}
             onChange={(evenement) => changerDePerimetre(evenement.target.value || null)}
             className={[
-              "plaque-code h-8 cursor-pointer appearance-none rounded-plaque border py-1 pr-7 pl-2 text-sm leading-none",
+              "h-8 max-w-[11rem] cursor-pointer appearance-none truncate rounded-plaque border py-1 pr-7 pl-2 text-sm leading-none font-medium",
               plaque,
             ].join(" ")}
           >
-            <option value="">SDI</option>
+            <option value="">Toutes les boutiques</option>
             {boutiques
               .filter((boutique) => boutique.actif)
               .map((boutique) => (
                 <option key={boutique.id} value={boutique.id}>
-                  {boutique.code}
+                  {boutique.nom}
                 </option>
               ))}
           </select>
@@ -146,16 +148,23 @@ export function BandeauEtat() {
           />
         </span>
       ) : (
+        /* **Le gérant y lit son nom, et non le code de sa boutique.** Il n'en
+           a qu'une et ne la choisit pas : lui répéter trois lettres ne lui
+           apprenait rien. Son nom, lui, dit sous quel compte l'appareil écrit —
+           ce qui compte au comptoir, où l'on se relaie sur la même tablette. */
         <span
           className={[
-            "plaque-code flex h-8 shrink-0 items-center rounded-plaque border px-2 text-sm leading-none",
+            "flex h-8 max-w-[11rem] shrink-0 items-center truncate rounded-plaque border px-2 text-sm leading-none font-medium",
             plaque,
           ].join(" ")}
         >
-          {perimetre.code}
+          {session.statut === "connecte" ? session.utilisateur.nom : perimetre.nom}
         </span>
       )}
 
+      {/* Le nom de la boutique, à côté de la plaque. Masqué chez le
+          responsable : son sélecteur l'affiche déjà, et le redire deux fois de
+          suite ne dit pas deux fois plus. */}
       <span
         id={idNom}
         className={[
@@ -163,7 +172,7 @@ export function BandeauEtat() {
           horsLigne ? "text-encre-fixe" : perimetre.type === "aucune" ? "text-encre-doux" : "text-encre",
         ].join(" ")}
       >
-        {perimetre.nom}
+        {peutChoisir ? "" : perimetre.nom}
       </span>
 
       {/* La recherche globale : atteindre un écran sans lever la main du

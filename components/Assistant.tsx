@@ -2,7 +2,7 @@
 
 import { History, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 
 import {
   MessageAssistant,
@@ -17,14 +17,30 @@ import { avancerDUnMot } from "@/lib/ia/flux-mot-a-mot";
 import { cheminVentePreparee, type Geste } from "@/lib/ia/gestes";
 import {
   enregistrerDiscussion,
-  lireDiscussions,
+  AUCUNE_DISCUSSION,
+  instantaneDesDiscussions,
   nouvelleDiscussion,
   oublierDiscussion,
+  souscrireAuxDiscussions,
   titreDe,
   type Bulle,
   type Discussion,
 } from "@/lib/ia/historique";
 import type { PieceJointe } from "@/lib/ia/media";
+
+/**
+ * Un abonnement qui ne notifie jamais.
+ *
+ * L'adresse de la page ne change pas sous le composant : il vit dans la
+ * coquille, et une navigation la remonte. `useSyncExternalStore` veut quand
+ * même une fonction d'abonnement — la voici, inerte, définie une fois pour que
+ * son identité ne change pas d'un rendu à l'autre.
+ */
+const ABONNEMENT_INERTE = () => () => {};
+
+function lireRaccourci(): boolean {
+  return new URLSearchParams(window.location.search).get("assistant") === "1";
+}
 import { LIBELLE_OUTIL } from "@/lib/ia/outils";
 import { resume, type Proposition } from "@/lib/ia/propositions";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -139,9 +155,33 @@ export function Assistant() {
      la tablette du comptoir ne s'héritent pas leurs questions. */
   const uid = session.statut === "connecte" ? session.utilisateur.uid : "";
 
-  const [ouvert, setOuvert] = useState(false);
+  /**
+   * **Ouvert directement depuis l'écran d'accueil.** Le manifeste propose un
+   * raccourci « Assistant » : un appui long sur l'icône installée, et l'on
+   * parle à l'assistant sans traverser l'application.
+   *
+   * Lu par `useSyncExternalStore` et non dans un effet. L'adresse est une
+   * donnée du navigateur, pas un état de React : un effet aurait demandé un
+   * second rendu pour une information disponible au premier. Et pas
+   * `useSearchParams` non plus — ce composant vit dans la coquille, et le
+   * crochet de Next ferait basculer en rendu dynamique toutes les pages
+   * statiques qu'elle enveloppe.
+   *
+   * `null` veut dire « personne n'y a touché » : on suit alors le raccourci.
+   * Le premier geste de l'utilisateur tranche, et le raccourci ne revient pas.
+   */
+  const raccourci = useSyncExternalStore(ABONNEMENT_INERTE, lireRaccourci, () => false);
+  const [choixDOuverture, setOuvert] = useState<boolean | null>(null);
+  const ouvert = choixDOuverture ?? raccourci;
   const [montreHistorique, setMontreHistorique] = useState(false);
-  const [discussions, setDiscussions] = useState<Discussion[]>([]);
+  /* L'historique vit dans le stockage local, hors de React : on le lit comme
+     une source extérieure plutôt que de le recopier dans un état qu'il
+     faudrait resynchroniser à chaque écriture. */
+  const discussions = useSyncExternalStore(
+    souscrireAuxDiscussions,
+    () => instantaneDesDiscussions(uid),
+    () => AUCUNE_DISCUSSION,
+  );
   const [discussion, setDiscussion] = useState<Discussion>(() => nouvelleDiscussion());
   const [saisie, setSaisie] = useState("");
   /* `null` = au repos. Une chaîne = ce qu'on est en train de faire, affiché tel
@@ -186,21 +226,6 @@ export function Assistant() {
     conversation.current = null;
   }, [perimetreCourant]);
 
-  useEffect(() => {
-    if (ouvert) setDiscussions(lireDiscussions(uid));
-  }, [ouvert, uid]);
-
-  /* **Ouvert directement depuis l'écran d'accueil.** Le manifeste propose un
-     raccourci « Assistant » : un appui long sur l'icône installée, et l'on
-     parle à l'assistant sans traverser l'application.
-
-     Lu sur `window` plutôt que par `useSearchParams` : ce composant vit dans
-     la coquille, et le crochet de Next ferait basculer en rendu dynamique
-     toutes les pages statiques qu'elle enveloppe. */
-  useEffect(() => {
-    if (new URLSearchParams(window.location.search).get("assistant") === "1") setOuvert(true);
-  }, []);
-
   /* Le battement du dévoilement. Un `setTimeout` par pas plutôt qu'un
      intervalle : il s'arrête de lui-même quand la cible est rattrapée, et
      repart tout seul au morceau suivant. */
@@ -210,12 +235,26 @@ export function Assistant() {
     return () => clearTimeout(minuteur);
   }, [cible, montre]);
 
-  /* La réponse ne se fige en bulle qu'une fois entièrement dévoilée. */
+  /**
+   * La réponse ne se fige en bulle qu'une fois entièrement dévoilée.
+   *
+   * **Cet effet garde son `setState`, et la règle est désactivée sciemment.**
+   * Le dévoilement est un processus extérieur — un minuteur qui avance mot à
+   * mot — et « quand il a rattrapé la cible, enregistre » est précisément ce
+   * qu'un effet sert à exprimer. Les deux autres cas de ce fichier ont été
+   * retirés parce qu'ils recopiaient une donnée déjà disponible au rendu ;
+   * celui-ci réagit à un franchissement de seuil, et le réécrire dans le
+   * minuteur demanderait de doubler `montre` et `aFiger` en références — plus
+   * de pièces mobiles pour le même résultat, sur le chemin où une réponse se
+   * perd si l'on se trompe.
+   */
   useEffect(() => {
     if (aFiger === null || montre < cible.length) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDiscussion(aFiger);
+    /* La liste se met à jour toute seule : `enregistrerDiscussion` prévient
+       ceux qui l'écoutent. */
     enregistrerDiscussion(uid, aFiger);
-    setDiscussions(lireDiscussions(uid));
     setAFiger(null);
     setCible("");
     setMontre(0);
@@ -565,7 +604,6 @@ export function Assistant() {
                           type="button"
                           onClick={() => {
                             oublierDiscussion(uid, ancienne.id);
-                            setDiscussions(lireDiscussions(uid));
                           }}
                           aria-label={`Oublier « ${ancienne.titre} »`}
                           className="rounded-lg p-2 text-encre-doux transition hover:bg-papier hover:text-encre"
