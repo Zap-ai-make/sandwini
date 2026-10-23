@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  champsDossierNeuf,
   dossierEnCours,
   rangerDossiers,
   estTerminal,
@@ -227,5 +228,76 @@ describe("ranger les dossiers pour l’écran", () => {
       dossier({ id: "hier", statut: "remis", remisLe: new Date(2026, 9, 22) }),
     ]);
     expect(termines.map((d) => d.id)).toEqual(["hier", "ancien"]);
+  });
+});
+
+describe("les champs d’un dossier neuf", () => {
+  const NAISSANCE = {
+    boutiqueId: "PTG",
+    venteId: "v1",
+    origine: "vente" as const,
+    clientNom: "Sawadogo Harouna",
+    motoLibelle: "Yamaha SR 115",
+    numeroChassis: "02SY052982",
+    statut: "a_faire" as const,
+  };
+
+  it("porte les dix-sept champs, et pas un de plus", () => {
+    /* **Les règles exigent `hasOnly`** : un champ en trop fait refuser
+       l'écriture, et un champ manquant fait refuser toutes les modifications
+       suivantes. C'est la seule chose que ce test garde. */
+    expect(Object.keys(champsDossierNeuf(NAISSANCE)).sort()).toEqual(
+      [
+        "avance",
+        "boutiqueId",
+        "clientNom",
+        "deposeLe",
+        "disponibleLe",
+        "immatriculation",
+        "motoLibelle",
+        "numeroChassis",
+        "origine",
+        "prestataireId",
+        "prestataireNom",
+        "remisANom",
+        "remisATelephone",
+        "remisLe",
+        "revenuLe",
+        "statut",
+        "venteId",
+      ].sort(),
+    );
+  });
+
+  it("naît vide de tout ce qui s’écrit plus tard", () => {
+    const champs = champsDossierNeuf(NAISSANCE);
+    expect(champs.prestataireId).toBeNull();
+    expect(champs.deposeLe).toBeNull();
+    expect(champs.avance).toBeNull();
+    expect(champs.immatriculation).toBe("");
+    expect(champs.remisANom).toBe("");
+  });
+
+  it("laisse passer « sans objet » quand le client n’en veut pas", () => {
+    /* La case du comptoir pilote le dossier (S53, arbitrage 5). Décocher
+       « Carte grise » ne doit pas laisser un dossier à faire que personne ne
+       fera jamais. */
+    expect(champsDossierNeuf({ ...NAISSANCE, statut: "non_applicable" }).statut).toBe(
+      "non_applicable",
+    );
+  });
+
+  it("recopie le propriétaire et la moto en clair", () => {
+    /* Elle ne lit ni le fichier des clients ni le stock : sans cette copie, sa
+       liste afficherait des identifiants. */
+    const champs = champsDossierNeuf(NAISSANCE);
+    expect(champs.clientNom).toBe("Sawadogo Harouna");
+    expect(champs.motoLibelle).toBe("Yamaha SR 115");
+  });
+
+  it("garde un dossier extérieur sans vente", () => {
+    const champs = champsDossierNeuf({ ...NAISSANCE, origine: "exterieur", venteId: null });
+    expect(champs.venteId).toBeNull();
+    expect(champs.origine).toBe("exterieur");
   });
 });

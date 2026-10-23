@@ -14,6 +14,7 @@ import {
 
 import { lireJour } from "@/lib/domain/dossier";
 import {
+  champsDossierNeuf,
   normaliserDossierExterieur,
   transitionAutorisee,
   validerDossierExterieur,
@@ -113,62 +114,6 @@ function lireDossier(instantane: QueryDocumentSnapshot<DocumentData>): DossierCa
 
 /* --- Ouvrir un dossier ----------------------------------------------------- */
 
-/** Ce qu'une vente sait de la carte grise qu'elle fait naître. */
-export type NaissanceDossier = {
-  venteId: string;
-  boutiqueId: string;
-  clientNom: string;
-  motoLibelle: string;
-  numeroChassis: string;
-  /** « Sans objet » quand le client repart sans vouloir de carte grise. */
-  statut: Extract<StatutCarteGrise, "a_faire" | "non_applicable">;
-};
-
-/**
- * Les champs d'un dossier neuf, sans l'écrire.
- *
- * Exposés séparément parce qu'une vente s'enregistre en **un seul lot** : la
- * vente, ses documents, son premier versement. Le dossier de carte grise doit
- * pouvoir entrer dans ce lot, et non partir dans une écriture à côté qui
- * réussirait quand la vente échoue.
- */
-export function champsNouveauDossier(naissance: NaissanceDossier, auteur: Auteur) {
-  return {
-    boutiqueId: naissance.boutiqueId,
-    venteId: naissance.venteId,
-    origine: "vente" as const,
-    clientNom: naissance.clientNom,
-    motoLibelle: naissance.motoLibelle,
-    numeroChassis: naissance.numeroChassis,
-    statut: naissance.statut,
-    prestataireId: null,
-    prestataireNom: "",
-    deposeLe: null,
-    avance: null,
-    disponibleLe: null,
-    immatriculation: "",
-    revenuLe: null,
-    remisLe: null,
-    remisANom: "",
-    remisATelephone: "",
-    ...traceCreation(auteur),
-  };
-}
-
-/** La référence d'un dossier né d'une vente : son identifiant est celui de la vente. */
-export function referenceDossierDeVente(venteId: string) {
-  return doc(db(), COLLECTION, venteId);
-}
-
-export function creerDossierDepuisVente(
-  naissance: NaissanceDossier,
-  auteur: Auteur,
-): Promise<void> {
-  const lot = writeBatch(db());
-  lot.set(referenceDossierDeVente(naissance.venteId), champsNouveauDossier(naissance, auteur));
-  return suivreEcriture(lot.commit());
-}
-
 /**
  * Un dossier qui n'est pas passé par une vente.
  *
@@ -192,23 +137,15 @@ export function ouvrirDossierExterieur(
 
   const lot = writeBatch(db());
   lot.set(reference, {
-    boutiqueId,
-    venteId: null,
-    origine: "exterieur" as const,
-    clientNom: propre.clientNom,
-    motoLibelle: propre.motoLibelle,
-    numeroChassis: propre.numeroChassis,
-    statut: "a_faire" as const,
-    prestataireId: null,
-    prestataireNom: "",
-    deposeLe: null,
-    avance: null,
-    disponibleLe: null,
-    immatriculation: "",
-    revenuLe: null,
-    remisLe: null,
-    remisANom: "",
-    remisATelephone: "",
+    ...champsDossierNeuf({
+      boutiqueId,
+      venteId: null,
+      origine: "exterieur",
+      clientNom: propre.clientNom,
+      motoLibelle: propre.motoLibelle,
+      numeroChassis: propre.numeroChassis,
+      statut: "a_faire",
+    }),
     ...traceCreation(auteur),
   });
 

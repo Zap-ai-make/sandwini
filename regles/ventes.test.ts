@@ -110,6 +110,35 @@ const venteTranches = (partie: Record<string, unknown> = {}) =>
     ...partie,
   });
 
+/**
+ * Le dossier de carte grise que la vente fait naître depuis S59.
+ *
+ * Il entre dans **le même lot** que la vente : une écriture à côté réussirait
+ * quand la vente échouerait, et un dossier sans vente n'a personne à qui
+ * rendre le papier.
+ */
+const dossierCarteGrise = (partie: Record<string, unknown> = {}, auteur = "ger-1") => ({
+  boutiqueId: "PTG",
+  venteId: "vente-ptg",
+  origine: "vente",
+  clientNom: "Sawadogo Harouna",
+  motoLibelle: "Yamaha SR 115",
+  numeroChassis: "02SY052982",
+  statut: "a_faire",
+  prestataireId: null,
+  prestataireNom: "",
+  deposeLe: null,
+  avance: null,
+  disponibleLe: null,
+  immatriculation: "",
+  revenuLe: null,
+  remisLe: null,
+  remisANom: "",
+  remisATelephone: "",
+  ...audit(auteur),
+  ...partie,
+});
+
 const documentDossier = (partie: Record<string, unknown> = {}, auteur = "ger-1") => ({
   boutiqueId: "PTG",
   venteId: "vente-ptg",
@@ -335,6 +364,14 @@ describe("le lot complet d’une vente", () => {
       doc(reference, "documents", "carte_grise"),
       documentDossier({ type: "carte_grise", venteId: reference.id }),
     );
+    /* **Les deux coexistent, et c'est voulu** (S59) : le document sous la vente
+       pour les écrans d'avant la bascule, le dossier dans sa collection pour
+       celle qui traite les papiers. La migration retrouvera ce dossier déjà
+       écrit et ne le touchera pas — elle crée, elle n'écrase pas. */
+    lot.set(
+      doc(base, "dossiersCarteGrise", reference.id),
+      dossierCarteGrise({ venteId: reference.id }),
+    );
     lot.set(doc(collection(reference, "versements")), {
       ...versement({ venteId: reference.id, montant: 1_200_000, encaissementId: enc.id }),
     });
@@ -370,6 +407,27 @@ describe("le lot complet d’une vente", () => {
       const trace = await getDoc(doc(avecDroits, "ventesMotos", reference.id));
       expect(trace.exists()).toBe(false);
     });
+  });
+
+  it("un client qui ne veut pas de carte grise fait naître un dossier sans objet", async () => {
+    /* La case du comptoir pilote le dossier (S53, arbitrage 5) : décocher
+       « Carte grise » ne doit pas laisser derrière elle un dossier à faire que
+       personne ne fera jamais, et qui bloquerait la clôture. */
+    const base = gerant();
+    const reference = doc(collection(base, "ventesMotos"));
+    const lot = writeBatch(base);
+
+    lot.set(reference, vente({ carteGrise: false }));
+    lot.set(
+      doc(reference, "documents", "carte_grise"),
+      documentDossier({ venteId: reference.id, statut: "non_applicable" }),
+    );
+    lot.set(
+      doc(base, "dossiersCarteGrise", reference.id),
+      dossierCarteGrise({ venteId: reference.id, statut: "non_applicable" }),
+    );
+
+    await assertSucceeds(lot.commit());
   });
 
   it("le responsable vend dans n’importe quelle boutique", async () => {

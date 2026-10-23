@@ -38,6 +38,7 @@ import {
   type Vente,
   type Versement,
 } from "@/lib/domain/vente";
+import { champsDossierNeuf } from "@/lib/domain/dossier-carte-grise";
 import { validerFichierPapier, type PapierMoto } from "@/lib/domain/moto";
 import { reserverNumero, type Numeroteur } from "@/lib/numerotation/compteur";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
@@ -404,6 +405,16 @@ export type ContexteVente = {
   boutique: Numeroteur;
   /** Les numéros déjà connus de cet appareil, lus dans le cache Firestore (S7). */
   numerosConnus: readonly string[];
+  /**
+   * Ce que le dossier de carte grise **recopie** : le propriétaire et la moto
+   * en clair.
+   *
+   * Fourni par l'écran, qui les a déjà sous les yeux, plutôt que relu ici. La
+   * personne des cartes grises ne lit ni le fichier des clients ni le stock —
+   * c'est tout l'objet de son cloisonnement — donc sans cette copie sa liste
+   * afficherait des identifiants.
+   */
+  dossier: { clientNom: string; motoLibelle: string; numeroChassis: string };
 };
 
 /**
@@ -488,6 +499,32 @@ export function enregistrerVente(
      « non inclus » pendant que le dossier la réclamait. */
   const statutCarteGrise: StatutDocument =
     saisie.carteGrise === false ? "non_applicable" : "a_faire";
+
+  /* **Le dossier prend sa place dans le même lot** (S59). Il vit désormais dans
+     une collection à lui : accroché à la vente, il n'en existait pas sans
+     vente, or le client en confie régulièrement qui viennent du dehors.
+
+     Son identifiant est celui de la vente. C'est ce qui rend la migration de
+     l'existant reprenable sans table de correspondance — et ce qui fait qu'une
+     vente enregistrée aujourd'hui ne sera pas migrée deux fois : le script
+     écrit avec `create`, et trouvera le document déjà là.
+
+     **Le document sous la vente continue d'être écrit, et ce n'est pas un
+     oubli.** Les écrans d'avant la bascule le lisent encore ; les deux
+     coexistent le temps que la migration passe. C'est la ligne à retirer quand
+     tout lira la nouvelle collection. */
+  lot.set(doc(db(), "dossiersCarteGrise", reference.id), {
+    ...champsDossierNeuf({
+      boutiqueId,
+      venteId: reference.id,
+      origine: "vente",
+      clientNom: contexte.dossier.clientNom,
+      motoLibelle: contexte.dossier.motoLibelle,
+      numeroChassis: contexte.dossier.numeroChassis,
+      statut: statutCarteGrise === "non_applicable" ? "non_applicable" : "a_faire",
+    }),
+    ...traceCreation(auteur),
+  });
 
   lot.set(doc(reference, "documents", "carte_grise"), {
     /* Répété ici pour la même raison qu'en S5 sur le coût : dans un lot, les

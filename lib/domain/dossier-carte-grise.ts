@@ -156,6 +156,61 @@ function parAnciennete(a: DossierCarteGrise, b: DossierCarteGrise): number {
   return a.deposeLe.getTime() - b.deposeLe.getTime();
 }
 
+/**
+ * Ce qu'un dossier porte à sa naissance, sans sa trace d'audit.
+ *
+ * **Pur, et dans le domaine, pour une raison d'architecture.** Deux endroits
+ * font naître un dossier : la vente, dans son propre lot, et l'écran des
+ * cartes grises. Si le premier appelait le dépôt du second, `ventes.ts` et
+ * `dossiers-carte-grise.ts` s'importeraient mutuellement — un cycle qui tient
+ * tant qu'on ne l'observe pas, et qui casse le jour où l'un des deux évalue
+ * quelque chose au chargement.
+ *
+ * **Et les règles exigent `hasOnly`.** Un champ en trop fait refuser
+ * l'écriture ; un champ manquant fait refuser toutes les *modifications*
+ * suivantes, ce qui est pire — le dossier existe et se fige. Deux listes de
+ * champs auraient divergé (D73), donc il n'y en a qu'une, et un test la garde.
+ */
+export type DossierNeuf = {
+  boutiqueId: string;
+  /** `null` pour un dossier extérieur : il n'y a pas eu de vente. */
+  venteId: string | null;
+  origine: OrigineDossier;
+  clientNom: string;
+  motoLibelle: string;
+  numeroChassis: string;
+  /**
+   * `non_applicable` quand le client repart sans vouloir de carte grise.
+   *
+   * C'est la case du comptoir qui pilote le dossier (S53, arbitrage 5) :
+   * décocher « Carte grise » laissait jusque-là un document « à faire » que
+   * personne n'allait jamais faire, et qui bloquait la clôture.
+   */
+  statut: Extract<StatutCarteGrise, "a_faire" | "non_applicable">;
+};
+
+export function champsDossierNeuf(naissance: DossierNeuf) {
+  return {
+    boutiqueId: naissance.boutiqueId,
+    venteId: naissance.venteId,
+    origine: naissance.origine,
+    clientNom: naissance.clientNom,
+    motoLibelle: naissance.motoLibelle,
+    numeroChassis: naissance.numeroChassis,
+    statut: naissance.statut as StatutCarteGrise,
+    prestataireId: null as string | null,
+    prestataireNom: "",
+    deposeLe: null as Date | null,
+    avance: null as number | null,
+    disponibleLe: null as Date | null,
+    immatriculation: "",
+    revenuLe: null as Date | null,
+    remisLe: null as Date | null,
+    remisANom: "",
+    remisATelephone: "",
+  };
+}
+
 /* --- Ouvrir un dossier venu du dehors ------------------------------------- */
 
 export type SaisieDossierExterieur = {

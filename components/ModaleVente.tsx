@@ -349,9 +349,27 @@ export function ModaleVente({
 
     setErreur(null);
     setRapproche(null);
+    /* **Recopié, et non pointé.** Le dossier de carte grise porte le nom du
+       propriétaire et la moto en clair : celle qui traite les papiers ne lit ni
+       le fichier des clients ni le stock, et sans cette copie sa liste
+       afficherait des identifiants.
+
+       Le client vient de `clientChoisi` quand il existe déjà, et de la saisie
+       quand il naît avec la vente — c'est le même nom, lu à deux endroits selon
+       le chemin pris. */
     const { id, numero, enregistre } = enregistrerVente(
       { ...saisie, clientId },
-      { boutique: { boutiqueId, code: perimetre.code }, numerosConnus },
+      {
+        boutique: { boutiqueId, code: perimetre.code },
+        numerosConnus,
+        dossier: {
+          clientNom: nomComplet(clientChoisi ?? client),
+          motoLibelle: `${catalogue.nomMarque(motoChoisie.marqueId)} ${catalogue.nomModele(
+            motoChoisie.modeleId,
+          )}`.trim(),
+          numeroChassis: motoChoisie.numeroChassis,
+        },
+      },
       auteur,
     );
     enregistre.catch((cause) => setErreur(messageErreurVente(cause)));
