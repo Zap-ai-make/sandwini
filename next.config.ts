@@ -309,6 +309,7 @@ const ECRANS_HORS_LIGNE = [
   "/parametres/referentiels",
   "/prestataires",
   "/cartes-grises",
+  "/parametres/cartes-grises",
 ];
 
 /* Une révision par build : elle change à chaque compilation pour qu'une

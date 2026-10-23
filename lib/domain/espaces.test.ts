@@ -202,7 +202,9 @@ describe("le second niveau de navigation", () => {
        entrée sous lui est un rangement qui ment ». */
     const hrefs = ecransVisibles("reglages", "gerant").map((e) => e.href);
     expect(hrefs).toEqual([]);
-    expect(ecransVisibles("reglages", "responsable").length).toBe(3);
+    /* Quatre depuis S59 : la reprise des cartes grises s'y est rangée, gardée
+       par la même capacité que les boutiques. */
+    expect(ecransVisibles("reglages", "responsable").length).toBe(4);
   });
 
   it("désigne l’écran le plus précis, pas le préfixe le plus court", () => {
