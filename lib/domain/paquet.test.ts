@@ -17,9 +17,8 @@ const SAISIE: SaisiePaquet = {
   prestataireNom: "Ouédraogo Plaques",
   deposeLe: "2026-10-15",
   avance: "150000",
-  moyenPaiement: "especes",
   disponibleLe: "",
-  venteIds: ["v1", "v2", "v3"],
+  dossierIds: ["v1", "v2", "v3"],
 };
 
 describe("validerPaquet", () => {
@@ -30,7 +29,7 @@ describe("validerPaquet", () => {
   /* **Point de vigilance 4.** Un paquet sans carte écrirait une sortie de
      caisse sans contrepartie : de l’argent parti pour rien. */
   it("refuse un paquet sans carte", () => {
-    expect(validerPaquet({ ...SAISIE, venteIds: [] })).toMatch(/au moins une carte/i);
+    expect(validerPaquet({ ...SAISIE, dossierIds: [] })).toMatch(/au moins une carte/i);
   });
 
   /* **Point de vigilance 3.** L’écran coche des lignes ; rien n’empêche deux
@@ -38,18 +37,18 @@ describe("validerPaquet", () => {
      Deux écritures sur le même document dans un lot Firestore sont refusées en
      bloc, sans dire laquelle — autant le dire ici, où le message est lisible. */
   it("refuse deux fois la même vente", () => {
-    expect(validerPaquet({ ...SAISIE, venteIds: ["v1", "v2", "v1"] })).toMatch(/deux fois/i);
+    expect(validerPaquet({ ...SAISIE, dossierIds: ["v1", "v2", "v1"] })).toMatch(/deux fois/i);
   });
 
   it("refuse au-delà de la borne, et la borne est dans le message", () => {
     const trop = Array.from({ length: CARTES_PAR_PAQUET_MAX + 1 }, (_, rang) => `v${rang}`);
-    const message = validerPaquet({ ...SAISIE, venteIds: trop });
+    const message = validerPaquet({ ...SAISIE, dossierIds: trop });
     expect(message).toContain(String(CARTES_PAR_PAQUET_MAX));
   });
 
   it("accepte exactement la borne", () => {
     const pile = Array.from({ length: CARTES_PAR_PAQUET_MAX }, (_, rang) => `v${rang}`);
-    expect(validerPaquet({ ...SAISIE, venteIds: pile })).toBeNull();
+    expect(validerPaquet({ ...SAISIE, dossierIds: pile })).toBeNull();
   });
 
   it("refuse un paquet sans prestataire", () => {
@@ -81,7 +80,7 @@ describe("etatPaquet", () => {
     deposeLe: new Date("2026-10-15T12:00:00"),
     disponibleLe: null,
     avance: 150_000,
-    venteIds: ["v1", "v2", "v3"],
+    dossierIds: ["v1", "v2", "v3"],
     ...partie,
   });
 
@@ -163,7 +162,7 @@ describe("etatPaquet", () => {
   });
 
   it("ne dit pas le retard quand tout est revenu, même après la date", () => {
-    const annonce = paquet({ venteIds: ["v1"], disponibleLe: new Date("2026-10-20T12:00:00") });
+    const annonce = paquet({ dossierIds: ["v1"], disponibleLe: new Date("2026-10-20T12:00:00") });
     expect(etatPaquet(annonce, [carte("v1", "revenu_magasin")], AUJOURDHUI).enRetard).toBe(false);
   });
 });
@@ -239,7 +238,7 @@ describe("cartesAConfier", () => {
       ],
       nomDe,
     );
-    expect(liste.map((carte) => carte.venteId)).toEqual(["v1"]);
+    expect(liste.map((carte) => carte.dossierId)).toEqual(["v1"]);
   });
 
   it("ignore un dossier dont le document n’est pas encore parvenu", () => {
@@ -258,7 +257,7 @@ describe("cartesAConfier", () => {
       ],
       nomDe,
     );
-    expect(liste.map((carte) => carte.venteId)).toEqual(["ancien", "recent"]);
+    expect(liste.map((carte) => carte.dossierId)).toEqual(["ancien", "recent"]);
   });
 
   it("porte de quoi reconnaître le dossier sans ouvrir la vente", () => {
@@ -303,7 +302,7 @@ describe("les deux portes d’un même dépôt", () => {
         }) as unknown as DossierEnAttente,
     );
 
-    expect(cartesAConfier(dossiers, () => "Client").map((carte) => carte.venteId)).toEqual(
+    expect(cartesAConfier(dossiers, () => "Client").map((carte) => carte.dossierId)).toEqual(
       cartesConfiables(documents).map((document) => document.venteId),
     );
   });
@@ -336,7 +335,7 @@ describe("historiqueDesDeparts", () => {
       ...extra,
     }) as unknown as DocumentDossier;
 
-  const paquet = (id: string, venteIds: string[], extra: object = {}): PaquetCartesGrises => ({
+  const paquet = (id: string, dossierIds: string[], extra: object = {}): PaquetCartesGrises => ({
     id,
     boutiqueId: "b1",
     prestataireId: "p1",
@@ -344,7 +343,7 @@ describe("historiqueDesDeparts", () => {
     deposeLe: LE_1ER,
     disponibleLe: null,
     avance: 150_000,
-    venteIds,
+    dossierIds,
     ...extra,
   });
 

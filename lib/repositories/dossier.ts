@@ -7,23 +7,23 @@ import {
   validerDepot,
   type SaisieDepot,
 } from "@/lib/domain/dossier";
-import {
-  lireMontant,
-  LIBELLE_DOCUMENT,
-  type DocumentDossier,
-  type StatutDocument,
-} from "@/lib/domain/vente";
+import { lireMontant, type DocumentDossier, type StatutDocument } from "@/lib/domain/vente";
 import { traceCreation, traceModification, type Auteur } from "./referentiels";
 
 /**
  * Faire avancer un document de dossier (S11).
  *
- * Trois écritures dans **un seul lot** : le nouveau statut, la ligne
- * d'historique qui garde la trace du passage, et — au dépôt — la sortie de
- * caisse de l'avance. Un `writeBatch` reste atomique hors ligne : Firestore le
- * garde entier dans sa file et le rejoue d'un bloc au retour du réseau. C'est
- * ce qui interdit l'état le plus coûteux à démêler : un document déposé chez un
- * prestataire dont l'argent n'est jamais sorti de la caisse, ou l'inverse.
+ * Deux écritures dans **un seul lot** : le nouveau statut, et la ligne
+ * d'historique qui garde la trace du passage. Un `writeBatch` reste atomique
+ * hors ligne : Firestore le garde entier dans sa file et le rejoue d'un bloc au
+ * retour du réseau. C'est ce qui interdit le document avancé dont le passage
+ * n'est noté nulle part.
+ *
+ * **Le dépôt n'écrit plus en caisse** (arbitrage du 21 octobre 2026) : « pas de
+ * caisse pour carte grise […] uniquement pour mettre les montants des avances ».
+ * L'avance vit sur le document et sur le paquet, et l'historique des départs en
+ * donne les totaux. La règle vaut **partout** — deux comportements selon
+ * l'écran d'où part le geste produiraient deux vérités sur le même billet.
  *
  * La transition est revalidée ici même si l'écran ne propose que des passages
  * licites : entre l'affichage d'un bouton et le clic, un autre appareil a pu
@@ -75,24 +75,6 @@ export function avancerDocument(
     changement.avance = montant;
     changement.disponibleLe = disponible ? Timestamp.fromDate(disponible) : null;
 
-    /* L'avance est de l'argent qui quitte la caisse aujourd'hui. Elle n'est
-       jamais nulle — sans montant, le travail serait confié à crédit, ce que le
-       modèle traite ailleurs — donc cette écriture est inconditionnelle : il
-       n'existe pas de dépôt sans mouvement correspondant. */
-    lot.set(doc(collection(db(), "encaissements")), {
-      boutiqueId: document.boutiqueId,
-      date: maintenant,
-      sens: "sortie",
-      montant,
-      moyenPaiement: depot.moyenPaiement,
-      origine: "avance_prestataire",
-      origineRefId: document.venteId,
-      libelle: `Avance ${depot.prestataireNom} — ${LIBELLE_DOCUMENT[document.type]}`,
-      /* Une sortie de caisse n'est jamais un engagement de tranches : ce drapeau
-         ne concerne que l'argent qui entre (§6.2). */
-      categorieTranches: false,
-      ...traceCreation(auteur),
-    });
   }
 
   if (vers === "remis_client") changement.remisLe = maintenant;

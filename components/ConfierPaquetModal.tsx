@@ -9,7 +9,6 @@ import { joursEcoules } from "@/lib/domain/dossier";
 import { formaterAnciennete, formaterMontant } from "@/lib/domain/format";
 import { validerPaquet, type CarteAConfier, type SaisiePaquet } from "@/lib/domain/paquet";
 import type { Prestataire } from "@/lib/domain/prestataire";
-import { LIBELLE_MOYEN, MOYENS_PAIEMENT } from "@/lib/domain/vente";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { messageErreurDossier } from "@/lib/repositories/dossier";
 import { confierPaquet } from "@/lib/repositories/paquets";
@@ -43,8 +42,11 @@ function jourLocal(date: Date): string {
  *
  * **L'avance est celle du paquet, pas celle d'une carte.** On tape ce qu'on
  * verse, une fois, parce que c'est un seul billet qui change de main. Le dépôt
- * la répartit ensuite sur les documents pour que la somme des dossiers retombe
- * sur la sortie de caisse ; l'écran, lui, ne demande qu'un chiffre.
+ * la répartit ensuite sur les dossiers pour que leur somme retombe sur l'avance
+ * du paquet ; l'écran, lui, ne demande qu'un chiffre.
+ *
+ * **Et elle ne passe plus par la caisse** (arbitrage du 21 octobre 2026) : d'où
+ * la disparition du moyen de paiement, qui ne servait qu'à la ligne du journal.
  *
  * **On attend le serveur ici, et c'est l'exception.** Partout ailleurs le
  * produit rend la main tout de suite (D76). Mais un lot de `2N + 2` écritures
@@ -84,13 +86,12 @@ export function ConfierPaquetModal({
   );
 
   const [coches, setCoches] = useState<Set<string>>(() => new Set(choisies ?? []));
-  const [saisie, setSaisie] = useState<Omit<SaisiePaquet, "venteIds">>({
+  const [saisie, setSaisie] = useState<Omit<SaisiePaquet, "dossierIds">>({
     prestataireId: prestataireImpose?.id ?? "",
     prestataireNom: prestataireImpose?.nom ?? "",
     deposeLe: jourLocal(new Date()),
     avance: "",
-    moyenPaiement: "especes",
-    disponibleLe: "",
+      disponibleLe: "",
   });
   const [erreur, setErreur] = useState<string | null>(null);
   const [envoi, setEnvoi] = useState(false);
@@ -101,7 +102,7 @@ export function ConfierPaquetModal({
      cochée ferait refuser le lot entier au moment d'envoyer — sans dire
      laquelle des dix a fauté. */
   const retenues = useMemo(
-    () => cartes.filter((carte) => coches.has(carte.venteId)),
+    () => cartes.filter((carte) => coches.has(carte.dossierId)),
     [cartes, coches],
   );
 
@@ -111,7 +112,7 @@ export function ConfierPaquetModal({
     (prestataire) => prestataire.actif && prestataire.typesDocuments.includes("carte_grise"),
   );
 
-  function changer(partie: Partial<Omit<SaisiePaquet, "venteIds">>) {
+  function changer(partie: Partial<Omit<SaisiePaquet, "dossierIds">>) {
     setSaisie((ancienne) => ({ ...ancienne, ...partie }));
     setErreur(null);
   }
@@ -132,7 +133,7 @@ export function ConfierPaquetModal({
 
     const complete: SaisiePaquet = {
       ...saisie,
-      venteIds: retenues.map((carte) => carte.venteId),
+      dossierIds: retenues.map((carte) => carte.dossierId),
     };
 
     /* Validé ici avant de partir : le même refus vu côté serveur arriverait
@@ -174,7 +175,7 @@ export function ConfierPaquetModal({
           ? `Confier des cartes grises à ${prestataireImpose.nom}`
           : "Confier des cartes grises"
       }
-      description="Un prestataire, une date, une avance. L’avance sort de la caisse en une seule fois."
+      description="Un prestataire, une date, une avance. Elle se note sur les dossiers, pas dans la caisse."
     >
       {cartes.length === 0 ? (
         /* **Pas un formulaire vide.** Sans carte à confier, tous les champs
@@ -221,7 +222,7 @@ export function ConfierPaquetModal({
             cartes={cartes}
             coches={coches}
             basculer={basculer}
-            toutCocher={() => setCoches(new Set(cartes.map((carte) => carte.venteId)))}
+            toutCocher={() => setCoches(new Set(cartes.map((carte) => carte.dossierId)))}
             toutDecocher={() => setCoches(new Set())}
           />
 
@@ -264,25 +265,6 @@ export function ConfierPaquetModal({
                 onChange={(evenement) => changer({ avance: evenement.target.value })}
                 className="saisie"
               />
-            </Champ>
-
-            <Champ id="paq-moyen" libelle="Par quel moyen">
-              <select
-                id="paq-moyen"
-                value={saisie.moyenPaiement}
-                onChange={(evenement) =>
-                  changer({
-                    moyenPaiement: evenement.target.value as SaisiePaquet["moyenPaiement"],
-                  })
-                }
-                className="saisie"
-              >
-                {MOYENS_PAIEMENT.map((moyen) => (
-                  <option key={moyen} value={moyen}>
-                    {LIBELLE_MOYEN[moyen]}
-                  </option>
-                ))}
-              </select>
             </Champ>
           </div>
 
@@ -345,7 +327,7 @@ function ChoixDesCartes({
   /* Figée au rendu : recalculée par ligne, deux cartes de la même liste
      seraient datées d'instants différents. */
   const maintenant = new Date();
-  const nombre = cartes.filter((carte) => coches.has(carte.venteId)).length;
+  const nombre = cartes.filter((carte) => coches.has(carte.dossierId)).length;
 
   return (
     <fieldset className="cadre p-3">
@@ -376,12 +358,12 @@ function ChoixDesCartes({
         {cartes.map((carte) => {
           const jours = joursEcoules(carte.date, maintenant);
           return (
-            <li key={carte.venteId}>
+            <li key={carte.dossierId}>
               <label className="flex cursor-pointer items-center gap-2 rounded-champ py-2 hover:bg-fond">
                 <input
                   type="checkbox"
-                  checked={coches.has(carte.venteId)}
-                  onChange={(evenement) => basculer(carte.venteId, evenement.target.checked)}
+                  checked={coches.has(carte.dossierId)}
+                  onChange={(evenement) => basculer(carte.dossierId, evenement.target.checked)}
                   className="size-4 shrink-0 accent-[var(--color-solde)]"
                 />
                 <span className="plaque-code shrink-0 text-corps text-encre">{carte.numero}</span>

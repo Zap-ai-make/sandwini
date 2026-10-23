@@ -14,7 +14,7 @@
  */
 
 import { estEnRetard, joursEcoules, lireJour, type DossierEnAttente } from "./dossier";
-import { lireMontant, MONTANT_MAX, type DocumentDossier, type MoyenPaiement } from "./vente";
+import { lireMontant, MONTANT_MAX, type DocumentDossier } from "./vente";
 
 /**
  * Le nombre de cartes qu'un paquet peut porter.
@@ -39,12 +39,18 @@ export type SaisiePaquet = {
   /** Format de `<input type="date">` : `aaaa-mm-jj`. */
   deposeLe: string;
   avance: string;
-  /** L'avance sort de la caisse : par quel moyen, il faut le dire. */
-  moyenPaiement: MoyenPaiement;
   /** Facultatif. Même format. */
   disponibleLe: string;
-  /** Les ventes dont la carte grise part. Une par carte. */
-  venteIds: readonly string[];
+  /**
+   * Les dossiers qui partent. Un par carte.
+   *
+   * **Des dossiers, et plus des ventes** (S59) : un dossier venu du dehors se
+   * confie dans les mêmes paquets, et il n'a pas de vente d'où tirer une clé.
+   * La bascule ne coûte aucune migration de données parce qu'un dossier né
+   * d'une vente porte l'identifiant de cette vente : les listes déjà écrites
+   * sont valides telles quelles.
+   */
+  dossierIds: readonly string[];
 };
 
 /**
@@ -61,18 +67,18 @@ export function validerPaquet(saisie: SaisiePaquet): string | null {
     return "Choisissez le prestataire à qui vous confiez les cartes grises.";
   }
 
-  if (saisie.venteIds.length === 0) {
+  if (saisie.dossierIds.length === 0) {
     return "Choisissez au moins une carte grise à confier.";
   }
 
   /* Deux écritures sur le même document dans un lot Firestore font échouer le
      lot entier, sans dire laquelle. Le doublon se refuse donc ici, où le
      message est lisible. */
-  if (new Set(saisie.venteIds).size !== saisie.venteIds.length) {
-    return "La même vente figure deux fois dans la sélection.";
+  if (new Set(saisie.dossierIds).size !== saisie.dossierIds.length) {
+    return "Le même dossier figure deux fois dans la sélection.";
   }
 
-  if (saisie.venteIds.length > CARTES_PAR_PAQUET_MAX) {
+  if (saisie.dossierIds.length > CARTES_PAR_PAQUET_MAX) {
     return `Un paquet porte au plus ${CARTES_PAR_PAQUET_MAX} cartes grises. Faites-en deux.`;
   }
 
@@ -109,7 +115,7 @@ export type PaquetCartesGrises = {
   deposeLe: Date | null;
   disponibleLe: Date | null;
   avance: number;
-  venteIds: readonly string[];
+  dossierIds: readonly string[];
 };
 
 export type EtatPaquet = {
@@ -143,7 +149,7 @@ export function etatPaquet(
   documents: readonly DocumentDossier[],
   aujourdhui: Date,
 ): EtatPaquet {
-  const siennes = new Set(paquet.venteIds);
+  const siennes = new Set(paquet.dossierIds);
   const cartes = documents.filter(
     (document) => document.type === "carte_grise" && siennes.has(document.venteId),
   );
@@ -158,7 +164,7 @@ export function etatPaquet(
   const lu = cartes.length > 0;
 
   return {
-    total: paquet.venteIds.length,
+    total: paquet.dossierIds.length,
     dehors,
     revenues,
     solde: lu && dehors === 0,
@@ -210,7 +216,14 @@ function carteConfiable(document: DocumentDossier): boolean {
  * désignent rien.
  */
 export type CarteAConfier = {
-  venteId: string;
+  /**
+   * L'identifiant du dossier.
+   *
+   * Égal au `venteId` pour une carte née d'une vente, et c'est ce qui rend la
+   * bascule de S59 gratuite. Le document, lui, garde sa vente : c'est encore
+   * sous elle que le dépôt écrit.
+   */
+  dossierId: string;
   numero: string;
   client: string;
   /** La date de la vente : ce qui dit depuis quand le client attend. */
@@ -245,7 +258,7 @@ export function cartesAConfier(
       if (!carte || !carteConfiable(carte)) return [];
       return [
         {
-          venteId: dossier.venteId,
+          dossierId: dossier.venteId,
           numero: dossier.numero,
           client: nomDuClient(dossier.clientId),
           date: dossier.date,
@@ -260,7 +273,7 @@ export function cartesAConfier(
 
 /** Une carte dans un départ, avec ce qu'on sait de son retour. */
 export type CartePartie = {
-  venteId: string;
+  dossierId: string;
   numero: string;
   client: string;
   /**
@@ -324,6 +337,14 @@ export type Depart = {
  * **Du plus récent d'abord, à l'inverse de la file des dossiers.** Une file se
  * vide par le bas — le plus vieux d'abord ; un historique se lit par le haut,
  * on y cherche ce qui vient de se passer.
+ *
+ * **Limite à connaître depuis S59.** Les identifiants d'un paquet sont des
+ * identifiants de dossier, mais cette fonction les cherche encore parmi les
+ * documents des ventes. Tant que le dépôt écrit sous la vente, les deux sont le
+ * même, et tout est juste. Le jour où un dossier venu du dehors entrera dans un
+ * paquet, il faudra lire `dossiersCarteGrise` — sinon il paraîtrait revenu
+ * alors que personne ne l'a vu rentrer. C'est le lot 3, et il est nommé ici
+ * pour qu'on ne le découvre pas à l'écran.
  */
 export function historiqueDesDeparts(
   paquets: readonly PaquetCartesGrises[],
@@ -337,14 +358,14 @@ export function historiqueDesDeparts(
     documents.filter((document) => document.type === "carte_grise").map((d) => [d.venteId, d]),
   );
 
-  const decrireCarte = (venteId: string): CartePartie => {
-    const { numero, client } = decrire(venteId);
+  const decrireCarte = (dossierId: string): CartePartie => {
+    const { numero, client } = decrire(dossierId);
     return {
-      venteId,
+      dossierId,
       numero,
       client,
-      revenueLe: retours.get(venteId) ?? null,
-      dehors: cartes.get(venteId)?.statut === "chez_prestataire",
+      revenueLe: retours.get(dossierId) ?? null,
+      dehors: cartes.get(dossierId)?.statut === "chez_prestataire",
     };
   };
 
@@ -354,9 +375,9 @@ export function historiqueDesDeparts(
     deposeLe: Date | null,
     disponibleLe: Date | null,
     avance: number,
-    venteIds: readonly string[],
+    dossierIds: readonly string[],
   ): Depart => {
-    const lignes = venteIds.map(decrireCarte);
+    const lignes = dossierIds.map(decrireCarte);
     const dehors = lignes.filter((ligne) => ligne.dehors).length;
     /* Le retour du départ est celui de sa dernière carte. Tant qu'il en reste
        dehors, il n'y a pas de retour à annoncer. */
@@ -386,7 +407,7 @@ export function historiqueDesDeparts(
       paquet.deposeLe,
       paquet.disponibleLe,
       paquet.avance,
-      paquet.venteIds,
+      paquet.dossierIds,
     ),
   );
 
@@ -395,7 +416,7 @@ export function historiqueDesDeparts(
      d'avant le lot et ne peuvent pas lire un paquet créé dans le même lot.
      Sans cette exclusion, chaque carte d'un paquet de dix ferait une onzième
      ligne à elle seule, et l'avance paraîtrait versée deux fois. */
-  const enPaquet = new Set(paquets.flatMap((paquet) => [...paquet.venteIds]));
+  const enPaquet = new Set(paquets.flatMap((paquet) => [...paquet.dossierIds]));
 
   for (const document of cartes.values()) {
     if (enPaquet.has(document.venteId)) continue;

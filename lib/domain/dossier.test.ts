@@ -299,7 +299,6 @@ describe("validerDepot", () => {
     prestataireNom: "Kaboré Plaques",
     deposeLe: "2026-09-03",
     avance: "15000",
-    moyenPaiement: "especes",
     disponibleLe: "2026-09-10",
     ...partie,
   });

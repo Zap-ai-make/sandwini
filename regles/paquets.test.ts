@@ -61,7 +61,7 @@ const paquet = (partie: Record<string, unknown> = {}) => ({
   deposeLe: new Date("2026-10-15T12:00:00"),
   disponibleLe: null,
   avance: 150_000,
-  venteIds: ["v1", "v2"],
+  dossierIds: ["v1", "v2"],
   ...audit(),
   ...partie,
 });
@@ -123,7 +123,7 @@ describe("le paquet de cartes grises", () => {
   });
 
   it("refuse un paquet sans carte : l’avance partirait sans contrepartie", async () => {
-    await assertFails(addDoc(collection(gerant(), "lotsCartesGrises"), paquet({ venteIds: [] })));
+    await assertFails(addDoc(collection(gerant(), "lotsCartesGrises"), paquet({ dossierIds: [] })));
   });
 
   it("refuse une avance nulle — sans montant, c’est un crédit", async () => {
@@ -161,24 +161,28 @@ describe("le paquet de cartes grises", () => {
  * Le lot exact que `lib/repositories/paquets.ts` envoie.
  *
  * **Les cas ci-dessus valident le document du paquet SEUL.** Or le produit ne
- * l'envoie jamais seul : il part avec les mises à jour des documents, leurs
- * lignes d'historique et la sortie de caisse de l'avance, dans un
- * `writeBatch`. Et un lot est accepté ou refusé **en bloc** — une seule des
- * écritures refusée, et le dépôt entier reste coincé dans la file, sans erreur
- * visible à l'écran puisque l'affichage optimiste a déjà montré le résultat.
+ * l'envoie jamais seul : il part avec les mises à jour des documents et leurs
+ * lignes d'historique, dans un `writeBatch`. Et un lot est accepté ou refusé
+ * **en bloc** — une seule des écritures refusée, et le dépôt entier reste
+ * coincé dans la file, sans erreur visible à l'écran puisque l'affichage
+ * optimiste a déjà montré le résultat.
+ *
+ * **Plus de sortie de caisse dans ce lot depuis le 21 octobre 2026.** C'est
+ * l'arbitrage du commanditaire : « pas de caisse pour carte grise ». Que ces
+ * tests passent sans elle prouve que la base ne l'exige nulle part.
  *
  * C'est exactement la panne trouvée en S30 sur le dépôt unitaire, et la raison
  * pour laquelle elle est retestée ici sur la forme groupée.
  */
 describe("le lot complet du dépôt groupé", () => {
-  const depot = (base: ReturnType<typeof gerant>, venteIds: readonly string[]) => {
+  const depot = (base: ReturnType<typeof gerant>, dossierIds: readonly string[]) => {
     const lot = writeBatch(base);
     const reference = doc(collection(base, "lotsCartesGrises"));
     const depose = new Date("2026-10-15T12:00:00");
 
-    lot.set(reference, paquet({ venteIds: [...venteIds] }));
+    lot.set(reference, paquet({ dossierIds: [...dossierIds] }));
 
-    for (const venteId of venteIds) {
+    for (const venteId of dossierIds) {
       const cible = doc(base, `ventesMotos/${venteId}/documents/carte_grise`);
       lot.update(cible, {
         statut: "chez_prestataire",
@@ -205,28 +209,26 @@ describe("le lot complet du dépôt groupé", () => {
     return { lot, reference };
   };
 
-  const sortie = (montant: number, refId: string, nombre: number) => ({
-    boutiqueId: "PTG",
-    date: new Date("2026-10-15T12:00:00"),
-    sens: "sortie",
-    montant,
-    moyenPaiement: "especes",
-    origine: "avance_prestataire",
-    origineRefId: refId,
-    libelle: `Avance Ouédraogo Plaques — ${nombre} cartes grises`,
-    categorieTranches: false,
-    ...audit(),
-  });
-
-  it("passe : le paquet, les deux documents, leurs historiques et une seule sortie de caisse", async () => {
+  it("passe : le paquet, les deux documents et leurs historiques", async () => {
     const base = gerant();
-    const { lot, reference } = depot(base, ["v1", "v2"]);
-    lot.set(doc(collection(base, "encaissements")), sortie(150_000, reference.id, 2));
+    const { lot } = depot(base, ["v1", "v2"]);
     await assertSucceeds(lot.commit());
   });
 
+  it("refuse un paquet qui porte encore l’ancien nom de champ", async () => {
+    /* `venteIds` n'est plus accepte a la creation. Un paquet ne se modifiant
+       jamais, les documents deja ecrits ne repassent pas par cette regle : la
+       bascule ne demande donc aucune migration. */
+    const base = gerant();
+    const lot = writeBatch(base);
+    const ancien: Record<string, unknown> = { ...paquet(), venteIds: ["v1", "v2"] };
+    delete ancien.dossierIds;
+    lot.set(doc(collection(base, "lotsCartesGrises")), ancien);
+    await assertFails(lot.commit());
+  });
+
   /* **La preuve d'atomicité, et ce qu'elle peut prouver.** Les règles Firestore
-     ne savent pas joindre : aucune ne peut vérifier que les `venteIds` du
+     ne savent pas joindre : aucune ne peut vérifier que les `dossierIds` du
      paquet correspondent aux documents mis à jour dans le même lot. Ce que la
      base garantit, et qui suffit, c'est qu'un lot est accepté ou refusé **en
      bloc** — donc qu'une seule écriture fautive empêche le paquet d'exister.
@@ -237,10 +239,17 @@ describe("le lot complet du dépôt groupé", () => {
   it("ne laisse aucun paquet derrière lui quand une écriture du lot est refusée", async () => {
     const base = gerant();
     const { lot, reference } = depot(base, ["v1"]);
-    /* La trace mensongère est l'écriture fautive : `traceCreation` exige que
-       `createdBy` soit le compte qui écrit. */
-    lot.set(doc(collection(base, "encaissements")), {
-      ...sortie(150_000, reference.id, 1),
+    /* L'écriture fautive est une ligne d'historique à la trace mensongère :
+       `traceCreation` exige que `createdBy` soit le compte qui écrit. Elle a
+       remplacé la sortie de caisse, qui ne fait plus partie du lot. */
+    lot.set(doc(base, "ventesMotos/v1/documents/carte_grise/historique/menteuse"), {
+      boutiqueId: "PTG",
+      venteId: "v1",
+      type: "carte_grise",
+      de: "a_faire",
+      vers: "chez_prestataire",
+      le: new Date("2026-10-15T12:00:00"),
+      ...audit(),
       createdBy: "quelqu-un-dautre",
     });
     await assertFails(lot.commit());
@@ -269,8 +278,7 @@ describe("le lot complet du dépôt groupé", () => {
     });
 
     const base = gerant();
-    const { lot, reference } = depot(base, ["v1", "v2"]);
-    lot.set(doc(collection(base, "encaissements")), sortie(150_000, reference.id, 2));
+    const { lot } = depot(base, ["v1", "v2"]);
     await assertFails(lot.commit());
   });
 });

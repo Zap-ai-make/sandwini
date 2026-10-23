@@ -93,9 +93,9 @@ export function PaquetsEnCours({
 
             {deplie === paquet.id && (
               <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                {paquet.venteIds.map((venteId) => (
-                  <li key={venteId} className="plaque-code text-legende text-encre-doux">
-                    {numeroDe(venteId)}
+                {paquet.dossierIds.map((dossierId) => (
+                  <li key={dossierId} className="plaque-code text-legende text-encre-doux">
+                    {numeroDe(dossierId)}
                   </li>
                 ))}
               </ul>

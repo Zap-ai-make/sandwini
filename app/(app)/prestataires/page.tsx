@@ -126,8 +126,8 @@ function Prestataires() {
           ouvrir une modale dont l'enregistrement serait refusé à la fin. */}
       {boutiqueId === null && (
         <Avis ton="transit" titre="Choisissez une boutique pour confier des cartes grises">
-          Un paquet part d’une boutique et son avance sort de sa caisse. La liste des
-          prestataires, elle, est la même partout.
+          Un paquet part d’une boutique, et c’est sur ses dossiers que l’avance se note. La
+          liste des prestataires, elle, est la même partout.
         </Avis>
       )}
 

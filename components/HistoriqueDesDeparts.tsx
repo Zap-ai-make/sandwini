@@ -116,7 +116,7 @@ export function HistoriqueDesDeparts({
               <ul className="mt-2">
                 {depart.cartes.map((carte) => (
                   <li
-                    key={carte.venteId}
+                    key={carte.dossierId}
                     className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1"
                   >
                     <span className="plaque-code shrink-0 text-legende text-encre">

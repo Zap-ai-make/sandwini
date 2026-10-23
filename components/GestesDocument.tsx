@@ -7,10 +7,7 @@ import { estTypeDocument, type Prestataire } from "@/lib/domain/prestataire";
 import { jourLocal } from "@/lib/domain/format";
 import {
   LIBELLE_DOCUMENT,
-  LIBELLE_MOYEN,
-  MOYENS_PAIEMENT,
   type DocumentDossier,
-  type MoyenPaiement,
   type StatutDocument,
 } from "@/lib/domain/vente";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -179,7 +176,6 @@ function FormulaireDepot({
     prestataireNom: "",
     deposeLe: jourLocal(new Date()),
     avance: "",
-    moyenPaiement: "especes",
     disponibleLe: "",
   });
   const [probleme, setProbleme] = useState<string | null>(null);
@@ -277,30 +273,16 @@ function FormulaireDepot({
                 className="saisie text-lg"
               />
             </Champ>
-            <Champ id={`moyen-${type}`} libelle="Moyen de paiement">
-              <select
-                id={`moyen-${type}`}
-                value={saisie.moyenPaiement}
-                onChange={(evenement) =>
-                  changer({
-                    moyenPaiement: evenement.target.value as MoyenPaiement,
-                  })
-                }
-                className="saisie"
-              >
-                {MOYENS_PAIEMENT.map((moyen) => (
-                  <option key={moyen} value={moyen}>
-                    {LIBELLE_MOYEN[moyen]}
-                  </option>
-                ))}
-              </select>
-            </Champ>
           </div>
 
-          {/* L'avance sort de la caisse au moment du dépôt : le dire ici évite
-              de le découvrir dans le journal de caisse. */}
+          {/* **Le contraire de ce qui était écrit ici jusqu'au 21 octobre 2026.**
+              Le dépôt n'écrit plus en caisse : l'avance se note sur le dossier,
+              et on la retrouve dans l'historique des départs. Le dire est le
+              minimum — qui lisait le journal de caisse pour suivre cet argent
+              doit savoir qu'il n'y est plus. */}
           <p className="mt-2 text-sm text-encre-doux">
-            L’avance est enregistrée comme une sortie de caisse, en même temps que le dépôt.
+            L’avance se note sur le dossier. Elle n’apparaît pas dans le journal de caisse : on la
+            retrouve dans l’historique des départs.
           </p>
 
           <EtatErreur message={probleme} className="mt-3" />

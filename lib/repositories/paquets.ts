@@ -27,18 +27,23 @@ import { traceCreation, traceModification, type Auteur } from "@/lib/repositorie
  * laisserait des cartes dehors sans paquet pour les rassembler, ou un paquet
  * qui promet dix cartes dont trois seraient restées au magasin.
  *
- * **Une seule sortie de caisse, et c'est un critère de la spec.** Dix sorties
- * de 15 000 pour une avance de 150 000 rendraient le journal illisible et
- * feraient croire à dix décisions. L'avance est un geste, elle s'écrit une
- * fois, et son `origineRefId` est le paquet — qui porte le détail des cartes.
+ * **Plus aucune sortie de caisse, et c'est un renversement de S53** (arbitrage
+ * du 21 octobre 2026). Le commanditaire, rapportant son client : « pas de
+ * caisse pour carte grise, et elle est dissociée des autres caisses ; ici ce
+ * sera uniquement pour mettre les montants des avances, pas d'entrée d'argent.
+ * Pas de liaison de comptabilité. »
  *
- * **Pas de `posteId`, et le critère de la spec est quand même tenu.** « Elle se
- * range dans un poste de dépense (S55) » : S55 a prévu ce cas en repliant
- * `libelleDuPoste` sur l'origine quand aucun poste n'est posé, et
- * `avance_prestataire` est l'une de ces origines. L'avance apparaît donc dans
- * le bloc analytique sous son propre nom, sans qu'il faille créer une ligne de
- * référentiel que personne n'a demandée — et sans faire dépendre un dépôt de
- * l'existence d'un poste.
+ * **La conséquence, dite une fois.** L'argent remis à un prestataire cesse
+ * d'apparaître dans le journal de caisse. Qui lit ce journal ne verra plus ces
+ * sorties : il faut ouvrir l'historique des départs pour les retrouver. Le
+ * journal cesse donc d'être le seul endroit où l'argent qui sort est écrit, et
+ * c'est un fait à connaître avant de lire un écart.
+ *
+ * **Et une seule règle, pas deux.** Le dépôt cesse d'écrire en caisse partout,
+ * pas seulement depuis l'espace des cartes grises. Deux comportements selon
+ * l'écran d'où part le geste produiraient deux vérités sur le même billet.
+ *
+ * Les avances déjà écrites en caisse restent : on ne retouche pas un journal.
  *
  * Chaque document garde malgré tout son `prestataireId`, son `deposeLe` et son
  * `avance` : les règles évaluent chaque écriture du lot contre l'état d'avant le
@@ -63,9 +68,12 @@ export function confierPaquet(
 
   /* La sélection de l'écran et les documents passés doivent se recouvrir
      exactement : un identifiant sans document, et le lot écrirait un paquet qui
-     promet une carte que personne ne fait partir. */
-  const parVente = new Map(cartes.map((carte) => [carte.venteId, carte]));
-  const manquante = saisie.venteIds.find((venteId) => !parVente.has(venteId));
+     promet une carte que personne ne fait partir.
+
+     L'identifiant d'un dossier né d'une vente est celui de la vente : c'est ce
+     qui laisse ce rapprochement fonctionner après le renommage de S59. */
+  const parDossier = new Map(cartes.map((carte) => [carte.venteId, carte]));
+  const manquante = saisie.dossierIds.find((dossierId) => !parDossier.has(dossierId));
   if (manquante) {
     return Promise.reject(
       new Error("La sélection a changé pendant la saisie. Rouvrez l’écran des dossiers."),
@@ -87,7 +95,7 @@ export function confierPaquet(
     deposeLe: depose,
     disponibleLe: disponible ? Timestamp.fromDate(disponible) : null,
     avance: montant,
-    venteIds: [...saisie.venteIds],
+    dossierIds: [...saisie.dossierIds],
     ...traceCreation(auteur),
   });
 
@@ -95,13 +103,13 @@ export function confierPaquet(
      laisserait un reste, et la somme des documents ne retomberait pas sur
      l'avance du paquet. Le reste va à la première carte, qui est aussi celle
      qu'on lit en premier. */
-  const nombre = saisie.venteIds.length;
+  const nombre = saisie.dossierIds.length;
   const part = Math.floor(montant / nombre);
   const reste = montant - part * nombre;
 
-  saisie.venteIds.forEach((venteId, rang) => {
-    const carte = parVente.get(venteId) as DocumentDossier;
-    const cible = doc(db(), "ventesMotos", venteId, "documents", "carte_grise");
+  saisie.dossierIds.forEach((dossierId, rang) => {
+    const carte = parDossier.get(dossierId) as DocumentDossier;
+    const cible = doc(db(), "ventesMotos", carte.venteId, "documents", "carte_grise");
 
     lot.update(cible, {
       statut: "chez_prestataire",
@@ -117,31 +125,13 @@ export function confierPaquet(
        les entrées se lisent dans l'ordre sans tri ni index. */
     lot.set(doc(collection(cible, "historique")), {
       boutiqueId,
-      venteId,
+      venteId: carte.venteId,
       type: "carte_grise",
       de: carte.statut,
       vers: "chez_prestataire",
       le: maintenant,
       ...traceCreation(auteur),
     });
-  });
-
-  lot.set(doc(collection(db(), "encaissements")), {
-    boutiqueId,
-    date: maintenant,
-    sens: "sortie",
-    montant,
-    moyenPaiement: saisie.moyenPaiement,
-    origine: "avance_prestataire",
-    /* Le paquet, et non une vente : c'est lui qui porte le détail des cartes, et
-       un journal de caisse qui renverrait vers une seule des dix ventes
-       mentirait sur ce qui a été payé. */
-    origineRefId: reference.id,
-    libelle: `Avance ${saisie.prestataireNom} — ${nombre} cartes grises`,
-    /* Une sortie de caisse n'est jamais un engagement de tranches : ce drapeau
-       ne concerne que l'argent qui entre. */
-    categorieTranches: false,
-    ...traceCreation(auteur),
   });
 
   return suivreEcriture(lot.commit()).then(() => reference.id);
@@ -185,8 +175,24 @@ function lirePaquet(instantane: QueryDocumentSnapshot<DocumentData>): PaquetCart
     deposeLe: donnees.deposeLe?.toDate?.() ?? null,
     disponibleLe: donnees.disponibleLe?.toDate?.() ?? null,
     avance: typeof donnees.avance === "number" ? donnees.avance : 0,
-    venteIds: Array.isArray(donnees.venteIds)
-      ? donnees.venteIds.filter((valeur: unknown): valeur is string => typeof valeur === "string")
-      : [],
+    dossierIds: lireIdsDuPaquet(donnees),
   };
+}
+
+/**
+ * Les identifiants d'un paquet, sous l'un ou l'autre nom.
+ *
+ * S59 a renommé `venteIds` en `dossierIds` : un dossier venu du dehors n'a pas
+ * de vente. **Les listes déjà écrites restent valides sans migration**, parce
+ * qu'un dossier né d'une vente porte l'identifiant de cette vente — les valeurs
+ * sont les mêmes, seul le nom du champ change. On lit donc les deux, et on
+ * n'écrit que le nouveau.
+ */
+function lireIdsDuPaquet(donnees: DocumentData): string[] {
+  const brut = Array.isArray(donnees.dossierIds)
+    ? donnees.dossierIds
+    : Array.isArray(donnees.venteIds)
+      ? donnees.venteIds
+      : [];
+  return brut.filter((valeur: unknown): valeur is string => typeof valeur === "string");
 }

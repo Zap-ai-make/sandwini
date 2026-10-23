@@ -660,10 +660,10 @@ service cloud.firestore {
     function paquetCartesGrisesValide(donnees) {
       return donnees.keys().hasOnly(['boutiqueId', 'prestataireId', 'prestataireNom',
                                      'deposeLe', 'disponibleLe', 'avance',
-                                     'venteIds'].concat(champsAudit()))
+                                     'dossierIds'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'prestataireId', 'prestataireNom',
                                        'deposeLe', 'disponibleLe', 'avance',
-                                       'venteIds'].concat(champsAudit()))
+                                       'dossierIds'].concat(champsAudit()))
              && donnees.boutiqueId is string
              && donnees.prestataireId is string
              && donnees.prestataireId.size() > 0
@@ -674,14 +674,21 @@ service cloud.firestore {
              // zero n'est pas une avance, c'est un travail confie a credit.
              && montantValide(donnees.avance)
              && donnees.avance > 0
-             && donnees.venteIds is list
-             // Un paquet vide ferait sortir l'avance sans contrepartie.
-             && donnees.venteIds.size() > 0
+             // **`dossierIds` et non plus `venteIds` depuis S59** : un dossier
+             // venu du dehors se confie dans les memes paquets, et il n'a pas de
+             // vente d'ou tirer une cle. Aucune migration : un dossier ne d'une
+             // vente porte l'identifiant de cette vente, donc les listes deja
+             // ecrites sont valides telles quelles. L'ancien nom n'est plus
+             // accepte a la creation — un paquet ne se modifie jamais, donc les
+             // anciens documents ne repassent pas par ici.
+             && donnees.dossierIds is list
+             // Un paquet vide ferait partir des cartes que rien ne rassemble.
+             && donnees.dossierIds.size() > 0
              // La borne redit `CARTES_PAR_PAQUET_MAX` du domaine, et cette
              // repetition est voulue (D27) : le domaine decide de ce qu'il
              // PROPOSE, la base de ce qu'elle ACCEPTE. 249 vient de la limite
              // de 500 ecritures par lot — un paquet en fait `2N + 2`.
-             && donnees.venteIds.size() <= 249;
+             && donnees.dossierIds.size() <= 249;
     }
 
     match /lotsCartesGrises/{paquetId} {

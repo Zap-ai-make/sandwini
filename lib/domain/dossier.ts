@@ -18,7 +18,6 @@ import {
   MONTANT_MAX,
   TYPES_DOCUMENT,
   type DocumentDossier,
-  type MoyenPaiement,
   type PapiersEmportes,
   type StatutDocument,
   type StatutDossier,
@@ -238,8 +237,6 @@ export type SaisieDepot = {
   /** Format de `<input type="date">` : `aaaa-mm-jj`. */
   deposeLe: string;
   avance: string;
-  /** L'avance sort de la caisse : par quel moyen, il faut le dire. */
-  moyenPaiement: MoyenPaiement;
   /** Facultatif. Même format. */
   disponibleLe: string;
 };
