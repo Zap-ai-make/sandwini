@@ -94,9 +94,42 @@ beforeEach(async () => {
         statut: "a_faire",
         ...audit(),
       });
+      /* **La seconde face de la carte** (S59) : depuis que le dossier vit dans
+         sa collection, le dépôt écrit les deux. */
+      await setDoc(doc(base, `dossiersCarteGrise/${venteId}`), dossier({ venteId }));
     }
+    /* Et un dossier venu du dehors, qui n'a pas de vente du tout. */
+    await setDoc(
+      doc(base, "dossiersCarteGrise/dx"),
+      dossier({ boutiqueId: "PTG", venteId: null, origine: "exterieur" }),
+    );
   });
 });
+
+/** Un dossier de carte grise à faire, tel que la vente ou l'écran l'ouvre. */
+function dossier(partie: Record<string, unknown> = {}) {
+  return {
+    boutiqueId: "PTG",
+    venteId: "v1",
+    origine: "vente",
+    clientNom: "Sawadogo Harouna",
+    motoLibelle: "Yamaha SR 115",
+    numeroChassis: "02SY052982",
+    statut: "a_faire",
+    prestataireId: null,
+    prestataireNom: "",
+    deposeLe: null,
+    avance: null,
+    disponibleLe: null,
+    immatriculation: "",
+    revenuLe: null,
+    remisLe: null,
+    remisANom: "",
+    remisATelephone: "",
+    ...audit(),
+    ...partie,
+  };
+}
 
 describe("le paquet de cartes grises", () => {
   it("le gérant confie un paquet dans sa boutique", async () => {
@@ -204,15 +237,101 @@ describe("le lot complet du dépôt groupé", () => {
         le: depose,
         ...audit(),
       });
+
+      /* La seconde face, dans le même lot. N'écrire que l'une laisserait
+         l'autre écran annoncer au magasin une carte déjà partie. */
+      const dossierCible = doc(base, `dossiersCarteGrise/${venteId}`);
+      lot.update(dossierCible, {
+        statut: "chez_prestataire",
+        prestataireId: "p1",
+        prestataireNom: "Ouédraogo Plaques",
+        deposeLe: depose,
+        avance: 75_000,
+        disponibleLe: null,
+        updatedAt: serverTimestamp(),
+        updatedBy: "ger-1",
+        updatedByName: "Gérant",
+      });
+      lot.set(doc(collection(dossierCible, "historique")), {
+        boutiqueId: "PTG",
+        dossierId: venteId,
+        de: "a_faire",
+        vers: "chez_prestataire",
+        le: depose,
+        ...audit(),
+      });
     }
 
     return { lot, reference };
   };
 
-  it("passe : le paquet, les deux documents et leurs historiques", async () => {
+  it("passe : le paquet, les deux documents, les deux dossiers et leurs journaux", async () => {
     const base = gerant();
     const { lot } = depot(base, ["v1", "v2"]);
     await assertSucceeds(lot.commit());
+  });
+
+  it("confie un dossier venu du dehors, qui n’a aucun document", async () => {
+    /* **Le critère que S59 vient chercher.** Sous l'ancien modèle, un tel
+       dossier n'existait pas : il n'y avait pas de vente sous laquelle le
+       ranger, donc rien à faire avancer. Ici le lot ne porte que la face du
+       dossier, et la base l'accepte. */
+    const base = gerant();
+    const lot = writeBatch(base);
+    const reference = doc(collection(base, "lotsCartesGrises"));
+    const depose = new Date("2026-10-15T12:00:00");
+
+    lot.set(reference, paquet({ dossierIds: ["dx"] }));
+    const cible = doc(base, "dossiersCarteGrise/dx");
+    lot.update(cible, {
+      statut: "chez_prestataire",
+      prestataireId: "p1",
+      prestataireNom: "Ouédraogo Plaques",
+      deposeLe: depose,
+      avance: 150_000,
+      disponibleLe: null,
+      updatedAt: serverTimestamp(),
+      updatedBy: "ger-1",
+      updatedByName: "Gérant",
+    });
+    lot.set(doc(collection(cible, "historique")), {
+      boutiqueId: "PTG",
+      dossierId: "dx",
+      de: "a_faire",
+      vers: "chez_prestataire",
+      le: depose,
+      ...audit(),
+    });
+
+    await assertSucceeds(lot.commit());
+  });
+
+  it("échoue si le dossier du lot est déjà chez un prestataire", async () => {
+    /* Le symétrique du test sur les documents : la machine à états du dossier
+       refuse `chez_prestataire` -> `chez_prestataire`, et emporte le paquet. */
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await updateDoc(doc(contexte.firestore(), "dossiersCarteGrise/dx"), {
+        statut: "chez_prestataire",
+        prestataireId: "p1",
+        prestataireNom: "Un autre",
+        deposeLe: new Date("2026-10-01T12:00:00"),
+        avance: 10_000,
+      });
+    });
+
+    const base = gerant();
+    const lot = writeBatch(base);
+    const reference = doc(collection(base, "lotsCartesGrises"));
+
+    lot.set(reference, paquet({ dossierIds: ["dx"] }));
+    lot.update(doc(base, "dossiersCarteGrise/dx"), {
+      statut: "chez_prestataire",
+      updatedAt: serverTimestamp(),
+      updatedBy: "ger-1",
+      updatedByName: "Gérant",
+    });
+
+    await assertFails(lot.commit());
   });
 
   it("accepte encore l’ancien nom de champ, le temps du déploiement", async () => {

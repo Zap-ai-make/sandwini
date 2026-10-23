@@ -147,9 +147,12 @@ export function ConfierPaquetModal({
     setErreur(null);
     setEnvoi(true);
     try {
+      /* Les cartes entières, et non leurs documents : chacune peut avoir deux
+         faces à écrire — l'ancien document et le nouveau dossier — et c'est le
+         dépôt qui sait lesquelles existent (S59). */
       await confierPaquet(
         complete,
-        retenues.map((carte) => carte.document),
+        retenues,
         boutiqueId,
         { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
       );
@@ -366,7 +369,7 @@ function ChoixDesCartes({
                   onChange={(evenement) => basculer(carte.dossierId, evenement.target.checked)}
                   className="size-4 shrink-0 accent-[var(--color-solde)]"
                 />
-                <span className="plaque-code shrink-0 text-corps text-encre">{carte.numero}</span>
+                <span className="plaque-code shrink-0 text-corps text-encre">{carte.repere}</span>
                 <span className="min-w-0 flex-1 truncate text-corps text-encre">
                   {carte.client}
                 </span>

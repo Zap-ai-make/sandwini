@@ -45,6 +45,18 @@ import {
 } from "@/lib/domain/paquet";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterPaquets } from "@/lib/repositories/paquets";
+import type { DossierCarteGrise } from "@/lib/domain/dossier-carte-grise";
+import { ecouterDossiersCarteGrise } from "@/lib/repositories/dossiers-carte-grise";
+
+/**
+ * La liste vide, **partagée par tous les rendus**.
+ *
+ * Un `?? []` écrit dans un `useMemo` fabrique un tableau neuf à chaque rendu :
+ * le compilateur React n'arrive plus à préserver la mémoïsation manuelle du
+ * composant, et le signale en **erreur** de compilation. Une constante de
+ * module a la même identité à chaque fois, et le problème disparaît.
+ */
+const AUCUN_DOSSIER: DossierCarteGrise[] = [];
 import { ecouterDossiers, ecouterRetoursCartes, ecouterVentes } from "@/lib/repositories/ventes";
 
 /**
@@ -160,6 +172,29 @@ export default function PageDossiers() {
     "L’état des dossiers n’a pas pu être lu.",
   );
 
+  /**
+   * Les dossiers de la nouvelle collection (S59).
+   *
+   * **Cet écran continue de lire les documents des ventes**, qui portent tout
+   * l'existant. Cette seconde lecture ne sert pas à l'affichage : elle donne au
+   * dépôt la seconde face des cartes, celle qu'il doit écrire pour que l'écran
+   * des cartes grises ne continue pas d'annoncer au magasin une carte partie.
+   *
+   * Un échec ne bloque rien ici : la liste reste juste, et seul l'écran d'à
+   * côté serait en retard — ce qui vaut mieux qu'un écran de dossiers qui
+   * refuse de s'ouvrir.
+   */
+  const souscrireCartesGrises = useCallback(
+    (auChangement: (dossiers: DossierCarteGrise[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterDossiersCarteGrise(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
+  );
+  const { valeur: dossiersCG } = useAbonnement(
+    souscrireCartesGrises,
+    "Les dossiers de carte grise n’ont pas pu être lus.",
+  );
+
+
   const parClient = useMemo(() => new Map(clients.map((client) => [client.id, client])), [clients]);
 
   /* **La sélection est un ensemble d'identifiants de VENTE**, pas de documents :
@@ -180,7 +215,10 @@ export default function PageDossiers() {
       else suivantes.delete(venteId);
       return suivantes;
     });
-  }, []);
+    /* `setChoisies` est stable, mais le compilateur React l'infère comme
+       dépendance et refuse une liste qui ne la cite pas. Le dire ne change
+       rien à l'exécution, et lui rend la mémoïsation du composant. */
+  }, [setChoisies]);
 
   /* Ce qui peut partir, calculé UNE fois par `cartesConfiables` plutôt que relu
      case par case : c'est elle qui porte la règle — une carte déjà dehors n'y
@@ -191,21 +229,35 @@ export default function PageDossiers() {
     [documents],
   );
 
-  /* La date du jour est figée au rendu : recalculée à chaque ligne, deux
-     documents de la même liste pourraient être jugés à des instants
-     différents. */
-  const dossiers = useMemo(
-    () => dossiersEnAttente(ventes ?? [], documents ?? [], motos ?? [], { etat }, new Date()),
-    [ventes, documents, motos, etat],
+  /**
+   * La date du jour, prise **une fois par rendu**.
+   *
+   * Recalculée à chaque ligne, deux documents de la même liste pourraient être
+   * jugés à des instants différents.
+   *
+   * **Et le calcul n'est plus mémoïsé à la main.** Il l'était, avec un
+   * `new Date()` dans le corps du `useMemo` : la mémo promettait alors une
+   * stabilité qu'elle n'avait pas, et le compilateur React refusait de
+   * l'honorer — il abandonnait l'optimisation du composant entier, en silence
+   * jusqu'à ce qu'une règle de lint le dise. Le compilateur mémoïse
+   * lui-même ce qui peut l'être ; mentir sur la pureté d'un corps de mémo
+   * l'empêchait de travailler.
+   */
+  const maintenant = new Date();
+  const dossiers = dossiersEnAttente(
+    ventes ?? [],
+    documents ?? [],
+    motos ?? [],
+    { etat },
+    maintenant,
   );
 
   /* **Tout ce qui peut partir, pas seulement ce qui est coché.** La modale
      laisse corriger la sélection sans fermer, ce qui demande qu'elle ait la
      liste entière sous la main — et c'est la même liste que celle montée
      depuis la fiche d'un prestataire, par la même fonction. */
-  const aConfier = useMemo(
-    () => cartesAConfier(dossiers, (clientId) => nomDuClient(parClient.get(clientId))),
-    [dossiers, parClient],
+  const aConfier = cartesAConfier(dossiers, dossiersCG ?? AUCUN_DOSSIER, (clientId) =>
+    nomDuClient(parClient.get(clientId)),
   );
 
   /* L'historique se nourrit des paquets ET des documents : une carte confiée
@@ -223,6 +275,7 @@ export default function PageDossiers() {
     return historiqueDesDeparts(
       paquets,
       documents,
+      dossiersCG ?? AUCUN_DOSSIER,
       retours ?? new Map(),
       (venteId) => ({
         numero: ventes?.find((vente) => vente.id === venteId)?.numero ?? venteId,
@@ -232,7 +285,7 @@ export default function PageDossiers() {
       }),
       new Date(),
     );
-  }, [paquets, documents, retours, erreurRetours, ventes, parClient]);
+  }, [paquets, documents, dossiersCG, retours, erreurRetours, ventes, parClient]);
 
   const resultats = useMemo(
     () =>

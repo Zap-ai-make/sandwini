@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { DocumentDossier, StatutDocument } from "./vente";
 import type { DossierEnAttente } from "./dossier";
+import type { DossierCarteGrise } from "./dossier-carte-grise";
 import {
   CARTES_PAR_PAQUET_MAX,
   cartesAConfier,
@@ -236,6 +237,7 @@ describe("cartesAConfier", () => {
         dossier("v3", "revenu_magasin", new Date(2026, 8, 3)),
         dossier("v4", "non_applicable", new Date(2026, 8, 4)),
       ],
+      [],
       nomDe,
     );
     expect(liste.map((carte) => carte.dossierId)).toEqual(["v1"]);
@@ -244,7 +246,11 @@ describe("cartesAConfier", () => {
   it("ignore un dossier dont le document n’est pas encore parvenu", () => {
     /* `null` ne veut pas dire « à faire » : on ne sait pas encore. Le proposer
        ferait monter un lot qui mettrait à jour un document inexistant. */
-    expect(cartesAConfier([dossier("v1", null, new Date())], nomDe)).toEqual([]);
+    expect(cartesAConfier(
+      [dossier("v1", null, new Date())],
+      [],
+      nomDe,
+    )).toEqual([]);
   });
 
   it("met le plus ancien en tête, comme la file des dossiers", () => {
@@ -255,16 +261,21 @@ describe("cartesAConfier", () => {
         dossier("recent", "a_faire", new Date(2026, 9, 10)),
         dossier("ancien", "a_faire", new Date(2026, 5, 2)),
       ],
+      [],
       nomDe,
     );
     expect(liste.map((carte) => carte.dossierId)).toEqual(["ancien", "recent"]);
   });
 
   it("porte de quoi reconnaître le dossier sans ouvrir la vente", () => {
-    const [carte] = cartesAConfier([dossier("v1", "a_faire", new Date(2026, 8, 1))], nomDe);
-    expect(carte.numero).toBe("V1");
+    const [carte] = cartesAConfier(
+      [dossier("v1", "a_faire", new Date(2026, 8, 1))],
+      [],
+      nomDe,
+    );
+    expect(carte.repere).toBe("V1");
     expect(carte.client).toBe("Client c-v1");
-    expect(carte.document.venteId).toBe("v1");
+    expect(carte.document?.venteId).toBe("v1");
   });
 });
 
@@ -302,7 +313,7 @@ describe("les deux portes d’un même dépôt", () => {
         }) as unknown as DossierEnAttente,
     );
 
-    expect(cartesAConfier(dossiers, () => "Client").map((carte) => carte.dossierId)).toEqual(
+    expect(cartesAConfier(dossiers, [], () => "Client").map((carte) => carte.dossierId)).toEqual(
       cartesConfiables(documents).map((document) => document.venteId),
     );
   });
@@ -356,6 +367,7 @@ describe("historiqueDesDeparts", () => {
     const departs = historiqueDesDeparts(
       [paquet("lot1", ["v1", "v2"])],
       [carte("v1", "revenu_magasin"), carte("v2", "revenu_magasin")],
+      [],
       new Map([
         ["v1", LE_10],
         ["v2", LE_12],
@@ -378,6 +390,7 @@ describe("historiqueDesDeparts", () => {
     const departs = historiqueDesDeparts(
       [paquet("lot1", ["v1", "v2"])],
       [carte("v1", "revenu_magasin"), carte("v2", "chez_prestataire")],
+      [],
       new Map([["v1", LE_10]]),
       decrire,
       AUJOURDHUI,
@@ -392,6 +405,7 @@ describe("historiqueDesDeparts", () => {
     const enRetard = historiqueDesDeparts(
       [paquet("lot1", ["v1"], { disponibleLe: new Date(2026, 8, 15) })],
       [carte("v1", "chez_prestataire")],
+      [],
       new Map(),
       decrire,
       AUJOURDHUI,
@@ -403,6 +417,7 @@ describe("historiqueDesDeparts", () => {
     const rendu = historiqueDesDeparts(
       [paquet("lot1", ["v1"], { disponibleLe: new Date(2026, 8, 15) })],
       [carte("v1", "revenu_magasin")],
+      [],
       new Map([["v1", LE_12]]),
       decrire,
       AUJOURDHUI,
@@ -423,6 +438,7 @@ describe("historiqueDesDeparts", () => {
           avance: 20_000,
         }),
       ],
+      [],
       new Map(),
       decrire,
       AUJOURDHUI,
@@ -447,6 +463,7 @@ describe("historiqueDesDeparts", () => {
           avance: 150_000,
         }),
       ],
+      [],
       new Map(),
       decrire,
       AUJOURDHUI,
@@ -455,18 +472,214 @@ describe("historiqueDesDeparts", () => {
   });
 
   it("ignore une carte qui n’est jamais partie", () => {
-    expect(historiqueDesDeparts([], [carte("v1", "a_faire")], new Map(), decrire, AUJOURDHUI))
-      .toEqual([]);
+    expect(
+      historiqueDesDeparts([], [carte("v1", "a_faire")], [], new Map(), decrire, AUJOURDHUI),
+    ).toEqual([]);
   });
 
   it("met le départ le plus récent en tête : c’est un historique, pas une file", () => {
     const departs = historiqueDesDeparts(
       [paquet("vieux", ["v1"], { deposeLe: LE_1ER }), paquet("neuf", ["v2"], { deposeLe: LE_12 })],
       [carte("v1", "chez_prestataire"), carte("v2", "chez_prestataire")],
+      [],
       new Map(),
       decrire,
       AUJOURDHUI,
     );
     expect(departs.map((depart) => depart.cle)).toEqual(["neuf", "vieux"]);
+  });
+});
+
+/**
+ * Le dossier venu du dehors entre dans les mêmes paquets (S59).
+ *
+ * **Les deux sources sont disjointes, et c'est ce qui rend l'union sûre** : une
+ * carte née d'une vente vient des documents, un dossier du dehors de la
+ * nouvelle collection. Aucune ne figure dans les deux.
+ */
+describe("confier un dossier venu du dehors", () => {
+  const cg = (partie: Partial<DossierCarteGrise>): DossierCarteGrise =>
+    ({
+      id: "dx",
+      boutiqueId: "CGP",
+      venteId: null,
+      origine: "exterieur",
+      clientNom: "Sana Harouna",
+      motoLibelle: "GEAR",
+      numeroChassis: "4140RY029597",
+      statut: "a_faire",
+      prestataireId: null,
+      prestataireNom: "",
+      deposeLe: null,
+      avance: null,
+      disponibleLe: null,
+      immatriculation: "",
+      revenuLe: null,
+      remisLe: null,
+      remisANom: "",
+      remisATelephone: "",
+      ...partie,
+    }) as DossierCarteGrise;
+
+  const vendu = (venteId: string, statut: StatutDocument, date: Date): DossierEnAttente =>
+    ({
+      venteId,
+      numero: venteId.toUpperCase(),
+      clientId: `c-${venteId}`,
+      date,
+      documents: {
+        quittance: null,
+        cmc: null,
+        carte_grise: { venteId, type: "carte_grise", statut } as unknown as DocumentDossier,
+      },
+    }) as unknown as DossierEnAttente;
+
+  it("le propose, alors qu’il n’a aucune vente", () => {
+    /* La raison d'être de la collection : sous l'ancien modèle, un tel dossier
+       n'existait pas, donc il ne pouvait pas être confié. */
+    const liste = cartesAConfier([], [cg({})], () => "ignoré");
+    expect(liste.map((carte) => carte.dossierId)).toEqual(["dx"]);
+    expect(liste[0].document).toBeNull();
+    expect(liste[0].dossier).not.toBeNull();
+  });
+
+  it("le désigne par son châssis, faute de numéro de vente", () => {
+    const [carte] = cartesAConfier([], [cg({})], () => "ignoré");
+    expect(carte.repere).toBe("4140RY029597");
+    expect(carte.client).toBe("Sana Harouna");
+  });
+
+  it("ne le propose plus une fois qu’il est parti", () => {
+    /* Son état ne se lit que sur lui-même : il n'a pas de document pour le
+       dire. Le proposer deux fois ferait verser deux avances pour le même
+       travail. */
+    expect(cartesAConfier([], [cg({ statut: "chez_prestataire" })], () => "x")).toEqual([]);
+    expect(cartesAConfier([], [cg({ statut: "remis" })], () => "x")).toEqual([]);
+  });
+
+  it("attache la seconde face d’une carte née d’une vente", () => {
+    /* **Sans elle, le dépôt n'écrirait que l'ancien document**, et l'écran des
+       cartes grises annoncerait au magasin une carte déjà partie. */
+    const [carte] = cartesAConfier(
+      [vendu("v1", "a_faire", new Date(2026, 8, 1))],
+      [cg({ id: "v1", venteId: "v1", origine: "vente" })],
+      () => "Client",
+    );
+    expect(carte.document).not.toBeNull();
+    expect(carte.dossier?.id).toBe("v1");
+  });
+
+  it("laisse la carte sans dossier passer quand même", () => {
+    /* Tout l'existant est dans ce cas tant que la migration n'a pas tourné :
+       lui refuser le dépôt aurait arrêté le comptoir. */
+    const [carte] = cartesAConfier([vendu("v9", "a_faire", new Date(2026, 8, 1))], [], () => "C");
+    expect(carte.dossier).toBeNull();
+    expect(carte.document).not.toBeNull();
+  });
+
+  it("met les sans-date derrière, pas devant", () => {
+    /* Un dossier du dehors vient d'être ouvert : il n'a pas d'ancienneté à
+       faire valoir, et le mettre en tête repousserait ceux qui attendent
+       depuis des mois. */
+    const liste = cartesAConfier(
+      [vendu("v1", "a_faire", new Date(2026, 8, 1))],
+      [cg({})],
+      () => "Client",
+    );
+    expect(liste.map((carte) => carte.dossierId)).toEqual(["v1", "dx"]);
+  });
+});
+
+describe("l’historique lit la face qui existe", () => {
+  const AUJOURDHUI_CG = new Date(2026, 9, 20);
+  const dehors = (partie: Partial<DossierCarteGrise> = {}): DossierCarteGrise =>
+    ({
+      id: "dx",
+      boutiqueId: "CGP",
+      venteId: null,
+      origine: "exterieur",
+      clientNom: "Sana Harouna",
+      motoLibelle: "GEAR",
+      numeroChassis: "4140RY029597",
+      statut: "chez_prestataire",
+      prestataireId: "p1",
+      prestataireNom: "Bohary",
+      deposeLe: new Date(2026, 7, 18),
+      avance: 50_000,
+      disponibleLe: null,
+      immatriculation: "",
+      revenuLe: null,
+      remisLe: null,
+      remisANom: "",
+      remisATelephone: "",
+      ...partie,
+    }) as DossierCarteGrise;
+
+  const paquetDx = (): PaquetCartesGrises =>
+    ({
+      id: "lotx",
+      boutiqueId: "CGP",
+      prestataireId: "p1",
+      prestataireNom: "Bohary",
+      deposeLe: new Date(2026, 7, 18),
+      disponibleLe: null,
+      avance: 50_000,
+      dossierIds: ["dx"],
+    }) as PaquetCartesGrises;
+
+  it("compte dehors un dossier du dehors, au lieu de le croire revenu", () => {
+    /* **Le défaut que ce test empêche, et il était silencieux.** Un dossier du
+       dehors n'a pas de document : l'ancienne version ne trouvait rien, en
+       déduisait « pas chez le prestataire », et soldait le départ. */
+    const [depart] = historiqueDesDeparts(
+      [paquetDx()],
+      [],
+      [dehors()],
+      new Map(),
+      (id) => ({ numero: id, client: "" }),
+      AUJOURDHUI_CG,
+    );
+    expect(depart.dehors).toBe(1);
+    expect(depart.soldeLe).toBeNull();
+    expect(depart.cartes[0].client).toBe("Sana Harouna");
+    expect(depart.cartes[0].numero).toBe("4140RY029597");
+  });
+
+  it("lit sa date de retour sur le dossier, pas dans le journal", () => {
+    /* `revenuLe` est écrit sur le dossier depuis S59 : un dossier du dehors n'a
+       pas de journal de document où la chercher. */
+    const [depart] = historiqueDesDeparts(
+      [paquetDx()],
+      [],
+      [dehors({ statut: "revenu_magasin", revenuLe: new Date(2026, 8, 12) })],
+      new Map(),
+      (id) => ({ numero: id, client: "" }),
+      AUJOURDHUI_CG,
+    );
+    expect(depart.dehors).toBe(0);
+    expect(depart.soldeLe).toEqual(new Date(2026, 8, 12));
+  });
+
+  it("n’oublie pas un dossier du dehors confié sans paquet", () => {
+    const departs = historiqueDesDeparts(
+      [],
+      [],
+      [dehors()],
+      new Map(),
+      (id) => ({ numero: id, client: "" }),
+      AUJOURDHUI_CG,
+    );
+    expect(departs.map((depart) => depart.cle)).toEqual(["carte:dx"]);
+    expect(departs[0].avance).toBe(50_000);
+  });
+});
+
+describe("la borne d’un paquet", () => {
+  it("vaut 124, parce qu’une carte demande maintenant quatre écritures", () => {
+    /* `4N + 1 <= 500` : le paquet, puis par carte l'ancien document et son
+       historique, le nouveau dossier et son journal. Elle était de 249 quand
+       une carte n'en demandait que deux. */
+    expect(CARTES_PAR_PAQUET_MAX).toBe(124);
+    expect(4 * CARTES_PAR_PAQUET_MAX + 1).toBeLessThanOrEqual(500);
   });
 });

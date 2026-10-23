@@ -12,8 +12,13 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 import { lireJour } from "@/lib/domain/dossier";
-import { validerPaquet, type PaquetCartesGrises, type SaisiePaquet } from "@/lib/domain/paquet";
-import { lireMontant, type DocumentDossier } from "@/lib/domain/vente";
+import {
+  validerPaquet,
+  type CarteAConfier,
+  type PaquetCartesGrises,
+  type SaisiePaquet,
+} from "@/lib/domain/paquet";
+import { lireMontant } from "@/lib/domain/vente";
 import { db } from "@/lib/firebase/client";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { traceCreation, traceModification, type Auteur } from "@/lib/repositories/referentiels";
@@ -51,6 +56,16 @@ import { traceCreation, traceModification, type Auteur } from "@/lib/repositorie
  * `depotRenseigne` qui l'exige, mot pour mot, et les écrans de dossier existants
  * continuent de lire ces champs sans rien savoir du paquet.
  *
+ * **Chaque carte a jusqu'à deux faces, et le dépôt écrit celles qui existent**
+ * (S59). Le document sous la vente pour les écrans d'avant la bascule, le
+ * dossier de la nouvelle collection pour celle qui traite les papiers. N'en
+ * écrire qu'une laisserait l'autre écran annoncer une carte au magasin pendant
+ * qu'elle est chez le prestataire. Une carte venue du dehors n'a pas de
+ * document — c'est la raison d'être de la collection — et une carte d'avant la
+ * migration n'a pas encore de dossier : d'où les deux conditions, et non une
+ * écriture inconditionnelle qui ferait échouer le lot entier sur un document
+ * absent.
+ *
  * **L'avance est répartie, pas répétée.** Chaque document porte sa part — le
  * total divisé par le nombre de cartes — afin que la somme des avances des
  * documents reste égale à l'avance du paquet. Sans cela, dix documents à
@@ -59,7 +74,7 @@ import { traceCreation, traceModification, type Auteur } from "@/lib/repositorie
  */
 export function confierPaquet(
   saisie: SaisiePaquet,
-  cartes: readonly DocumentDossier[],
+  cartes: readonly CarteAConfier[],
   boutiqueId: string,
   auteur: Auteur,
 ): Promise<string> {
@@ -72,7 +87,7 @@ export function confierPaquet(
 
      L'identifiant d'un dossier né d'une vente est celui de la vente : c'est ce
      qui laisse ce rapprochement fonctionner après le renommage de S59. */
-  const parDossier = new Map(cartes.map((carte) => [carte.venteId, carte]));
+  const parDossier = new Map(cartes.map((carte) => [carte.dossierId, carte]));
   const manquante = saisie.dossierIds.find((dossierId) => !parDossier.has(dossierId));
   if (manquante) {
     return Promise.reject(
@@ -108,30 +123,46 @@ export function confierPaquet(
   const reste = montant - part * nombre;
 
   saisie.dossierIds.forEach((dossierId, rang) => {
-    const carte = parDossier.get(dossierId) as DocumentDossier;
-    const cible = doc(db(), "ventesMotos", carte.venteId, "documents", "carte_grise");
-
-    lot.update(cible, {
-      statut: "chez_prestataire",
+    const carte = parDossier.get(dossierId) as CarteAConfier;
+    const depot = {
+      statut: "chez_prestataire" as const,
       prestataireId: saisie.prestataireId,
       prestataireNom: saisie.prestataireNom,
       deposeLe: depose,
       avance: rang === 0 ? part + reste : part,
       disponibleLe: disponible ? Timestamp.fromDate(disponible) : null,
-      ...traceModification(auteur),
-    });
+    };
 
-    /* L'identifiant porte l'horodatage du serveur, comme au dépôt unitaire :
-       les entrées se lisent dans l'ordre sans tri ni index. */
-    lot.set(doc(collection(cible, "historique")), {
-      boutiqueId,
-      venteId: carte.venteId,
-      type: "carte_grise",
-      de: carte.statut,
-      vers: "chez_prestataire",
-      le: maintenant,
-      ...traceCreation(auteur),
-    });
+    if (carte.document) {
+      const cible = doc(db(), "ventesMotos", carte.document.venteId, "documents", "carte_grise");
+      lot.update(cible, { ...depot, ...traceModification(auteur) });
+
+      /* L'identifiant porte l'horodatage du serveur, comme au dépôt unitaire :
+         les entrées se lisent dans l'ordre sans tri ni index. */
+      lot.set(doc(collection(cible, "historique")), {
+        boutiqueId,
+        venteId: carte.document.venteId,
+        type: "carte_grise",
+        de: carte.document.statut,
+        vers: "chez_prestataire",
+        le: maintenant,
+        ...traceCreation(auteur),
+      });
+    }
+
+    if (carte.dossier) {
+      const cible = doc(db(), "dossiersCarteGrise", carte.dossier.id);
+      lot.update(cible, { ...depot, ...traceModification(auteur) });
+
+      lot.set(doc(collection(cible, "historique")), {
+        boutiqueId: carte.dossier.boutiqueId,
+        dossierId: carte.dossier.id,
+        de: carte.dossier.statut,
+        vers: "chez_prestataire",
+        le: maintenant,
+        ...traceCreation(auteur),
+      });
+    }
   });
 
   return suivreEcriture(lot.commit()).then(() => reference.id);

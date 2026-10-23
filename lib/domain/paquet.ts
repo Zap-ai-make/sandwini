@@ -14,22 +14,30 @@
  */
 
 import { estEnRetard, joursEcoules, lireJour, type DossierEnAttente } from "./dossier";
+import { type DossierCarteGrise } from "./dossier-carte-grise";
 import { lireMontant, MONTANT_MAX, type DocumentDossier } from "./vente";
 
 /**
  * Le nombre de cartes qu'un paquet peut porter.
  *
  * **La borne vient du calcul, pas du confort.** Un lot Firestore accepte 500
- * écritures. Un paquet en fait `2N + 2` : le document du paquet, puis par carte
- * une mise à jour du document et une ligne d'historique, plus l'encaissement
- * unique de l'avance. `2N + 2 <= 500` donne `N <= 249`.
+ * écritures. Un paquet en fait au pire `4N + 1` : le document du paquet, puis
+ * par carte la mise à jour du document sous la vente et sa ligne d'historique,
+ * plus celles du dossier dans sa collection. `4N + 1 <= 500` donne `N <= 124`.
+ *
+ * **Elle était de 249, et elle a baissé** (S59). Le dépôt écrivait `2N + 2` :
+ * deux écritures par carte, plus la sortie de caisse. Celle-ci a disparu avec
+ * l'arbitrage du 21 octobre, mais chaque carte en demande maintenant deux de
+ * plus — l'ancien document pour les écrans d'avant la bascule, le nouveau
+ * dossier pour celle qui traite les papiers. Les deux coexistent le temps que
+ * la migration passe, et la borne remontera quand le vieux chemin tombera.
  *
  * C'est un **plafond**, pas une cible : le geste réel en tend dix. Mais une
  * borne choisie au hasard se révèle un jour fausse dans le mauvais sens, alors
  * que celle-ci est la limite au-delà de laquelle l'écriture échouerait en bloc,
  * sans message utile.
  */
-export const CARTES_PAR_PAQUET_MAX = 249;
+export const CARTES_PAR_PAQUET_MAX = 124;
 
 export type SaisiePaquet = {
   prestataireId: string;
@@ -220,15 +228,40 @@ export type CarteAConfier = {
    * L'identifiant du dossier.
    *
    * Égal au `venteId` pour une carte née d'une vente, et c'est ce qui rend la
-   * bascule de S59 gratuite. Le document, lui, garde sa vente : c'est encore
-   * sous elle que le dépôt écrit.
+   * bascule de S59 gratuite.
    */
   dossierId: string;
-  numero: string;
+  /**
+   * Ce qui désigne la ligne à l'écran.
+   *
+   * Le numéro de vente quand il y en a une, le numéro de châssis sinon : un
+   * dossier venu du dehors n'a pas de numéro de vente, et dix lignes sans
+   * repère ne désignent rien.
+   */
+  repere: string;
   client: string;
-  /** La date de la vente : ce qui dit depuis quand le client attend. */
+  /**
+   * Depuis quand le client attend — la date de la vente.
+   *
+   * `null` pour un dossier venu du dehors : il n'y a pas de vente à dater, et
+   * il vient d'être ouvert.
+   */
   date: Date | null;
-  document: DocumentDossier;
+  /**
+   * Le document sous la vente, que les écrans d'avant la bascule lisent encore.
+   *
+   * `null` pour un dossier venu du dehors : il n'y a pas de vente sous laquelle
+   * le ranger — c'est toute la raison d'être de la nouvelle collection.
+   */
+  document: DocumentDossier | null;
+  /**
+   * Le dossier dans sa collection, dès qu'il y est.
+   *
+   * `null` pour une carte d'avant la migration : son dossier n'existe pas
+   * encore. **Les deux ne sont jamais nuls en même temps** — une carte sans
+   * aucune des deux faces n'existe nulle part.
+   */
+  dossier: DossierCarteGrise | null;
 };
 
 /**
@@ -250,23 +283,63 @@ export type CarteAConfier = {
  */
 export function cartesAConfier(
   dossiers: readonly DossierEnAttente[],
+  /**
+   * Les dossiers de la nouvelle collection.
+   *
+   * **Les deux sources sont disjointes, et c'est ce qui rend l'union sûre** :
+   * les cartes nées d'une vente viennent des documents, les dossiers venus du
+   * dehors de cette liste. Aucune carte ne figure dans les deux, donc il n'y a
+   * pas de fusion à arbitrer. Les dossiers de vente de cette liste servent
+   * seulement à retrouver la seconde face d'une carte qu'on connaît déjà.
+   */
+  dossiersCarteGrise: readonly DossierCarteGrise[],
   nomDuClient: (clientId: string) => string,
 ): CarteAConfier[] {
-  return dossiers
-    .flatMap((dossier) => {
-      const carte = dossier.documents.carte_grise;
-      if (!carte || !carteConfiable(carte)) return [];
-      return [
-        {
-          dossierId: dossier.venteId,
-          numero: dossier.numero,
-          client: nomDuClient(dossier.clientId),
-          date: dossier.date,
-          document: carte,
-        },
-      ];
-    })
-    .sort((a, b) => (a.date?.getTime() ?? 0) - (b.date?.getTime() ?? 0));
+  const parVente = new Map(
+    dossiersCarteGrise
+      .filter((dossier) => dossier.venteId !== null)
+      .map((dossier) => [dossier.venteId as string, dossier]),
+  );
+
+  const nees = dossiers.flatMap((dossier): CarteAConfier[] => {
+    const carte = dossier.documents.carte_grise;
+    if (!carte || !carteConfiable(carte)) return [];
+    return [
+      {
+        dossierId: dossier.venteId,
+        repere: dossier.numero,
+        client: nomDuClient(dossier.clientId),
+        date: dossier.date,
+        document: carte,
+        dossier: parVente.get(dossier.venteId) ?? null,
+      },
+    ];
+  });
+
+  /* Un dossier du dehors n'a pas de document sous une vente : son état ne se
+     lit que sur lui-même. On ne propose que ceux qui attendent encore. */
+  const duDehors = dossiersCarteGrise
+    .filter((dossier) => dossier.origine === "exterieur" && dossier.statut === "a_faire")
+    .map(
+      (dossier): CarteAConfier => ({
+        dossierId: dossier.id,
+        repere: dossier.numeroChassis,
+        client: dossier.clientNom,
+        date: null,
+        document: null,
+        dossier,
+      }),
+    );
+
+  /* **Les sans-date passent derrière, pas devant.** Une carte sans vente n'a
+     pas d'ancienneté à faire valoir : elle vient d'être ouverte, et la placer
+     en tête repousserait les clients qui attendent depuis des mois. */
+  return [...nees, ...duDehors].sort((a, b) => {
+    if (a.date === null && b.date === null) return a.client.localeCompare(b.client);
+    if (a.date === null) return 1;
+    if (b.date === null) return -1;
+    return a.date.getTime() - b.date.getTime();
+  });
 }
 
 /* --- L'historique des départs --------------------------------------------- */
@@ -338,17 +411,22 @@ export type Depart = {
  * vide par le bas — le plus vieux d'abord ; un historique se lit par le haut,
  * on y cherche ce qui vient de se passer.
  *
- * **Limite à connaître depuis S59.** Les identifiants d'un paquet sont des
- * identifiants de dossier, mais cette fonction les cherche encore parmi les
- * documents des ventes. Tant que le dépôt écrit sous la vente, les deux sont le
- * même, et tout est juste. Le jour où un dossier venu du dehors entrera dans un
- * paquet, il faudra lire `dossiersCarteGrise` — sinon il paraîtrait revenu
- * alors que personne ne l'a vu rentrer. C'est le lot 3, et il est nommé ici
- * pour qu'on ne le découvre pas à l'écran.
+ * **L'état d'une carte se lit sur l'une de ses deux faces.** Le document sous
+ * la vente d'abord, parce que c'est lui que le produit écrit depuis S11 et le
+ * seul que l'existant porte ; le dossier de la nouvelle collection ensuite,
+ * seule face d'une carte venue du dehors. Sans ce second recours, un dossier du
+ * dehors paraîtrait **revenu alors que personne ne l'a vu rentrer** — il n'a
+ * pas de document, donc rien ne le disait dehors.
+ *
+ * Une carte dont aucune face n'est encore parvenue est comptée au magasin. La
+ * nuance « pas encore lu » est portée un cran plus haut, par `etatPaquet`, qui
+ * refuse de solder un paquet dont les cartes n'ont pas répondu (D95).
  */
 export function historiqueDesDeparts(
   paquets: readonly PaquetCartesGrises[],
   documents: readonly DocumentDossier[],
+  /** Les dossiers de la nouvelle collection : la seule face d'une carte du dehors. */
+  dossiersCarteGrise: readonly DossierCarteGrise[],
   /** Le jour du retour, par vente, lu dans le journal des passages. */
   retours: ReadonlyMap<string, Date>,
   decrire: (venteId: string) => { numero: string; client: string },
@@ -357,15 +435,28 @@ export function historiqueDesDeparts(
   const cartes = new Map(
     documents.filter((document) => document.type === "carte_grise").map((d) => [d.venteId, d]),
   );
+  const nouveaux = new Map(dossiersCarteGrise.map((dossier) => [dossier.id, dossier]));
 
   const decrireCarte = (dossierId: string): CartePartie => {
-    const { numero, client } = decrire(dossierId);
+    const document = cartes.get(dossierId);
+    const dossier = nouveaux.get(dossierId);
+
+    /* Le numéro de vente quand il existe, le châssis sinon : un dossier du
+       dehors n'a pas de vente à nommer. */
+    const nomme = decrire(dossierId);
+    const repere = document ? nomme.numero : (dossier?.numeroChassis ?? nomme.numero);
+    const client = document ? nomme.client : (dossier?.clientNom ?? nomme.client);
+
     return {
       dossierId,
-      numero,
+      numero: repere,
       client,
-      revenueLe: retours.get(dossierId) ?? null,
-      dehors: cartes.get(dossierId)?.statut === "chez_prestataire",
+      revenueLe: document
+        ? (retours.get(dossierId) ?? null)
+        : (dossier?.revenuLe ?? null),
+      dehors: document
+        ? document.statut === "chez_prestataire"
+        : dossier?.statut === "chez_prestataire",
     };
   };
 
@@ -430,6 +521,24 @@ export function historiqueDesDeparts(
         document.disponibleLe,
         document.avance ?? 0,
         [document.venteId],
+      ),
+    );
+  }
+
+  /* Le symétrique pour les dossiers du dehors : ils n'ont pas de document, donc
+     la boucle ci-dessus ne les voit pas. Sans celle-ci, un dossier du dehors
+     confié hors paquet serait parti sans laisser de trace dans l'historique. */
+  for (const dossier of nouveaux.values()) {
+    if (dossier.origine !== "exterieur") continue;
+    if (enPaquet.has(dossier.id) || dossier.deposeLe === null) continue;
+    departs.push(
+      assembler(
+        `carte:${dossier.id}`,
+        dossier.prestataireNom,
+        dossier.deposeLe,
+        dossier.disponibleLe,
+        dossier.avance ?? 0,
+        [dossier.id],
       ),
     );
   }

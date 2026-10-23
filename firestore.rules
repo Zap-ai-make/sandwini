@@ -1284,8 +1284,17 @@ service cloud.firestore {
 
     // Les memes chemins que `lib/domain/dossier-carte-grise.ts`, ecrits une
     // seconde fois a dessein : ici c'est la seule verification qui compte.
+    //
+    // **`de == vers` est permis partout SAUF chez le prestataire**, et cette
+    // exception ferme un trou trouve par un test le 23 octobre 2026. Garder le
+    // meme statut sert aux corrections : completer une immatriculation qu'on
+    // n'avait pas sous la main au retour, rattraper un nom mal tape. Mais
+    // `chez_prestataire` -> `chez_prestataire` aurait laisse CONFIER DEUX FOIS
+    // la meme carte : le second depot aurait ecrase l'avance du premier, et un
+    // second paquet aurait promis une carte deja dehors. L'ecran ne le propose
+    // pas, mais c'est la base qui doit le refuser (D27).
     function transitionCarteGriseAutorisee(de, vers) {
-      return de == vers
+      return (de == vers && de != 'chez_prestataire')
              || (de == 'a_faire' && vers in ['chez_prestataire', 'non_applicable'])
              || (de == 'chez_prestataire' && vers == 'revenu_magasin')
              || (de == 'revenu_magasin' && vers == 'remis');
