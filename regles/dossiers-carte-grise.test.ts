@@ -224,13 +224,66 @@ describe("écrire un dossier", () => {
     );
   });
 
-  it("un dossier naît à faire, jamais déjà chez quelqu’un", async () => {
-    /* Le faire naître « chez le prestataire » sauterait le dépôt — donc
-       l'avance et la trace qui vont avec. */
+  it("naît déjà chez le prestataire quand le dépôt est inscrit", () => {
+    /* **Ce que le classeur du commanditaire impose.** Il y recopie des dossiers
+       vieux d'un an, les dix cases remplies d'un coup : refuser une naissance
+       avancée aurait refusé sa saisie la plus courante. Ce qui tient la place
+       de l'ancienne restriction est la cohérence — le dépôt doit être là. */
+    return assertSucceeds(
+      setDoc(
+        doc(gerantCartes(), "dossiersCarteGrise/d-ancien"),
+        dossier({
+          boutiqueId: "CGP",
+          venteId: null,
+          origine: "exterieur",
+          statut: "chez_prestataire",
+          prestataireNom: "BOHARY",
+          deposeLe: new Date("2025-08-18T12:00:00"),
+          ...audit("ger-cg"),
+        }),
+      ),
+    );
+  });
+
+  it("refuse de naître chez le prestataire sans dépôt ni nom", async () => {
+    /* Le dépôt n'est donc jamais sauté : un dossier qui se dit dehors sans rien
+       pour le montrer ne dit plus où se trouve le papier — la seule chose que
+       cette liste serve à dire (D65). */
     await assertFails(
       setDoc(
         doc(gerantCartes(), "dossiersCarteGrise/d-triche"),
         dossier({ boutiqueId: "CGP", venteId: null, origine: "exterieur", statut: "chez_prestataire", ...audit("ger-cg") }),
+      ),
+    );
+  });
+
+  it("refuse de naître à faire avec un dépôt déjà écrit dessus", async () => {
+    /* L'autre moitié de la cohérence, et elle est nouvelle : l'ancien chemin
+       laissait passer une ligne qui disait « rien n'est parti » alors qu'un
+       prestataire et une date étaient inscrits. */
+    await assertFails(
+      setDoc(
+        doc(gerantCartes(), "dossiersCarteGrise/d-menteur"),
+        dossier({
+          boutiqueId: "CGP",
+          venteId: null,
+          origine: "exterieur",
+          statut: "a_faire",
+          prestataireNom: "BOHARY",
+          deposeLe: new Date("2025-08-18T12:00:00"),
+          ...audit("ger-cg"),
+        }),
+      ),
+    );
+  });
+
+  it("refuse un crédit qui n’est pas un entier positif", async () => {
+    /* Sa colonne `Credit`. Le FCFA ne se divise pas, et une dette négative ne
+       veut rien dire. */
+    await assertFails(
+      setDoc(
+        doc(gerantCartes(), "dossiersCarteGrise/d-credit"),
+        dossier({ boutiqueId: "CGP", venteId: null, origine: "exterieur", credit: -1, ...audit("ger-cg") }),
       ),
     );
   });
@@ -279,9 +332,11 @@ describe("faire avancer un dossier", () => {
     );
   });
 
-  it("refuse de sauter le prestataire", () => {
-    /* C'est lui qui dit qui détient le papier : sauter l'étape viderait la
-       liste de la seule chose qu'elle sert à dire (D65). */
+  it("refuse « au magasin » sans la moindre preuve de retour", () => {
+    /* Ni plaque, ni date de retour, ni même un dépôt : la ligne ne dit plus où
+       se trouve le papier (D65). C'est ce que la cohérence remplace par rapport
+       à l'ancien chemin — et elle le refuse pour une meilleure raison : non
+       parce qu'une étape manque, mais parce que rien ne la montre. */
     return assertFails(
       updateDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg"), {
         statut: "revenu_magasin",
@@ -292,15 +347,62 @@ describe("faire avancer un dossier", () => {
     );
   });
 
-  it("refuse de revenir en arrière", async () => {
+  it("laisse inscrire la plaque et le retour d’un seul coup", () => {
+    /* La saisie en ligne : on remplit `Immatriculation`, et le statut suit. Le
+       chemin l'aurait refusée sur un dossier encore « à faire ». */
+    return assertSucceeds(
+      updateDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg"), {
+        statut: "revenu_magasin",
+        immatriculation: "7078 7DQ 04",
+        revenuLe: new Date("2026-06-10T12:00:00"),
+        updatedAt: serverTimestamp(),
+        updatedBy: "ger-cg",
+        updatedByName: "Gérant",
+      }),
+    );
+  });
+
+  it("laisse effacer un dépôt inscrit sur le mauvais dossier", async () => {
+    /* **Le retour en arrière est désormais permis, et c'est la demande** :
+       « la possibilité d'ouvrir chaque ligne en modale pour modification ».
+       Vider les cases d'un dossier parti par erreur le ramène au départ. Ce
+       qu'on perd — la garantie qu'un second dépôt n'écrase pas le premier — est
+       remplacé par le journal, où chaque écriture laisse son auteur. */
     await env.withSecurityRulesDisabled(async (contexte) => {
       await updateDoc(doc(contexte.firestore(), "dossiersCarteGrise/d-ptg"), {
-        statut: "remis",
+        statut: "chez_prestataire",
+        prestataireNom: "BOHARY",
+        deposeLe: new Date("2025-08-18T12:00:00"),
+      });
+    });
+    await assertSucceeds(
+      updateDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg"), {
+        statut: "a_faire",
+        prestataireNom: "",
+        prestataireId: null,
+        deposeLe: null,
+        updatedAt: serverTimestamp(),
+        updatedBy: "ger-cg",
+        updatedByName: "Gérant",
+      }),
+    );
+  });
+
+  it("refuse d’effacer le dépôt en gardant « chez le prestataire »", async () => {
+    /* La correction doit être entière : une ligne qui se dit dehors sans dépôt
+       ni prestataire est exactement celle que la cohérence existe pour
+       attraper. */
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await updateDoc(doc(contexte.firestore(), "dossiersCarteGrise/d-ptg"), {
+        statut: "chez_prestataire",
+        prestataireNom: "BOHARY",
+        deposeLe: new Date("2025-08-18T12:00:00"),
       });
     });
     await assertFails(
       updateDoc(doc(gerantCartes(), "dossiersCarteGrise/d-ptg"), {
-        statut: "revenu_magasin",
+        prestataireNom: "",
+        deposeLe: null,
         updatedAt: serverTimestamp(),
         updatedBy: "ger-cg",
         updatedByName: "Gérant",

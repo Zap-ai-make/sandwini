@@ -12,18 +12,12 @@ import {
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
 
-import { lireJour } from "@/lib/domain/dossier";
 import {
+  champsDeLaLigne,
   champsDossierNeuf,
-  normaliserDossierExterieur,
-  transitionAutorisee,
-  validerDossierExterieur,
-  validerRemise,
-  validerRetour,
+  validerLigne,
   type DossierCarteGrise,
-  type SaisieDossierExterieur,
-  type SaisieRemise,
-  type SaisieRetour,
+  type SaisieLigne,
   type StatutCarteGrise,
 } from "@/lib/domain/dossier-carte-grise";
 import { db } from "@/lib/firebase/client";
@@ -98,6 +92,10 @@ function lireDossier(instantane: QueryDocumentSnapshot<DocumentData>): DossierCa
     clientNom: typeof donnees.clientNom === "string" ? donnees.clientNom : "",
     motoLibelle: typeof donnees.motoLibelle === "string" ? donnees.motoLibelle : "",
     numeroChassis: typeof donnees.numeroChassis === "string" ? donnees.numeroChassis : "",
+    /* Les deux colonnes revenues de son classeur. Tout ce qui précède leur
+       arrivée n'en porte pas : non cochée et vide, ce qui est la vérité. */
+    recu: donnees.recu === true,
+    credit: typeof donnees.credit === "number" ? donnees.credit : null,
     statut: (donnees.statut as StatutCarteGrise) ?? "a_faire",
     prestataireId: typeof donnees.prestataireId === "string" ? donnees.prestataireId : null,
     prestataireNom: typeof donnees.prestataireNom === "string" ? donnees.prestataireNom : "",
@@ -112,174 +110,115 @@ function lireDossier(instantane: QueryDocumentSnapshot<DocumentData>): DossierCa
   };
 }
 
-/* --- Ouvrir un dossier ----------------------------------------------------- */
+/* --- Écrire une ligne ------------------------------------------------------ */
 
 /**
- * Un dossier qui n'est pas passé par une vente.
+ * Une ligne qu'on ouvre, comme on ajoute une ligne à son classeur.
  *
- * **La raison d'être de la collection.** Le commanditaire : « souvent on peut
- * leur confier de gérer une carte grise de l'extérieur ». Sous l'ancien modèle,
- * un tel dossier n'avait nulle part où être écrit — il n'y avait pas de vente
- * sous laquelle le ranger.
+ * **Elle peut naître déjà rendue, et c'est le changement.** S59 faisait naître
+ * tout dossier « à faire » et refusait les sauts ; or il transcrit des dossiers
+ * vieux d'un an, donc il remplit les dix cases avant d'enregistrer. Le statut
+ * se déduit des cases (`statutDeLaLigne`), et les règles vérifient qu'il
+ * s'accorde avec elles.
  *
- * Il appartient à la boutique des cartes grises, la seule qui en réponde.
+ * Elle appartient à la boutique des cartes grises, la seule qui en réponde.
  */
-export function ouvrirDossierExterieur(
-  saisie: SaisieDossierExterieur,
+export function ouvrirLigne(
+  saisie: SaisieLigne,
   boutiqueId: string,
+  prestataireId: string | null,
   auteur: Auteur,
 ): Promise<string> {
-  const probleme = validerDossierExterieur(saisie);
+  const probleme = validerLigne(saisie);
   if (probleme) return Promise.reject(new Error(probleme));
 
-  const propre = normaliserDossierExterieur(saisie);
   const reference = doc(collection(db(), COLLECTION));
+  const champs = champsDeLaLigne(saisie, { statut: "a_faire", revenuLe: null }, new Date());
 
   const lot = writeBatch(db());
   lot.set(reference, {
+    /* **La liste des champs vient du domaine, et elle est entière.** Les règles
+       posent `hasOnly` : un champ manquant ferait refuser toutes les
+       modifications suivantes, et le dossier existerait, visible et figé. */
     ...champsDossierNeuf({
       boutiqueId,
       venteId: null,
       origine: "exterieur",
-      clientNom: propre.clientNom,
-      motoLibelle: propre.motoLibelle,
-      numeroChassis: propre.numeroChassis,
+      clientNom: "",
+      motoLibelle: "",
+      numeroChassis: "",
       statut: "a_faire",
     }),
+    ...horodater(champs),
+    prestataireId,
     ...traceCreation(auteur),
   });
 
   return suivreEcriture(lot.commit()).then(() => reference.id);
 }
 
-/* --- Faire avancer un dossier --------------------------------------------- */
-
 /**
- * Le retour du prestataire, et le numéro de plaque avec lui.
+ * La même ligne, rouverte et corrigée.
  *
- * Le numéro n'est pas exigé : la carte est physiquement revenue, et refuser de
- * l'enregistrer parce que le numéro n'est pas sous la main ferait mentir
- * l'écran sur un fait accompli. Un second passage le complétera — c'est le cas
- * que `de == vers` autorise dans les règles.
+ * **Toutes les cases, y compris le dépôt.** C'est la demande, et elle coûte
+ * quelque chose : la règle qui interdisait de retoucher un dossier parti chez
+ * un prestataire protégeait la première avance d'un second dépôt. Ce qui la
+ * remplace est le journal — chaque enregistrement y laisse une ligne, même
+ * quand le statut ne bouge pas, donc une case écrasée reste attribuable.
  */
-export function enregistrerRetour(
+export function corrigerLigne(
   dossier: DossierCarteGrise,
-  saisie: SaisieRetour,
+  saisie: SaisieLigne,
+  prestataireId: string | null,
   auteur: Auteur,
 ): Promise<void> {
-  const probleme = validerRetour(saisie);
+  const probleme = validerLigne(saisie);
   if (probleme) return Promise.reject(new Error(probleme));
 
-  /* Un dossier déjà revenu ne repasse pas par la transition : on ne complète
-     que le numéro, resté vide au retour. Le domaine refuse `revenu_magasin` ->
-     `revenu_magasin` — à raison, ce n'est pas un passage — et les règles
-     l'acceptent comme une simple correction (`de == vers`). */
-  if (dossier.statut !== "revenu_magasin") {
-    const refus = exigerTransition(dossier, "revenu_magasin");
-    if (refus) return Promise.reject(refus);
-  }
-
-  const revenu = lireJour(saisie.revenuLe) as Date;
-  return ecrire(dossier, "revenu_magasin", auteur, {
-    immatriculation: saisie.immatriculation.trim(),
-    revenuLe: Timestamp.fromDate(revenu),
-  });
-}
-
-/**
- * La remise au comptoir.
- *
- * **Le nom et le téléphone de celui qui vient chercher**, parce que ce n'est
- * pas toujours l'acheteur — souvent un frère, un employé. C'est la colonne
- * `RECEPTION` du fichier du client, et la question qu'on lui posera plus tard.
- */
-export function remettreDossier(
-  dossier: DossierCarteGrise,
-  saisie: SaisieRemise,
-  auteur: Auteur,
-): Promise<void> {
-  const probleme = validerRemise(saisie);
-  if (probleme) return Promise.reject(new Error(probleme));
-
-  const refus = exigerTransition(dossier, "remis");
-  if (refus) return Promise.reject(refus);
-
-  const remis = lireJour(saisie.remisLe) as Date;
-  return ecrire(dossier, "remis", auteur, {
-    remisANom: saisie.nom.trim(),
-    remisATelephone: saisie.telephone.trim(),
-    remisLe: Timestamp.fromDate(remis),
-  });
-}
-
-/**
- * Écarter un dossier qui n'a pas lieu d'être.
- *
- * On ne supprime pas : passer « sans objet » laisse la ligne lisible et dit
- * qui l'a écartée. Et seulement au début — une carte déjà partie est
- * physiquement dehors, et quelqu'un l'attend.
- */
-export function ecarterDossier(dossier: DossierCarteGrise, auteur: Auteur): Promise<void> {
-  const refus = exigerTransition(dossier, "non_applicable");
-  if (refus) return Promise.reject(refus);
-  return ecrire(dossier, "non_applicable", auteur, {});
-}
-
-/**
- * Revalide la transition côté navigateur, avant les règles.
- *
- * Entre l'affichage d'un bouton et le clic, un autre appareil a pu faire
- * avancer le même dossier. Les règles refuseraient de toute façon (D27), mais
- * elles refusent sans expliquer : autant s'arrêter ici, avec une phrase.
- */
-function exigerTransition(
-  dossier: DossierCarteGrise,
-  vers: StatutCarteGrise,
-): Error | null {
-  if (transitionAutorisee(dossier.statut, vers)) return null;
-  return new Error(
-    "Ce dossier ne peut pas passer à cette étape. Il a peut-être avancé sur un autre appareil ; rouvrez la fiche.",
-  );
-}
-
-/**
- * Le changement et sa trace, dans un seul lot.
- *
- * Un `writeBatch` reste atomique hors ligne : Firestore le garde entier dans sa
- * file et le rejoue d'un bloc au retour du réseau. C'est ce qui interdit le
- * dossier avancé dont le passage n'est noté nulle part.
- *
- * **La fonction ne s'attend pas.** Elle rend la promesse du lot sans
- * l'attendre : hors ligne, cette promesse ne se résout jamais, et un écran qui
- * l'attendait bloquerait le geste au comptoir là où le hors-ligne devait le
- * rendre possible. L'appelant avance sur l'écriture locale et rattache un
- * `catch` pour le refus tardif.
- */
-function ecrire(
-  dossier: DossierCarteGrise,
-  vers: StatutCarteGrise,
-  auteur: Auteur,
-  changement: Record<string, unknown>,
-): Promise<void> {
+  const champs = champsDeLaLigne(saisie, dossier, new Date());
   const reference = doc(db(), COLLECTION, dossier.id);
   const lot = writeBatch(db());
 
-  lot.update(reference, { statut: vers, ...changement, ...traceModification(auteur) });
+  lot.update(reference, { ...horodater(champs), prestataireId, ...traceModification(auteur) });
 
-  /* L'identifiant est tiré au sort et l'heure vient du serveur : deux appareils
-     hors ligne qui avancent le même dossier produisent deux lignes distinctes
-     plutôt qu'une qui écrase l'autre. */
+  /* **Le journal s'écrit à chaque fois, même sans changement de statut.** Il ne
+     dit plus seulement « le papier est passé là » mais « quelqu'un a touché
+     cette ligne, à cette heure » — la seule trace d'une correction, maintenant
+     que toutes les cases s'ouvrent.
+
+     L'identifiant est tiré au sort et l'heure vient de l'appareil : deux
+     appareils hors ligne qui corrigent la même ligne produisent deux entrées
+     distinctes plutôt qu'une qui écrase l'autre. */
   lot.set(doc(collection(reference, "historique")), {
     boutiqueId: dossier.boutiqueId,
     dossierId: dossier.id,
     de: dossier.statut,
-    vers,
+    vers: champs.statut,
     le: Timestamp.fromDate(new Date()),
     ...traceCreation(auteur),
   });
 
+  /* **La fonction ne s'attend pas** (D76). Hors ligne cette promesse ne se
+     résout jamais, et un écran qui l'attendrait bloquerait le geste au comptoir
+     là où le hors-ligne devait le rendre possible. L'appelant avance sur
+     l'écriture locale et rattache un `catch` pour le refus tardif. */
   return suivreEcriture(lot.commit());
 }
+
+/**
+ * Les dates du domaine en horodatages Firestore.
+ *
+ * Le domaine travaille sur des `Date` — il ne connaît pas Firestore, et c'est
+ * ce qui le rend testable. La conversion est donc ici, au dernier moment.
+ */
+function horodater(champs: Record<string, unknown>): Record<string, unknown> {
+  const sortie: Record<string, unknown> = {};
+  for (const [cle, valeur] of Object.entries(champs)) {
+    sortie[cle] = valeur instanceof Date ? Timestamp.fromDate(valeur) : valeur;
+  }
+  return sortie;
+}
+
 
 /**
  * Ce qu'on montre quand le serveur finit par refuser.

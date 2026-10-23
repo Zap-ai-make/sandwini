@@ -1,6 +1,8 @@
 import { lireJour } from "./dossier";
 import { LONGUEUR_NOM_MAX, LONGUEUR_TELEPHONE_MAX } from "./client";
+import { jourLocal } from "./format";
 import { LONGUEUR_CHASSIS_MAX, normaliserChassis } from "./moto";
+import { lireMontant, MONTANT_MAX } from "./vente";
 
 /**
  * Le dossier de carte grise — sorti de la vente (S59).
@@ -43,35 +45,26 @@ export const LIBELLE_STATUT_CARTE_GRISE: Record<StatutCarteGrise, string> = {
 };
 
 /**
- * Ce qu'un statut a le droit de devenir.
+ * Un statut dont plus rien ne sort : le dossier a fini sa vie.
  *
- * L'étape du prestataire ne se saute pas : c'est elle qui dit qui détient le
- * papier, et un dossier qui passerait directement à « au magasin » viderait la
- * liste de la seule chose qu'elle sert à dire (D65).
+ * **Il n'y a plus de machine à états, et c'est le classeur du client qui l'a
+ * décidé.** S59 faisait avancer un dossier d'un cran à la fois, par des
+ * boutons, et refusait les sauts. Son fichier ne marche pas comme ça : il n'a
+ * pas de colonne « état », parce que chez lui **l'état est le remplissage** —
+ * `Depot` renseigné veut dire « c'est parti », `retrait` renseigné veut dire
+ * « c'est rendu ». Et il transcrit des dossiers anciens, donc il remplit toute
+ * la ligne d'un coup : exiger le chemin aurait refusé sa saisie la plus
+ * courante.
  *
- * `non_applicable` ne s'atteint qu'au début. Une carte déjà partie ne devient
- * pas « sans objet » : elle est physiquement dehors, et quelqu'un l'attend.
+ * Le statut reste écrit sur le document — les paquets le lisent, et le portail
+ * prestataire le lira — mais il se **déduit** des cases (`statutDeLaLigne`), et
+ * les règles vérifient qu'il s'accorde avec elles au lieu de surveiller un
+ * chemin.
  */
-const CHEMIN: Record<StatutCarteGrise, readonly StatutCarteGrise[]> = {
-  a_faire: ["chez_prestataire", "non_applicable"],
-  chez_prestataire: ["revenu_magasin"],
-  revenu_magasin: ["remis"],
-  remis: [],
-  non_applicable: [],
-};
+const TERMINAUX: readonly StatutCarteGrise[] = ["remis", "non_applicable"];
 
-export function transitionAutorisee(de: StatutCarteGrise, vers: StatutCarteGrise): boolean {
-  return CHEMIN[de].includes(vers);
-}
-
-/** Ce qu'on propose à l'écran. Vide sur un statut terminal. */
-export function statutsSuivants(de: StatutCarteGrise): readonly StatutCarteGrise[] {
-  return CHEMIN[de];
-}
-
-/** Un statut dont plus rien ne sort : le dossier a fini sa vie. */
 export function estTerminal(statut: StatutCarteGrise): boolean {
-  return CHEMIN[statut].length === 0;
+  return TERMINAUX.includes(statut);
 }
 
 /** D'où vient le dossier : d'une vente d'ici, ou du dehors. */
@@ -101,6 +94,17 @@ export type DossierCarteGrise = {
   /** Marque et modèle réunis, recopiés de la moto ou tapés à la main. */
   motoLibelle: string;
   numeroChassis: string;
+  /**
+   * Sa colonne `Reci` — le reçu, confirmé par le commanditaire.
+   *
+   * Son classeur y porte `√` ou `OK` : deux façons d'écrire oui, donc une case
+   * à cocher. S59 l'avait mise hors périmètre en disant que la vente portait
+   * déjà le reçu — ce qui est vrai, et sans effet : la moitié de ses dossiers
+   * viennent du dehors et n'ont pas de vente.
+   */
+  recu: boolean;
+  /** Sa colonne `Credit`, vide sur toutes les lignes relevées. En francs. */
+  credit: number | null;
   statut: StatutCarteGrise;
   prestataireId: string | null;
   prestataireNom: string;
@@ -197,6 +201,8 @@ export function champsDossierNeuf(naissance: DossierNeuf) {
     clientNom: naissance.clientNom,
     motoLibelle: naissance.motoLibelle,
     numeroChassis: naissance.numeroChassis,
+    recu: false,
+    credit: null as number | null,
     statut: naissance.statut as StatutCarteGrise,
     prestataireId: null as string | null,
     prestataireNom: "",
@@ -211,93 +217,229 @@ export function champsDossierNeuf(naissance: DossierNeuf) {
   };
 }
 
-/* --- Ouvrir un dossier venu du dehors ------------------------------------- */
+/* --- La ligne de son classeur --------------------------------------------- */
 
-export type SaisieDossierExterieur = {
-  clientNom: string;
-  /** Facultatif : le fichier du client a des lignes sans modèle. */
-  motoLibelle: string;
-  numeroChassis: string;
+/**
+ * Les dix colonnes de son classeur Excel, dans son ordre et sous ses noms.
+ *
+ * **Ses noms, fautes comprises** — `CHASIS`, `Reci`, `TRANSITE`. Le reste du
+ * produit est écrit en français soigné ; ces dix mots sont une île, et c'est la
+ * demande : il s'est familiarisé avec son fichier et ne veut pas en changer. Un
+ * entête qu'il ne reconnaît pas lui ferait relire la colonne à chaque ligne.
+ *
+ * **Une seule liste pour l'entête et pour la modale.** La demande est que la
+ * saisie et le tableau montrent les mêmes cases dans le même ordre ; deux
+ * listes auraient divergé au premier ajout (D73).
+ */
+export const ENTETES_LIGNE = {
+  client: "client",
+  moto: "MOTO",
+  chassis: "CHASIS",
+  recu: "Reci",
+  credit: "Credit",
+  reception: "RECEPTION",
+  retrait: "retrait",
+  depot: "Depot",
+  immatriculation: "Immatriculation",
+  transite: "TRANSITE",
+} as const;
+
+export const ORDRE_LIGNE = [
+  "client",
+  "moto",
+  "chassis",
+  "recu",
+  "credit",
+  "reception",
+  "retrait",
+  "depot",
+  "immatriculation",
+  "transite",
+] as const;
+
+export type CleColonneLigne = (typeof ORDRE_LIGNE)[number];
+
+export const LONGUEUR_IMMATRICULATION_MAX = 24;
+
+/**
+ * Ce qu'on tape dans une ligne.
+ *
+ * Tout en texte, comme dans une cellule : c'est le domaine qui lit les dates et
+ * les montants, pas le navigateur. `RECEPTION` porte un téléphone — c'est ce
+ * que son fichier y met, des numéros à huit chiffres — et non un nom.
+ */
+export type SaisieLigne = {
+  client: string;
+  moto: string;
+  chassis: string;
+  recu: boolean;
+  credit: string;
+  reception: string;
+  /** Format de `<input type="date">` : `aaaa-mm-jj`. Vide tant que c'est en cours. */
+  retrait: string;
+  depot: string;
+  immatriculation: string;
+  transite: string;
 };
 
-export function validerDossierExterieur(saisie: SaisieDossierExterieur): string | null {
-  const nom = saisie.clientNom.trim();
-  if (!nom) return "Donnez le nom du propriétaire : c’est lui qui viendra chercher le papier.";
-  if (nom.length > LONGUEUR_NOM_MAX) return `Le nom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
+export const LIGNE_VIDE: SaisieLigne = {
+  client: "",
+  moto: "",
+  chassis: "",
+  recu: false,
+  credit: "",
+  reception: "",
+  retrait: "",
+  depot: "",
+  immatriculation: "",
+  transite: "",
+};
 
-  const chassis = normaliserChassis(saisie.numeroChassis);
+/** La ligne telle qu'elle se rouvre pour correction. */
+export function ligneDuDossier(dossier: DossierCarteGrise): SaisieLigne {
+  return {
+    client: dossier.clientNom,
+    moto: dossier.motoLibelle,
+    chassis: dossier.numeroChassis,
+    recu: dossier.recu,
+    credit: dossier.credit === null ? "" : `${dossier.credit}`,
+    reception: dossier.remisATelephone,
+    retrait: dossier.remisLe ? jourLocal(dossier.remisLe) : "",
+    depot: dossier.deposeLe ? jourLocal(dossier.deposeLe) : "",
+    immatriculation: dossier.immatriculation,
+    transite: dossier.prestataireNom,
+  };
+}
+
+export function validerLigne(saisie: SaisieLigne): string | null {
+  const client = saisie.client.trim();
+  if (!client) return "Donnez le nom du propriétaire : c’est lui qui viendra chercher le papier.";
+  if (client.length > LONGUEUR_NOM_MAX) return `Le nom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
+
+  const chassis = normaliserChassis(saisie.chassis);
   if (!chassis) return "Le numéro de châssis est obligatoire : c’est l’identité de la moto.";
   if (chassis.length > LONGUEUR_CHASSIS_MAX) {
     return `Le numéro de châssis dépasse ${LONGUEUR_CHASSIS_MAX} caractères.`;
   }
   /* **Aucune longueur imposée**, et c'est un relevé, pas une tolérance : les
-     châssis du client font dix à douze caractères — 10RY243294, 4140RY029597 —
-     là où une voiture en porte dix-sept. Exiger un compte aurait refusé la
-     totalité de ses dossiers. */
+     châssis de son fichier font dix à douze caractères — 10RY243294 — là où une
+     voiture en porte dix-sept. Exiger un compte aurait refusé tous ses
+     dossiers. */
   if (!/^[A-Z0-9]+$/.test(chassis)) {
     return "Le numéro de châssis ne contient que des lettres et des chiffres.";
   }
 
-  if (saisie.motoLibelle.trim().length > LONGUEUR_NOM_MAX) {
+  if (saisie.moto.trim().length > LONGUEUR_NOM_MAX) {
     return `Le modèle dépasse ${LONGUEUR_NOM_MAX} caractères.`;
   }
-  return null;
-}
-
-export function normaliserDossierExterieur(
-  saisie: SaisieDossierExterieur,
-): SaisieDossierExterieur {
-  return {
-    clientNom: saisie.clientNom.trim(),
-    motoLibelle: saisie.motoLibelle.trim(),
-    numeroChassis: normaliserChassis(saisie.numeroChassis),
-  };
-}
-
-/* --- Le retour du prestataire --------------------------------------------- */
-
-export const LONGUEUR_IMMATRICULATION_MAX = 24;
-
-export type SaisieRetour = {
-  /** Le numéro de plaque. Facultatif : on le complète si on ne l'a pas encore. */
-  immatriculation: string;
-  /** Format de `<input type="date">` : `aaaa-mm-jj`. */
-  revenuLe: string;
-};
-
-export function validerRetour(saisie: SaisieRetour): string | null {
-  if (!lireJour(saisie.revenuLe)) return "Indiquez la date du retour.";
-  /* **Le numéro n'est pas exigé.** La carte est physiquement revenue ; refuser
-     de l'enregistrer parce que le numéro n'est pas sous la main ferait mentir
-     l'écran sur un fait accompli. */
+  if (saisie.transite.trim().length > LONGUEUR_NOM_MAX) {
+    return `Le nom du prestataire dépasse ${LONGUEUR_NOM_MAX} caractères.`;
+  }
+  if (saisie.reception.trim().length > LONGUEUR_TELEPHONE_MAX) {
+    return `Le téléphone dépasse ${LONGUEUR_TELEPHONE_MAX} caractères.`;
+  }
   if (saisie.immatriculation.trim().length > LONGUEUR_IMMATRICULATION_MAX) {
     return `Le numéro d’immatriculation dépasse ${LONGUEUR_IMMATRICULATION_MAX} caractères.`;
   }
+
+  if (saisie.credit.trim() !== "") {
+    const credit = lireMontant(saisie.credit);
+    if (credit === null) return "Le crédit est un montant en francs, sans virgule.";
+    if (credit > MONTANT_MAX) return "Le crédit dépasse le maximum admis.";
+  }
+
+  const depot = jourOuRien(saisie.depot);
+  if (depot === false) return "La date de dépôt n’est pas une date.";
+  const retrait = jourOuRien(saisie.retrait);
+  if (retrait === false) return "La date de retrait n’est pas une date.";
+
+  /* **Le seul contrôle de cohérence entre deux cases, et il attrape une faute
+     de frappe qui coûte cher.** Une carte rendue avant d'être partie n'existe
+     pas ; la ligne resterait lisible, fausse, et personne ne la relirait. */
+  if (depot !== null && retrait !== null && retrait.getTime() < depot.getTime()) {
+    return "Le retrait est antérieur au dépôt : vérifiez les deux dates.";
+  }
   return null;
 }
 
-/* --- La remise au comptoir ------------------------------------------------ */
+/** `false` dit « il y a quelque chose, et ce n'est pas une date ». Vide est licite. */
+function jourOuRien(brut: string): Date | null | false {
+  if (brut.trim() === "") return null;
+  return lireJour(brut) ?? false;
+}
 
-export type SaisieRemise = {
-  nom: string;
-  /** Facultatif : tous les retraits du fichier du client n'en portent pas. */
-  telephone: string;
-  /** Format de `<input type="date">` : `aaaa-mm-jj`. */
-  remisLe: string;
-};
+/**
+ * Le statut que les cases racontent.
+ *
+ * **L'ordre des questions est celui de la vie du papier, lu à l'envers** : si on
+ * l'a rendu, le reste n'importe plus. Son classeur n'a pas de colonne pour le
+ * retour au magasin — `Immatriculation` en est la preuve, puisque la plaque
+ * s'obtient avec la carte grise — donc un dossier déjà revenu dont on n'a pas
+ * encore le numéro se reconnaît à `revenuLe`, enregistré la première fois.
+ */
+export function statutDeLaLigne(
+  saisie: SaisieLigne,
+  avant: Pick<DossierCarteGrise, "statut" | "revenuLe">,
+): StatutCarteGrise {
+  if (saisie.retrait.trim() !== "") return "remis";
+  if (saisie.immatriculation.trim() !== "" || avant.revenuLe !== null) return "revenu_magasin";
+  if (saisie.depot.trim() !== "" || saisie.transite.trim() !== "") return "chez_prestataire";
+  /* Vider les cases d'un dossier parti par erreur le ramène au départ — c'est
+     la correction qu'on vient chercher. Mais « sans objet » ne s'invente pas
+     ici : il vient du comptoir, quand le client ne veut pas de carte grise. */
+  return avant.statut === "non_applicable" ? "non_applicable" : "a_faire";
+}
 
-export function validerRemise(saisie: SaisieRemise): string | null {
-  const nom = saisie.nom.trim();
-  /* **Ce n'est pas toujours l'acheteur** — souvent un frère, un employé. C'est
-     précisément pour ça qu'on l'écrit : sans nom, la ligne ne dit pas à qui le
-     papier a été remis, et c'est la seule question qu'on lui posera. */
-  if (!nom) return "Donnez le nom de la personne qui est venue chercher le papier.";
-  if (nom.length > LONGUEUR_NOM_MAX) return `Le nom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
+/**
+ * Les champs du dossier que la ligne décide, statut compris.
+ *
+ * `aujourdhui` est passé et non lu : le domaine ne consulte pas d'horloge, et
+ * c'est ce qui rend la déduction testable.
+ */
+export function champsDeLaLigne(
+  saisie: SaisieLigne,
+  avant: Pick<DossierCarteGrise, "statut" | "revenuLe">,
+  aujourdhui: Date,
+) {
+  const statut = statutDeLaLigne(saisie, avant);
+  const retrait = lireJour(saisie.retrait);
+  return {
+    clientNom: saisie.client.trim(),
+    motoLibelle: saisie.moto.trim(),
+    numeroChassis: normaliserChassis(saisie.chassis),
+    recu: saisie.recu,
+    credit: saisie.credit.trim() === "" ? null : lireMontant(saisie.credit),
+    remisATelephone: saisie.reception.trim(),
+    remisLe: retrait,
+    deposeLe: lireJour(saisie.depot),
+    immatriculation: saisie.immatriculation.trim(),
+    prestataireNom: saisie.transite.trim(),
+    statut,
+    revenuLe: dateDuRetour(statut, avant.revenuLe, retrait, aujourdhui),
+  };
+}
 
-  if (saisie.telephone.trim().length > LONGUEUR_TELEPHONE_MAX) {
-    return `Le téléphone dépasse ${LONGUEUR_TELEPHONE_MAX} caractères.`;
-  }
-
-  if (!lireJour(saisie.remisLe)) return "Indiquez la date de la remise.";
+/**
+ * Le jour où le papier est revenu au magasin — la date que son classeur n'a pas.
+ *
+ * Elle existe dans le produit, et elle sert : c'est elle qui dit depuis combien
+ * de temps un papier dort au magasin sans que personne vienne le chercher. Donc
+ * on la tient, sans rien inventer :
+ *
+ * - déjà connue, elle ne bouge plus ;
+ * - le papier vient de rentrer, c'est maintenant qu'on l'enregistre ;
+ * - la ligne est transcrite d'un coup jusqu'au retrait : le papier était
+ *   forcément revenu **au plus tard** ce jour-là, et c'est la seule date qu'on
+ *   ait.
+ */
+function dateDuRetour(
+  statut: StatutCarteGrise,
+  connu: Date | null,
+  retrait: Date | null,
+  aujourdhui: Date,
+): Date | null {
+  if (connu !== null) return connu;
+  if (statut === "remis") return retrait;
+  if (statut === "revenu_magasin") return aujourdhui;
   return null;
 }

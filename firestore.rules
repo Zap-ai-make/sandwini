@@ -1282,29 +1282,55 @@ service cloud.firestore {
                         'non_applicable'];
     }
 
-    // Les memes chemins que `lib/domain/dossier-carte-grise.ts`, ecrits une
-    // seconde fois a dessein : ici c'est la seule verification qui compte.
+    // Le statut doit s'accorder avec les cases, et c'est tout ce qu'on
+    // verifie desormais.
     //
-    // **`de == vers` est permis partout SAUF chez le prestataire**, et cette
-    // exception ferme un trou trouve par un test le 23 octobre 2026. Garder le
-    // meme statut sert aux corrections : completer une immatriculation qu'on
-    // n'avait pas sous la main au retour, rattraper un nom mal tape. Mais
-    // `chez_prestataire` -> `chez_prestataire` aurait laisse CONFIER DEUX FOIS
-    // la meme carte : le second depot aurait ecrase l'avance du premier, et un
-    // second paquet aurait promis une carte deja dehors. L'ecran ne le propose
-    // pas, mais c'est la base qui doit le refuser (D27).
-    function transitionCarteGriseAutorisee(de, vers) {
-      return (de == vers && de != 'chez_prestataire')
-             || (de == 'a_faire' && vers in ['chez_prestataire', 'non_applicable'])
-             || (de == 'chez_prestataire' && vers == 'revenu_magasin')
-             || (de == 'revenu_magasin' && vers == 'remis');
+    // **Ce qui remplace le chemin, et pourquoi.** Jusqu'au 23 octobre 2026 ces
+    // regles surveillaient un parcours : « a faire » puis « chez le
+    // prestataire » puis « revenu » puis « remis », sans saut ni retour. Le
+    // classeur du commanditaire ne marche pas ainsi — il n'a pas de colonne
+    // d'etat, parce que chez lui l'etat EST le remplissage, et il transcrit des
+    // dossiers vieux d'un an en remplissant les dix cases avant d'enregistrer.
+    // Le chemin aurait refuse sa saisie la plus courante.
+    //
+    // La coherence est plus forte que le chemin sur un point : un dossier ne
+    // peut plus dire « a faire » alors qu'un depot est inscrit dessus, ni
+    // « revenu » sans aucune preuve de retour. Elle est plus faible sur un
+    // autre : un second depot ecrase desormais le premier. C'est le prix de la
+    // demande — toutes les cases s'ouvrent a la correction — et le journal du
+    // dossier garde la trace de chaque ecriture, auteur compris.
+    //
+    // `remis` et `non_applicable` ne reclament rien : le premier est une
+    // declaration du comptoir, le second vient de la vente quand le client ne
+    // veut pas de carte grise. Aucune case ne les prouve.
+    function statutCarteGriseAccorde(donnees) {
+      return donnees.statut in ['remis', 'non_applicable']
+             // Le depot suffit a rendre « revenu » credible : le papier est
+             // sorti, et le magasin declare qu'il est rentre. C'est la reprise
+             // des anciens dossiers qui l'exige — le journal des passages dira
+             // parfois QUAND il est parti sans dire quand il est revenu, et
+             // refuser ces lignes-la les laisserait dehors pour toujours.
+             || (donnees.statut == 'revenu_magasin'
+                 && (donnees.get('immatriculation', '') != ''
+                     || donnees.get('revenuLe', null) != null
+                     || donnees.get('deposeLe', null) != null))
+             || (donnees.statut == 'chez_prestataire'
+                 && (donnees.get('deposeLe', null) != null
+                     || donnees.get('prestataireNom', '') != ''))
+             || (donnees.statut == 'a_faire'
+                 && donnees.get('deposeLe', null) == null
+                 && donnees.get('prestataireNom', '') == ''
+                 && donnees.get('immatriculation', '') == ''
+                 && donnees.get('revenuLe', null) == null
+                 && donnees.get('remisLe', null) == null);
     }
 
     function champsDossierCarteGrise() {
       return ['boutiqueId', 'venteId', 'origine', 'clientNom', 'motoLibelle',
-              'numeroChassis', 'statut', 'prestataireId', 'prestataireNom',
-              'deposeLe', 'avance', 'disponibleLe', 'immatriculation', 'revenuLe',
-              'remisLe', 'remisANom', 'remisATelephone'];
+              'numeroChassis', 'recu', 'credit', 'statut', 'prestataireId',
+              'prestataireNom', 'deposeLe', 'avance', 'disponibleLe',
+              'immatriculation', 'revenuLe', 'remisLe', 'remisANom',
+              'remisATelephone'];
     }
 
     function dossierCarteGriseValide(donnees) {
@@ -1320,22 +1346,32 @@ service cloud.firestore {
              // ranger un roman dans `remisANom` et le faire relire a chaque
              // affichage de la liste.
              && texteBorne(donnees.get('motoLibelle', ''), 80)
+             && texteBorne(donnees.get('prestataireNom', ''), 80)
              && texteBorne(donnees.get('immatriculation', ''), 24)
              && texteBorne(donnees.get('remisANom', ''), 80)
              && texteBorne(donnees.get('remisATelephone', ''), 32)
-             && statutCarteGriseConnu(donnees.statut);
+             // Les deux colonnes revenues de son classeur. Le credit reste un
+             // entier positif : le FCFA ne se divise pas, et un montant negatif
+             // ne veut rien dire sur une dette.
+             && donnees.get('recu', false) is bool
+             && (donnees.get('credit', null) == null
+                 || (donnees.credit is int && donnees.credit >= 0
+                     && donnees.credit <= 1000000000))
+             && statutCarteGriseConnu(donnees.statut)
+             && statutCarteGriseAccorde(donnees);
     }
 
     match /dossiersCarteGrise/{dossierId} {
       allow read: if peutVendrePour(resource.data.boutiqueId) || traiteLesCartesGrises();
 
-      // Un dossier naît au debut de sa vie : « a faire », ou « sans objet »
-      // quand le client ne veut pas de carte grise. Le faire naitre deja chez
-      // un prestataire sauterait le depot, donc la sortie d'argent qui va avec.
+      // Un dossier peut naitre a n'importe quelle etape de sa vie, et c'est le
+      // classeur du commanditaire qui l'impose : il y recopie des dossiers
+      // vieux d'un an, dix cases remplies d'un coup. Ce qui tenait la place de
+      // cette restriction est la coherence — naitre « chez le prestataire »
+      // exige qu'un depot soit inscrit, donc le depot n'est jamais saute.
       allow create: if (peutVendrePour(request.resource.data.boutiqueId)
                         || traiteLesCartesGrises())
                     && dossierCarteGriseValide(request.resource.data)
-                    && request.resource.data.statut in ['a_faire', 'non_applicable']
                     && traceCreation(request.resource.data);
 
       allow update: if (peutVendrePour(resource.data.boutiqueId) || traiteLesCartesGrises())
@@ -1347,8 +1383,6 @@ service cloud.firestore {
                     && request.resource.data.origine == resource.data.origine
                     && request.resource.data.get('venteId', null)
                        == resource.data.get('venteId', null)
-                    && transitionCarteGriseAutorisee(resource.data.statut,
-                                                     request.resource.data.statut)
                     && traceModification(request.resource.data, resource.data);
 
       // Un dossier ne se supprime pas : on l'ecarte en le passant « sans

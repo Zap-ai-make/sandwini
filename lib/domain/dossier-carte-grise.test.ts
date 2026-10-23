@@ -1,66 +1,70 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  champsDeLaLigne,
   champsDossierNeuf,
   dossierEnCours,
-  rangerDossiers,
+  ENTETES_LIGNE,
   estTerminal,
   LIBELLE_STATUT_CARTE_GRISE,
-  normaliserDossierExterieur,
-  statutsSuivants,
-  transitionAutorisee,
-  validerDossierExterieur,
-  validerRemise,
-  validerRetour,
+  LIGNE_VIDE,
+  ligneDuDossier,
+  ORDRE_LIGNE,
+  rangerDossiers,
+  statutDeLaLigne,
+  validerLigne,
   type DossierCarteGrise,
-  type SaisieDossierExterieur,
-  type SaisieRemise,
+  type SaisieLigne,
 } from "./dossier-carte-grise";
 
 /**
- * Le dossier de carte grise, sorti de la vente (S59).
+ * Le dossier de carte grise, tel que son classeur le tient (S59).
  *
- * **Ce qui change par rapport à S53.** Un dossier vivait *dans* sa vente, donc
- * il n'en existait pas sans vente — or on confie souvent une carte grise venue
- * du dehors. Et son parcours s'arrêtait au retour du prestataire ; le fichier
- * du client montre qu'il y a une étape de plus, la remise, avec le nom et le
- * téléphone de celui qui vient chercher.
+ * **Ce que ces tests gardent.** Le commanditaire a demandé ses dix colonnes,
+ * sous ses noms et dans son ordre : ce sont elles qu'on fige ici, parce qu'un
+ * entête qui dérive lui fera relire la colonne à chaque ligne. Puis la
+ * déduction du statut — il n'y a plus de machine à états, c'est le remplissage
+ * des cases qui dit où se trouve le papier — et le seul contrôle de cohérence
+ * entre deux cases, le retrait antérieur au dépôt.
  */
-describe("le parcours d’une carte grise", () => {
-  it("va du magasin au prestataire, revient, puis se remet", () => {
-    expect(transitionAutorisee("a_faire", "chez_prestataire")).toBe(true);
-    expect(transitionAutorisee("chez_prestataire", "revenu_magasin")).toBe(true);
-    expect(transitionAutorisee("revenu_magasin", "remis")).toBe(true);
+
+describe("les dix colonnes de son classeur", () => {
+  it("garde ses noms, fautes comprises, et son ordre", () => {
+    /* **Fautes comprises, et c'est la demande.** Il s'est familiarisé avec son
+       fichier et ne veut pas en changer. `CHASIS` sans S, `Reci` pour reçu,
+       `TRANSITE` pour le prestataire : les corriger ferait un écran qu'il ne
+       reconnaît plus. */
+    expect(ORDRE_LIGNE.map((cle) => ENTETES_LIGNE[cle])).toEqual([
+      "client",
+      "MOTO",
+      "CHASIS",
+      "Reci",
+      "Credit",
+      "RECEPTION",
+      "retrait",
+      "Depot",
+      "Immatriculation",
+      "TRANSITE",
+    ]);
   });
 
-  it("ne saute jamais le prestataire", () => {
-    /* C'est lui qui dit qui détient le papier. Sauter l'étape viderait la
-       liste de la seule chose qu'elle sert à dire (D65). */
-    expect(transitionAutorisee("a_faire", "revenu_magasin")).toBe(false);
-    expect(transitionAutorisee("a_faire", "remis")).toBe(false);
+  it("n’en ajoute aucune : la saisie et le tableau montrent les mêmes", () => {
+    expect(ORDRE_LIGNE).toHaveLength(10);
+    expect(Object.keys(ENTETES_LIGNE).sort()).toEqual([...ORDRE_LIGNE].sort());
+    expect(Object.keys(LIGNE_VIDE).sort()).toEqual([...ORDRE_LIGNE].sort());
   });
+});
 
-  it("ne revient jamais en arrière", () => {
-    expect(transitionAutorisee("revenu_magasin", "chez_prestataire")).toBe(false);
-    expect(transitionAutorisee("remis", "revenu_magasin")).toBe(false);
-  });
-
+describe("ce qui est fini", () => {
   it("s’arrête à la remise, et pas avant", () => {
     /* **Le changement de définition de S59.** S53 arrêtait le parcours au
        retour au magasin. Le fichier du client montre qu'il manque une étape :
        une carte revenue n'est pas une carte rendue, et c'est justement celle
        qu'il faut pouvoir retrouver quand quelqu'un vient la chercher. */
     expect(estTerminal("revenu_magasin")).toBe(false);
+    expect(estTerminal("chez_prestataire")).toBe(false);
     expect(estTerminal("remis")).toBe(true);
     expect(estTerminal("non_applicable")).toBe(true);
-    expect(statutsSuivants("remis")).toEqual([]);
-  });
-
-  it("laisse écarter un dossier qui n’a pas lieu d’être, mais seulement au début", () => {
-    expect(transitionAutorisee("a_faire", "non_applicable")).toBe(true);
-    /* Une carte déjà chez quelqu'un ne devient pas « sans objet » : elle est
-       physiquement dehors, et quelqu'un l'attend. */
-    expect(transitionAutorisee("chez_prestataire", "non_applicable")).toBe(false);
   });
 
   it("nomme chaque étape avec les mots du comptoir", () => {
@@ -84,23 +88,25 @@ describe("ce qui est encore en cours", () => {
   });
 });
 
-describe("un dossier venu du dehors", () => {
-  const SAISIE: SaisieDossierExterieur = {
-    clientNom: "Sawadogo Harouna",
-    motoLibelle: "SR - 115",
-    numeroChassis: "02SY052982",
+
+describe("une ligne de son classeur", () => {
+  const LIGNE: SaisieLigne = {
+    ...LIGNE_VIDE,
+    client: "SOUMBOUGMA KARIM",
+    moto: "SR - 115",
+    chassis: "10RY243294",
   };
 
-  it("accepte un propriétaire et un châssis", () => {
-    expect(validerDossierExterieur(SAISIE)).toBeNull();
+  it("accepte un propriétaire et un châssis, le reste vide", () => {
+    expect(validerLigne(LIGNE)).toBeNull();
   });
 
   it("exige un nom : sans lui, personne ne vient chercher le papier", () => {
-    expect(validerDossierExterieur({ ...SAISIE, clientNom: "  " })).toMatch(/nom/i);
+    expect(validerLigne({ ...LIGNE, client: "  " })).toMatch(/nom/i);
   });
 
   it("exige un châssis : c’est l’identité de la moto", () => {
-    expect(validerDossierExterieur({ ...SAISIE, numeroChassis: "" })).toMatch(/châssis/i);
+    expect(validerLigne({ ...LIGNE, chassis: "" })).toMatch(/châssis/i);
   });
 
   it("n’impose aucune longueur de châssis", () => {
@@ -108,71 +114,215 @@ describe("un dossier venu du dehors", () => {
        font dix à douze caractères — 10RY243294, 4140RY029597 — et non les
        dix-sept d'une voiture. Une longueur imposée aurait refusé la totalité
        de leurs dossiers. */
-    expect(validerDossierExterieur({ ...SAISIE, numeroChassis: "10RY243294" })).toBeNull();
-    expect(validerDossierExterieur({ ...SAISIE, numeroChassis: "4140RY029597" })).toBeNull();
+    expect(validerLigne({ ...LIGNE, chassis: "10RY243294" })).toBeNull();
+    expect(validerLigne({ ...LIGNE, chassis: "4140RY029597" })).toBeNull();
   });
 
   it("refuse un châssis qui n’est pas fait de lettres et de chiffres", () => {
-    expect(validerDossierExterieur({ ...SAISIE, numeroChassis: "70SJ/0229" })).toMatch(/châssis/i);
+    expect(validerLigne({ ...LIGNE, chassis: "70SJ/0229" })).toMatch(/châssis/i);
   });
 
-  it("se passe du modèle : le fichier du client en a sans", () => {
-    expect(validerDossierExterieur({ ...SAISIE, motoLibelle: "" })).toBeNull();
+  it("se passe du modèle : son fichier en a des lignes sans", () => {
+    expect(validerLigne({ ...LIGNE, moto: "" })).toBeNull();
   });
+
+  it("accepte la ligne entière, transcrite d’un coup", () => {
+    /* **C'est sa saisie la plus courante**, et c'est pour elle que la machine à
+       états est partie : il recopie des dossiers vieux d'un an, donc il remplit
+       toutes les cases avant d'enregistrer. */
+    expect(
+      validerLigne({
+        client: "SANA HAROUNA",
+        moto: "GEAR",
+        chassis: "70SJ022946",
+        recu: true,
+        credit: "",
+        reception: "70518381",
+        retrait: "2026-07-29",
+        depot: "2025-08-18",
+        immatriculation: "7078 7DQ 04",
+        transite: "BOHARY",
+      }),
+    ).toBeNull();
+  });
+
+  it("refuse un retrait antérieur au dépôt", () => {
+    /* Le seul contrôle entre deux cases, et il attrape une faute de frappe qui
+       coûte cher : une carte rendue avant d'être partie n'existe pas, et la
+       ligne resterait lisible et fausse pour toujours. */
+    expect(
+      validerLigne({ ...LIGNE, depot: "2026-07-29", retrait: "2025-08-18" }),
+    ).toMatch(/antérieur/i);
+  });
+
+  it("accepte un dépôt et un retrait le même jour", () => {
+    expect(
+      validerLigne({ ...LIGNE, depot: "2026-07-29", retrait: "2026-07-29" }),
+    ).toBeNull();
+  });
+
+  it("refuse une date qui n’en est pas une, mais pas une case vide", () => {
+    expect(validerLigne({ ...LIGNE, depot: "2026-02-31" })).toMatch(/date/i);
+    expect(validerLigne({ ...LIGNE, retrait: "" })).toBeNull();
+  });
+
+  it("lit le crédit comme un montant en francs, et le laisse vide", () => {
+    /* Sa colonne `Credit` est vide sur toutes les lignes relevées. Elle existe
+       quand même, parce qu'il a demandé ses champs et qu'un champ absent est
+       un champ qu'il ira chercher ailleurs. */
+    expect(validerLigne({ ...LIGNE, credit: "" })).toBeNull();
+    expect(validerLigne({ ...LIGNE, credit: "150 000" })).toBeNull();
+    expect(validerLigne({ ...LIGNE, credit: "12,5" })).toMatch(/montant/i);
+  });
+
+  it("borne le téléphone et la plaque", () => {
+    expect(validerLigne({ ...LIGNE, reception: "7".repeat(40) })).toMatch(/téléphone/i);
+    expect(validerLigne({ ...LIGNE, immatriculation: "A".repeat(30) })).toMatch(
+      /immatriculation/i,
+    );
+  });
+});
+
+describe("le statut que les cases racontent", () => {
+  const NEUF = { statut: "a_faire" as const, revenuLe: null };
+
+  it("ne dit rien tant que rien n’est rempli", () => {
+    expect(statutDeLaLigne(LIGNE_VIDE, NEUF)).toBe("a_faire");
+  });
+
+  it("dit « chez le prestataire » dès que le dépôt ou le prestataire est là", () => {
+    expect(statutDeLaLigne({ ...LIGNE_VIDE, depot: "2025-08-18" }, NEUF)).toBe("chez_prestataire");
+    expect(statutDeLaLigne({ ...LIGNE_VIDE, transite: "BOHARY" }, NEUF)).toBe("chez_prestataire");
+  });
+
+  it("dit « au magasin » dès que la plaque est connue", () => {
+    /* `Immatriculation` est la preuve du retour : la plaque s'obtient avec la
+       carte grise, et son classeur n'a pas d'autre colonne pour le dire. */
+    expect(
+      statutDeLaLigne({ ...LIGNE_VIDE, depot: "2025-08-18", immatriculation: "7078 7DQ 04" }, NEUF),
+    ).toBe("revenu_magasin");
+  });
+
+  it("garde « au magasin » pour un papier revenu sans numéro", () => {
+    /* Le numéro n'est pas toujours sous la main au retour. Sans ce rappel, la
+       moindre correction d'une autre case renverrait le dossier chez le
+       prestataire — alors que le papier est sur le bureau. */
+    expect(
+      statutDeLaLigne(
+        { ...LIGNE_VIDE, depot: "2025-08-18" },
+        { statut: "revenu_magasin", revenuLe: new Date(2026, 5, 10) },
+      ),
+    ).toBe("revenu_magasin");
+  });
+
+  it("dit « remis » dès que le retrait est daté", () => {
+    expect(statutDeLaLigne({ ...LIGNE_VIDE, retrait: "2026-07-29" }, NEUF)).toBe("remis");
+  });
+
+  it("revient au départ quand on vide les cases d’un dossier parti par erreur", () => {
+    /* C'est la correction qu'on vient chercher en rouvrant la ligne : un dépôt
+       inscrit sur le mauvais dossier s'efface, et le papier redevient à faire. */
+    expect(statutDeLaLigne(LIGNE_VIDE, { statut: "chez_prestataire", revenuLe: null })).toBe(
+      "a_faire",
+    );
+  });
+
+  it("n’invente jamais « sans objet », et ne le dément pas non plus", () => {
+    /* « Sans objet » vient du comptoir — le client ne veut pas de carte grise —
+       et aucune colonne de son classeur ne le porte. */
+    expect(statutDeLaLigne(LIGNE_VIDE, { statut: "non_applicable", revenuLe: null })).toBe(
+      "non_applicable",
+    );
+    expect(
+      statutDeLaLigne({ ...LIGNE_VIDE, depot: "2025-08-18" }, { statut: "non_applicable", revenuLe: null }),
+    ).toBe("chez_prestataire");
+  });
+});
+
+describe("les champs que la ligne décide", () => {
+  const NEUF = { statut: "a_faire" as const, revenuLe: null };
+  const AUJOURDHUI = new Date(2026, 9, 23);
 
   it("range le châssis en majuscules, sans espaces ni tirets", () => {
     /* Deux saisies du même numéro doivent donner la même chaîne, sinon le
        contrôle d'unicité laisse passer un doublon. */
-    const propre = normaliserDossierExterieur({ ...SAISIE, numeroChassis: " 02sy-052982 " });
-    expect(propre.numeroChassis).toBe("02SY052982");
-    expect(propre.clientNom).toBe("Sawadogo Harouna");
-  });
-});
-
-describe("le retour du prestataire", () => {
-  it("accepte le numéro d’immatriculation", () => {
-    expect(validerRetour({ immatriculation: "7078 7DQ 04", revenuLe: "2026-07-29" })).toBeNull();
+    const champs = champsDeLaLigne(
+      { ...LIGNE_VIDE, client: " SANA HAROUNA ", chassis: " 02sy-052982 " },
+      NEUF,
+      AUJOURDHUI,
+    );
+    expect(champs.numeroChassis).toBe("02SY052982");
+    expect(champs.clientNom).toBe("SANA HAROUNA");
   });
 
-  it("ne bloque pas un retour dont on n’a pas encore le numéro", () => {
-    /* La carte est physiquement revenue : refuser de l'enregistrer parce que
-       le numéro n'est pas sous la main ferait mentir l'écran sur un fait
-       accompli. On le complétera. */
-    expect(validerRetour({ immatriculation: "", revenuLe: "2026-07-29" })).toBeNull();
+  it("met les cases aux champs du dossier", () => {
+    const champs = champsDeLaLigne(
+      {
+        client: "SANA HAROUNA",
+        moto: "GEAR",
+        chassis: "70SJ022946",
+        recu: true,
+        credit: "150 000",
+        reception: "70518381",
+        retrait: "2026-07-29",
+        depot: "2025-08-18",
+        immatriculation: "7078 7DQ 04",
+        transite: "BOHARY",
+      },
+      NEUF,
+      AUJOURDHUI,
+    );
+    expect(champs.recu).toBe(true);
+    expect(champs.credit).toBe(150_000);
+    /* `RECEPTION` porte un téléphone, pas un nom : ce sont des numéros à huit
+       chiffres dans son fichier. */
+    expect(champs.remisATelephone).toBe("70518381");
+    expect(champs.prestataireNom).toBe("BOHARY");
+    expect(champs.deposeLe).toEqual(new Date(2025, 7, 18, 12));
+    expect(champs.remisLe).toEqual(new Date(2026, 6, 29, 12));
+    expect(champs.statut).toBe("remis");
   });
 
-  it("exige une date de retour, et une vraie", () => {
-    expect(validerRetour({ immatriculation: "", revenuLe: "" })).toMatch(/date/i);
-    expect(validerRetour({ immatriculation: "", revenuLe: "2026-02-31" })).toMatch(/date/i);
-  });
-});
-
-describe("la remise au comptoir", () => {
-  const REMISE: SaisieRemise = {
-    nom: "Ouédraogo Issa",
-    telephone: "70518381",
-    remisLe: "2026-07-29",
-  };
-
-  it("accepte un nom, un téléphone et une date", () => {
-    expect(validerRemise(REMISE)).toBeNull();
+  it("laisse le crédit vide plutôt qu’à zéro", () => {
+    /* Zéro dirait « il ne doit rien », vide dit « on n'a pas renseigné ». Sur
+       une colonne vide dans tout son fichier, la nuance est la seule chose qui
+       reste. */
+    expect(champsDeLaLigne(LIGNE_VIDE, NEUF, AUJOURDHUI).credit).toBeNull();
   });
 
-  it("exige le nom de celui qui est venu", () => {
-    /* **Ce n'est pas toujours l'acheteur** — c'est souvent un frère ou un
-       employé. C'est précisément pour ça qu'on l'écrit : sans nom, la ligne ne
-       dit pas à qui le papier a été remis. */
-    expect(validerRemise({ ...REMISE, nom: "   " })).toMatch(/nom/i);
+  it("date le retour du jour où on l’enregistre", () => {
+    const champs = champsDeLaLigne(
+      { ...LIGNE_VIDE, immatriculation: "7078 7DQ 04" },
+      NEUF,
+      AUJOURDHUI,
+    );
+    expect(champs.revenuLe).toEqual(AUJOURDHUI);
   });
 
-  it("se passe du téléphone sans se bloquer", () => {
-    /* Le fichier du client en a, mais tous les retraits n'en portent pas. Un
-       champ obligatoire ferait inventer un numéro. */
-    expect(validerRemise({ ...REMISE, telephone: "" })).toBeNull();
+  it("ne rejuge pas un retour déjà daté", () => {
+    const connu = new Date(2026, 5, 10);
+    const champs = champsDeLaLigne(
+      { ...LIGNE_VIDE, immatriculation: "7078 7DQ 04" },
+      { statut: "revenu_magasin", revenuLe: connu },
+      AUJOURDHUI,
+    );
+    expect(champs.revenuLe).toEqual(connu);
   });
 
-  it("exige une date de remise", () => {
-    expect(validerRemise({ ...REMISE, remisLe: "" })).toMatch(/date/i);
+  it("sur une ligne transcrite d’un coup, fait revenir le papier le jour du retrait", () => {
+    /* **Sans rien inventer.** Son classeur n'a pas de colonne pour le retour au
+       magasin ; sur une ligne déjà rendue, la seule date qu'on ait est celle du
+       retrait, et le papier était forcément revenu au plus tard ce jour-là. */
+    const champs = champsDeLaLigne(
+      { ...LIGNE_VIDE, depot: "2025-08-18", retrait: "2026-07-29" },
+      NEUF,
+      AUJOURDHUI,
+    );
+    expect(champs.revenuLe).toEqual(new Date(2026, 6, 29, 12));
+  });
+
+  it("ne date aucun retour sur un dossier qui n’est pas parti", () => {
+    expect(champsDeLaLigne(LIGNE_VIDE, NEUF, AUJOURDHUI).revenuLe).toBeNull();
   });
 });
 
@@ -242,7 +392,7 @@ describe("les champs d’un dossier neuf", () => {
     statut: "a_faire" as const,
   };
 
-  it("porte les dix-sept champs, et pas un de plus", () => {
+  it("porte les dix-neuf champs, et pas un de plus", () => {
     /* **Les règles exigent `hasOnly`** : un champ en trop fait refuser
        l'écriture, et un champ manquant fait refuser toutes les modifications
        suivantes. C'est la seule chose que ce test garde. */
@@ -251,6 +401,7 @@ describe("les champs d’un dossier neuf", () => {
         "avance",
         "boutiqueId",
         "clientNom",
+        "credit",
         "deposeLe",
         "disponibleLe",
         "immatriculation",
@@ -259,6 +410,7 @@ describe("les champs d’un dossier neuf", () => {
         "origine",
         "prestataireId",
         "prestataireNom",
+        "recu",
         "remisANom",
         "remisATelephone",
         "remisLe",
@@ -299,5 +451,67 @@ describe("les champs d’un dossier neuf", () => {
     const champs = champsDossierNeuf({ ...NAISSANCE, origine: "exterieur", venteId: null });
     expect(champs.venteId).toBeNull();
     expect(champs.origine).toBe("exterieur");
+  });
+});
+
+describe("rouvrir une ligne pour la corriger", () => {
+  const DOSSIER: DossierCarteGrise = {
+    id: "d1",
+    boutiqueId: "PTG",
+    venteId: null,
+    origine: "exterieur",
+    clientNom: "SOUMBOUGMA KARIM",
+    motoLibelle: "SR-115",
+    numeroChassis: "10RY243294",
+    recu: true,
+    credit: 150_000,
+    statut: "remis",
+    prestataireId: "p1",
+    prestataireNom: "BOHARY",
+    deposeLe: new Date(2025, 7, 18, 12),
+    avance: 100_000,
+    disponibleLe: null,
+    immatriculation: "7078 7DQ 04",
+    revenuLe: new Date(2026, 5, 10, 12),
+    remisLe: new Date(2026, 6, 29, 12),
+    remisANom: "",
+    remisATelephone: "70518381",
+  };
+
+  it("remet chaque case dans l’état où elle a été laissée", () => {
+    /* **L'aller-retour doit être neutre.** Rouvrir une ligne et enregistrer
+       sans rien toucher ne doit rien changer — sinon la moindre relecture
+       déplacerait un dossier. */
+    expect(ligneDuDossier(DOSSIER)).toEqual({
+      client: "SOUMBOUGMA KARIM",
+      moto: "SR-115",
+      chassis: "10RY243294",
+      recu: true,
+      credit: "150000",
+      reception: "70518381",
+      retrait: "2026-07-29",
+      depot: "2025-08-18",
+      immatriculation: "7078 7DQ 04",
+      transite: "BOHARY",
+    });
+  });
+
+  it("rend un crédit absent comme une case vide, et non comme zéro", () => {
+    expect(ligneDuDossier({ ...DOSSIER, credit: null }).credit).toBe("");
+  });
+
+  it("rend les dates absentes comme des cases vides", () => {
+    const ligne = ligneDuDossier({ ...DOSSIER, deposeLe: null, remisLe: null });
+    expect(ligne.depot).toBe("");
+    expect(ligne.retrait).toBe("");
+  });
+
+  it("se relit sans rien déplacer", () => {
+    const champs = champsDeLaLigne(ligneDuDossier(DOSSIER), DOSSIER, new Date(2026, 9, 23));
+    expect(champs.statut).toBe(DOSSIER.statut);
+    expect(champs.deposeLe).toEqual(DOSSIER.deposeLe);
+    expect(champs.remisLe).toEqual(DOSSIER.remisLe);
+    expect(champs.revenuLe).toEqual(DOSSIER.revenuLe);
+    expect(champs.credit).toBe(DOSSIER.credit);
   });
 });
