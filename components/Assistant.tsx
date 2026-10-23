@@ -58,6 +58,16 @@ import { useEtatReseau } from "@/lib/reseau/etat-reseau";
  */
 type Avis =
   | { quoi: "ouvert"; libelle: string }
+  /**
+   * Un écran **proposé**, et c'est la main qui décide quand.
+   *
+   * Le commanditaire, après essai : « il détaille bien, et à la fin il ouvre
+   * l'onglet avec un bouton voir — mais il doit le faire à la fin ». Un geste
+   * d'ouverture part avant que le modèle ait écrit sa phrase ; l'écran
+   * changeait donc pendant qu'on lisait. Le bouton, lui, attend — et il
+   * n'apparaît qu'une fois la réponse entièrement écrite.
+   */
+  | { quoi: "propose"; libelle: string; chemin: string }
   /** Un refus de l'appareil : micro fermé, photo illisible. */
   | { quoi: "souci"; texte: string }
   | { quoi: "boutique_requise"; libelle: string }
@@ -319,7 +329,18 @@ export function Assistant() {
         return;
       }
 
-      router.push(geste.quoi === "vente" ? cheminVentePreparee(geste) : geste.destination.chemin);
+      const chemin =
+        geste.quoi === "vente" ? cheminVentePreparee(geste) : geste.destination.chemin;
+
+      /* **On ne bouge pas : on propose.** Le même contrôle de boutique a déjà
+         été fait au-dessus — proposer un écran qu'on ne pourrait pas ouvrir
+         ferait un bouton qui mène à un refus. */
+      if (geste.quoi === "proposer") {
+        setAvis({ quoi: "propose", libelle, chemin });
+        return;
+      }
+
+      router.push(chemin);
       setAvis({ quoi: "ouvert", libelle });
     },
     [boutiques, choisir, perimetre.boutiqueId, router],
@@ -386,7 +407,7 @@ export function Assistant() {
             nomBoutique: perimetre.boutiqueId ? perimetre.nom : null,
             aujourdhui: new Date(),
           },
-          { boutiqueId: perimetre.boutiqueId },
+          { boutiqueId: perimetre.boutiqueId, role: session.utilisateur.role },
         );
 
         const { texte, outils } = await conversation.current.envoyer(question, jointes, (progres) => {
@@ -692,9 +713,30 @@ export function Assistant() {
               </section>
             )}
 
-            {avis !== null && (
+            {/* **La proposition attend la fin de la phrase.** `enTrainDEcrire`
+                retombe quand le dernier mot est posé : avant ça, un bouton
+                « Voir » surgissant sous un texte en train de s'écrire invite à
+                partir au milieu de la réponse — exactement ce qu'on corrige. */}
+            {avis !== null && !(avis.quoi === "propose" && enTrainDEcrire) && (
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-bord bg-fond px-5 py-3">
-                {avis.quoi === "ouvert" ? (
+                {avis.quoi === "propose" ? (
+                  <>
+                    <p className="flex-1 text-sm text-encre-doux">
+                      Le détail est dans {avis.libelle}.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        router.push(avis.chemin);
+                        setOuvert(false);
+                        setAvis(null);
+                      }}
+                      className="bouton bouton-principal"
+                    >
+                      Voir {avis.libelle}
+                    </button>
+                  </>
+                ) : avis.quoi === "ouvert" ? (
                   <>
                     <p className="flex-1 text-sm text-encre">
                       {avis.libelle.charAt(0).toUpperCase() + avis.libelle.slice(1)} vient de

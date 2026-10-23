@@ -7,8 +7,11 @@ import {
   type MouvementPiece,
 } from "@/lib/domain/piece";
 import { db } from "@/lib/firebase/client";
+import type { Role } from "@/lib/domain/roles";
 import { clesDisponibles } from "./destinations";
-import { lireGeste, OUTILS_QUI_AGISSENT, resumeGeste } from "./gestes";
+import { clesDuManuel, sommaire, trouverFiche } from "./manuel";
+import { resumerLeCommerce } from "./resume";
+import { lireGeste, resumeGeste } from "./gestes";
 import { estRefus, lireProposition, resume } from "./propositions";
 
 /**
@@ -59,6 +62,15 @@ const VERSEMENTS_MAX = 5_000;
 export type ContexteOutils = {
   /** `null` veut dire « toutes les boutiques » : le responsable seul l'obtient. */
   boutiqueId: string | null;
+  /**
+   * Le rôle de celui qui parle.
+   *
+   * Il ne protège rien — les règles Firestore s'en chargent — mais il décide de
+   * ce que le **mode d'emploi** raconte : expliquer à un gérant comment poser
+   * un prix d'achat lui apprendrait l'existence d'un écran que sa garde lui
+   * refuse, et donnerait l'impression que l'application est cassée.
+   */
+  role: Role;
 };
 
 /**
@@ -87,6 +99,37 @@ export const DECLARATIONS = [
       },
     },
   },
+  {
+    name: "etat_du_commerce",
+    description:
+      "Le résumé de tout le commerce en UNE seule consultation : motos en stock et celles qui " +
+      "dorment, ventes du mois, argent que les clients doivent, tranches en cours, caisse du " +
+      "mois, cartes grises chez un prestataire, pièces à réapprovisionner. " +
+      "C'est l'outil de « fais-moi un inventaire », « comment va le commerce », « un résumé », " +
+      "« où on en est », « quoi de neuf ». Emploie-le AVANT d'ouvrir un écran : la question " +
+      "demande des chiffres, pas une page. Tu ouvriras l'écran ensuite, si on te le demande.",
+    parameters: { type: "object", properties: {} },
+  },
+
+  {
+    name: "comment_faire",
+    description:
+      "Le mode d'emploi de l'application : à quoi sert un geste, les étapes dans l'ordre, et le " +
+      "piège à éviter. Sers-t'en dès qu'on te demande comment faire quelque chose, où ça se " +
+      "trouve, ou qu'on te demande une formation. " +
+      "N'explique JAMAIS de mémoire : lis la fiche. Sans `sujet`, tu obtiens la liste de tout ce " +
+      "que tu sais expliquer — c'est la réponse à « qu'est-ce que je peux faire ici ».",
+    parameters: {
+      type: "object",
+      properties: {
+        sujet: {
+          type: "string",
+          description: "Une clé de la liste, exactement. Laisse vide pour obtenir le sommaire.",
+        },
+      },
+    },
+  },
+
   {
     name: "chercher_client",
     description:
@@ -241,6 +284,22 @@ export const DECLARATIONS = [
     },
   },
   {
+    name: "proposer_l_ecran",
+    description:
+      "Pose un bouton « Voir » sous ta réponse, SANS rien ouvrir. C'est ce qu'il faut employer " +
+      "à la fin d'une réponse à une question : la personne lit d'abord, et décide ensuite " +
+      "d'aller voir. Même liste d'écrans que `aller_a`. " +
+      "N'emploie `aller_a` que lorsqu'on demande explicitement d'ouvrir quelque chose.",
+    parameters: {
+      type: "object",
+      properties: {
+        ecran: { type: "string", description: "Une clé de la liste, exactement." },
+      },
+      required: ["ecran"],
+    },
+  },
+
+  {
     name: "choisir_la_boutique",
     description:
       "Bascule le travail sur une autre boutique, comme le fait le sélecteur du bandeau. " +
@@ -336,18 +395,38 @@ async function lire(
  * Ils portent leur `boutiqueId` en double exactement pour ça : une requête de
  * groupe ne sait filtrer que sur les champs du document lui-même.
  */
-async function lireVersements(
+async function lireGroupe(
+  nomCollection: string,
   boutiqueId: string | null,
+  plafond: number,
 ): Promise<{ lignes: Record<string, unknown>[]; tronque: boolean }> {
-  const base = collectionGroup(db(), "versements");
+  const base = collectionGroup(db(), nomCollection);
   const requete = boutiqueId
-    ? query(base, where("boutiqueId", "==", boutiqueId), limit(VERSEMENTS_MAX))
-    : query(base, limit(VERSEMENTS_MAX));
+    ? query(base, where("boutiqueId", "==", boutiqueId), limit(plafond))
+    : query(base, limit(plafond));
   const instantane = await getDocs(requete);
   return {
     lignes: instantane.docs.map((document) => ({ id: document.id, ...document.data() })),
-    tronque: instantane.size >= VERSEMENTS_MAX,
+    tronque: instantane.size >= plafond,
   };
+}
+
+function lireVersements(
+  boutiqueId: string | null,
+): Promise<{ lignes: Record<string, unknown>[]; tronque: boolean }> {
+  return lireGroupe("versements", boutiqueId, VERSEMENTS_MAX);
+}
+
+/** Un horodatage de la base ramené à une date, ou `null`. */
+function enDate(valeur: unknown): Date | null {
+  const horodatage = valeur as { toDate?: () => Date };
+  if (typeof horodatage?.toDate === "function") return horodatage.toDate();
+  if (valeur instanceof Date) return valeur;
+  if (typeof valeur === "string") {
+    const date = new Date(valeur);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+  return null;
 }
 
 /** Un argument du modèle ramené à une chaîne propre, ou vide. */
@@ -453,6 +532,112 @@ export async function executerOutil(
           ? motos.filter((moto) => reduire(Object.values(moto).join(" ")).includes(recherche))
           : motos;
         return { motos: retenues.slice(0, PLAFOND), combien: retenues.length };
+      }
+
+      case "etat_du_commerce": {
+        /* **Sept lectures en parallèle, et c'est le but.** Elles coûtent un
+           aller-retour au modèle au lieu de quatre : c'est précisément ce qui
+           faisait préférer l'ouverture d'un écran à une réponse. Firestore les
+           sert depuis son cache local quand il l'a, et elles ne s'attendent pas
+           les unes les autres. */
+        const [motos, vendues, verses, caisse, papiers, cataloguee, bouges] = await Promise.all([
+          decrireMotos(contexte.boutiqueId),
+          lire("ventesMotos", contexte.boutiqueId, LECTURE_MAX),
+          lireVersements(contexte.boutiqueId),
+          lire("encaissements", contexte.boutiqueId, LECTURE_MAX * 2),
+          lireGroupe("documents", contexte.boutiqueId, LECTURE_MAX * 2),
+          lire("pieces", contexte.boutiqueId, LECTURE_MAX),
+          lire("mouvementsPieces", contexte.boutiqueId, MOUVEMENTS_MAX),
+        ]);
+
+        const quantites = stockParPiece(bouges.lignes as unknown as readonly MouvementPiece[]);
+
+        /* Chaque lecture coupée emporte sa réserve. Un total partiel annoncé
+           sans elle sera recopié sans elle. */
+        const avertissements: string[] = [];
+        if (verses.tronque) {
+          avertissements.push("Tous les versements n’ont pas été lus : les dettes sont des maximums.");
+        }
+        if (caisse.tronque) avertissements.push("Le journal de caisse a été coupé : les totaux du mois sont partiels.");
+        if (bouges.tronque) avertissements.push("Trop de mouvements de pièces : le compte des pièces à réapprovisionner n’est pas sûr.");
+
+        return {
+          resume: resumerLeCommerce(
+            {
+              motos: motos.toutes.map((moto) => ({
+                statut: String(moto.statut ?? ""),
+                dateEntree: enDate(moto.dateEntree),
+              })),
+              ventes: vendues.lignes.map((vente) => ({
+                id: String(vente.id),
+                date: enDate(vente.date),
+                prixConvenu: Number(vente.prixConvenu ?? 0),
+                modePaiement: String(vente.modePaiement ?? ""),
+              })),
+              versements: verses.lignes.map((versement) => ({
+                venteId: String(versement.venteId ?? ""),
+                montant: Number(versement.montant ?? 0),
+              })),
+              caisse: caisse.lignes.map((mouvement) => ({
+                date: enDate(mouvement.date),
+                sens: String(mouvement.sens ?? ""),
+                montant: Number(mouvement.montant ?? 0),
+              })),
+              cartesGrises: papiers.lignes
+                .filter((document) => document.type === "carte_grise")
+                .map((document) => ({
+                  statut: String(document.statut ?? ""),
+                  disponibleLe: enDate(document.disponibleLe),
+                })),
+              pieces: cataloguee.lignes.map((piece) => ({
+                quantite: quantites.get(String(piece.id)) ?? 0,
+                seuilAlerte: Number(piece.seuilAlerte ?? 0),
+              })),
+              avertissements,
+            },
+            new Date(),
+          ),
+          /* Le périmètre voyage avec les chiffres : « 14 motos » ne veut pas
+             dire la même chose sur une boutique et sur l'entreprise entière. */
+          portee: contexte.boutiqueId ? "la boutique en cours" : "toutes les boutiques",
+        };
+      }
+
+      case "comment_faire": {
+        const sujet = texteSimple(arguments_.sujet);
+        if (!sujet) {
+          return {
+            sommaire: sommaire(contexte.role).map((groupe) => ({
+              rubrique: groupe.libelle,
+              gestes: groupe.fiches.map((fiche) => ({ sujet: fiche.cle, titre: fiche.titre, quand: fiche.quand })),
+            })),
+            consigne:
+              "Propose les rubriques, et demande laquelle l’intéresse. Ne récite pas tout.",
+          };
+        }
+
+        const fiche = trouverFiche(sujet, contexte.role);
+        if (!fiche) {
+          /* On rend la liste plutôt qu'un refus sec : le modèle a souvent
+             choisi un mot voisin, et il peut corriger sans un aller-retour de
+             plus avec l'utilisateur. */
+          return {
+            erreur: `Je n’ai pas de fiche sur « ${sujet} ».`,
+            sujetsConnus: clesDuManuel(contexte.role),
+          };
+        }
+
+        return {
+          titre: fiche.titre,
+          quand: fiche.quand,
+          etapes: fiche.etapes,
+          ...(fiche.attention ? { attention: fiche.attention } : {}),
+          ...(fiche.ecran ? { ecranOuCaCommence: fiche.ecran } : {}),
+          consigne:
+            "Dis les étapes dans l’ordre, avec tes mots, et répète l’avertissement s’il y en a " +
+            "un. Propose ensuite d’ouvrir l’écran — ne l’ouvre pas sans qu’on te le demande, " +
+            "la personne est peut-être en train d’apprendre.",
+        };
       }
 
       case "chercher_client": {

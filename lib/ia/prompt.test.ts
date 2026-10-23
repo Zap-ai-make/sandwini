@@ -150,4 +150,74 @@ describe("le prompt système de l'assistant", () => {
   it("pousse à faire la suite évidente au lieu de la proposer", () => {
     expect(promptSysteme(BASE)).toContain("Va au bout du geste");
   });
+
+  /*
+   * **Le défaut observé le 20 octobre 2026**, et il venait du prompt.
+   *
+   * « Fais-moi un inventaire » ouvrait l'écran de l'inventaire au lieu de
+   * répondre. La consigne d'alors disait « ouvre l'écran dès qu'il répond mieux
+   * que toi » — sans distinguer une question d'une intention. Le modèle a suivi
+   * la consigne ; c'est la consigne qui était fausse.
+   */
+  it("répond à une question avant d’ouvrir quoi que ce soit", () => {
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("Une question se répond");
+    expect(prompt).toContain("jamais un écran");
+    /* Et la proposition vient après la réponse, pas à sa place. */
+    expect(prompt).toContain("donne le chiffre d’abord");
+  });
+
+  it("ouvre tout de suite quand on exprime une intention", () => {
+    /* L'inverse est tout aussi coûteux : répondre un mode d'emploi à
+       « je veux vendre une moto » fait retaper la demande. */
+    expect(promptSysteme(BASE)).toContain("Une intention appelle l’écran tout de suite");
+  });
+
+  it("envoie vers le résumé d’un coup plutôt que vers les chiffres un par un", () => {
+    /* C'est ce qui enlève au modèle la raison d'ouvrir un écran : répondre
+       devient le chemin le plus court, et non plus le plus long. */
+    expect(promptSysteme(BASE)).toContain("tout d’un coup");
+  });
+
+  it("lit le mode d’emploi au lieu de l’inventer", () => {
+    /* Un bouton inventé se cherche pendant dix minutes avant qu'on en conclue
+       que l'application est cassée. */
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("mode d’emploi écrit");
+    expect(prompt).toContain("ne l’invente pas");
+  });
+
+  /*
+   * **Le second essai du commanditaire, le 20 octobre 2026.** Répondre sans
+   * rien ouvrir ne lui allait pas non plus : « il détaille bien, et à la fin il
+   * ouvre l'onglet avec un bouton voir — mais il doit le faire à la fin ». Le
+   * bouton existe désormais ; ce que le prompt doit garantir, c'est qu'il ne
+   * confonde pas les deux outils, et qu'il n'annonce pas une ouverture qui n'a
+   * pas eu lieu.
+   */
+  it("pose un bouton plutôt que d’ouvrir, quand il répond à une question", () => {
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("proposer_l_ecran");
+    expect(prompt).toContain("seulement à la fin");
+    /* Ce qui distingue les deux outils est le moment, pas la destination : s'il
+       croit que ce sont deux écrans différents, il choisira au hasard. */
+    expect(prompt).toContain("le **moment**, pas la destination");
+    /* Et il ne doit pas raconter une ouverture qui n'a pas eu lieu, sinon on
+       cherche un écran qui n'a pas changé. */
+    expect(prompt).toContain("jamais « je t’ouvre » quand tu proposes");
+  });
+
+  it("détaille un résumé au lieu de le compresser", () => {
+    /* « Il détaille bien » : un résumé est le seul endroit du produit où l'on
+       attend une réponse longue, et un zéro tu ferait chercher. */
+    const prompt = promptSysteme(BASE);
+    expect(prompt).toContain("Un résumé se détaille");
+    expect(prompt).toContain("Un chiffre à zéro se dit aussi");
+  });
+
+  it("n’ouvre pas l’écran au milieu d’une explication", () => {
+    /* La seule exception à « pilote sans demander » : quelqu'un qui apprend
+       perd le fil si l'écran change sous ses yeux. */
+    expect(promptSysteme(BASE)).toContain("ne l’ouvre pas de toi-même");
+  });
 });

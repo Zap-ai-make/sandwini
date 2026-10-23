@@ -31,6 +31,23 @@ import type { Refus } from "./propositions";
 
 export type Geste =
   | { quoi: "aller"; destination: Destination }
+  /**
+   * Le même écran, **proposé** au lieu d'être ouvert.
+   *
+   * **Pourquoi les deux existent.** Un geste part *avant* que le modèle ait
+   * fini d'écrire — c'est l'ordre dans lequel l'API les rend. Ouvrir tout de
+   * suite escamote donc la réponse : l'écran change pendant qu'on lisait, et
+   * la question posée reste sans réponse à l'écran.
+   *
+   * Le commanditaire l'a dit après essai : « il détaille bien, et à la fin il
+   * ouvre l'onglet avec un bouton voir — mais il doit le faire à la fin ». Une
+   * proposition pose un bouton ; c'est la main qui décide du moment, et le
+   * moment est forcément après la lecture.
+   *
+   * `aller` reste pour les intentions explicites — « ouvre la caisse » —, où
+   * attendre un second clic serait une politesse qui fait perdre du temps.
+   */
+  | { quoi: "proposer"; destination: Destination }
   /** Le nom tel que prononcé ; c'est l'écran qui le rapproche de sa boutique. */
   | { quoi: "boutique"; nom: string }
   | { quoi: "fermer" }
@@ -49,6 +66,7 @@ export type Geste =
 /** Les outils qui agissent sur l'écran plutôt que de consulter des données. */
 export const OUTILS_QUI_AGISSENT = new Set([
   "aller_a",
+  "proposer_l_ecran",
   "choisir_la_boutique",
   "fermer_l_assistant",
   "preparer_vente_moto",
@@ -65,7 +83,7 @@ function chiffresSeuls(valeur: unknown): string {
 }
 
 export function lireGeste(nom: string, args: Record<string, unknown>): Geste | Refus {
-  if (nom === "aller_a") {
+  if (nom === "aller_a" || nom === "proposer_l_ecran") {
     const demande = typeof args.ecran === "string" ? args.ecran : "";
     const destination = trouverDestination(demande);
     /* Nommer le refus plutôt que de choisir à peu près : emmener quelqu'un sur
@@ -74,7 +92,9 @@ export function lireGeste(nom: string, args: Record<string, unknown>): Geste | R
     if (!destination) {
       return { erreur: `Il n’y a pas d’écran « ${demande} ». Choisis dans la liste proposée.` };
     }
-    return { quoi: "aller", destination };
+    /* Une seule lecture pour les deux : l'écran est le même, c'est le moment
+       qui change. Deux branches auraient fini par accepter deux listes. */
+    return { quoi: nom === "aller_a" ? "aller" : "proposer", destination };
   }
 
   if (nom === "choisir_la_boutique") {
@@ -108,6 +128,11 @@ export function lireGeste(nom: string, args: Record<string, unknown>): Geste | R
 /** Ce que l'assistant redit, pour qu'on sache ce qui vient de se passer. */
 export function resumeGeste(geste: Geste): string {
   if (geste.quoi === "aller") return `J’ouvre ${geste.destination.libelle}.`;
+  if (geste.quoi === "proposer") {
+    /* Au modèle, pas à l'utilisateur : il doit savoir que le bouton est posé,
+       sinon il le redemande ou annonce un écran ouvert qui ne l'est pas. */
+    return `Le bouton pour ouvrir ${geste.destination.libelle} est affiché sous ta réponse.`;
+  }
   if (geste.quoi === "boutique") return `Je passe sur ${geste.nom}.`;
   if (geste.quoi === "vente") return "J’ouvre la vente, déjà remplie. Rien n’est enregistré.";
   return "Je referme l’assistant.";

@@ -159,3 +159,43 @@ describe("l’adresse qui porte la vente pré-remplie", () => {
     expect(lireVentePreparee(new URLSearchParams({ nouvelle: "1" }))).toBe(null);
   });
 });
+
+/**
+ * Proposer un écran au lieu de l'ouvrir (20 octobre 2026).
+ *
+ * **Le défaut observé à l'essai.** Un geste part avant que le modèle ait fini
+ * d'écrire — c'est l'ordre dans lequel l'API les rend. L'écran changeait donc
+ * pendant qu'on lisait la réponse, et la question posée restait sans réponse
+ * sous les yeux. Le commanditaire : « il détaille bien, et à la fin il ouvre
+ * l'onglet avec un bouton voir — mais il doit le faire à la fin ».
+ */
+describe("proposer un écran", () => {
+  it("rend une proposition, pas une ouverture", () => {
+    const geste = lireGeste("proposer_l_ecran", { ecran: "inventaire" });
+    expect(estRefus(geste)).toBe(false);
+    expect((geste as Geste).quoi).toBe("proposer");
+  });
+
+  it("vise le même écran que l’ouverture immédiate", () => {
+    /* Une seule lecture pour les deux : si elles divergeaient, le bouton
+       n'emmènerait pas là où l'assistant a dit qu'il emmenait. */
+    const propose = lireGeste("proposer_l_ecran", { ecran: "caisse" }) as Geste;
+    const ouvre = lireGeste("aller_a", { ecran: "caisse" }) as Geste;
+    expect(propose.quoi === "proposer" && ouvre.quoi === "aller").toBe(true);
+    if (propose.quoi === "proposer" && ouvre.quoi === "aller") {
+      expect(propose.destination).toEqual(ouvre.destination);
+    }
+  });
+
+  it("refuse un écran inventé, comme l’ouverture", () => {
+    expect(estRefus(lireGeste("proposer_l_ecran", { ecran: "tableau_des_marges" }))).toBe(true);
+  });
+
+  it("dit au modèle que le bouton est posé, pas que l’écran est ouvert", () => {
+    /* Sans ça il annonce « je t'ai ouvert l'inventaire » alors que rien n'a
+       bougé, et la personne cherche un écran qui n'a pas changé. */
+    const geste = lireGeste("proposer_l_ecran", { ecran: "inventaire" }) as Geste;
+    expect(resumeGeste(geste)).toContain("bouton");
+    expect(resumeGeste(geste)).not.toContain("J’ouvre");
+  });
+});
