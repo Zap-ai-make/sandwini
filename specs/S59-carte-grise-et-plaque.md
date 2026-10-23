@@ -68,8 +68,8 @@ qu'on **inscrit au retour**, et non comme un second papier à poursuivre.
       boutiques, et peut les faire avancer.
 - [ ] Il ne lit **ni** les ventes, **ni** le stock, **ni** les pièces d'aucune boutique. Prouvé
       par un test de règles.
-- [ ] La caisse fait l'objet d'une question ouverte ci-dessous : l'avance versée au prestataire
-      sort forcément d'un tiroir.
+- [ ] Il ne lit aucune caisse : l'espace n'en a pas. L'avance se note sur le dépôt, et l'espace
+      en donne les totaux.
 - [ ] Il ne voit ni prix d'achat ni marge : le mur de D2 ne bouge pas.
 - [ ] Un gérant motos continue de ne voir que les dossiers de sa boutique.
 
@@ -87,6 +87,8 @@ qu'on **inscrit au retour**, et non comme un second papier à poursuivre.
 ### Le dépôt
 
 - [ ] Confier un paquet continue de marcher, depuis la fiche d'un prestataire comme depuis la liste.
+- [ ] Le dépôt n'écrit **plus** de sortie de caisse, d'où qu'il parte (arbitrage ci-dessus).
+- [ ] L'espace affiche le total des avances versées, par prestataire et sur une période.
 - [ ] Un dossier extérieur se confie dans les mêmes paquets qu'un dossier de vente.
 - [ ] Un dossier seul se confie sans passer par un paquet.
 
@@ -108,33 +110,27 @@ qu'on **inscrit au retour**, et non comme un second papier à poursuivre.
 
 ---
 
-## Une question laissée ouverte : l'avance sort de quelle caisse ?
+## L'avance ne passe plus par la caisse — arbitrage du 21 octobre 2026
 
-**Le seul point que les réponses du 21 octobre ne tranchent pas, et il faut le trancher avant le
-lot 2.**
+**Décision du commanditaire, rapportée du client : « pas de caisse pour carte grise, elle est
+dissociée des autres caisses ; ici ce sera uniquement pour mettre les montants des avances, pas
+d'entrée d'argent. Pas de liaison de comptabilité. »**
 
-Confier un paquet verse une avance, et cette avance **sort d'une caisse** : `confierPaquet` écrit
-une ligne de sortie, c'est un critère de S53 et le journal en dépend. Or la personne des cartes
-grises ne doit lire « ni les ventes, ni le stock, ni la caisse ».
+Ce que ça change, et il faut l'écrire parce que **cela renverse un critère de S53** : le dépôt
+d'un paquet n'écrit plus de ligne de sortie dans le journal de caisse. L'avance vit sur le paquet
+et sur le dossier, et l'espace en donne les totaux — par prestataire, et sur une période.
 
-Les deux se heurtent de front. Trois issues, et aucune n'est gratuite :
+**La conséquence, dite une fois.** L'argent remis à un prestataire cesse d'apparaître dans le
+journal de caisse de la boutique. Qui lit ce journal ne verra plus ces sorties : il faudra ouvrir
+l'historique des départs pour les retrouver. C'est le choix du client, et il se tient — ce n'est
+pas sa trésorerie de comptoir, c'est une avance sur un travail. Mais le journal cesse d'être le
+seul endroit où l'argent qui sort est écrit, et c'est un fait à connaître avant de lire un écart.
 
-1. **Elle tient sa propre caisse.** L'avance sort de la boutique « Carte grise et plaque », qui
-   devient un poste de trésorerie à part. C'est cohérent avec le fait qu'elle avance l'argent, et
-   ça garde les caisses des boutiques de vente intactes. Mais elle lit et écrit **une** caisse — la
-   sienne —, donc la phrase « ni la caisse » devient « pas celle des autres ».
-2. **L'avance reste à la charge de la boutique d'origine.** Fidèle à aujourd'hui, mais un paquet
-   mélangeant trois boutiques produirait trois sorties de caisse pour un seul billet — ce que S53 a
-   justement refusé.
-3. **Le dépôt n'écrit plus en caisse depuis cet espace.** Le plus simple, et le plus coûteux :
-   l'argent sortirait sans trace, ce que le produit interdit partout ailleurs.
+**Et une seule règle, pas deux.** Le dépôt cesse d'écrire en caisse **partout**, pas seulement
+depuis l'espace des cartes grises. Deux comportements selon l'écran d'où part le geste
+produiraient deux vérités sur le même billet — exactement ce que le dépôt refuse ailleurs.
 
-**Recommandation : la première.** Elle avance l'argent, elle tient le compte, et les sorties
-restent une par billet. Le critère « rien d'autre » se lit alors : *aucune autre boutique*.
-
-À arbitrer par le commanditaire avant d'écrire la règle.
-
----
+Les avances déjà écrites en caisse restent : on ne retouche pas un journal.
 
 ## Hors périmètre
 
@@ -237,6 +233,9 @@ cartes grises : seule leur source change de collection.
 ### Découpage proposé
 
 1. **Le métier et l'espace** — `METIERS`, règles, navigation, renommage. Rien ne bouge en données.
+   L'espace reste ouvert aux boutiques **motos** en plus de la nouvelle : fermer d'un coup ce que
+   S58 vient d'ouvrir aux gérants serait une régression gratuite, et la refermer plus tard ne coûte
+   qu'une ligne.
 2. **La collection et la migration** — domaine, dépôt, script, tests de règles. Lancé sur émulateurs.
 3. **Les écrans basculent** — dossiers, paquets, portail lisent la nouvelle collection.
 4. **Le dossier extérieur, l'immatriculation, la remise** — les trois ajouts du client.

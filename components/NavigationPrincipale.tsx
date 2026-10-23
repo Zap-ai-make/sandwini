@@ -65,7 +65,7 @@ const ICONE_ESPACE: Record<Espace, Icone> = {
   motos: Bike,
   /* Le même pictogramme que l'écran portait déjà dans la colonne des
      paramètres : l'entrée a déménagé, elle n'a pas changé de sens. */
-  prestataires: HardHat,
+  cartes_grises: HardHat,
   pieces: Wrench,
   caisse: Coins,
   reglages: Settings,

@@ -106,7 +106,7 @@ service cloud.firestore {
              && donnees.metiers is list
              && donnees.metiers.size() > 0
              && donnees.metiers.size() <= 2
-             && donnees.metiers.hasOnly(['motos', 'pieces'])
+             && donnees.metiers.hasOnly(['motos', 'pieces', 'cartes_grises'])
              && texteBorne(donnees.adresse, 200)
              && texteBorne(donnees.telephone, 40)
              && texteBorne(donnees.createdByName, 200)

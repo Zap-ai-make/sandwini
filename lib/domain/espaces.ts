@@ -22,7 +22,7 @@ export type Espace =
   | "supervision"
   | "accueil"
   | "motos"
-  | "prestataires"
+  | "cartes_grises"
   | "pieces"
   | "caisse"
   | "reglages";
@@ -31,25 +31,41 @@ export const ESPACES: Record<Espace, { href: string; libelle: string }> = {
   supervision: { href: "/supervision", libelle: "Supervision" },
   accueil: { href: "/dashboard", libelle: "Accueil" },
   motos: { href: "/motos", libelle: "Motos" },
-  prestataires: { href: "/prestataires", libelle: "Prestataires" },
+  /* Le rail dit « Cartes grises » et non « Carte grise et plaque » : 62 px de
+     large et dix pixels de haut ne tiennent pas quatre mots, et le nom complet
+     reste celui du métier, là où l'on déclare une boutique. */
+  cartes_grises: { href: "/prestataires", libelle: "Cartes grises" },
   pieces: { href: "/pieces", libelle: "Pièces" },
   caisse: { href: "/caisse", libelle: "Caisse" },
   reglages: { href: "/parametres", libelle: "Paramètres" },
 };
 
-/** L'espace qui porte un métier, et le métier qu'il demande. */
-const METIER_DE: Partial<Record<Espace, Metier>> = {
-  motos: "motos",
-  /* Les cartes grises sont une affaire de motos : une boutique de pièces n'a
-     rien à confier, et lui montrer l'entrée promettrait un écran sans emploi.
-     L'axe existe déjà, on s'y branche plutôt que d'inventer une garde. */
-  prestataires: "motos",
-  pieces: "pieces",
+/**
+ * Les métiers qui ouvrent un espace. Le **premier** est le sien.
+ *
+ * Une liste et non une valeur depuis S59 : l'espace des cartes grises
+ * appartient au métier du même nom, mais reste ouvert aux boutiques motos. Le
+ * fermer d'un coup retirerait aux gérants le dépôt qu'ils viennent d'obtenir
+ * (S58), et surtout il disparaîtrait de **tout le monde** tant que la boutique
+ * « Carte grise et plaque » n'est pas déclarée.
+ */
+const METIERS_DE: Partial<Record<Espace, readonly Metier[]>> = {
+  motos: ["motos"],
+  /* Une boutique de pièces n'a rien à confier : lui montrer l'entrée
+     promettrait un écran sans emploi. */
+  cartes_grises: ["cartes_grises", "motos"],
+  pieces: ["pieces"],
 };
 
-/** Le métier qu'un espace exige, s'il en exige un. */
+/**
+ * Le métier qu'un espace exige, s'il en exige un.
+ *
+ * Le premier de la liste : c'est celui que le refus nomme — « aucune boutique
+ * de ce métier » doit citer celui auquel l'espace appartient, pas celui qu'on
+ * tolère en plus.
+ */
 export function metierDeLEspace(espace: Espace): Metier | null {
-  return METIER_DE[espace] ?? null;
+  return METIERS_DE[espace]?.[0] ?? null;
 }
 
 /**
@@ -78,8 +94,8 @@ export function espacesVisibles(
   perimetre: PortéeDuPerimetre = "toutes",
 ): Espace[] {
   const ordre: Espace[] = surveille(role, perimetre)
-    ? ["supervision", "motos", "prestataires", "pieces", "caisse", "reglages"]
-    : ["accueil", "motos", "prestataires", "pieces", "caisse", "reglages"];
+    ? ["supervision", "motos", "cartes_grises", "pieces", "caisse", "reglages"]
+    : ["accueil", "motos", "cartes_grises", "pieces", "caisse", "reglages"];
 
   return ordre.filter((espace) => accedeEspace(role, metiers, espace, perimetre));
 }
@@ -154,8 +170,8 @@ export function accedeEspace(
   if (espace === "supervision") return surveille(role, perimetre);
   if (espace === "accueil") return !surveille(role, perimetre);
 
-  const metier = METIER_DE[espace];
-  return metier ? metiers.includes(metier) : true;
+  const exiges = METIERS_DE[espace];
+  return exiges ? exiges.some((metier) => metiers.includes(metier)) : true;
 }
 
 /* --------------------------------------------------------------------------
@@ -415,7 +431,7 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
    * l'autre bout — ici la personne, là les papiers — et passer de l'une à
    * l'autre est le geste naturel une fois le paquet tendu.
    */
-  prestataires: [
+  cartes_grises: [
     {
       titre: "Confier",
       ecrans: [
@@ -426,17 +442,11 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
         },
       ],
     },
-    {
-      titre: "Suivre",
-      ecrans: [
-        {
-          href: "/motos/dossiers",
-          libelle: "Dossiers en cours",
-          compteur: "dossiers",
-          renvoi: true,
-        },
-      ],
-    },
+    /* **Les dossiers ne sont pas encore ici, et c'est volontaire** (S59, lot 1).
+       Ils vivent sous `/motos/`, derrière la garde de l'espace motos : une
+       boutique « Carte grise et plaque » seule s'y verrait refuser l'entrée, et
+       une entrée qu'on ne peut pas suivre vaut moins qu'une entrée absente
+       (S54). Ils arrivent au lot 3, quand ils quittent la vente. */
   ],
   pieces: [
     {

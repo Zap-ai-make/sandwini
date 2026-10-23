@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   comparerBoutiques,
+  LIBELLE_METIER,
+  METIERS,
   estCodeValide,
   normaliserBoutique,
   normaliserCode,
@@ -144,5 +146,34 @@ describe("reunirMetiers", () => {
 
   it("ne rend rien quand il n’y a aucune boutique", () => {
     expect(reunirMetiers([])).toEqual([]);
+  });
+});
+
+/**
+ * Le troisième métier (S59, demande du client du 21 octobre 2026).
+ *
+ * « Le client veut que prestataire soit comme une boutique au même titre que
+ * moto et pièce, et que ça se déroule au niveau de la plaque jaune. » Les
+ * cartes grises sont traitées par une personne qui ne fait que ça : elle a
+ * besoin d'un endroit à elle, choisi comme une boutique.
+ *
+ * **Un métier, et non un troisième rôle.** Le produit en a deux, et c'est
+ * délibéré (`prompt.md` §4). L'axe des métiers décide déjà de ce qu'un compte
+ * voit (D62) ; s'y brancher évite d'inventer une garde parallèle.
+ */
+describe("le métier des cartes grises", () => {
+  it("existe et porte le nom que le client emploie", () => {
+    expect(METIERS).toContain("cartes_grises");
+    expect(LIBELLE_METIER.cartes_grises).toBe("Carte grise et plaque");
+  });
+
+  it("se déclare sur une boutique comme les deux autres", () => {
+    expect(validerBoutique(saisie({ metiers: ["cartes_grises"] }))).toBeNull();
+  });
+
+  it("garde l’ordre de déclaration, quel que soit l’ordre de clic", () => {
+    /* Deux boutiques aux mêmes métiers doivent porter le même tableau en base,
+       sinon les comparer demande de les trier d'abord. */
+    expect(normaliserMetiers(["cartes_grises", "motos"])).toEqual(["motos", "cartes_grises"]);
   });
 });

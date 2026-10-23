@@ -61,7 +61,7 @@ import { messageErreurReferentiel } from "@/lib/repositories/referentiels";
  */
 export default function PagePrestataires() {
   return (
-    <GardeEspace espace="prestataires">
+    <GardeEspace espace="cartes_grises">
       <Prestataires />
     </GardeEspace>
   );

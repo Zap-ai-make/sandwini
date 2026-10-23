@@ -17,12 +17,20 @@
  * Un tableau plutôt qu'une valeur unique : rien n'interdit qu'une boutique
  * finisse par tenir les deux, et ce jour-là le modèle n'a pas à être repeint.
  */
-export const METIERS = ["motos", "pieces"] as const;
+/* **Trois métiers depuis S59.** Les cartes grises sont traitées par quelqu'un
+   qui ne fait que ça : le client veut qu'elle se choisisse sur la plaque jaune,
+   au même titre que les motos et les pièces. On se branche sur l'axe qui décide
+   déjà de ce qu'un compte voit (D62) plutôt que d'inventer un troisième rôle —
+   le produit en a deux, et c'est délibéré. */
+export const METIERS = ["motos", "pieces", "cartes_grises"] as const;
 export type Metier = (typeof METIERS)[number];
 
 export const LIBELLE_METIER: Record<Metier, string> = {
   motos: "Motos",
   pieces: "Pièces détachées",
+  /* Le nom que le client emploie, repris mot pour mot. « Prestataires »
+     désignait qui fait le travail ; lui parle de ce qui est produit. */
+  cartes_grises: "Carte grise et plaque",
 };
 
 export function estMetier(valeur: unknown): valeur is Metier {

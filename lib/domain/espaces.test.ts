@@ -16,7 +16,7 @@ describe("espacesVisibles — le gérant", () => {
     expect(espacesVisibles("gerant", ["motos"])).toEqual([
       "accueil",
       "motos",
-      "prestataires",
+      "cartes_grises",
       "caisse",
       "reglages",
     ]);
@@ -32,7 +32,7 @@ describe("espacesVisibles — le gérant", () => {
     expect(espacesVisibles("gerant", ["motos", "pieces"])).toEqual([
       "accueil",
       "motos",
-      "prestataires",
+      "cartes_grises",
       "pieces",
       "caisse",
       "reglages",
@@ -56,7 +56,7 @@ describe("espacesVisibles — le responsable", () => {
     expect(espacesVisibles("responsable", ["motos", "pieces"])).toEqual([
       "supervision",
       "motos",
-      "prestataires",
+      "cartes_grises",
       "pieces",
       "caisse",
       "reglages",
@@ -289,7 +289,7 @@ describe("le périmètre pilote la navigation", () => {
     expect(espacesVisibles("responsable", ["motos"], "boutique")).toEqual([
       "accueil",
       "motos",
-      "prestataires",
+      "cartes_grises",
       "caisse",
       "reglages",
     ]);
@@ -308,7 +308,7 @@ describe("le périmètre pilote la navigation", () => {
     expect(espacesVisibles("responsable", ["motos", "pieces"], "toutes")).toEqual([
       "supervision",
       "motos",
-      "prestataires",
+      "cartes_grises",
       "pieces",
       "caisse",
       "reglages",
@@ -492,11 +492,11 @@ describe("la destination après un changement de périmètre", () => {
  * boutique de pièces n'a pas de carte grise à confier, et lui montrer l'entrée
  * serait promettre un écran sans emploi.
  */
-describe("l’espace des prestataires", () => {
+describe("l’espace des cartes grises", () => {
   it("suit les motos dans le rail, et seulement là où l’on en vend", () => {
-    expect(espacesVisibles("gerant", ["motos"])).toContain("prestataires");
-    expect(espacesVisibles("gerant", ["pieces"])).not.toContain("prestataires");
-    expect(accedeEspace("gerant", ["pieces"], "prestataires")).toBe(false);
+    expect(espacesVisibles("gerant", ["motos"])).toContain("cartes_grises");
+    expect(espacesVisibles("gerant", ["pieces"])).not.toContain("cartes_grises");
+    expect(accedeEspace("gerant", ["pieces"], "cartes_grises")).toBe(false);
   });
 
   it("s’ouvre au gérant, qui est celui qui confie les cartes", () => {
@@ -504,8 +504,8 @@ describe("l’espace des prestataires", () => {
        Or c'est lui qui tend le paquet au prestataire — il le fait déjà depuis
        l'écran des dossiers. Ce qui reste au responsable vit DANS l'écran :
        créer, renommer, retirer un prestataire. */
-    expect(accedeEspace("gerant", ["motos"], "prestataires")).toBe(true);
-    expect(groupesVisibles("prestataires", "gerant").length).toBeGreaterThan(0);
+    expect(accedeEspace("gerant", ["motos"], "cartes_grises")).toBe(true);
+    expect(groupesVisibles("cartes_grises", "gerant").length).toBeGreaterThan(0);
   });
 
   it("a quitté les paramètres, et n’y a pas laissé de double", () => {
@@ -517,7 +517,7 @@ describe("l’espace des prestataires", () => {
 
   it("revendique son chemin plutôt que de le laisser aux paramètres", () => {
     const ouverts = espacesVisibles("gerant", ["motos"]);
-    expect(espaceDuChemin("/prestataires", ouverts)).toBe("prestataires");
-    expect(ecranCourant("prestataires", "gerant", "/prestataires")).toBe("/prestataires");
+    expect(espaceDuChemin("/prestataires", ouverts)).toBe("cartes_grises");
+    expect(ecranCourant("cartes_grises", "gerant", "/prestataires")).toBe("/prestataires");
   });
 });
