@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   ECRANS_DE,
+  ESPACES,
   accedeEspace,
   accueilDuRole,
   ecranCourant,
@@ -519,5 +520,22 @@ describe("l’espace des cartes grises", () => {
     const ouverts = espacesVisibles("gerant", ["motos"]);
     expect(espaceDuChemin("/prestataires", ouverts)).toBe("cartes_grises");
     expect(ecranCourant("cartes_grises", "gerant", "/prestataires")).toBe("/prestataires");
+  });
+
+  it("atterrit sur les dossiers, pas sur le répertoire des prestataires", () => {
+    /* Celle qui ne fait que les cartes grises travaille sur des papiers. Ouvrir
+       son espace sur une liste de noms lui aurait demandé un clic de plus à
+       chaque fois pour atteindre la seule chose qu'elle vient faire (S59). */
+    expect(ESPACES.cartes_grises.href).toBe("/cartes-grises");
+  });
+
+  it("porte les deux écrans de la spec, et rien d’autre", () => {
+    const ouverts = espacesVisibles("gerant", ["cartes_grises"]);
+    expect(ECRANS_DE.cartes_grises.map((ecran) => ecran.href)).toEqual([
+      "/cartes-grises",
+      "/prestataires",
+    ]);
+    expect(espaceDuChemin("/cartes-grises", ouverts)).toBe("cartes_grises");
+    expect(ecranCourant("cartes_grises", "gerant", "/cartes-grises")).toBe("/cartes-grises");
   });
 });

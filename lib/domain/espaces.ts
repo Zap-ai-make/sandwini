@@ -34,7 +34,7 @@ export const ESPACES: Record<Espace, { href: string; libelle: string }> = {
   /* Le rail dit « Cartes grises » et non « Carte grise et plaque » : 62 px de
      large et dix pixels de haut ne tiennent pas quatre mots, et le nom complet
      reste celui du métier, là où l'on déclare une boutique. */
-  cartes_grises: { href: "/prestataires", libelle: "Cartes grises" },
+  cartes_grises: { href: "/cartes-grises", libelle: "Cartes grises" },
   pieces: { href: "/pieces", libelle: "Pièces" },
   caisse: { href: "/caisse", libelle: "Caisse" },
   reglages: { href: "/parametres", libelle: "Paramètres" },
@@ -433,6 +433,31 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
    */
   cartes_grises: [
     {
+      /**
+       * **Les dossiers sont l'écran d'atterrissage de l'espace** (S59), et non
+       * plus les prestataires.
+       *
+       * Celle qui ne fait que les cartes grises travaille sur des papiers, pas
+       * sur une liste de noms : ouvrir son espace sur le répertoire de ses
+       * prestataires lui aurait demandé un clic de plus à chaque fois pour
+       * atteindre la seule chose qu'elle vient faire.
+       *
+       * Ils vivent à `/cartes-grises` et non sous `/motos/` : la file des
+       * dossiers motos reste derrière la garde de l'espace motos, où une
+       * boutique « Carte grise et plaque » se verrait refuser l'entrée. Les
+       * deux écrans coexistent le temps que la migration passe — rien n'est
+       * supprimé, et un écran vide valait moins qu'un écran juste.
+       */
+      titre: "Les papiers",
+      ecrans: [
+        {
+          href: "/cartes-grises",
+          libelle: "Dossiers",
+          quoi: "Les cartes grises et les plaques, de la demande à la remise",
+        },
+      ],
+    },
+    {
       titre: "Confier",
       ecrans: [
         {
@@ -442,11 +467,6 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
         },
       ],
     },
-    /* **Les dossiers ne sont pas encore ici, et c'est volontaire** (S59, lot 1).
-       Ils vivent sous `/motos/`, derrière la garde de l'espace motos : une
-       boutique « Carte grise et plaque » seule s'y verrait refuser l'entrée, et
-       une entrée qu'on ne peut pas suivre vaut moins qu'une entrée absente
-       (S54). Ils arrivent au lot 3, quand ils quittent la vente. */
   ],
   pieces: [
     {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   dossierEnCours,
+  rangerDossiers,
   estTerminal,
   LIBELLE_STATUT_CARTE_GRISE,
   normaliserDossierExterieur,
@@ -171,5 +172,60 @@ describe("la remise au comptoir", () => {
 
   it("exige une date de remise", () => {
     expect(validerRemise({ ...REMISE, remisLe: "" })).toMatch(/date/i);
+  });
+});
+
+describe("ranger les dossiers pour l’écran", () => {
+  const dossier = (partie: Partial<DossierCarteGrise>): DossierCarteGrise =>
+    ({
+      id: "d",
+      statut: "a_faire",
+      clientNom: "",
+      deposeLe: null,
+      remisLe: null,
+      ...partie,
+    }) as DossierCarteGrise;
+
+  it("sépare ce qui attend de ce qui est fini", () => {
+    const { cours, termines } = rangerDossiers([
+      dossier({ id: "a", statut: "remis" }),
+      dossier({ id: "b", statut: "chez_prestataire" }),
+      dossier({ id: "c", statut: "non_applicable" }),
+      dossier({ id: "d", statut: "revenu_magasin" }),
+    ]);
+    expect(cours.map((d) => d.id)).toEqual(["b", "d"]);
+    expect(termines.map((d) => d.id).sort()).toEqual(["a", "c"]);
+  });
+
+  it("met en tête ce qui n’est pas encore parti", () => {
+    /* Un dossier sans dépôt est celui sur lequel il y a quelque chose à
+       faire. Le ranger après ceux qui sont déjà chez quelqu'un enterrerait la
+       seule colonne d'action de l'écran sous une année d'attente. */
+    const { cours } = rangerDossiers([
+      dossier({ id: "parti", statut: "chez_prestataire", deposeLe: new Date(2025, 7, 18) }),
+      dossier({ id: "a-faire", statut: "a_faire" }),
+    ]);
+    expect(cours.map((d) => d.id)).toEqual(["a-faire", "parti"]);
+  });
+
+  it("puis du plus ancien dépôt au plus récent", () => {
+    /* C'est une file qu'on vide : entre le dépôt et le retrait il passe presque
+       un an, et ce qui traîne depuis le plus longtemps est ce qu'il faut
+       relancer. */
+    const { cours } = rangerDossiers([
+      dossier({ id: "recent", statut: "chez_prestataire", deposeLe: new Date(2026, 5, 1) }),
+      dossier({ id: "vieux", statut: "chez_prestataire", deposeLe: new Date(2025, 7, 18) }),
+    ]);
+    expect(cours.map((d) => d.id)).toEqual(["vieux", "recent"]);
+  });
+
+  it("rend l’historique du plus récemment remis", () => {
+    /* Une file se vide par le bas, un historique se lit par le haut : on y
+       cherche ce qui vient de se passer. */
+    const { termines } = rangerDossiers([
+      dossier({ id: "ancien", statut: "remis", remisLe: new Date(2026, 1, 3) }),
+      dossier({ id: "hier", statut: "remis", remisLe: new Date(2026, 9, 22) }),
+    ]);
+    expect(termines.map((d) => d.id)).toEqual(["hier", "ancien"]);
   });
 });

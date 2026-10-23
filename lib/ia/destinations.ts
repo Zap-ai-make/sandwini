@@ -69,6 +69,11 @@ export const DESTINATIONS: readonly Destination[] = [
   { cle: "depenses", chemin: "/caisse/depenses", libelle: "les dépenses" },
   { cle: "clients", chemin: "/clients", libelle: "le fichier des clients" },
   { cle: "prestataires", chemin: "/prestataires", libelle: "les prestataires" },
+  {
+    cle: "cartes_grises",
+    chemin: "/cartes-grises",
+    libelle: "les dossiers de carte grise",
+  },
   { cle: "reglages", chemin: "/parametres", libelle: "les paramètres" },
 ];
 

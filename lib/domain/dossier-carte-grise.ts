@@ -122,6 +122,40 @@ export function dossierEnCours(dossier: Pick<DossierCarteGrise, "statut">): bool
   return !estTerminal(dossier.statut);
 }
 
+/**
+ * Les deux listes de l'écran, triées comme on les lit.
+ *
+ * **Ce qui n'est pas encore parti vient en tête.** C'est la seule colonne
+ * d'action de l'écran : un dossier sans dépôt attend un geste. Le ranger avec
+ * les autres l'enterrerait sous une année d'attente — le fichier du client
+ * montre presque un an entre le dépôt et le retrait.
+ *
+ * **Puis du plus ancien dépôt au plus récent**, parce que c'est une file qu'on
+ * vide et que ce qui traîne depuis le plus longtemps est ce qu'il faut
+ * relancer. L'historique, lui, se lit à l'envers : on y cherche ce qui vient de
+ * se passer.
+ */
+export function rangerDossiers(dossiers: readonly DossierCarteGrise[]): {
+  cours: DossierCarteGrise[];
+  termines: DossierCarteGrise[];
+} {
+  const cours = dossiers.filter(dossierEnCours).sort(parAnciennete);
+  const termines = dossiers
+    .filter((dossier) => !dossierEnCours(dossier))
+    .sort((a, b) => (b.remisLe?.getTime() ?? 0) - (a.remisLe?.getTime() ?? 0));
+  return { cours, termines };
+}
+
+function parAnciennete(a: DossierCarteGrise, b: DossierCarteGrise): number {
+  /* Pas de dépôt veut dire « rien n'est encore parti », pas « très ancien » :
+     ces dossiers passent devant, et se départagent par le nom pour que l'ordre
+     ne bouge pas d'un affichage à l'autre. */
+  if (a.deposeLe === null && b.deposeLe === null) return a.clientNom.localeCompare(b.clientNom);
+  if (a.deposeLe === null) return -1;
+  if (b.deposeLe === null) return 1;
+  return a.deposeLe.getTime() - b.deposeLe.getTime();
+}
+
 /* --- Ouvrir un dossier venu du dehors ------------------------------------- */
 
 export type SaisieDossierExterieur = {
