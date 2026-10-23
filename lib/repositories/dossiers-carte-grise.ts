@@ -162,9 +162,18 @@ export function ouvrirLigne(
  *
  * **Toutes les cases, y compris le dépôt.** C'est la demande, et elle coûte
  * quelque chose : la règle qui interdisait de retoucher un dossier parti chez
- * un prestataire protégeait la première avance d'un second dépôt. Ce qui la
- * remplace est le journal — chaque enregistrement y laisse une ligne, même
- * quand le statut ne bouge pas, donc une case écrasée reste attribuable.
+ * un prestataire protégeait la première avance d'un second dépôt. Plus rien ne
+ * l'en protège.
+ *
+ * **Ce qui reste, et il faut être exact sur la limite.** Les règles imposent
+ * `traceModification` à chaque écriture : `updatedBy` est l'identité vérifiée
+ * de l'appelant et `updatedAt` l'heure du serveur, donc **l'état courant d'un
+ * dossier est toujours attribuable**, journal ou pas. Ce que le journal ajoute
+ * — l'enchaînement des valeurs précédentes — est écrit par cette fonction et
+ * **non exigé par les règles** : il vaut ce que vaut l'application, pas ce que
+ * garantit la base. L'exiger côté serveur demanderait une entrée de journal
+ * pour chaque écriture, ce que la reprise des anciens dossiers ne peut pas
+ * fournir sans dater d'aujourd'hui des gestes de l'an dernier.
  */
 export function corrigerLigne(
   dossier: DossierCarteGrise,
@@ -183,8 +192,9 @@ export function corrigerLigne(
 
   /* **Le journal s'écrit à chaque fois, même sans changement de statut.** Il ne
      dit plus seulement « le papier est passé là » mais « quelqu'un a touché
-     cette ligne, à cette heure » — la seule trace d'une correction, maintenant
-     que toutes les cases s'ouvrent.
+     cette ligne, à cette heure » — l'historique d'une correction, maintenant
+     que toutes les cases s'ouvrent. Les règles ne l'exigent pas : c'est une
+     trace tenue par l'application, pas une garantie de la base.
 
      L'identifiant est tiré au sort et l'heure vient de l'appareil : deux
      appareils hors ligne qui corrigent la même ligne produisent deux entrées

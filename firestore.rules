@@ -1297,8 +1297,15 @@ service cloud.firestore {
     // peut plus dire « a faire » alors qu'un depot est inscrit dessus, ni
     // « revenu » sans aucune preuve de retour. Elle est plus faible sur un
     // autre : un second depot ecrase desormais le premier. C'est le prix de la
-    // demande — toutes les cases s'ouvrent a la correction — et le journal du
-    // dossier garde la trace de chaque ecriture, auteur compris.
+    // demande — toutes les cases s'ouvrent a la correction.
+    //
+    // Ce qui reste du cote serveur : `traceModification` impose `updatedBy` =
+    // l'appelant verifie et `updatedAt` = l'heure du serveur, donc l'etat
+    // courant d'un dossier est toujours attribuable. L'enchainement des valeurs
+    // precedentes, lui, vit dans le journal du dossier, que ces regles
+    // n'EXIGENT pas : il est tenu par l'application. L'exiger demanderait une
+    // entree pour chaque ecriture, ce que la reprise des anciens dossiers ne
+    // peut pas fournir sans dater d'aujourd'hui des gestes de l'an dernier.
     //
     // `remis` et `non_applicable` ne reclament rien : le premier est une
     // declaration du comptoir, le second vient de la vente quand le client ne
