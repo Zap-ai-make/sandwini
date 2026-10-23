@@ -215,15 +215,26 @@ describe("le lot complet du dépôt groupé", () => {
     await assertSucceeds(lot.commit());
   });
 
-  it("refuse un paquet qui porte encore l’ancien nom de champ", async () => {
-    /* `venteIds` n'est plus accepte a la creation. Un paquet ne se modifiant
-       jamais, les documents deja ecrits ne repassent pas par cette regle : la
-       bascule ne demande donc aucune migration. */
+  it("accepte encore l’ancien nom de champ, le temps du déploiement", async () => {
+    /* **Des règles ne se déploient pas en même temps que l'application.**
+       Refuser `venteIds` dès maintenant casserait le dépôt d'un paquet dans la
+       version en ligne, qui l'écrit encore — et un appareil hors ligne peut
+       porter un dépôt de l'ancienne forme dans sa file pendant des jours.
+       À resserrer quand la nouvelle version sera installée partout. */
     const base = gerant();
     const lot = writeBatch(base);
     const ancien: Record<string, unknown> = { ...paquet(), venteIds: ["v1", "v2"] };
     delete ancien.dossierIds;
     lot.set(doc(collection(base, "lotsCartesGrises")), ancien);
+    await assertSucceeds(lot.commit());
+  });
+
+  it("refuse un paquet sans aucune des deux listes", async () => {
+    const base = gerant();
+    const lot = writeBatch(base);
+    const nu: Record<string, unknown> = { ...paquet() };
+    delete nu.dossierIds;
+    lot.set(doc(collection(base, "lotsCartesGrises")), nu);
     await assertFails(lot.commit());
   });
 

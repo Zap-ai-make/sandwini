@@ -657,13 +657,28 @@ service cloud.firestore {
     // « rendu » dirait un jour le contraire de ses propres documents, et il
     // faudrait un geste pour les raccorder. Le `hasOnly` ci-dessous est ce qui
     // empeche de le reintroduire par inadvertance.
+    // Les identifiants du paquet, sous l'un ou l'autre nom.
+    //
+    // **Les deux sont acceptes pendant la bascule, et c'est deliberé.** Des
+    // regles ne se deploient pas en meme temps que l'application : refuser
+    // `venteIds` des maintenant casserait le depot d'un paquet dans la version
+    // en ligne, qui l'ecrit encore. Accepter les deux fait de l'ordre de
+    // deploiement un non-sujet.
+    //
+    // A resserrer sur `dossierIds` seul quand la version qui l'ecrit sera en
+    // ligne depuis assez longtemps pour que plus aucun appareil hors ligne ne
+    // porte un depot de l'ancienne forme dans sa file.
+    function idsDuPaquet(donnees) {
+      return donnees.get('dossierIds', donnees.get('venteIds', []));
+    }
+
     function paquetCartesGrisesValide(donnees) {
       return donnees.keys().hasOnly(['boutiqueId', 'prestataireId', 'prestataireNom',
                                      'deposeLe', 'disponibleLe', 'avance',
-                                     'dossierIds'].concat(champsAudit()))
+                                     'dossierIds', 'venteIds'].concat(champsAudit()))
              && donnees.keys().hasAll(['boutiqueId', 'prestataireId', 'prestataireNom',
-                                       'deposeLe', 'disponibleLe', 'avance',
-                                       'dossierIds'].concat(champsAudit()))
+                                       'deposeLe', 'disponibleLe', 'avance'].concat(champsAudit()))
+             && donnees.keys().hasAny(['dossierIds', 'venteIds'])
              && donnees.boutiqueId is string
              && donnees.prestataireId is string
              && donnees.prestataireId.size() > 0
@@ -674,21 +689,19 @@ service cloud.firestore {
              // zero n'est pas une avance, c'est un travail confie a credit.
              && montantValide(donnees.avance)
              && donnees.avance > 0
-             // **`dossierIds` et non plus `venteIds` depuis S59** : un dossier
+             // **`dossierIds` plutot que `venteIds` depuis S59** : un dossier
              // venu du dehors se confie dans les memes paquets, et il n'a pas de
-             // vente d'ou tirer une cle. Aucune migration : un dossier ne d'une
-             // vente porte l'identifiant de cette vente, donc les listes deja
-             // ecrites sont valides telles quelles. L'ancien nom n'est plus
-             // accepte a la creation — un paquet ne se modifie jamais, donc les
-             // anciens documents ne repassent pas par ici.
-             && donnees.dossierIds is list
+             // vente d'ou tirer une cle. Aucune migration de donnees : un
+             // dossier ne d'une vente porte l'identifiant de cette vente, donc
+             // les listes deja ecrites sont valides telles quelles.
+             && idsDuPaquet(donnees) is list
              // Un paquet vide ferait partir des cartes que rien ne rassemble.
-             && donnees.dossierIds.size() > 0
+             && idsDuPaquet(donnees).size() > 0
              // La borne redit `CARTES_PAR_PAQUET_MAX` du domaine, et cette
              // repetition est voulue (D27) : le domaine decide de ce qu'il
              // PROPOSE, la base de ce qu'elle ACCEPTE. 249 vient de la limite
              // de 500 ecritures par lot — un paquet en fait `2N + 2`.
-             && donnees.dossierIds.size() <= 249;
+             && idsDuPaquet(donnees).size() <= 249;
     }
 
     match /lotsCartesGrises/{paquetId} {
