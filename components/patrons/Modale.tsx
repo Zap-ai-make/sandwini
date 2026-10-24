@@ -41,12 +41,15 @@ import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react
 /** Les modales ouvertes, de la plus ancienne à la plus récente. */
 const pile: string[] = [];
 
-export type TailleModale = "etroite" | "moyenne" | "large";
+export type TailleModale = "etroite" | "moyenne" | "large" | "pleine";
 
 const LARGEUR: Record<TailleModale, string> = {
   etroite: "sm:w-[min(28rem,calc(100vw-2rem))]",
   moyenne: "sm:w-[min(36rem,calc(100vw-2rem))]",
   large: "sm:w-[min(56rem,calc(100vw-2rem))]",
+  /* Pour une grille de saisie, et elle seule : onze colonnes font une ligne
+     plus large qu'un écran, et chaque rem gagné est du défilement en moins. */
+  pleine: "sm:w-[min(78rem,calc(100vw-2rem))]",
 };
 
 const SELECTEUR_FOCUSABLE = [

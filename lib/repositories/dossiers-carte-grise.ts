@@ -90,6 +90,8 @@ function lireDossier(instantane: QueryDocumentSnapshot<DocumentData>): DossierCa
        ce qui précède S59, et la migration les écrit ainsi. */
     origine: donnees.origine === "exterieur" ? "exterieur" : "vente",
     clientNom: typeof donnees.clientNom === "string" ? donnees.clientNom : "",
+    clientTelephone:
+      typeof donnees.clientTelephone === "string" ? donnees.clientTelephone : "",
     motoLibelle: typeof donnees.motoLibelle === "string" ? donnees.motoLibelle : "",
     numeroChassis: typeof donnees.numeroChassis === "string" ? donnees.numeroChassis : "",
     /* Les deux colonnes revenues de son classeur. Tout ce qui précède leur
@@ -112,49 +114,81 @@ function lireDossier(instantane: QueryDocumentSnapshot<DocumentData>): DossierCa
 
 /* --- Écrire une ligne ------------------------------------------------------ */
 
+/** Une ligne prête à partir, et le prestataire qu'on a reconnu dans `TRANSITE`. */
+export type LigneAOuvrir = { saisie: SaisieLigne; prestataireId: string | null };
+
+/** Le plafond d'un lot Firestore. Une ligne vaut une écriture, on garde la marge. */
+const LIGNES_PAR_LOT_MAX = 400;
+
 /**
- * Une ligne qu'on ouvre, comme on ajoute une ligne à son classeur.
+ * Des lignes qu'on ouvre, comme on en ajoute à son classeur.
  *
- * **Elle peut naître déjà rendue, et c'est le changement.** S59 faisait naître
- * tout dossier « à faire » et refusait les sauts ; or il transcrit des dossiers
- * vieux d'un an, donc il remplit les dix cases avant d'enregistrer. Le statut
- * se déduit des cases (`statutDeLaLigne`), et les règles vérifient qu'il
- * s'accorde avec elles.
+ * **Plusieurs d'un coup, et c'est la demande** : « pouvoir ajouter plusieurs
+ * dossiers avant que ça ne descende dans la liste ». Il transcrit un classeur,
+ * pas un dossier isolé — ouvrir et fermer une modale par ligne lui ferait
+ * répéter vingt fois le même aller-retour.
  *
- * Elle appartient à la boutique des cartes grises, la seule qui en réponde.
+ * **Tout part ensemble, ou rien.** Un `writeBatch` est atomique, hors ligne
+ * compris : Firestore le garde entier dans sa file et le rejoue d'un bloc au
+ * retour du réseau. C'est ce qui interdit la moitié d'une saisie, dont
+ * personne ne saurait où elle s'est arrêtée.
+ *
+ * **Elles peuvent naître déjà rendues.** S59 faisait naître tout dossier « à
+ * faire » et refusait les sauts ; or il recopie des dossiers vieux d'un an,
+ * donc il remplit toute la ligne avant d'enregistrer. Le statut se déduit des
+ * cases (`statutDeLaLigne`), et les règles vérifient qu'il s'accorde avec elles.
+ *
+ * Elles appartiennent à la boutique des cartes grises, la seule qui en réponde.
  */
-export function ouvrirLigne(
-  saisie: SaisieLigne,
+export function ouvrirLignes(
+  lignes: readonly LigneAOuvrir[],
   boutiqueId: string,
-  prestataireId: string | null,
   auteur: Auteur,
-): Promise<string> {
-  const probleme = validerLigne(saisie);
-  if (probleme) return Promise.reject(new Error(probleme));
+): Promise<string[]> {
+  if (lignes.length === 0) return Promise.resolve([]);
+  if (lignes.length > LIGNES_PAR_LOT_MAX) {
+    return Promise.reject(
+      new Error(
+        `Pas plus de ${LIGNES_PAR_LOT_MAX} lignes à la fois : au-delà, l’enregistrement ne peut plus être garanti d’un seul tenant.`,
+      ),
+    );
+  }
 
-  const reference = doc(collection(db(), COLLECTION));
-  const champs = champsDeLaLigne(saisie, { statut: "a_faire", revenuLe: null }, new Date());
+  for (const [rang, ligne] of lignes.entries()) {
+    const probleme = validerLigne(ligne.saisie);
+    /* Le rang est nommé : sur douze lignes à l'écran, « il manque un châssis »
+       sans dire laquelle oblige à les relire toutes. */
+    if (probleme) return Promise.reject(new Error(`Ligne ${rang + 1} — ${probleme}`));
+  }
 
+  const maintenant = new Date();
   const lot = writeBatch(db());
-  lot.set(reference, {
-    /* **La liste des champs vient du domaine, et elle est entière.** Les règles
-       posent `hasOnly` : un champ manquant ferait refuser toutes les
-       modifications suivantes, et le dossier existerait, visible et figé. */
-    ...champsDossierNeuf({
-      boutiqueId,
-      venteId: null,
-      origine: "exterieur",
-      clientNom: "",
-      motoLibelle: "",
-      numeroChassis: "",
-      statut: "a_faire",
-    }),
-    ...horodater(champs),
-    prestataireId,
-    ...traceCreation(auteur),
+  const references = lignes.map(({ saisie, prestataireId }) => {
+    const reference = doc(collection(db(), COLLECTION));
+    const champs = champsDeLaLigne(saisie, { statut: "a_faire", revenuLe: null }, maintenant);
+
+    lot.set(reference, {
+      /* **La liste des champs vient du domaine, et elle est entière.** Les
+         règles posent `hasOnly` : un champ manquant ferait refuser toutes les
+         modifications suivantes, et le dossier existerait, visible et figé. */
+      ...champsDossierNeuf({
+        boutiqueId,
+        venteId: null,
+        origine: "exterieur",
+        clientNom: "",
+        motoLibelle: "",
+        numeroChassis: "",
+        statut: "a_faire",
+      }),
+      ...horodater(champs),
+      prestataireId,
+      ...traceCreation(auteur),
+    });
+
+    return reference;
   });
 
-  return suivreEcriture(lot.commit()).then(() => reference.id);
+  return suivreEcriture(lot.commit()).then(() => references.map((reference) => reference.id));
 }
 
 /**

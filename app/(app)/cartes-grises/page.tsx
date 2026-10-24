@@ -1,7 +1,7 @@
 "use client";
 
-import { Plus } from "lucide-react";
-import { useCallback, useState, type ReactNode } from "react";
+import { Plus, Search } from "lucide-react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { GardeEspace } from "@/components/GardeSession";
 import { LigneModale } from "@/components/GestesDossierCarteGrise";
@@ -11,7 +11,9 @@ import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
+import { normaliserNom } from "@/lib/domain/client";
 import {
+  chercherDossiers,
   ENTETES_LIGNE,
   ORDRE_LIGNE,
   rangerDossiers,
@@ -62,6 +64,7 @@ function Ecran() {
   const { perimetre } = usePerimetre();
   const [panneau, setPanneau] = useState<Panneau>("cours");
   const [creation, setCreation] = useState(false);
+  const [recherche, setRecherche] = useState("");
 
   /**
    * **Toute l'entreprise dès que le périmètre porte le métier.** C'est ce que
@@ -90,10 +93,19 @@ function Ecran() {
     "La liste des prestataires n’a pas pu être chargée.",
   );
 
+  /* **La recherche porte sur les deux onglets à la fois.** C'est la demande, et
+     c'est la bonne : celui qui cherche un nom ne sait pas si le papier est
+     encore dehors ou déjà rendu — c'est même souvent la question qu'il pose. */
+  const trouves = useMemo(
+    () => chercherDossiers(valeur ?? [], recherche, normaliserNom),
+    [valeur, recherche],
+  );
+
   if (session.statut !== "connecte") return null;
   const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
 
-  const { cours, termines } = rangerDossiers(valeur ?? []);
+  const { cours, termines } = rangerDossiers(trouves);
+  const cherche = recherche.trim() !== "";
 
   /* Une ligne appartient à la boutique des cartes grises : sans boutique
      choisie, il n'y a pas de propriétaire à lui donner. */
@@ -126,6 +138,37 @@ function Ecran() {
         </Avis>
       )}
 
+      <div className="mt-6">
+        <label htmlFor="recherche-dossier" className="block text-sm font-medium text-encre">
+          Chercher un dossier
+        </label>
+        <div className="relative mt-1.5">
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
+          />
+          <input
+            id="recherche-dossier"
+            type="search"
+            inputMode="search"
+            autoComplete="off"
+            placeholder="Un nom, un téléphone, un châssis, une plaque, une date…"
+            value={recherche}
+            onChange={(evenement) => setRecherche(evenement.target.value)}
+            /* Bornée comme les autres recherches du produit : un champ qui
+               traverse l'écran fait perdre le début de la ligne à l'œil. */
+            className="saisie pr-3 pl-9 placeholder:text-encre-doux sm:max-w-96"
+          />
+        </div>
+        {/* Le compte explique un écran vide : sans lui, on croit que la liste
+            n'a rien, alors que c'est la recherche qui a tout mangé. */}
+        <p aria-live="polite" className="mt-1.5 text-legende text-encre-doux">
+          {cherche
+            ? `${cours.length + termines.length} ligne(s) trouvée(s) — ${cours.length} en cours, ${termines.length} terminée(s).`
+            : "Tape n’importe quoi qui figure sur la ligne : la recherche regarde toutes les colonnes."}
+        </p>
+      </div>
+
       {/* **La liste entière manque, et l'écran n'a plus rien à montrer.** Un
           bandeau au-dessus d'un tableau vide laisserait croire qu'il n'y a
           aucun dossier — ce qui est la pire des deux réponses possibles ici. */}
@@ -153,7 +196,11 @@ function Ecran() {
                 <Liste
                   dossiers={cours}
                   chargement={valeur === null}
-                  vide="Aucun dossier en cours. Tout ce qui est parti est revenu et a été remis."
+                  vide={
+                    cherche
+                      ? "Aucun dossier en cours ne correspond à cette recherche."
+                      : "Aucun dossier en cours. Tout ce qui est parti est revenu et a été remis."
+                  }
                   boutiqueId={boutiqueId}
                   prestataires={connus}
                   auteur={auteur}
@@ -162,12 +209,16 @@ function Ecran() {
             },
             {
               valeur: "historique",
-              libelle: "Terminés",
+              libelle: `Terminés${termines.length > 0 ? ` (${termines.length})` : ""}`,
               contenu: (
                 <Liste
                   dossiers={termines}
                   chargement={valeur === null}
-                  vide="Rien de terminé pour l’instant."
+                  vide={
+                    cherche
+                      ? "Aucun dossier terminé ne correspond à cette recherche."
+                      : "Rien de terminé pour l’instant."
+                  }
                   boutiqueId={boutiqueId}
                   prestataires={connus}
                   auteur={auteur}
@@ -217,13 +268,20 @@ function Liste({
    * personne ne remarque.
    */
   const rendus: Record<CleColonneLigne, (dossier: DossierCarteGrise) => ReactNode> = {
-    /* La première cellule ouvre la ligne. Un vrai bouton, pas une ligne
-       cliquable : il s'atteint au clavier et s'annonce à un lecteur d'écran. */
+    tel: (dossier) => dossier.clientTelephone || "—",
+    /* **Toute la ligne s'ouvre au clic**, et ce bouton n'est plus là pour la
+       souris : il est là pour le clavier et le lecteur d'écran, qui n'ont pas
+       de prise sur une `<tr>`. D'où le souligné disparu — il faisait vieux, et
+       il promettait un lien là où la ligne entière répond. `stopPropagation`
+       évite d'ouvrir deux fois pour un seul clic. */
     client: (dossier) => (
       <button
         type="button"
-        onClick={() => setOuvert(dossier)}
-        className="text-left underline decoration-dotted underline-offset-4"
+        onClick={(evenement) => {
+          evenement.stopPropagation();
+          setOuvert(dossier);
+        }}
+        className="text-left"
       >
         {dossier.clientNom || "—"}
       </button>
@@ -242,6 +300,7 @@ function Liste({
 
   /* Chiffres et codes : alignés à droite, en Plex Mono, insécables. */
   const CHIFFRES: readonly CleColonneLigne[] = [
+    "tel",
     "chassis",
     "credit",
     "reception",
@@ -270,6 +329,9 @@ function Liste({
         /* Ses noms gardent leur casse : les capitales de tableau feraient de
            `Reci` et `Depot` d'autres mots à l'œil de celui qui les relit. */
         entetesLitterales
+        /* « Si on clique sur la ligne, ça doit ouvrir la fiche » — demande du
+           commanditaire, 24 octobre 2026. */
+        ouvrir={setOuvert}
         colonnes={colonnes}
         lignes={dossiers}
         cleDe={(dossier) => dossier.id}

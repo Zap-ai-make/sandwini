@@ -837,25 +837,54 @@
     letter-spacing: 0;
   }
 
-  /* La grille de saisie d'une ligne : un tableur, pas un formulaire (S59).
+  /* La grille de saisie : un tableur, pas un formulaire (S59, refondue le 24
+     octobre 2026).
 
-     Le commanditaire recopie depuis son classeur Excel — « fais ça en tableau,
-     les champs en horizontal ». Dix champs posés côte à côte ne suffisaient
-     pas : sans filets, l'œil ne sait pas où finit une case et où commence la
-     suivante, et la correspondance avec la ligne du tableau en dessous se perd.
-     Ici la cellule dessine, et le champ la remplit sans rien dessiner lui-même.
+     **Ce que le commanditaire demande est contradictoire, et il le sait** : il
+     veut ce qui lui est familier — son classeur, ses colonnes, son ordre — et
+     en même temps « quelque chose de super moderne ». L'arbitrage qu'il a
+     tranché : moderne sur la forme, sa hiérarchie intacte. Donc l'ordre et les
+     noms des colonnes ne bougent pas d'un cran ; tout le reste est refait.
 
-     Elle déborde volontiers : dix colonnes ne tiennent pas dans la largeur d'un
-     pouce, et c'est le conteneur qui défile de côté. */
-  .grille-saisie {
-    width: max-content;
-    border-collapse: collapse;
+     **Ce qui change par rapport au premier essai.** Des filets partout faisaient
+     un quadrillage de tableur des années 2000 ; il ne reste que les séparations
+     utiles, dans un cadre arrondi. L'entête se colle en haut et la gouttière à
+     gauche, parce qu'on y saisit maintenant plusieurs lignes et qu'on perd de
+     vue laquelle on remplit dès qu'on part vers la droite. */
+  .cadre-grille {
+    border: 1px solid var(--color-bord);
+    border-radius: var(--radius-carte);
+    background: var(--color-papier);
+    overflow: auto;
+    /* Sur une saisie de vingt lignes, la grille défile dans son cadre et le
+       pied de la modale reste atteignable. */
+    max-height: min(60vh, 28rem);
   }
 
-  .grille-saisie th {
-    padding: 0.375rem 0.5rem;
-    border: 1px solid var(--color-bord);
+  .grille-saisie {
+    width: max-content;
+    min-width: 100%;
+    /* `separate` et non `collapse` : une cellule collée perd ses bords en
+       `collapse`, et la colonne figée se retrouve sans filet. */
+    border-collapse: separate;
+    border-spacing: 0;
+  }
+
+  .grille-saisie th,
+  .grille-saisie td {
+    border-bottom: 1px solid var(--color-bord);
+  }
+
+  .grille-saisie tbody tr:last-child > * {
+    border-bottom: 0;
+  }
+
+  .grille-saisie thead th {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     background: var(--color-survol);
+    padding: 0.5rem 0.625rem;
     text-align: left;
     font-size: var(--text-legende);
     font-weight: 600;
@@ -865,30 +894,103 @@
 
   .grille-saisie td {
     padding: 0;
-    border: 1px solid var(--color-bord);
+    /* Un filet seulement entre deux champs, et discret : c'est la ligne qu'on
+       lit, pas la case. */
+    border-left: 1px solid color-mix(in oklab, var(--color-bord) 55%, transparent);
+  }
+
+  .grille-saisie td:first-child {
+    border-left: 0;
+  }
+
+  /* La gouttière — le numéro de ligne — reste visible quand on part vers la
+     droite. Sans elle, à la onzième colonne, on ne sait plus quelle ligne on
+     est en train de remplir. */
+  .grille-saisie .gouttiere {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    width: 2.25rem;
+    min-width: 2.25rem;
+    background: var(--color-papier);
+    border-left: 0;
+    border-right: 1px solid var(--color-bord);
+    text-align: center;
+    font-size: var(--text-micro);
+    color: var(--color-encre-doux);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .grille-saisie thead .gouttiere {
+    z-index: 3;
+    background: var(--color-survol);
+  }
+
+  .grille-saisie tbody tr:hover .gouttiere {
+    background: var(--color-survol);
   }
 
   /* Le champ remplit sa cellule et n'a pas de bord à lui : deux traits
      parallèles à un millimètre l'un de l'autre font un dessin sale. */
   .grille-saisie .cellule {
-    height: 2.5rem;
+    height: 2.75rem;
     width: 100%;
-    padding-inline: 0.5rem;
+    padding-inline: 0.625rem;
     border: 0;
     background: transparent;
     color: inherit;
     font: inherit;
   }
 
-  /* Le liseré de focus se pose à l'intérieur : posé dehors, il serait rogné par
-     le conteneur qui défile, et la case active deviendrait invisible au clavier. */
-  .grille-saisie .cellule:focus-visible {
-    outline: 2px solid var(--color-focus-trait);
-    outline-offset: -2px;
-  }
-
+  /* La case active s'allume en entier, et le liseré se pose à l'intérieur :
+     posé dehors, il serait rogné par le cadre qui défile, et la case active
+     deviendrait invisible au clavier. */
   .grille-saisie td:focus-within {
     background: var(--color-survol);
+    box-shadow: inset 0 0 0 2px var(--color-focus-trait);
+  }
+
+  .grille-saisie .cellule:focus-visible {
+    outline: none;
+  }
+
+  /* La ligne qu'on ne peut plus enregistrer : elle se montre, elle ne se
+     cache pas derrière un message en bas de modale (`DESIGN.md` §5 — jamais
+     la couleur seule, le message la nomme aussi). */
+  .grille-saisie tbody tr.ligne-fautive .gouttiere {
+    background: var(--color-alerte);
+    color: var(--color-papier);
+    font-weight: 700;
+  }
+
+  /* La dernière rangée : « ajouter une ligne », à la place exacte où la
+     prochaine ligne apparaîtra. */
+  .grille-saisie .rangee-ajout td {
+    padding: 0;
+    border-left: 0;
+  }
+
+  .grille-saisie .rangee-ajout button {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.625rem 0.75rem;
+    color: var(--color-encre-doux);
+    font-size: var(--text-corps);
+  }
+
+  .grille-saisie .rangee-ajout button:hover {
+    background: var(--color-survol);
+    color: var(--color-encre);
+  }
+
+  /* La ligne entière s'ouvre au clic (S59). Le curseur est la seule promesse
+     visible qu'elle est cliquable ailleurs que sur son nom ; le survol, lui,
+     était déjà là. Un vrai bouton reste dans la première cellule pour le
+     clavier — une `<tr>` ne se met pas au clavier. */
+  .tableau tbody tr.ligne-ouvrable {
+    cursor: pointer;
   }
 
   /* La ligne ouverte dans le panneau. Le fond seul ne suffit pas — il disparaît

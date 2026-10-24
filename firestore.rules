@@ -1333,7 +1333,8 @@ service cloud.firestore {
     }
 
     function champsDossierCarteGrise() {
-      return ['boutiqueId', 'venteId', 'origine', 'clientNom', 'motoLibelle',
+      return ['boutiqueId', 'venteId', 'origine', 'clientNom', 'clientTelephone',
+              'motoLibelle',
               'numeroChassis', 'recu', 'credit', 'statut', 'prestataireId',
               'prestataireNom', 'deposeLe', 'avance', 'disponibleLe',
               'immatriculation', 'revenuLe', 'remisLe', 'remisANom',
@@ -1353,6 +1354,9 @@ service cloud.firestore {
              // ranger un roman dans `remisANom` et le faire relire a chaque
              // affichage de la liste.
              && texteBorne(donnees.get('motoLibelle', ''), 80)
+             // Sa colonne `Tel` : le telephone du proprietaire, a ne pas
+             // confondre avec `remisATelephone`, celui de qui vient chercher.
+             && texteBorne(donnees.get('clientTelephone', ''), 32)
              && texteBorne(donnees.get('prestataireNom', ''), 80)
              && texteBorne(donnees.get('immatriculation', ''), 24)
              && texteBorne(donnees.get('remisANom', ''), 80)

@@ -147,6 +147,7 @@ export function Tableau<T>({
   cleActive,
   enRetard,
   entetesLitterales = false,
+  ouvrir,
 }: {
   /**
    * Ce que le tableau montre, et dans quel ordre. Lu par les lecteurs d’écran
@@ -185,6 +186,17 @@ export function Tableau<T>({
    * journée, et c'est précisément ce qu'il a demandé d'éviter.
    */
   entetesLitterales?: boolean;
+  /**
+   * La ligne entière s’ouvre au clic, et pas seulement sa première cellule.
+   *
+   * Posé pour les cartes grises (S59) : « pour ouvrir la fiche, on est obligé
+   * de cliquer sur le nom ; si on clique sur la ligne, ça doit ouvrir ». Une
+   * `<tr>` ne se met pas au clavier, donc **l’appelant garde un vrai bouton
+   * dans la première cellule** — celui-ci sert la souris et le doigt, l’autre
+   * sert le clavier et le lecteur d’écran. Sans les deux, l’écran devient
+   * inutilisable sans souris.
+   */
+  ouvrir?: (ligne: T) => void;
 }) {
   const arrivees = useArrivees(lignes.map(cleDe).join(SEPARATEUR), chargement === true);
 
@@ -226,8 +238,10 @@ export function Tableau<T>({
             {lignes.map((ligne) => (
               <tr
                 key={cleDe(ligne)}
+                onClick={ouvrir === undefined ? undefined : () => ouvrir(ligne)}
                 className={
                   [
+                    ouvrir === undefined ? "" : "ligne-ouvrable",
                     enRetard?.(ligne) ? "ligne-retard" : "",
                     cleDe(ligne) === cleActive ? "ligne-active" : "",
                     arrivees.has(cleDe(ligne)) ? "ligne-arrivee" : "",

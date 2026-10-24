@@ -277,6 +277,25 @@ describe("écrire un dossier", () => {
     );
   });
 
+  it("accepte le téléphone du propriétaire, et le borne", async () => {
+    /* Sa colonne `Tel`, ajoutée le 24 octobre 2026 — à ne pas confondre avec
+       `RECEPTION`, le numéro de qui vient chercher le papier. Facultatif ne
+       veut pas dire libre : sans borne, un compte légitime pourrait ranger un
+       roman là et le faire relire à chaque affichage de la liste. */
+    await assertSucceeds(
+      setDoc(
+        doc(gerantCartes(), "dossiersCarteGrise/d-tel"),
+        dossier({ boutiqueId: "CGP", venteId: null, origine: "exterieur", clientTelephone: "70445566", ...audit("ger-cg") }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(gerantCartes(), "dossiersCarteGrise/d-tel-long"),
+        dossier({ boutiqueId: "CGP", venteId: null, origine: "exterieur", clientTelephone: "7".repeat(40), ...audit("ger-cg") }),
+      ),
+    );
+  });
+
   it("refuse un crédit qui n’est pas un entier positif", async () => {
     /* Sa colonne `Credit`. Le FCFA ne se divise pas, et une dette négative ne
        veut rien dire. */

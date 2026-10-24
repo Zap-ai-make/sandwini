@@ -3,12 +3,15 @@ import { describe, expect, it } from "vitest";
 import {
   champsDeLaLigne,
   champsDossierNeuf,
+  chercherDossiers,
   dossierEnCours,
   ENTETES_LIGNE,
   estTerminal,
   LIBELLE_STATUT_CARTE_GRISE,
   LIGNE_VIDE,
   ligneDuDossier,
+  ligneEstVide,
+  ligneSuivante,
   ORDRE_LIGNE,
   rangerDossiers,
   statutDeLaLigne,
@@ -35,6 +38,7 @@ describe("les dix colonnes de son classeur", () => {
        `TRANSITE` pour le prestataire : les corriger ferait un écran qu'il ne
        reconnaît plus. */
     expect(ORDRE_LIGNE.map((cle) => ENTETES_LIGNE[cle])).toEqual([
+      "Tel",
       "client",
       "MOTO",
       "CHASIS",
@@ -49,7 +53,7 @@ describe("les dix colonnes de son classeur", () => {
   });
 
   it("n’en ajoute aucune : la saisie et le tableau montrent les mêmes", () => {
-    expect(ORDRE_LIGNE).toHaveLength(10);
+    expect(ORDRE_LIGNE).toHaveLength(11);
     expect(Object.keys(ENTETES_LIGNE).sort()).toEqual([...ORDRE_LIGNE].sort());
     expect(Object.keys(LIGNE_VIDE).sort()).toEqual([...ORDRE_LIGNE].sort());
   });
@@ -132,6 +136,7 @@ describe("une ligne de son classeur", () => {
        toutes les cases avant d'enregistrer. */
     expect(
       validerLigne({
+        tel: "70112233",
         client: "SANA HAROUNA",
         moto: "GEAR",
         chassis: "70SJ022946",
@@ -258,6 +263,7 @@ describe("les champs que la ligne décide", () => {
   it("met les cases aux champs du dossier", () => {
     const champs = champsDeLaLigne(
       {
+        tel: "70112233",
         client: "SANA HAROUNA",
         moto: "GEAR",
         chassis: "70SJ022946",
@@ -272,6 +278,7 @@ describe("les champs que la ligne décide", () => {
       NEUF,
       AUJOURDHUI,
     );
+    expect(champs.clientTelephone).toBe("70112233");
     expect(champs.recu).toBe(true);
     expect(champs.credit).toBe(150_000);
     /* `RECEPTION` porte un téléphone, pas un nom : ce sont des numéros à huit
@@ -392,7 +399,7 @@ describe("les champs d’un dossier neuf", () => {
     statut: "a_faire" as const,
   };
 
-  it("porte les dix-neuf champs, et pas un de plus", () => {
+  it("porte les vingt champs, et pas un de plus", () => {
     /* **Les règles exigent `hasOnly`** : un champ en trop fait refuser
        l'écriture, et un champ manquant fait refuser toutes les modifications
        suivantes. C'est la seule chose que ce test garde. */
@@ -401,6 +408,7 @@ describe("les champs d’un dossier neuf", () => {
         "avance",
         "boutiqueId",
         "clientNom",
+        "clientTelephone",
         "credit",
         "deposeLe",
         "disponibleLe",
@@ -461,6 +469,7 @@ describe("rouvrir une ligne pour la corriger", () => {
     venteId: null,
     origine: "exterieur",
     clientNom: "SOUMBOUGMA KARIM",
+    clientTelephone: "70445566",
     motoLibelle: "SR-115",
     numeroChassis: "10RY243294",
     recu: true,
@@ -483,6 +492,7 @@ describe("rouvrir une ligne pour la corriger", () => {
        sans rien toucher ne doit rien changer — sinon la moindre relecture
        déplacerait un dossier. */
     expect(ligneDuDossier(DOSSIER)).toEqual({
+      tel: "70445566",
       client: "SOUMBOUGMA KARIM",
       moto: "SR-115",
       chassis: "10RY243294",
@@ -513,5 +523,142 @@ describe("rouvrir une ligne pour la corriger", () => {
     expect(champs.remisLe).toEqual(DOSSIER.remisLe);
     expect(champs.revenuLe).toEqual(DOSSIER.revenuLe);
     expect(champs.credit).toBe(DOSSIER.credit);
+  });
+});
+
+describe("enchaîner plusieurs lignes", () => {
+  it("hérite du dépôt et du prestataire, et de rien d’autre", () => {
+    /* **Un relevé, pas une commodité.** Son classeur porte la même date de
+       `Depot` sur tout un bloc : c'est un paquet confié le même jour, au même
+       transitaire. Un châssis ou un nom hérité, lui, serait un doublon que
+       personne ne remarque. */
+    const premiere: SaisieLigne = {
+      tel: "70112233",
+      client: "SANA HAROUNA",
+      moto: "GEAR",
+      chassis: "70SJ022946",
+      recu: true,
+      credit: "150000",
+      reception: "70518381",
+      retrait: "2026-07-29",
+      depot: "2025-08-18",
+      immatriculation: "7078 7DQ 04",
+      transite: "BOHARY",
+    };
+
+    expect(ligneSuivante(premiere)).toEqual({
+      ...LIGNE_VIDE,
+      depot: "2025-08-18",
+      transite: "BOHARY",
+    });
+  });
+
+  it("reconnaît une ligne où personne n’a rien tapé", () => {
+    expect(ligneEstVide(LIGNE_VIDE)).toBe(true);
+    expect(ligneEstVide({ ...LIGNE_VIDE, client: "  " })).toBe(true);
+    expect(ligneEstVide({ ...LIGNE_VIDE, tel: "70112233" })).toBe(false);
+    expect(ligneEstVide({ ...LIGNE_VIDE, recu: true })).toBe(false);
+  });
+
+  it("tient la ligne de trop pour vide, malgré ce qu’elle a hérité", () => {
+    /* **Sinon le « + » de trop écrit un dossier fantôme.** La dernière ligne
+       porte la date du dépôt et le transitaire sans rien d'autre : si elle
+       comptait comme saisie, elle partirait dans la base comme une carte
+       confiée à personne. */
+    expect(ligneEstVide(ligneSuivante({ ...LIGNE_VIDE, depot: "2025-08-18", transite: "BOHARY" }))).toBe(
+      true,
+    );
+  });
+});
+
+describe("chercher dans la liste", () => {
+  const normaliser = (brut: string) =>
+    brut.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ");
+
+  const base: DossierCarteGrise = {
+    id: "d1",
+    boutiqueId: "PTG",
+    venteId: null,
+    origine: "exterieur",
+    clientNom: "SOUMBOUGMA KARIM",
+    clientTelephone: "70445566",
+    motoLibelle: "SR-115",
+    numeroChassis: "10RY243294",
+    recu: false,
+    credit: null,
+    statut: "chez_prestataire",
+    prestataireId: null,
+    prestataireNom: "BOHARY",
+    deposeLe: new Date(2025, 7, 18, 12),
+    avance: null,
+    disponibleLe: null,
+    immatriculation: "7078 7DQ 04",
+    revenuLe: null,
+    remisLe: null,
+    remisANom: "",
+    remisATelephone: "70518381",
+  };
+  const autre: DossierCarteGrise = {
+    ...base,
+    id: "d2",
+    clientNom: "SANA HAROUNA",
+    clientTelephone: "76001122",
+    motoLibelle: "GEAR",
+    numeroChassis: "70SJ022946",
+    prestataireNom: "KABORE",
+    immatriculation: "",
+    remisATelephone: "",
+    deposeLe: new Date(2026, 5, 2, 12),
+  };
+  const liste = [base, autre];
+
+  it("rend tout quand on n’a rien tapé", () => {
+    expect(chercherDossiers(liste, "   ", normaliser)).toHaveLength(2);
+  });
+
+  it("cherche dans toutes les colonnes, pas dans une seule", () => {
+    /* La demande : « qu'on puisse faire une recherche là-dessus », sur tous les
+       champs. Celui qui cherche au comptoir a un bout de papier a la main ; il
+       ne sait pas dans quelle colonne vit ce qu'il lit. */
+    expect(chercherDossiers(liste, "karim", normaliser).map((d) => d.id)).toEqual(["d1"]);
+    expect(chercherDossiers(liste, "70445566", normaliser).map((d) => d.id)).toEqual(["d1"]);
+    expect(chercherDossiers(liste, "70SJ022946", normaliser).map((d) => d.id)).toEqual(["d2"]);
+    expect(chercherDossiers(liste, "kabore", normaliser).map((d) => d.id)).toEqual(["d2"]);
+    expect(chercherDossiers(liste, "gear", normaliser).map((d) => d.id)).toEqual(["d2"]);
+  });
+
+  it("trouve le téléphone de celui qui est venu chercher, pas seulement celui du propriétaire", () => {
+    /* Les deux numéros sont des colonnes distinctes — `Tel` et `RECEPTION` — et
+       ce n'est pas la même personne. */
+    expect(chercherDossiers(liste, "70518381", normaliser).map((d) => d.id)).toEqual(["d1"]);
+  });
+
+  it("retrouve une plaque tapée d’un seul tenant", () => {
+    /* Elle se lit `7078 7DQ 04` sur le papier et se tape rarement avec ses
+       espaces. */
+    expect(chercherDossiers(liste, "70787DQ04", normaliser).map((d) => d.id)).toEqual(["d1"]);
+  });
+
+  it("cherche une date comme on la lit, comme on la tape, ou par son année", () => {
+    expect(chercherDossiers(liste, "18/08/2025", normaliser).map((d) => d.id)).toEqual(["d1"]);
+    expect(chercherDossiers(liste, "2025-08-18", normaliser).map((d) => d.id)).toEqual(["d1"]);
+    expect(chercherDossiers(liste, "2026", normaliser).map((d) => d.id)).toEqual(["d2"]);
+  });
+
+  it("demande que chaque mot se retrouve, sans exiger la même colonne", () => {
+    /* « sana 2026 » rend les lignes de Sana datées de 2026. Deux mots forcés
+       dans la même colonne n'auraient presque jamais de réponse. */
+    expect(chercherDossiers(liste, "sana 2026", normaliser).map((d) => d.id)).toEqual(["d2"]);
+    expect(chercherDossiers(liste, "sana 2025", normaliser)).toEqual([]);
+  });
+
+  it("ignore accents et casse", () => {
+    expect(chercherDossiers(liste, "Kaboré", normaliser).map((d) => d.id)).toEqual(["d2"]);
+  });
+
+  it("rend une liste vide plutôt que tout, quand rien ne correspond", () => {
+    /* Le pire des deux comportements serait de rendre la liste entière : on
+       croirait avoir trouvé. */
+    expect(chercherDossiers(liste, "zzzz", normaliser)).toEqual([]);
   });
 });

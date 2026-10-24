@@ -91,6 +91,19 @@ export type DossierCarteGrise = {
    * des identifiants.
    */
   clientNom: string;
+  /**
+   * Sa colonne `Tel` — le téléphone du **propriétaire**.
+   *
+   * **À ne pas confondre avec `remisATelephone`**, sa colonne `RECEPTION`, qui
+   * porte le numéro de celui qui est venu chercher le papier. Ce n'est pas la
+   * même personne — souvent un frère, un employé — et c'est bien pour ça qu'il
+   * tient les deux.
+   *
+   * **Il se tape, il ne se recopie pas de la vente.** Arbitrage du
+   * commanditaire : plusieurs boutiques vendent, plusieurs traitent les
+   * papiers, et il ne veut pas qu'un numéro arrive d'ailleurs dans sa ligne.
+   */
+  clientTelephone: string;
   /** Marque et modèle réunis, recopiés de la moto ou tapés à la main. */
   motoLibelle: string;
   numeroChassis: string;
@@ -199,6 +212,9 @@ export function champsDossierNeuf(naissance: DossierNeuf) {
     venteId: naissance.venteId,
     origine: naissance.origine,
     clientNom: naissance.clientNom,
+    /* Vide à la naissance, même née d'une vente : le commanditaire ne veut pas
+       qu'un numéro arrive d'ailleurs dans sa ligne. */
+    clientTelephone: "",
     motoLibelle: naissance.motoLibelle,
     numeroChassis: naissance.numeroChassis,
     recu: false,
@@ -232,6 +248,9 @@ export function champsDossierNeuf(naissance: DossierNeuf) {
  * listes auraient divergé au premier ajout (D73).
  */
 export const ENTETES_LIGNE = {
+  /* Ajoutée le 24 octobre 2026, en tête et à sa demande : le téléphone du
+     propriétaire. La seule colonne qui ne vienne pas de son classeur. */
+  tel: "Tel",
   client: "client",
   moto: "MOTO",
   chassis: "CHASIS",
@@ -245,6 +264,7 @@ export const ENTETES_LIGNE = {
 } as const;
 
 export const ORDRE_LIGNE = [
+  "tel",
   "client",
   "moto",
   "chassis",
@@ -269,6 +289,7 @@ export const LONGUEUR_IMMATRICULATION_MAX = 24;
  * que son fichier y met, des numéros à huit chiffres — et non un nom.
  */
 export type SaisieLigne = {
+  tel: string;
   client: string;
   moto: string;
   chassis: string;
@@ -283,6 +304,7 @@ export type SaisieLigne = {
 };
 
 export const LIGNE_VIDE: SaisieLigne = {
+  tel: "",
   client: "",
   moto: "",
   chassis: "",
@@ -298,6 +320,7 @@ export const LIGNE_VIDE: SaisieLigne = {
 /** La ligne telle qu'elle se rouvre pour correction. */
 export function ligneDuDossier(dossier: DossierCarteGrise): SaisieLigne {
   return {
+    tel: dossier.clientTelephone,
     client: dossier.clientNom,
     moto: dossier.motoLibelle,
     chassis: dossier.numeroChassis,
@@ -334,6 +357,9 @@ export function validerLigne(saisie: SaisieLigne): string | null {
   }
   if (saisie.transite.trim().length > LONGUEUR_NOM_MAX) {
     return `Le nom du prestataire dépasse ${LONGUEUR_NOM_MAX} caractères.`;
+  }
+  if (saisie.tel.trim().length > LONGUEUR_TELEPHONE_MAX) {
+    return `Le téléphone du propriétaire dépasse ${LONGUEUR_TELEPHONE_MAX} caractères.`;
   }
   if (saisie.reception.trim().length > LONGUEUR_TELEPHONE_MAX) {
     return `Le téléphone dépasse ${LONGUEUR_TELEPHONE_MAX} caractères.`;
@@ -405,6 +431,7 @@ export function champsDeLaLigne(
   const retrait = lireJour(saisie.retrait);
   return {
     clientNom: saisie.client.trim(),
+    clientTelephone: saisie.tel.trim(),
     motoLibelle: saisie.moto.trim(),
     numeroChassis: normaliserChassis(saisie.chassis),
     recu: saisie.recu,
@@ -442,4 +469,102 @@ function dateDuRetour(
   if (statut === "remis") return retrait;
   if (statut === "revenu_magasin") return aujourdhui;
   return null;
+}
+
+/* --- Saisir plusieurs lignes d'affilée ------------------------------------ */
+
+/**
+ * La ligne suivante, quand on en enchaîne plusieurs.
+ *
+ * **Elle hérite du dépôt et du prestataire, et c'est un relevé.** Son classeur
+ * porte la même date de `Depot` sur tout un bloc : c'est un paquet confié le
+ * même jour, au même transitaire. Lui faire retaper les deux à chaque ligne
+ * serait du temps perdu à chaque ligne. Tout le reste part vide — un châssis
+ * ou un nom hérité serait un doublon qu'on ne remarque pas.
+ */
+export function ligneSuivante(precedente: SaisieLigne): SaisieLigne {
+  return { ...LIGNE_VIDE, depot: precedente.depot, transite: precedente.transite };
+}
+
+/**
+ * Une ligne où personne n'a rien tapé.
+ *
+ * On clique « + » une fois de trop, et cela n'a pas à devenir une erreur : à
+ * l'enregistrement, ces lignes-là sont ignorées sans un mot. L'héritage ne
+ * compte pas comme une saisie — sinon la ligne de trop, qui porte la date du
+ * dépôt sans rien d'autre, serait écrite comme un dossier fantôme.
+ */
+export function ligneEstVide(saisie: SaisieLigne): boolean {
+  return (
+    saisie.tel.trim() === "" &&
+    saisie.client.trim() === "" &&
+    saisie.moto.trim() === "" &&
+    saisie.chassis.trim() === "" &&
+    !saisie.recu &&
+    saisie.credit.trim() === "" &&
+    saisie.reception.trim() === "" &&
+    saisie.retrait.trim() === "" &&
+    saisie.immatriculation.trim() === ""
+  );
+}
+
+/* --- Chercher dans la liste ------------------------------------------------ */
+
+/**
+ * Les dossiers qui répondent à ce qu'on tape, toutes colonnes confondues.
+ *
+ * **Toutes les colonnes, parce que c'est la demande** : « qu'on puisse faire
+ * une recherche là-dessus », sur le téléphone comme sur le nom, le châssis, la
+ * plaque, le transitaire. Celui qui cherche au comptoir a un bout de papier à
+ * la main ; il ne sait pas dans quelle colonne vit ce qu'il lit.
+ *
+ * **Chaque mot doit se retrouver, pas forcément au même endroit.** « sana
+ * 2026 » rend les lignes de Sana datées de 2026. Deux mots qui devraient tous
+ * deux tomber dans la même colonne n'auraient presque jamais de réponse.
+ *
+ * **Les dates se cherchent comme on les lit et comme on les tape** —
+ * `29/07/2026`, `2026-07-29`, ou juste `2026`. Et les numéros se retrouvent
+ * avec ou sans leurs espaces : une plaque se lit `7078 7DQ 04` et se tape
+ * souvent d'un seul tenant.
+ */
+export function chercherDossiers(
+  dossiers: readonly DossierCarteGrise[],
+  recherche: string,
+  normaliser: (brut: string) => string,
+): DossierCarteGrise[] {
+  const mots = normaliser(recherche).split(" ").filter(Boolean);
+  if (mots.length === 0) return [...dossiers];
+
+  return dossiers.filter((dossier) => {
+    const foin = normaliser(texteCherchable(dossier));
+    const serre = foin.replace(/[\s-]+/g, "");
+    return mots.every((mot) => foin.includes(mot) || serre.includes(mot.replace(/[\s-]+/g, "")));
+  });
+}
+
+/** Tout ce qu'une ligne montre, mis bout à bout pour être fouillé. */
+function texteCherchable(dossier: DossierCarteGrise): string {
+  return [
+    dossier.clientTelephone,
+    dossier.clientNom,
+    dossier.motoLibelle,
+    dossier.numeroChassis,
+    /* La case cochée se cherche par les mots qu'il y mettrait lui-même. */
+    dossier.recu ? "reci recu oui ok" : "",
+    dossier.credit === null ? "" : `${dossier.credit}`,
+    dossier.remisATelephone,
+    ...datesCherchables(dossier.remisLe),
+    ...datesCherchables(dossier.deposeLe),
+    dossier.immatriculation,
+    dossier.prestataireNom,
+    LIBELLE_STATUT_CARTE_GRISE[dossier.statut],
+  ].join(" ");
+}
+
+/** Une date sous ses deux écritures : celle qu'on lit, celle qu'on tape. */
+function datesCherchables(date: Date | null): string[] {
+  if (date === null) return [];
+  const iso = jourLocal(date);
+  const [annee, mois, jour] = iso.split("-");
+  return [iso, `${jour}/${mois}/${annee}`];
 }
