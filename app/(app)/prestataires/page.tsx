@@ -1,7 +1,8 @@
 "use client";
 
-import { Link2, Phone, Plus, Send } from "lucide-react";
+import { Download, Link2, Phone, Plus, Printer, Send } from "lucide-react";
 import { useCallback, useState } from "react";
+import { BordereauPaquet } from "@/components/BordereauPaquet";
 import { ConfierDepuisPrestataire } from "@/components/ConfierDepuisPrestataire";
 import { GardeEspace } from "@/components/GardeSession";
 import { LienDeSuivi } from "@/components/LienDeSuivi";
@@ -25,6 +26,7 @@ import {
   type Prestataire,
   type SaisiePrestataire,
 } from "@/lib/domain/prestataire";
+import type { PaquetConfie } from "@/lib/domain/paquet";
 import { peut } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -92,6 +94,10 @@ function Prestataires() {
     "La liste des prestataires n’a pas pu être chargée.",
   );
   const [creation, setCreation] = useState(false);
+  /* **Le bordereau vit au niveau de la page, et c'est l'impression qui l'exige.**
+     Imprimer prend la page entière : il faut que le papier soit un frère de
+     l'écran masqué, pas un enfant d'une ligne de la liste. */
+  const [confie, setConfie] = useState<PaquetConfie | null>(null);
 
   if (session.statut !== "connecte") return null;
   /* Administrer le référentiel reste au responsable ; confier est ouvert. */
@@ -99,7 +105,8 @@ function Prestataires() {
   const boutiqueId = perimetre.boutiqueId;
 
   return (
-    <div>
+    <>
+    <div className="print:hidden">
       {/* La liste d'abord, la création en modale (S54). Le formulaire occupait
           le haut de l'écran en permanence : on venait presque toujours pour
           consulter ou corriger, et il fallait le dépasser à chaque fois. Un
@@ -154,11 +161,98 @@ function Prestataires() {
               prestataire={prestataire}
               administre={administre}
               boutiqueId={boutiqueId}
+              onConfie={setConfie}
             />
           ))}
         </ul>
       )}
+
+      {confie !== null && (
+        <ApresAvoirConfie confie={confie} onFermer={() => setConfie(null)} />
+      )}
     </div>
+
+    {/* Le bordereau ne s'affiche qu'à l'impression ; l'écran, lui, est masqué
+        ci-dessus. « Exporter en PDF » n'est qu'un `window.print()` : la boîte
+        du navigateur propose « Enregistrer au format PDF », sans réseau (D60). */}
+    <div className="hidden print:block">
+      {confie !== null && (
+        <BordereauPaquet
+          confie={confie}
+          nomBoutique={perimetre.nom}
+          auteur={session.utilisateur.nom}
+        />
+      )}
+    </div>
+    </>
+  );
+}
+
+/**
+ * Ce qu'on voit une fois le paquet parti.
+ *
+ * **Elle ne confirme pas, elle propose le papier.** Un « c'est enregistré »
+ * seul ferait refermer la fenêtre, et le bordereau se perdrait avec — il n'est
+ * nulle part en base, le lot ne s'attendant pas (D76). Le transitaire est
+ * encore devant le comptoir à ce moment-là : c'est maintenant qu'on imprime.
+ */
+function ApresAvoirConfie({
+  confie,
+  onFermer,
+}: {
+  confie: PaquetConfie;
+  onFermer: () => void;
+}) {
+  return (
+    <Modale
+      ouvert
+      onFermer={onFermer}
+      titre={`${confie.cartes.length} carte(s) confiée(s) à ${confie.prestataireNom}`}
+      description="Le bordereau liste ce qu’il emporte. Imprimez-le pendant qu’il est là."
+      pied={
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="bouton bouton-principal"
+          >
+            <Printer aria-hidden="true" className="size-4" />
+            Imprimer
+          </button>
+          {/* **Le même geste, et ce n'est pas un raccourci paresseux.** La boîte
+              d'impression du navigateur propose « Enregistrer au format PDF » :
+              deux cents kilo-octets de librairie auraient donné le même
+              fichier, dans une application qui doit se charger hors ligne. */}
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="bouton bouton-neutre"
+          >
+            <Download aria-hidden="true" className="size-4" />
+            Exporter en PDF
+          </button>
+          <button type="button" onClick={onFermer} className="bouton bouton-neutre">
+            Fermer
+          </button>
+        </div>
+      }
+    >
+      <p className="text-corps text-encre-doux">
+        Dans la boîte d’impression, choisissez « Enregistrer au format PDF » pour obtenir le
+        fichier. Le paquet, lui, est déjà enregistré : fermer cette fenêtre ne le perd pas — seul
+        le bordereau ne se retrouvera plus.
+      </p>
+
+      <ul className="mt-4 cadre cadre-liste">
+        {confie.cartes.map((carte) => (
+          <li key={carte.dossierId} className="flex flex-wrap gap-x-3 px-4 py-2 text-corps">
+            <span className="plaque-code">{carte.repere}</span>
+            <span className="text-encre">{carte.client || "—"}</span>
+            <span className="text-encre-doux">{carte.dossier?.numeroChassis ?? ""}</span>
+          </li>
+        ))}
+      </ul>
+    </Modale>
   );
 }
 
@@ -270,10 +364,12 @@ function Ligne({
   prestataire,
   administre,
   boutiqueId,
+  onConfie,
 }: {
   prestataire: Prestataire;
   administre: boolean;
   boutiqueId: string | null;
+  onConfie: (confie: PaquetConfie) => void;
 }) {
   const session = useSession();
   const [edition, setEdition] = useState(false);
@@ -416,6 +512,10 @@ function Ligne({
           prestataire={prestataire}
           boutiqueId={boutiqueId}
           onFermer={() => setConfie(false)}
+          onConfie={(paquet) => {
+            setConfie(false);
+            onConfie(paquet);
+          }}
         />
       )}
 

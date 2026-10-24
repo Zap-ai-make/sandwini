@@ -545,3 +545,24 @@ export function historiqueDesDeparts(
 
   return departs.sort((a, b) => (b.deposeLe?.getTime() ?? 0) - (a.deposeLe?.getTime() ?? 0));
 }
+
+/**
+ * Ce qu'on vient de confier, retenu le temps de l'imprimer (24 octobre 2026).
+ *
+ * **Pourquoi le garder en mémoire plutôt que le relire.** Le paquet part dans
+ * un lot qu'on n'attend pas (D76) : hors ligne, il n'est nulle part à relire
+ * avant le retour du réseau. Or c'est précisément là, le papier à la main et
+ * le transitaire devant soi, qu'on veut le bordereau. Il se construit donc à
+ * partir de ce qu'on vient de saisir.
+ *
+ * Il ne vit pas plus longtemps que l'écran : rien ne s'écrit, rien ne se
+ * relit. Fermer la fenêtre le perd, et c'est sans conséquence — le paquet, lui,
+ * est enregistré.
+ */
+export type PaquetConfie = {
+  prestataireNom: string;
+  deposeLe: Date;
+  disponibleLe: Date | null;
+  avance: number | null;
+  cartes: readonly CarteAConfier[];
+};

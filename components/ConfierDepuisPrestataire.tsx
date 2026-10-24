@@ -6,9 +6,10 @@ import { Modale } from "@/components/patrons/Modale";
 import { nomDuClient } from "@/lib/domain/client";
 import { dossiersEnAttente, FILTRES_DOSSIERS_VIDES } from "@/lib/domain/dossier";
 import type { DossierCarteGrise } from "@/lib/domain/dossier-carte-grise";
-import { cartesAConfier } from "@/lib/domain/paquet";
+import { cartesAConfier, type PaquetConfie } from "@/lib/domain/paquet";
 import type { Prestataire } from "@/lib/domain/prestataire";
 import type { DocumentDossier, Vente } from "@/lib/domain/vente";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterDossiersCarteGrise } from "@/lib/repositories/dossiers-carte-grise";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
@@ -49,17 +50,51 @@ export function ConfierDepuisPrestataire({
   prestataire,
   boutiqueId,
   onFermer,
+  onConfie,
 }: {
   prestataire: Prestataire;
+  /** La boutique à qui le paquet appartiendra — celle de la plaque jaune. */
   boutiqueId: string;
   onFermer: () => void;
+  onConfie: (confie: PaquetConfie) => void;
 }) {
   const { clients } = useFichierClients();
+  const { perimetre } = usePerimetre();
 
+  /**
+   * **Deux sources, et le métier décide laquelle.**
+   *
+   * Une boutique motos lit ses propres ventes, ses documents de dossier et ses
+   * dossiers de carte grise : c'est son magasin, elle a le droit sur les trois.
+   *
+   * La personne des cartes grises, elle, traite les papiers de **toute**
+   * l'entreprise — et c'est précisément ce qui manquait : la modale lisait la
+   * boutique de la plaque jaune, la sienne, où aucune vente n'a jamais eu lieu.
+   * Elle annonçait donc « aucune carte n'attend » avec des dizaines de dossiers
+   * ouverts ailleurs.
+   *
+   * **Mais elle ne lit pas les ventes des autres, et ce n'est pas un oubli** :
+   * le cloisonnement des magasins est la raison d'être de son espace (D2). Sa
+   * source est la collection des dossiers de carte grise, la seule que son
+   * métier lui ouvre partout. Conséquence à connaître : **un dossier qui n'a
+   * pas encore été repris n'y est pas**, et il ne lui apparaîtra pas tant que
+   * la reprise n'est pas passée.
+   */
+  const traiteTout = perimetre.metiers.includes("cartes_grises");
+
+  /* Les trois écoutes restent montées — un abonnement ne se branche pas sous
+     condition — mais deux rendent le vide quand c'est le métier des cartes
+     grises qui regarde : les ventes et les documents d'une autre boutique lui
+     seraient refusés par les règles, et la demande partirait pour rien. */
   const souscrireVentes = useCallback(
-    (auChangement: (ventes: Vente[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterVentes(boutiqueId, auChangement, enErreur),
-    [boutiqueId],
+    (auChangement: (ventes: Vente[]) => void, enErreur: (cause: unknown) => void) => {
+      if (traiteTout) {
+        auChangement([]);
+        return () => undefined;
+      }
+      return ecouterVentes(boutiqueId, auChangement, enErreur);
+    },
+    [boutiqueId, traiteTout],
   );
   const { valeur: ventes, erreur: erreurVentes } = useAbonnement(
     souscrireVentes,
@@ -68,8 +103,8 @@ export function ConfierDepuisPrestataire({
 
   const souscrireCartesGrises = useCallback(
     (auChangement: (dossiers: DossierCarteGrise[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterDossiersCarteGrise(boutiqueId, auChangement, enErreur),
-    [boutiqueId],
+      ecouterDossiersCarteGrise(traiteTout ? null : boutiqueId, auChangement, enErreur),
+    [boutiqueId, traiteTout],
   );
   const { valeur: dossiersCG, erreur: erreurCartesGrises } = useAbonnement(
     souscrireCartesGrises,
@@ -77,9 +112,14 @@ export function ConfierDepuisPrestataire({
   );
 
   const souscrireDossiers = useCallback(
-    (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterDossiers(boutiqueId, auChangement, enErreur),
-    [boutiqueId],
+    (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) => {
+      if (traiteTout) {
+        auChangement([]);
+        return () => undefined;
+      }
+      return ecouterDossiers(boutiqueId, auChangement, enErreur);
+    },
+    [boutiqueId, traiteTout],
   );
   const { valeur: documents, erreur: erreurDossiers } = useAbonnement(
     souscrireDossiers,
@@ -127,7 +167,7 @@ export function ConfierDepuisPrestataire({
       prestataireImpose={{ id: prestataire.id, nom: prestataire.nom }}
       boutiqueId={boutiqueId}
       onFermer={onFermer}
-      onConfie={onFermer}
+      onConfie={onConfie}
     />
   );
 }

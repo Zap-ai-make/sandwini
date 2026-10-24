@@ -5,10 +5,16 @@ import { Champ } from "@/components/patrons/Champ";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { useSession } from "@/lib/auth/session";
-import { joursEcoules } from "@/lib/domain/dossier";
+import { joursEcoules, lireJour } from "@/lib/domain/dossier";
 import { formaterAnciennete, formaterMontant } from "@/lib/domain/format";
-import { validerPaquet, type CarteAConfier, type SaisiePaquet } from "@/lib/domain/paquet";
+import {
+  validerPaquet,
+  type CarteAConfier,
+  type PaquetConfie,
+  type SaisiePaquet,
+} from "@/lib/domain/paquet";
 import type { Prestataire } from "@/lib/domain/prestataire";
+import { lireMontant } from "@/lib/domain/vente";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { messageErreurDossier } from "@/lib/repositories/dossier";
 import { confierPaquet } from "@/lib/repositories/paquets";
@@ -71,7 +77,14 @@ export function ConfierPaquetModal({
   prestataireImpose?: { id: string; nom: string } | null;
   boutiqueId: string;
   onFermer: () => void;
-  onConfie: () => void;
+  /**
+   * Ce qui vient d'être confié, pour le bordereau.
+   *
+   * **Passé en mémoire plutôt que relu de la base.** Le lot ne s'attend pas
+   * (D76) : hors ligne il n'est nulle part à relire, et c'est précisément là,
+   * le transitaire devant soi, qu'on veut imprimer le papier.
+   */
+  onConfie: (confie: PaquetConfie) => void;
 }) {
   const session = useSession();
 
@@ -156,7 +169,13 @@ export function ConfierPaquetModal({
         boutiqueId,
         { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
       );
-      onConfie();
+      onConfie({
+        prestataireNom: complete.prestataireNom,
+        deposeLe: lireJour(complete.deposeLe) ?? new Date(),
+        disponibleLe: complete.disponibleLe ? lireJour(complete.disponibleLe) : null,
+        avance: lireMontant(complete.avance),
+        cartes: retenues,
+      });
     } catch (cause) {
       setErreur(cause instanceof Error ? cause.message : messageErreurDossier(cause));
       setEnvoi(false);

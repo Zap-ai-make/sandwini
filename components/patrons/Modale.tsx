@@ -173,7 +173,16 @@ export function Modale({
         if (evenement.target === evenement.currentTarget) onFermer();
       }}
       ref={calque}
-      className="fixed inset-0 z-50 flex items-end justify-center bg-nuit/45 sm:items-center sm:p-4"
+      className={[
+        "fixed inset-0 z-50 flex justify-center bg-nuit/45 sm:items-center sm:p-4",
+        /* **Une grille de saisie n'est pas une feuille de téléphone.** Les
+           autres modales se collent en bas sous 640 px et montent comme une
+           feuille — le bon geste pour un formulaire court qu'on remplit au
+           pouce. Celle-ci est un plan de travail large, à onze colonnes :
+           collée en bas, elle laisse une bande grise au-dessus et son entête
+           part hors du champ. Elle se centre donc à toutes les largeurs. */
+        taille === "pleine" ? "items-center p-3" : "items-end",
+      ].join(" ")}
     >
       <div
         ref={cadre}
@@ -186,7 +195,7 @@ export function Modale({
           "border border-bord bg-papier text-encre shadow-panneau outline-none",
           /* En bas de l'écran sur téléphone : seuls les coins hauts s'arrondissent,
              comme une feuille qui monte. Centrée au-dessus. */
-          "rounded-t-carte sm:rounded-carte",
+          taille === "pleine" ? "rounded-carte" : "rounded-t-carte sm:rounded-carte",
           "motion-safe:animate-[monte_var(--duree-apparition)_var(--ease-sortie)]",
           LARGEUR[taille],
         ].join(" ")}
