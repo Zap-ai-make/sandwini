@@ -1,7 +1,15 @@
 "use client";
 
 import { X } from "lucide-react";
-import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react";
+import {
+  useEffect,
+  useId,
+  useLayoutEffect,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from "react";
+import { createPortal } from "react-dom";
 
 /**
  * La modale du produit : un calque, ses garanties écrites une fois.
@@ -40,6 +48,9 @@ import { useEffect, useId, useLayoutEffect, useRef, type ReactNode } from "react
 
 /** Les modales ouvertes, de la plus ancienne à la plus récente. */
 const pile: string[] = [];
+
+/** Rien à écouter : l'information cherchée ne change jamais après le montage. */
+const ABONNEMENT_INERTE = () => () => {};
 
 export type TailleModale = "etroite" | "moyenne" | "large" | "pleine";
 
@@ -83,6 +94,10 @@ export function Modale({
   const cadre = useRef<HTMLDivElement>(null);
   const identifiant = useId();
   const titreId = `${identifiant}-titre`;
+  /* Le portail a besoin de `document`, qui n'existe pas au rendu serveur. Lu
+     comme une source extérieure plutôt que posé par un effet : un `setState`
+     dans un effet fait un rendu de plus et le compilateur le refuse. */
+  const monte = useSyncExternalStore(ABONNEMENT_INERTE, () => true, () => false);
 
   useLayoutEffect(() => {
     if (!ouvert) return;
@@ -165,9 +180,23 @@ export function Modale({
     return () => document.removeEventListener("keydown", auClavier, true);
   }, [ouvert, identifiant, onFermer]);
 
-  if (!ouvert) return null;
+  if (!ouvert || !monte) return null;
 
-  return (
+  /**
+   * **La modale sort de l'arbre et se pose sur le corps du document.**
+   *
+   * Sans ce portail, `position: fixed` ne vise pas toujours la fenêtre. Un
+   * ancêtre qui porte une animation de `transform` devient le référentiel de
+   * tous ses descendants fixés — c'est la règle CSS, pas un défaut de
+   * navigateur. Or `.panneau-onglet` en porte une, avec `fill-mode: both`,
+   * donc **en permanence** : une modale ouverte depuis un onglet se calait
+   * sous les onglets au lieu de se centrer dans la fenêtre, et sa moitié basse
+   * sortait de l'écran. Vu le 24 octobre 2026 sur l'écran des cartes grises.
+   *
+   * Le portail règle la classe entière du défaut plutôt que ce cas-là : toute
+   * modale, ouverte de n'importe où, vise désormais la fenêtre.
+   */
+  return createPortal(
     <div
       onMouseDown={(evenement) => {
         if (evenement.target === evenement.currentTarget) onFermer();
@@ -234,6 +263,7 @@ export function Modale({
           </div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

@@ -316,10 +316,25 @@ export function cartesAConfier(
     ];
   });
 
-  /* Un dossier du dehors n'a pas de document sous une vente : son état ne se
-     lit que sur lui-même. On ne propose que ceux qui attendent encore. */
+  /**
+   * Les dossiers que seule la nouvelle collection connaît.
+   *
+   * **La condition portait sur l'origine, et c'était trop étroit.** Elle ne
+   * retenait que les dossiers venus du dehors, en supposant que les autres
+   * arrivaient forcément par `nees`, c'est-à-dire par leur document sous la
+   * vente. Vrai pour un gérant motos, qui lit ses ventes. Faux pour la
+   * personne des cartes grises : le cloisonnement des magasins lui interdit de
+   * lire les ventes des autres boutiques (D2), donc `nees` est vide pour elle,
+   * et un dossier né d'une vente puis repris dans la collection n'apparaissait
+   * nulle part — alors que c'est exactement ce qu'elle a à confier.
+   *
+   * Le tri se fait donc sur ce qu'on a déjà vu, et non sur l'origine. Les deux
+   * sources restent disjointes : un dossier déjà monté par son document n'est
+   * pas repris ici.
+   */
+  const dejaVues = new Set(nees.map((carte) => carte.dossierId));
   const duDehors = dossiersCarteGrise
-    .filter((dossier) => dossier.origine === "exterieur" && dossier.statut === "a_faire")
+    .filter((dossier) => dossier.statut === "a_faire" && !dejaVues.has(dossier.id))
     .map(
       (dossier): CarteAConfier => ({
         dossierId: dossier.id,

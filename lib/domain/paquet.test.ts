@@ -569,6 +569,34 @@ describe("confier un dossier venu du dehors", () => {
     expect(carte.dossier?.id).toBe("v1");
   });
 
+  it("propose un dossier né d’une vente quand on ne lit pas les ventes", () => {
+    /* **Le cas de la personne des cartes grises, et il manquait.** Le
+       cloisonnement des magasins lui interdit de lire les ventes des autres
+       boutiques (D2) : la liste des dossiers vendus est donc vide pour elle,
+       et le tri se faisait sur l'origine — « extérieur » seulement. Un dossier
+       né d'une vente puis repris dans la collection n'apparaissait nulle part,
+       alors que c'est exactement ce qu'elle a à confier. */
+    const liste = cartesAConfier(
+      [],
+      [cg({ id: "v1", venteId: "v1", origine: "vente", clientNom: "Kabore Lazarre" })],
+      () => "ignoré",
+    );
+    expect(liste.map((carte) => carte.dossierId)).toEqual(["v1"]);
+    expect(liste[0].client).toBe("Kabore Lazarre");
+    expect(liste[0].document).toBeNull();
+  });
+
+  it("ne propose pas deux fois une carte montée par son document", () => {
+    /* Les deux sources restent disjointes : le tri se fait sur ce qu'on a déjà
+       vu, et non plus sur l'origine. */
+    const liste = cartesAConfier(
+      [vendu("v1", "a_faire", new Date(2026, 8, 1))],
+      [cg({ id: "v1", venteId: "v1", origine: "vente" })],
+      () => "Client",
+    );
+    expect(liste).toHaveLength(1);
+  });
+
   it("laisse la carte sans dossier passer quand même", () => {
     /* Tout l'existant est dans ce cas tant que la migration n'a pas tourné :
        lui refuser le dépôt aurait arrêté le comptoir. */
