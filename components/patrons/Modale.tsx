@@ -204,6 +204,13 @@ export function Modale({
       ref={calque}
       className={[
         "fixed inset-0 z-50 flex justify-center bg-nuit/45 sm:items-center sm:p-4",
+        /* **Une modale ne s'imprime jamais**, et depuis le portail il faut le
+           dire ici. Avant, elle vivait dans l'arbre de son écran et héritait du
+           `print:hidden` que celui-ci porte ; posée sur le corps du document,
+           elle y échappe — le voile gris et le cadre seraient sortis sur le
+           papier, par-dessus le bordereau qui est le seul bloc à imprimer.
+           C'est vrai de toutes : ce qui doit s'imprimer est un bloc à part. */
+        "print:hidden",
         /* **Une grille de saisie n'est pas une feuille de téléphone.** Les
            autres modales se collent en bas sous 640 px et montent comme une
            feuille — le bon geste pour un formulaire court qu'on remplit au
