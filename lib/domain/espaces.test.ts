@@ -108,10 +108,11 @@ describe("accueilDuRole", () => {
 describe("le second niveau de navigation", () => {
   /* Huit depuis S54 : les reçus n'ont plus d'entrée à eux — ils s'ouvrent
      dans le panneau de l'écran des ventes, d'où ils sortent déjà. Neuf depuis
-     S55 : l'Inventaire s'ouvre au gérant. */
-  it("met les neuf écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
+     S55 : l'Inventaire s'ouvre au gérant. Dix depuis le 26 octobre 2026 : le
+     registre des CMC retirés, demandé par le commanditaire. */
+  it("met les dix écrans de l’espace motos à portée, sous les groupes de sa maquette", () => {
     const ecrans = ecransVisibles("motos", "gerant");
-    expect(ecrans).toHaveLength(9);
+    expect(ecrans).toHaveLength(10);
     expect(ecrans.map((e) => e.href)).toEqual(
       expect.arrayContaining([
         "/motos",
@@ -121,6 +122,7 @@ describe("le second niveau de navigation", () => {
         "/motos/ventes?nouvelle=1",
         "/motos/paiements",
         "/motos/dossiers",
+        "/motos/cmc",
         "/motos/inventaire",
       ]),
     );

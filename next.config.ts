@@ -280,6 +280,7 @@ const ECRANS_HORS_LIGNE = [
   "/motos/nouvelle",
   "/motos/ventes",
   "/motos/dossiers",
+  "/motos/cmc",
   "/motos/ventes/nouvelle",
   "/motos/paiements",
   /* **Jamais `/diagnostic` : la route a disparu en S54, la ligne est restée,

@@ -764,6 +764,56 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // --- Registre des CMC retires (26 octobre 2026) -------------------------
+    // « Ajoute un nouveau sous-onglet CMC, pour enregistrer ceux qui viennent
+    // recuperer les CMC : nom, prenom, numero, numero de la moto. »
+    //
+    // Une collection de premier niveau, et non une sous-collection d'une moto :
+    // celui qui vient chercher un CMC n'est pas toujours l'acheteur, et la moto
+    // n'est pas toujours une moto vendue par la maison. L'accrocher a un
+    // document qui peut ne pas exister aurait ecarte la moitie des cas.
+    //
+    // Deux champs seulement sont exiges non vides — le nom de qui emporte et le
+    // numero de la moto. Sans eux la ligne ne designe personne et ne designe
+    // rien : elle ne prouverait pas que le papier est sorti. Le prenom et le
+    // telephone sont facultatifs parce qu'ils le sont au comptoir.
+    function retraitCmcValide(donnees) {
+      return donnees.keys().hasOnly(['boutiqueId', 'nom', 'prenom', 'telephone',
+                                     'numeroMoto', 'date'].concat(champsAudit()))
+             && donnees.keys().hasAll(['boutiqueId', 'nom', 'prenom', 'telephone',
+                                       'numeroMoto', 'date'].concat(champsAudit()))
+             && donnees.boutiqueId is string
+             && donnees.boutiqueId.size() > 0
+             && donnees.nom is string
+             && donnees.nom.size() > 0
+             && donnees.nom.size() <= 80
+             && texteBorne(donnees.prenom, 80)
+             && texteBorne(donnees.telephone, 40)
+             && donnees.numeroMoto is string
+             && donnees.numeroMoto.size() > 0
+             && donnees.numeroMoto.size() <= 40
+             && donnees.date is timestamp;
+    }
+
+    match /retraitsCmc/{retraitId} {
+      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+
+      allow create: if retraitCmcValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
+
+      // Une correction reste possible — un nom mal orthographie se repare — mais
+      // la ligne ne change pas de boutique : elle appartient au comptoir qui a
+      // remis le papier, et la deplacer la ferait disparaitre de son registre.
+      allow update: if retraitCmcValide(request.resource.data)
+                    && traceModification(request.resource.data, resource.data)
+                    && request.resource.data.boutiqueId == resource.data.boutiqueId
+                    && (estResponsable() || estGerantDe(resource.data.boutiqueId));
+
+      // Un registre ne s'efface pas. C'est ce qui en fait un registre.
+      allow delete: if false;
+    }
+
     // --- Arrivages (S42) ----------------------------------------------------
     // Un lot de motos entrées ensemble, rattaché à une boutique. Même portée
     // que les motos : le responsable voit tout, le gérant les lots de sa

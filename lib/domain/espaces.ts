@@ -342,6 +342,10 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
         { href: "/motos/ventes", libelle: "Ventes" },
         { href: "/motos/paiements", libelle: "Paiements", compteur: "tranches" },
         { href: "/motos/dossiers", libelle: "Dossiers", compteur: "dossiers" },
+        /* **Le registre des CMC retirés** (26 octobre 2026). Rangé sous
+           « Suivre » et non sous « Enregistrer » : on y inscrit une ligne,
+           mais on vient surtout y chercher qui est passé. */
+        { href: "/motos/cmc", libelle: "CMC" },
         /**
          * **L'Inventaire s'ouvre au gérant (S55), et c'est une demande du
          * commanditaire : « l'inventaire doit se faire à deux niveaux, pour
