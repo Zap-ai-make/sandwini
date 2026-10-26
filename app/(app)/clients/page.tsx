@@ -205,27 +205,33 @@ function LigneClient({
 }) {
   return (
     <li className="px-4 py-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
         <span className="min-w-0 flex-1">
           {/* **Le nom n'est plus un lien** (26 octobre 2026, demande du
               commanditaire) : deux gestes partaient de la même ligne — ouvrir
               la fiche et corriger — et seul le premier se voyait. Les deux sont
               maintenant dans le menu, nommés, à la même place. */}
-          {/* **Tout sur la même ligne, pas empilé** (26 octobre 2026, demande
-              du commanditaire). Empilés, le nom, le numéro et les dates
-              faisaient trois lignes par client : dix clients remplissaient
-              l'écran et l'œil devait descendre pour comparer deux numéros.
-              Côte à côte, chaque fiche tient sur une ligne et la liste
-              redevient une liste. Elle se replie d'elle-même quand la largeur
-              manque — c'est `flex-wrap` qui s'en charge, pas une seconde mise
-              en page. */}
-          <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-            <span className="font-medium text-encre">{nomComplet(client)}</span>
+          {/* **Le numéro sous le nom, les dates à côté** (26 octobre 2026,
+              deuxième passe du commanditaire : « laisse le numéro en bas du nom
+              faut juste aligner les dates »). Le numéro appartient à
+              l'identité, il se lit avec le nom ; les dates, elles, sont ce
+              qu'on parcourt d'une ligne à l'autre, et empilées elles
+              obligeaient l'œil à descendre.
 
-            <span className="flex items-center gap-1.5 text-sm text-encre-doux">
-              <Phone aria-hidden="true" className="size-3.5 shrink-0" />
-              <span className="plaque-code">{formaterTelephone(client.telephone)}</span>
-              {client.telephone2 && <span>· {formaterTelephone(client.telephone2)}</span>}
+              L'identité porte une largeur minimale pour que les dates
+              commencent au même endroit sur chaque ligne — sans elle, elles
+              dansaient d'un client à l'autre au gré de la longueur du nom, et
+              « aligner » n'aurait rien voulu dire. Elle tombe sous `sm` : sur
+              un téléphone, réserver 14rem écraserait les dates. */}
+          <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <span className="min-w-0 sm:min-w-56">
+              <span className="block font-medium text-encre">{nomComplet(client)}</span>
+
+              <span className="mt-0.5 flex items-center gap-1.5 text-sm text-encre-doux">
+                <Phone aria-hidden="true" className="size-3.5 shrink-0" />
+                <span className="plaque-code">{formaterTelephone(client.telephone)}</span>
+                {client.telephone2 && <span>· {formaterTelephone(client.telephone2)}</span>}
+              </span>
             </span>
 
             {achats !== undefined && achats.length > 0 && (

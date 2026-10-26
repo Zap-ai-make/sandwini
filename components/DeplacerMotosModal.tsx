@@ -152,6 +152,19 @@ export function DeplacerMotosModal({
           </select>
         </Champ>
 
+        {destinations.length === 0 && (
+          /* Un geste indisponible dit toujours pourquoi (`DESIGN.md` §10). La
+             liste peut être vide maintenant qu'elle écarte les boutiques qui ne
+             tiennent pas de motos : sans cette phrase, le sélecteur n'offrirait
+             que « Choisir… » et on le croirait cassé. */
+          <Avis ton="transit" titre="Aucune boutique où les envoyer">
+            <p>
+              Seules les boutiques ouvertes qui vendent des motos reçoivent un stock de motos. Une
+              boutique de pièces détachées ou de cartes grises n’en tient pas.
+            </p>
+          </Avis>
+        )}
+
         <Champ
           id="motif-transfert"
           libelle="Motif"

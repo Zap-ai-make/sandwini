@@ -9,7 +9,7 @@ import {
   raisonDeNePasPartir,
   validerTransfert,
 } from "./transfert";
-import type { Boutique } from "./boutique";
+import type { Boutique, Metier } from "./boutique";
 import type { Moto, StatutMoto } from "./moto";
 
 /**
@@ -23,8 +23,8 @@ import type { Moto, StatutMoto } from "./moto";
 
 const moto = (statut: StatutMoto): Moto => ({ statut }) as Moto;
 
-const boutique = (id: string, actif = true): Boutique =>
-  ({ id, code: id, nom: `Boutique ${id}`, actif }) as Boutique;
+const boutique = (id: string, actif = true, metiers: Metier[] = ["motos"]): Boutique =>
+  ({ id, code: id, nom: `Boutique ${id}`, metiers, actif }) as Boutique;
 
 describe("peutPartir", () => {
   it("laisse partir une moto en stock", () => {
@@ -93,6 +93,20 @@ describe("destinationsPossibles", () => {
     expect(destinationsPossibles(avecFermee, "PTG").map((b) => b.id)).toEqual(["OUA"]);
   });
 
+  /**
+   * Une boutique qui ne vend pas de motos n'en reçoit pas.
+   *
+   * C'est le magasin physique qui porte le métier (D62) : l'espace motos
+   * n'existe pas pour la boutique de pièces détachées, ni pour celle des
+   * cartes grises. Y envoyer une moto la retirerait du stock de départ sans
+   * qu'aucun écran de l'arrivée ne la montre — elle serait perdue, pas
+   * déplacée.
+   */
+  it("écarte une boutique qui ne tient pas de motos", () => {
+    const avecPieces = [boutique("PTG"), boutique("PCS", true, ["pieces"]), boutique("OUA")];
+    expect(destinationsPossibles(avecPieces, "PTG").map((b) => b.id)).toEqual(["OUA"]);
+  });
+
   it("rend une liste vide quand il n’y a que la boutique d’origine", () => {
     expect(destinationsPossibles([boutique("PTG")], "PTG")).toEqual([]);
   });
@@ -146,7 +160,8 @@ describe("validerTransfert", () => {
 });
 
 describe("déplacer plusieurs motos d’un coup", () => {
-  const boutique = (id: string, actif = true): Boutique => ({ id, nom: id, actif }) as Boutique;
+  const boutique = (id: string, actif = true, metiers: Metier[] = ["motos"]): Boutique =>
+    ({ id, nom: id, metiers, actif }) as Boutique;
   const BOUTIQUES = [boutique("PTG"), boutique("KDG"), boutique("OUA", false)];
   const moto = (id: string, boutiqueId: string, statut = "en_stock"): Moto =>
     ({ id, boutiqueId, statut, numeroChassis: id }) as unknown as Moto;
@@ -191,5 +206,19 @@ describe("déplacer plusieurs motos d’un coup", () => {
     /* Les motos cochées peuvent venir de magasins différents : il n'y a pas
        une origine à exclure. */
     expect(destinationsGroupees(BOUTIQUES).map((b) => b.id)).toEqual(["PTG", "KDG"]);
+  });
+
+  /* Demande du commanditaire du 26 octobre 2026 : « une boutique de pièce
+     détachée ou de carte grise ne doit pas s'afficher ». Elles ne tiennent pas
+     de stock de motos — la proposer, c'est proposer d'en perdre une. Une
+     boutique qui fait les deux reste offerte. */
+  it("ne propose ni les pièces détachées ni les cartes grises", () => {
+    const melange = [
+      boutique("PTG"),
+      boutique("PCS", true, ["pieces"]),
+      boutique("CGR", true, ["cartes_grises"]),
+      boutique("MIX", true, ["pieces", "motos"]),
+    ];
+    expect(destinationsGroupees(melange).map((b) => b.id)).toEqual(["PTG", "MIX"]);
   });
 });

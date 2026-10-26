@@ -82,16 +82,34 @@ export function raisonDeNePasPartir(moto: Moto, destinations: readonly Boutique[
     return `Cette moto est « ${LIBELLE_STATUT[moto.statut].toLowerCase()} » : seule une moto en stock se déplace.`;
   }
   if (destinations.length === 0) {
-    return "Aucune autre boutique ouverte où l’envoyer.";
+    return "Aucune autre boutique de motos ouverte où l’envoyer.";
   }
   return null;
 }
 
 /**
+ * Une boutique qui ne vend pas de motos n'en reçoit pas (26 octobre 2026).
+ *
+ * C'est le magasin physique qui porte le métier (D62) : l'espace motos
+ * n'existe pas pour la boutique de pièces détachées, ni pour celle des cartes
+ * grises. Y envoyer une moto la retirerait du stock de départ sans qu'aucun
+ * écran de l'arrivée ne la montre — elle serait perdue, pas déplacée. Le
+ * commanditaire l'a demandé en ces termes : « une boutique de pièce détachée
+ * ou de carte grise ne doit pas s'afficher ».
+ *
+ * Une boutique qui tient les deux métiers reste une destination : c'est le
+ * métier qui compte, pas l'exclusivité.
+ */
+function tientLesMotos(boutique: Boutique): boolean {
+  return boutique.metiers.includes("motos");
+}
+
+/**
  * Les boutiques où cette moto peut aller.
  *
- * Les ouvertes, moins celle où elle est déjà. L'ordre reçu est conservé : c'est
- * celui du périmètre, donc celui que la personne a l'habitude de lire.
+ * Les ouvertes qui tiennent des motos, moins celle où elle est déjà. L'ordre
+ * reçu est conservé : c'est celui du périmètre, donc celui que la personne a
+ * l'habitude de lire.
  *
  * Une boutique fermée est aussi refusée par les règles — c'est cette garde-là
  * qui compte. La retirer ici évite seulement de proposer un geste qui échouerait.
@@ -100,7 +118,9 @@ export function destinationsPossibles(
   boutiques: readonly Boutique[],
   origineId: string,
 ): Boutique[] {
-  return boutiques.filter((boutique) => boutique.actif && boutique.id !== origineId);
+  return boutiques.filter(
+    (boutique) => boutique.actif && tientLesMotos(boutique) && boutique.id !== origineId,
+  );
 }
 
 /**
@@ -172,10 +192,11 @@ export function repartirPourDeplacement(
 /**
  * Les destinations offertes pour un envoi groupé.
  *
- * Toutes les boutiques ouvertes, **sans en retirer aucune** : quand les motos
- * cochées viennent de magasins différents, il n'y a pas une origine à exclure.
- * Celles qui s'y trouvent déjà sont écartées ligne par ligne, avec leur raison.
+ * Les boutiques ouvertes qui tiennent des motos, **sans retirer d'origine** :
+ * quand les motos cochées viennent de magasins différents, il n'y a pas une
+ * origine à exclure. Celles qui s'y trouvent déjà sont écartées ligne par
+ * ligne, avec leur raison.
  */
 export function destinationsGroupees(boutiques: readonly Boutique[]): Boutique[] {
-  return boutiques.filter((boutique) => boutique.actif);
+  return boutiques.filter((boutique) => boutique.actif && tientLesMotos(boutique));
 }
