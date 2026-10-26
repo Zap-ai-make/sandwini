@@ -162,10 +162,14 @@ function Marque() {
   return (
     <span
       aria-hidden="true"
-      className="mb-3 block w-10 text-coquille-encre max-lg:hidden"
+      /* **Agrandi le 26 octobre 2026**, à la demande du commanditaire. 56 px
+         dans un rail de 62 : la marque occupe sa largeur sans toucher les
+         bords, là où 40 la laissaient flotter au-dessus d'icônes plus
+         présentes qu'elle. */
+      className="mb-3 block w-14 text-coquille-encre max-lg:hidden"
       title="Sandwidi et Frères"
     >
-      <Monogramme fond="sombre" className="block h-auto w-full" />
+      <Monogramme fond="sombre" anime className="w-full" />
     </span>
   );
 }

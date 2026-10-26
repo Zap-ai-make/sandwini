@@ -44,7 +44,7 @@ export function IdentiteEntreprise() {
           reçu, et c'est désormais cette image-là qui s'y imprime. Réduit sur un
           téléphone : à 88 px, il prenait le quart de la largeur et poussait
           « BF-OUA-01-2016-A12-00847 » sur trois lignes. */}
-      <Monogramme fond="auto" className="mt-2 h-auto w-14 shrink-0 sm:w-[88px]" />
+      <Monogramme fond="auto" anime className="mt-2 w-14 shrink-0 sm:w-[88px]" />
       <dl className="min-w-0 flex-1 divide-y divide-bord sm:max-w-[560px]">
       {(Object.keys(IDENTITE) as (keyof typeof IDENTITE)[]).map((champ) => (
         <div key={champ} className="flex flex-wrap items-baseline justify-between gap-x-4 py-2">

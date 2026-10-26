@@ -246,7 +246,8 @@ function PanneauMarque() {
     <div className="flex flex-col bg-nuit px-6 py-8 text-coquille-encre md:px-10 md:py-14 [--color-focus-halo:var(--color-nuit)] [--color-focus-trait:#ffffff]">
       <Monogramme
         fond="sombre"
-        className="mb-6 h-auto w-28 md:mb-10 md:w-44"
+        anime
+        className="mb-6 w-28 md:mb-10 md:w-44"
         titre="Sandwidi Entreprise"
       />
       <p className="font-display text-bloc font-bold tracking-tight md:text-ecran">

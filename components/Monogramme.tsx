@@ -32,6 +32,7 @@ export function Monogramme({
   className,
   titre,
   fond = "clair",
+  anime = false,
 }: {
   className?: string;
   /** Donné seulement quand aucun texte à côté ne dit déjà le nom. */
@@ -49,6 +50,25 @@ export function Monogramme({
    * rendu.
    */
   fond?: "clair" | "sombre" | "auto";
+  /**
+   * Le reflet qui traverse la marque toutes les 3,5 secondes.
+   *
+   * **La seule chose du produit qui bouge en permanence**, et c'est un
+   * arbitrage du commanditaire (S54) repris le 26 octobre 2026 : « anime-le
+   * comme pour l'ancien ». Le monogramme est dans le rail sur tous les écrans,
+   * il porte les couleurs de la maison, et il n'est jamais dans la ligne de
+   * lecture. Le faire vivre, c'est faire vivre la marque et rien d'autre.
+   *
+   * **Le reflet ne sort pas du glyphe.** L'ancien l'obtenait en rallumant les
+   * arrêts d'un dégradé SVG ; celui-ci, le logo étant une image, découpe la
+   * lueur avec l'image elle-même en masque. Le principe est le même : la
+   * lumière est enfermée dans la lettre par construction, et non arrêtée par
+   * une boîte qui aurait débordé en rectangle sur le rail.
+   *
+   * Jamais sur un reçu : un document imprimé ne bouge pas, et la feuille de
+   * style d'impression éteindrait le reflet de toute façon.
+   */
+  anime?: boolean;
 }) {
   const commun = {
     width: 440,
@@ -60,8 +80,15 @@ export function Monogramme({
     decoding: "sync" as const,
   };
 
+  /* Animée, l'enveloppe porte la taille et l'image la remplit : le reflet se
+     dessine sur un pseudo-élément de cette enveloppe, qui doit donc avoir
+     exactement les dimensions du logo. */
+  const habit = anime ? "block h-auto w-full" : (className ?? "");
+  const envelopper = (contenu: React.ReactNode) =>
+    anime ? <span className={`marque-vivante ${className ?? ""}`}>{contenu}</span> : contenu;
+
   if (fond === "auto") {
-    return (
+    return envelopper(
       <>
         {/* eslint-disable-next-line @next/next/no-img-element -- `next/image`
             attend la mise en page avant de charger : sur un document qu'on
@@ -70,7 +97,7 @@ export function Monogramme({
           src="/logo-se.png"
           alt={titre ?? ""}
           {...commun}
-          className={`logo-fond-clair ${className ?? ""}`}
+          className={`logo-fond-clair ${habit}`}
         />
         {/* eslint-disable-next-line @next/next/no-img-element -- idem. */}
         <img
@@ -78,19 +105,21 @@ export function Monogramme({
           alt=""
           {...commun}
           aria-hidden
-          className={`logo-fond-sombre ${className ?? ""}`}
+          className={`logo-fond-sombre ${habit}`}
         />
-      </>
+      </>,
     );
   }
 
-  return (
-    /* eslint-disable-next-line @next/next/no-img-element -- voir ci-dessus. */
+  const image = (
+    // eslint-disable-next-line @next/next/no-img-element -- voir ci-dessus.
     <img
       src={fond === "sombre" ? "/logo-se-clair.png" : "/logo-se.png"}
       alt={titre ?? ""}
       {...commun}
-      className={className}
+      className={habit}
     />
   );
+
+  return envelopper(image);
 }

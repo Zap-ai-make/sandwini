@@ -2236,110 +2236,82 @@
 
      La seule chose du produit qui bouge en permanence. Un reflet traverse le
      monogramme toutes les 3,5 s, de gauche à droite : de la lumière sur du
-     métal poli, ce que raconte déjà le dégradé or → rouge.
+     métal poli.
 
      **Pourquoi la marque et pas un décor.** Le premier essai posait une lueur
      en tête de coquille ; le commanditaire ne l'a pas vue, et il avait raison —
      deux pixels au bord de l'écran font un indicateur réseau, pas une identité.
      Ce qui identifie SDI est le monogramme : il est dans le rail sur tous les
-     écrans, il porte les couleurs de la maison, et il n'est jamais dans la ligne
-     de lecture. Le faire vivre, c'est faire vivre la marque et rien d'autre
-     (arbitrage du commanditaire, S54).
+     écrans, il porte les couleurs de la maison, et il n'est jamais dans la
+     ligne de lecture. Le faire vivre, c'est faire vivre la marque et rien
+     d'autre (arbitrage du commanditaire, S54, redemandé le 26 octobre 2026).
 
-     **Le reflet voyage dans le glyphe.** Un calque en mode de fusion posé
-     par-dessus aurait débordé en rectangle sur le rail : le monogramme n'est pas
-     une boîte. Ici ce sont les arrêts du dégradé qui s'éclaircissent l'un après
-     l'autre, décalés de 130 ms — la lumière ne peut donc pas sortir de la
-     lettre, par construction.
+     **Le reflet voyage dans le glyphe**, et c'est la contrainte qui a décidé de
+     la technique. Un calque en mode de fusion posé par-dessus déborderait en
+     rectangle sur le rail : le monogramme n'est pas une boîte. L'ancien logo,
+     qui était un tracé SVG, rallumait les arrêts de son dégradé l'un après
+     l'autre — la lumière ne pouvait pas sortir de la lettre. Le nouveau est une
+     image découpée dans la photographie du graveur : la lueur est donc
+     **masquée par cette même image**, dont le canal alpha est exactement le
+     contour de la marque. Même garantie, autre moyen.
 
-     Le relais d'arrêt en arrêt, plutôt qu'un point lumineux qui glisse : seul
-     `stop-color` est animable en CSS, `offset` est une géométrie et ne l'est
-     pas.
+     Le masque prend toujours `logo-se.png`, y compris quand c'est la variante
+     claire qui s'affiche : les deux fichiers sortent du même découpage et
+     partagent leur canal alpha au pixel près.
 
-     **Les cinq teintes de repos sont celles de `components/Monogramme.tsx`**,
-     lui-même transcrit de `design/marque/monogramme-se.svg`. Les deux listes
-     bougent ensemble ou pas du tout.
+     L'éclat ne dure qu'un tiers du cycle. Le reste du temps, la bande est
+     parquée hors du glyphe et la marque est exactement au repos — le retour à
+     la position de départ se fait donc sans qu'on le voie.
 
-     Ce que ça coûte : une repeinte du monogramme à chaque image, là où une
-     translation serait composée par le GPU. C'est le prix d'un reflet qui ne
-     déborde pas, et il se paie sur quarante pixels de côté. Sous « moins de
-     mouvement », le garde de `@layer base` le ramène à un seul passage de
-     0,01 ms : la marque reprend ses couleurs de repos et ne bouge plus.
+     Sous « moins de mouvement », le garde de `@layer base` ramène l'animation à
+     un seul passage de 0,01 ms : la marque ne bouge plus.
      -------------------------------------------------------------------------- */
-  .marque-metal stop:nth-child(1) {
-    animation: marque-reflet-1 3.5s ease-in-out infinite;
+  .marque-vivante {
+    position: relative;
+    display: block;
+    /* Sans elle, l'enveloppe prendrait la hauteur de ligne du texte et le
+       reflet se dessinerait à côté du logo. */
+    line-height: 0;
   }
 
-  .marque-metal stop:nth-child(2) {
-    animation: marque-reflet-2 3.5s ease-in-out 0.13s infinite;
+  .marque-vivante::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    /* Une bande oblique, étroite : c'est un reflet, pas un projecteur. */
+    background-image: linear-gradient(
+      100deg,
+      transparent 42%,
+      rgb(255 255 255 / 0.78) 50%,
+      transparent 58%
+    );
+    background-size: 300% 100%;
+    background-repeat: no-repeat;
+    -webkit-mask-image: url("/logo-se.png");
+    mask-image: url("/logo-se.png");
+    -webkit-mask-size: 100% 100%;
+    mask-size: 100% 100%;
+    -webkit-mask-repeat: no-repeat;
+    mask-repeat: no-repeat;
+    animation: marque-reflet 3.5s ease-in-out infinite;
   }
 
-  .marque-metal stop:nth-child(3) {
-    animation: marque-reflet-3 3.5s ease-in-out 0.26s infinite;
-  }
-
-  .marque-metal stop:nth-child(4) {
-    animation: marque-reflet-4 3.5s ease-in-out 0.39s infinite;
-  }
-
-  .marque-metal stop:nth-child(5) {
-    animation: marque-reflet-5 3.5s ease-in-out 0.52s infinite;
-  }
-
-  /* L'éclat ne dure qu'un dixième du cycle : le reste du temps, la marque est
-     exactement à ses couleurs de repos. */
-  @keyframes marque-reflet-1 {
-    0%,
-    26%,
+  @keyframes marque-reflet {
+    0% {
+      background-position: -110% 0;
+    }
+    34%,
     100% {
-      stop-color: #e0a81a;
-    }
-    9% {
-      stop-color: #fff6df;
+      background-position: 210% 0;
     }
   }
 
-  @keyframes marque-reflet-2 {
-    0%,
-    26%,
-    100% {
-      stop-color: #dfa01c;
-    }
-    9% {
-      stop-color: #fff6df;
-    }
-  }
-
-  @keyframes marque-reflet-3 {
-    0%,
-    26%,
-    100% {
-      stop-color: #dd7a28;
-    }
-    9% {
-      stop-color: #fff6df;
-    }
-  }
-
-  @keyframes marque-reflet-4 {
-    0%,
-    26%,
-    100% {
-      stop-color: #d3592c;
-    }
-    9% {
-      stop-color: #fff6df;
-    }
-  }
-
-  @keyframes marque-reflet-5 {
-    0%,
-    26%,
-    100% {
-      stop-color: #c93c2e;
-    }
-    9% {
-      stop-color: #fff6df;
+  /* Sur le papier, rien ne bouge et rien ne brille : le reflet est une
+     promesse d'écran. */
+  @media print {
+    .marque-vivante::after {
+      display: none;
     }
   }
 }
