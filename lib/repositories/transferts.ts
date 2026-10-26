@@ -11,7 +11,11 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { Moto } from "@/lib/domain/moto";
-import type { SaisieTransfert, Transfert } from "@/lib/domain/transfert";
+import {
+  MOTOS_PAR_DEPLACEMENT_MAX,
+  type SaisieTransfert,
+  type Transfert,
+} from "@/lib/domain/transfert";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { traceCreation, traceModification, type Auteur } from "./referentiels";
 
@@ -96,6 +100,83 @@ export function deplacerMoto(
          déplacement pour un champ que personne ne lit. */
       const cout = await getDoc(reference).catch(() => null);
       if (cout?.exists()) lot.update(reference, { boutiqueId: vers });
+    }
+
+    await lot.commit();
+  })();
+
+  return { enregistre: suivreEcriture(enregistre) };
+}
+
+/**
+ * Déplace plusieurs motos d'un coup, et écrit une trace par moto.
+ *
+ * **Tout part ensemble, ou rien.** Un `writeBatch` reste atomique hors ligne :
+ * Firestore le garde entier dans sa file et le rejoue d'un bloc au retour du
+ * réseau. La moitié d'un envoi ferait disparaître des motos d'un stock sans
+ * qu'elles apparaissent dans l'autre, et personne ne saurait où l'envoi s'est
+ * arrêté.
+ *
+ * **Une trace par moto, et non une par envoi.** C'est la moto qu'on cherche
+ * plus tard — « d'où vient celle-là ? » — et un document unique obligerait à
+ * fouiller une liste d'identifiants pour répondre. Le coût est le même, la
+ * question est mieux servie.
+ *
+ * **Les coûts privés sont lus avant le lot, pas pendant.** Chacun demande un
+ * aller-retour ; les lancer ensemble évite de les enchaîner un par un. Hors
+ * ligne la lecture échoue, et on laisse alors le coût tel quel plutôt que de
+ * faire échouer le déplacement pour un champ que personne ne lit (voir
+ * `deplacerMoto`).
+ */
+export function deplacerMotos(
+  motos: readonly Moto[],
+  saisie: SaisieTransfert,
+  auteur: Auteur,
+  voitLesCouts: boolean,
+): { enregistre: Promise<void> } {
+  const vers = saisie.versBoutiqueId.trim();
+
+  const enregistre = (async () => {
+    if (motos.length === 0) return;
+    if (motos.length > MOTOS_PAR_DEPLACEMENT_MAX) {
+      throw new Error(
+        `Pas plus de ${MOTOS_PAR_DEPLACEMENT_MAX} motos à la fois : au-delà, l’envoi ne peut plus être garanti d’un seul tenant.`,
+      );
+    }
+
+    const coutsAEcrire = voitLesCouts
+      ? await Promise.all(
+          motos.map(async (moto) => {
+            const reference = doc(db(), "motos", moto.id, "prive", "cout");
+            const cout = await getDoc(reference).catch(() => null);
+            return cout?.exists() ? reference : null;
+          }),
+        )
+      : [];
+
+    const lot = writeBatch(db());
+
+    for (const moto of motos) {
+      lot.update(doc(db(), "motos", moto.id), {
+        boutiqueId: vers,
+        ...traceModification(auteur),
+      });
+
+      lot.set(doc(collection(db(), "transfertsMotos")), {
+        motoId: moto.id,
+        /* Le châssis est recopié : la trace doit rester lisible quand son sujet
+           ne l'est plus — et la boutique de départ perd justement le droit
+           d'ouvrir la moto. */
+        numeroChassis: moto.numeroChassis,
+        deBoutiqueId: moto.boutiqueId,
+        versBoutiqueId: vers,
+        motif: saisie.motif.trim(),
+        ...traceCreation(auteur),
+      });
+    }
+
+    for (const reference of coutsAEcrire) {
+      if (reference) lot.update(reference, { boutiqueId: vers });
     }
 
     await lot.commit();

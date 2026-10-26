@@ -1,7 +1,7 @@
 "use client";
 
 import { Download } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { motosEnClasseur, nomFichierExport } from "@/lib/domain/export";
 import { TYPE_CLASSEUR } from "@/lib/domain/xlsx";
 import { formaterNombre } from "@/lib/domain/format";
@@ -29,6 +29,7 @@ export function ExportMotos({
   nomModele,
   toutCocher,
   toutDecocher,
+  actions,
 }: {
   /** Les motos cochées, dans l'ordre de l'écran. */
   motos: Moto[];
@@ -36,6 +37,16 @@ export function ExportMotos({
   nomModele: (id: string) => string;
   toutCocher: () => void;
   toutDecocher: () => void;
+  /**
+   * Ce qu'on peut faire d'autre de la même sélection, posé après l'export.
+   *
+   * **Une seule barre pour une seule sélection.** Le déplacement groupé (26
+   * octobre 2026) lit exactement les mêmes cases que l'export ; lui donner sa
+   * propre barre aurait fait deux façons de choisir des lignes dans un écran
+   * qui n'en demande qu'une. Le geste vient de l'appelant, parce que lui seul
+   * connaît les boutiques et l'auteur.
+   */
+  actions?: ReactNode;
 }) {
   const [echec, setEchec] = useState<string | null>(null);
 
@@ -95,6 +106,8 @@ export function ExportMotos({
         <Download aria-hidden="true" className="size-4" />
         Exporter (Excel)
       </button>
+
+      {actions}
 
       {echec && (
         <p role="alert" className="text-corps text-alerte">

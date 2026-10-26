@@ -211,28 +211,40 @@ function LigneClient({
               commanditaire) : deux gestes partaient de la même ligne — ouvrir
               la fiche et corriger — et seul le premier se voyait. Les deux sont
               maintenant dans le menu, nommés, à la même place. */}
-          <span className="block font-medium text-encre">{nomComplet(client)}</span>
-          <span className="flex items-center gap-1.5 text-sm text-encre-doux">
-            <Phone aria-hidden="true" className="size-3.5 shrink-0" />
-            <span className="plaque-code">{formaterTelephone(client.telephone)}</span>
-            {client.telephone2 && <span>· {formaterTelephone(client.telephone2)}</span>}
-          </span>
-          {achats !== undefined && achats.length > 0 && (
-            /* **Toutes les dates, et non la dernière**, c'est la demande : on
-               veut savoir d'un coup d'œil si quelqu'un est un habitué. */
-            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-encre-doux">
-              <ShoppingBag aria-hidden="true" className="size-3.5 shrink-0" />
-              <span className="sr-only">
-                {achats.length === 1 ? "Un achat le" : `${achats.length} achats, les`}
-              </span>
-              {achats.map((date, rang) => (
-                <span key={date.getTime() + "-" + rang} className="plaque-code">
-                  {formaterDateCourte(date)}
-                  {rang < achats.length - 1 ? " ·" : ""}
-                </span>
-              ))}
+          {/* **Tout sur la même ligne, pas empilé** (26 octobre 2026, demande
+              du commanditaire). Empilés, le nom, le numéro et les dates
+              faisaient trois lignes par client : dix clients remplissaient
+              l'écran et l'œil devait descendre pour comparer deux numéros.
+              Côte à côte, chaque fiche tient sur une ligne et la liste
+              redevient une liste. Elle se replie d'elle-même quand la largeur
+              manque — c'est `flex-wrap` qui s'en charge, pas une seconde mise
+              en page. */}
+          <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <span className="font-medium text-encre">{nomComplet(client)}</span>
+
+            <span className="flex items-center gap-1.5 text-sm text-encre-doux">
+              <Phone aria-hidden="true" className="size-3.5 shrink-0" />
+              <span className="plaque-code">{formaterTelephone(client.telephone)}</span>
+              {client.telephone2 && <span>· {formaterTelephone(client.telephone2)}</span>}
             </span>
-          )}
+
+            {achats !== undefined && achats.length > 0 && (
+              /* **Toutes les dates, et non la dernière**, c'est la demande : on
+                 veut savoir d'un coup d'œil si quelqu'un est un habitué. */
+              <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-encre-doux">
+                <ShoppingBag aria-hidden="true" className="size-3.5 shrink-0" />
+                <span className="sr-only">
+                  {achats.length === 1 ? "Un achat le" : `${achats.length} achats, les`}
+                </span>
+                {achats.map((date, rang) => (
+                  <span key={date.getTime() + "-" + rang} className="plaque-code">
+                    {formaterDateCourte(date)}
+                    {rang < achats.length - 1 ? " ·" : ""}
+                  </span>
+                ))}
+              </span>
+            )}
+          </span>
           {client.adresse && (
             <span className="block text-sm text-encre-doux">{client.adresse}</span>
           )}

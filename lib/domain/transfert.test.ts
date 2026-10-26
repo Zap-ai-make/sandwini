@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import {
   LONGUEUR_MOTIF_MAX,
   TRANSFERT_VIDE,
+  destinationsGroupees,
   destinationsPossibles,
+  repartirPourDeplacement,
   peutPartir,
   raisonDeNePasPartir,
   validerTransfert,
@@ -140,5 +142,54 @@ describe("validerTransfert", () => {
     expect(
       validerTransfert({ versBoutiqueId: "KDG", motif: "x".repeat(LONGUEUR_MOTIF_MAX) }, "PTG"),
     ).toBeNull();
+  });
+});
+
+describe("déplacer plusieurs motos d’un coup", () => {
+  const boutique = (id: string, actif = true): Boutique => ({ id, nom: id, actif }) as Boutique;
+  const BOUTIQUES = [boutique("PTG"), boutique("KDG"), boutique("OUA", false)];
+  const moto = (id: string, boutiqueId: string, statut = "en_stock"): Moto =>
+    ({ id, boutiqueId, statut, numeroChassis: id }) as unknown as Moto;
+
+  it("laisse partir celles qui sont en stock ailleurs", () => {
+    const { partantes, bloquees } = repartirPourDeplacement(
+      [moto("m1", "PTG"), moto("m2", "PTG")],
+      "KDG",
+      BOUTIQUES,
+    );
+    expect(partantes.map((m) => m.id)).toEqual(["m1", "m2"]);
+    expect(bloquees).toEqual([]);
+  });
+
+  it("écarte celle qui est déjà dans la boutique visée, et le dit", () => {
+    /* **Rien n'est écarté en silence** : sans la ligne, on croirait avoir
+       déplacé deux motos quand une seule est partie. */
+    const { partantes, bloquees } = repartirPourDeplacement(
+      [moto("m1", "PTG"), moto("m2", "KDG")],
+      "KDG",
+      BOUTIQUES,
+    );
+    expect(partantes.map((m) => m.id)).toEqual(["m1"]);
+    expect(bloquees).toHaveLength(1);
+    expect(bloquees[0].moto.id).toBe("m2");
+    expect(bloquees[0].raison).toMatch(/déjà/i);
+  });
+
+  it("écarte celle qui n’est plus en stock", () => {
+    /* Une moto vendue est promise à quelqu'un : la déplacer ferait voyager la
+       promesse sans que le client en sache rien. */
+    const { partantes, bloquees } = repartirPourDeplacement(
+      [moto("m1", "PTG"), moto("m2", "PTG", "vendue")],
+      "KDG",
+      BOUTIQUES,
+    );
+    expect(partantes.map((m) => m.id)).toEqual(["m1"]);
+    expect(bloquees[0].raison).toMatch(/stock/i);
+  });
+
+  it("ne propose que les boutiques ouvertes, sans retirer d’origine", () => {
+    /* Les motos cochées peuvent venir de magasins différents : il n'y a pas
+       une origine à exclure. */
+    expect(destinationsGroupees(BOUTIQUES).map((b) => b.id)).toEqual(["PTG", "KDG"]);
   });
 });

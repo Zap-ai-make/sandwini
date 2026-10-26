@@ -120,3 +120,62 @@ export function validerTransfert(saisie: SaisieTransfert, origineId: string): st
   }
   return null;
 }
+
+/* --- Déplacer plusieurs motos d'un coup ----------------------------------- */
+
+/**
+ * Le plafond d'un envoi groupé.
+ *
+ * Une moto coûte trois écritures — la moto, la trace, et son coût privé quand
+ * le responsable le corrige — et un lot Firestore en porte 500. On garde de la
+ * marge : au-delà, l'envoi ne serait plus garanti d'un seul tenant.
+ */
+export const MOTOS_PAR_DEPLACEMENT_MAX = 150;
+
+export type MotoBloquee = { moto: Moto; raison: string };
+
+/**
+ * Qui part, qui reste, et pourquoi.
+ *
+ * **Un envoi groupé ne vérifie pas les mêmes choses qu'un envoi seul.** On
+ * coche des lignes dans une liste qui mélange les statuts, et le responsable
+ * posé sur « Toutes les boutiques » peut cocher des motos de magasins
+ * différents. La destination choisie est alors l'origine de certaines : elles
+ * ne partent pas, et il faut le dire ligne par ligne plutôt que de refuser
+ * l'envoi en bloc.
+ *
+ * **Rien n'est écarté en silence.** Une moto cochée qui ne part pas est nommée
+ * avec sa raison : sans cela, on croirait avoir déplacé vingt motos quand
+ * dix-sept sont parties.
+ */
+export function repartirPourDeplacement(
+  motos: readonly Moto[],
+  versBoutiqueId: string,
+  boutiques: readonly Boutique[],
+): { partantes: Moto[]; bloquees: MotoBloquee[] } {
+  const partantes: Moto[] = [];
+  const bloquees: MotoBloquee[] = [];
+
+  for (const moto of motos) {
+    if (moto.boutiqueId === versBoutiqueId) {
+      bloquees.push({ moto, raison: "Elle est déjà dans cette boutique." });
+      continue;
+    }
+    const raison = raisonDeNePasPartir(moto, destinationsPossibles(boutiques, moto.boutiqueId));
+    if (raison) bloquees.push({ moto, raison });
+    else partantes.push(moto);
+  }
+
+  return { partantes, bloquees };
+}
+
+/**
+ * Les destinations offertes pour un envoi groupé.
+ *
+ * Toutes les boutiques ouvertes, **sans en retirer aucune** : quand les motos
+ * cochées viennent de magasins différents, il n'y a pas une origine à exclure.
+ * Celles qui s'y trouvent déjà sont écartées ligne par ligne, avec leur raison.
+ */
+export function destinationsGroupees(boutiques: readonly Boutique[]): Boutique[] {
+  return boutiques.filter((boutique) => boutique.actif);
+}

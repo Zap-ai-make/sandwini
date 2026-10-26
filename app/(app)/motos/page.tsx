@@ -1,6 +1,6 @@
 "use client";
 
-import { Bike, Plus, Search } from "lucide-react";
+import { Bike, Plus, Search, Truck } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
@@ -28,8 +28,13 @@ import {
 } from "@/lib/domain/moto";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useCatalogue } from "@/lib/repositories/catalogue";
+import { DeplacerMotosModal } from "@/components/DeplacerMotosModal";
+import { useSession } from "@/lib/auth/session";
+import type { Boutique } from "@/lib/domain/boutique";
+import { peut } from "@/lib/domain/roles";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterArrivages } from "@/lib/repositories/arrivages";
+import { ecouterBoutiques } from "@/lib/repositories/boutiques";
 import { ecouterFournisseurs } from "@/lib/repositories/fournisseurs";
 import { ecouterStock } from "@/lib/repositories/motos";
 import type { Arrivage } from "@/lib/domain/arrivage";
@@ -87,7 +92,9 @@ function AiguillageMotos() {
 
 function Stock() {
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
+  const session = useSession();
   const catalogue = useCatalogue();
+  const [deplacement, setDeplacement] = useState(false);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   /* Les motos cochées pour l'export (S50). Un `Set` d'identifiants plutôt qu'un
      drapeau porté par chaque moto : la liste se recharge en direct à chaque
@@ -158,6 +165,18 @@ function Stock() {
       return (id && nomParId.get(id)) || "—";
     };
   }, [arrivages, fournisseurs]);
+
+  /* Les boutiques servent au déplacement groupé seul : la liste des
+     destinations, et le nom qu'on lit dans la confirmation. */
+  const souscrireBoutiques = useCallback(
+    (auChangement: (liste: Boutique[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterBoutiques(auChangement, enErreur),
+    [],
+  );
+  const { valeur: boutiques } = useAbonnement(
+    souscrireBoutiques,
+    "La liste des boutiques n’a pas pu être lue.",
+  );
 
   const resultats = useMemo(() => filtrerMotos(stock ?? [], filtres), [stock, filtres]);
   const modelesDeLaMarque = filtres.marqueId
@@ -424,6 +443,20 @@ function Stock() {
                   nomModele={catalogue.nomModele}
                   toutCocher={() => setCochees(new Set(resultats.map((moto) => moto.id)))}
                   toutDecocher={() => setCochees(new Set())}
+                  /* **Le même lot de cases sert les deux gestes** (26 octobre
+                     2026). On coche une fois, et on choisit ensuite ce qu'on
+                     en fait : un fichier, ou un camion. */
+                  actions={
+                    <button
+                      type="button"
+                      onClick={() => setDeplacement(true)}
+                      disabled={cochees.size === 0}
+                      className="bouton bouton-neutre"
+                    >
+                      <Truck aria-hidden="true" className="size-4" />
+                      Transférer
+                    </button>
+                  }
                 />
               </div>
             )}
@@ -450,6 +483,24 @@ function Stock() {
             />
           )}
         </div>
+      )}
+
+      {deplacement && session.statut === "connecte" && (
+        <DeplacerMotosModal
+          motos={resultats.filter((moto) => cochees.has(moto.id))}
+          boutiques={boutiques ?? []}
+          auteur={{ uid: session.utilisateur.uid, nom: session.utilisateur.nom }}
+          /* Le responsable seul lit le coût privé, donc lui seul peut en
+             corriger la boutique quand la moto déménage (D2). */
+          voitLesCouts={peut(session.utilisateur.role, "voir_marges")}
+          onFermer={() => {
+            setDeplacement(false);
+            /* Les cases se vident : celles qui sont parties ne sont plus dans
+               la liste, et garder cochées celles qui restent ferait croire que
+               l'envoi les a oubliées. */
+            setCochees(new Set());
+          }}
+        />
       )}
     </div>
   );
