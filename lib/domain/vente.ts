@@ -891,3 +891,253 @@ export function ventesDuClient(ventes: readonly Vente[], clientId: string): Vent
     .filter((vente) => vente.clientId === clientId)
     .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
 }
+
+/* --- Vendre plusieurs motos d'un coup (26 octobre 2026) ------------------- */
+
+/**
+ * Le plafond d'une vente groupée.
+ *
+ * Chaque moto coûte jusqu'à six écritures — la vente, son dossier de carte
+ * grise, le document du dossier, la moto, le versement, l'encaissement — et un
+ * lot Firestore en porte 500. Dix laisse une marge large. Le commanditaire
+ * parle de « 2-3 motos » : le plafond n'est pas là pour le gêner, mais pour
+ * qu'un collage de cent lignes ne parte pas en silence.
+ */
+export const MOTOS_PAR_VENTE_MAX = 10;
+
+/** Une moto de la vente, et ce qui lui est propre : son prix. */
+export type LigneMotoVendue = {
+  motoId: string;
+  prixConvenu: string;
+};
+
+/**
+ * Une saisie de vente portant plusieurs motos (arbitrage du 26 octobre 2026).
+ *
+ * **Une saisie, plusieurs ventes.** « Souvent une seule personne peut acheter
+ * 2-3 motos en même temps. » Le commanditaire a tranché l'option A : chaque
+ * moto garde sa vente, donc son reçu, son dossier de carte grise et son
+ * crédit. Une vente unique pour trois motos aurait donné un reçu pour trois
+ * motos, un seul dossier et un crédit indivisible — or les papiers d'une moto
+ * suivent la moto, et le client peut revendre l'une sans les autres.
+ *
+ * **Ce qui est commun l'est vraiment.** Le client, le mode et le moyen de
+ * paiement, la référence du transfert : c'est une seule négociation, un seul
+ * geste de caisse. Les deux inclusions aussi — chaque moto emporte sa carte
+ * grise et son casque, ou aucune ne les emporte ; une case par moto doublerait
+ * les contrôles pour un cas que personne n'a rapporté.
+ *
+ * **Le prix, lui, est propre à chaque moto**, parce qu'il l'est toujours : deux
+ * motos du même lot ne se vendent pas au même prix, et c'est ce prix qui
+ * s'imprime sur son reçu.
+ */
+export type SaisieVenteGroupee = {
+  /** Une ligne par moto, dans l'ordre où elles ont été cochées. */
+  motos: LigneMotoVendue[];
+  clientId: string;
+  modePaiement: ModePaiement;
+  carteGrise: boolean;
+  casque: boolean;
+  /** Ce que le client dépose pour l'ensemble. Réparti par `repartirEncaisse`. */
+  montantEncaisse: string;
+  moyenPaiement: MoyenPaiement;
+  reference: string;
+};
+
+export const SAISIE_GROUPEE_VIDE: SaisieVenteGroupee = {
+  motos: [],
+  clientId: "",
+  modePaiement: "comptant",
+  carteGrise: true,
+  casque: true,
+  montantEncaisse: "",
+  moyenPaiement: "especes",
+  reference: "",
+};
+
+/** Le refus, et la ligne qu'il vise — `null` quand il porte sur l'ensemble. */
+export type RefusGroupe = { message: string; rang: number | null };
+
+/**
+ * Le total des prix saisis.
+ *
+ * Une ligne encore vide compte zéro plutôt que de rendre le total muet : un
+ * total qui refuserait de s'afficher cacherait ce qui est déjà saisi, au moment
+ * précis où l'on veut vérifier qu'on ne s'est pas trompé d'un zéro.
+ */
+export function totalGroupe(motos: readonly LigneMotoVendue[]): number {
+  return motos.reduce((somme, ligne) => somme + (lireMontant(ligne.prixConvenu) ?? 0), 0);
+}
+
+/**
+ * Répartit l'acompte : la première moto d'abord, puis le reste sur la suivante.
+ *
+ * **Pourquoi une règle, et non un champ par moto.** Le client dépose une somme
+ * pour l'ensemble ; lui demander « combien pour la rouge ? » serait inventer
+ * une répartition que personne n'a décidée, et l'inscrire sur un reçu. La
+ * règle, elle, se dit en une phrase — l'acompte solde la première moto, puis
+ * déborde — et l'écran montre son résultat ligne par ligne avant qu'on valide.
+ * Rien n'est donc écrit que le gérant n'ait pu lire.
+ *
+ * Aucune ligne ne reçoit plus que son prix : le dépassement est refusé en
+ * amont par `validerVenteGroupee`, et le laisser passer ici ferait naître une
+ * vente trop payée.
+ */
+export function repartirEncaisse(montant: number, prix: readonly number[]): number[] {
+  let reste = Math.max(montant, 0);
+  return prix.map((unPrix) => {
+    const part = Math.min(reste, Math.max(unPrix, 0));
+    reste -= part;
+    return part;
+  });
+}
+
+/**
+ * Valide une vente groupée. Rend le refus et la ligne visée, ou `null`.
+ *
+ * Les contrôles d'une ligne sont ceux de `validerVente`, qui les porte déjà
+ * pour une moto seule — répétés ici parce qu'ils doivent nommer **quelle**
+ * ligne cloche : un « le prix convenu est obligatoire » sans rang laisse
+ * chercher laquelle des trois lignes l'a perdu.
+ *
+ * Les règles Firestore revalident tout ceci de leur côté (`SECURITY.md` §5) :
+ * ce qui suit sert à expliquer, pas à protéger.
+ */
+export function validerVenteGroupee(groupe: SaisieVenteGroupee): RefusGroupe | null {
+  if (groupe.motos.length === 0) {
+    return { message: "Choisissez au moins une moto.", rang: null };
+  }
+  if (groupe.motos.length > MOTOS_PAR_VENTE_MAX) {
+    return {
+      message: `Pas plus de ${MOTOS_PAR_VENTE_MAX} motos dans une même vente. Enregistrez-la en deux fois.`,
+      rang: null,
+    };
+  }
+  if (!groupe.clientId) {
+    return { message: "Choisissez le client, ou créez sa fiche.", rang: null };
+  }
+
+  const vues = new Set<string>();
+  for (const [rang, ligne] of groupe.motos.entries()) {
+    if (vues.has(ligne.motoId)) {
+      /* Deux lignes sur la même moto feraient deux ventes du même engin, et la
+         seconde écraserait le statut de la première sans rien signaler. */
+      return { message: "Cette moto apparaît deux fois dans la vente.", rang };
+    }
+    vues.add(ligne.motoId);
+
+    const prixConvenu = lireMontant(ligne.prixConvenu);
+    if (prixConvenu === null) {
+      return { message: "Le prix convenu est obligatoire, en chiffres entiers.", rang };
+    }
+    if (prixConvenu <= 0) {
+      return { message: "Le prix convenu doit être supérieur à zéro.", rang };
+    }
+    if (prixConvenu > MONTANT_MAX) {
+      return { message: "Le prix convenu dépasse le maximum admis.", rang };
+    }
+  }
+
+  const total = totalGroupe(groupe.motos);
+  const encaisse = lireMontantEncaisse(groupe.montantEncaisse);
+  if (encaisse === null) {
+    return {
+      message: "Le montant reçu doit être un nombre entier, ou rester vide.",
+      rang: null,
+    };
+  }
+  if (encaisse > total) {
+    return {
+      message: "Le montant reçu ne peut pas dépasser le total de la vente.",
+      rang: null,
+    };
+  }
+  if (groupe.modePaiement === "comptant" && encaisse !== total) {
+    return {
+      message:
+        "Une vente au comptant est payée en entier. Encaissez le total, ou choisissez crédit ou tranches.",
+      rang: null,
+    };
+  }
+
+  if (groupe.reference.trim().length > LONGUEUR_REFERENCE_MAX) {
+    return { message: `La référence dépasse ${LONGUEUR_REFERENCE_MAX} caractères.`, rang: null };
+  }
+
+  return null;
+}
+
+/**
+ * Projette la saisie groupée en une saisie de vente par moto.
+ *
+ * **C'est la charnière de l'option A.** Au-delà de cette fonction, plus rien ne
+ * sait qu'il y avait plusieurs motos : chaque vente est écrite, validée et lue
+ * exactement comme une vente seule, par le code qui existait déjà. Sans cette
+ * projection, il aurait fallu un second type de vente dans la base, dans les
+ * règles, sur les reçus, dans les dossiers — pour exprimer quelque chose que
+ * le métier ne distingue pas.
+ */
+export function ventesDuGroupe(groupe: SaisieVenteGroupee): SaisieVente[] {
+  const prix = groupe.motos.map((ligne) => lireMontant(ligne.prixConvenu) ?? 0);
+  const parts = repartirEncaisse(lireMontantEncaisse(groupe.montantEncaisse) ?? 0, prix);
+
+  return groupe.motos.map((ligne, rang) => ({
+    motoId: ligne.motoId,
+    clientId: groupe.clientId,
+    prixConvenu: ligne.prixConvenu,
+    modePaiement: groupe.modePaiement,
+    carteGrise: groupe.carteGrise,
+    casque: groupe.casque,
+    montantEncaisse: String(parts[rang]),
+    moyenPaiement: groupe.moyenPaiement,
+    reference: groupe.reference,
+  }));
+}
+
+/**
+ * Applique un changement à la saisie groupée, le montant reçu suivant le total.
+ *
+ * Même règle que `appliquerSaisieVente`, et pour la même raison : tant que le
+ * montant n'a pas été tapé à la main, il vaut le total au comptant — que la
+ * validation exige de toute façon — et rien ailleurs, un crédit pré-rempli au
+ * total entier se lisant comme une vente déjà soldée.
+ *
+ * **Avec plusieurs motos, la règle compte davantage** : le total change chaque
+ * fois qu'une moto s'ajoute ou qu'un prix bouge. Si le montant ne suivait pas,
+ * on cocherait la troisième moto et la vente au comptant serait refusée pour un
+ * montant qui valait le total des deux premières.
+ */
+export function appliquerSaisieGroupee(
+  actuel: SaisieVenteGroupee,
+  partie: Partial<SaisieVenteGroupee>,
+  montantTouche: boolean,
+): SaisieVenteGroupee {
+  const suivant = { ...actuel, ...partie };
+  if (partie.montantEncaisse !== undefined || montantTouche) return suivant;
+  const total = totalGroupe(suivant.motos);
+  return {
+    ...suivant,
+    montantEncaisse:
+      suivant.modePaiement === "comptant" && total > 0 ? String(total) : "",
+  };
+}
+
+/**
+ * Le départ d'une vente préparée par l'assistant (S57), en saisie groupée.
+ *
+ * L'assistant retrouve une moto et un client et ouvre la modale garnie. Il n'en
+ * propose qu'une : la conversion fait donc une ligne, et la vente s'ouvre comme
+ * avant, à ceci près qu'on peut maintenant en cocher d'autres avant de valider.
+ *
+ * Rend une **part** de saisie et non une saisie entière : le montant reçu doit
+ * rester absent pour que `appliquerSaisieGroupee` pose le total lui-même.
+ */
+export function groupeDepuisDepart(depart: Partial<SaisieVente>): Partial<SaisieVenteGroupee> {
+  const partie: Partial<SaisieVenteGroupee> = {};
+  if (depart.motoId) {
+    partie.motos = [{ motoId: depart.motoId, prixConvenu: depart.prixConvenu ?? "" }];
+  }
+  if (depart.clientId) partie.clientId = depart.clientId;
+  if (depart.modePaiement) partie.modePaiement = depart.modePaiement;
+  return partie;
+}

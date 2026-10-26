@@ -8,7 +8,16 @@ import {
   SAISIE_VENTE_VIDE,
   SAISIE_VERSEMENT_VIDE,
   agregatsPaiement,
+  MOTOS_PAR_VENTE_MAX,
+  SAISIE_GROUPEE_VIDE,
+  appliquerSaisieGroupee,
+  groupeDepuisDepart,
   appliquerSaisieVente,
+  repartirEncaisse,
+  totalGroupe,
+  validerVenteGroupee,
+  ventesDuGroupe,
+  type SaisieVenteGroupee,
   bilanVentes,
   chercherVentes,
   comparerVentes,
@@ -919,5 +928,248 @@ describe("papiersEmportesDeVente", () => {
      une phrase, et n'a pas deux cas d'absence à distinguer. */
   it("rend une liste vide quand le client n’a rien pris", () => {
     expect(papiersEmportesDeVente({ emporte: { quittance: false, cmc: false } })).toEqual([]);
+  });
+});
+
+/**
+ * Vendre plusieurs motos d'un coup (26 octobre 2026, arbitrage du commanditaire).
+ *
+ * « Au niveau de ventes, on doit pouvoir vendre plusieurs motos à la fois,
+ * souvent une seule personne peut acheter 2-3 motos en même temps. » Il a
+ * tranché l'option A : **une saisie, plusieurs ventes**, chacune gardant son
+ * reçu, son dossier de carte grise et son crédit. Une vente pour trois motos
+ * aurait donné un reçu pour trois motos, un seul dossier et un crédit
+ * indivisible — or les papiers d'une moto suivent la moto, et le client peut
+ * revendre l'une sans l'autre.
+ */
+describe("vendre plusieurs motos d’un coup", () => {
+  const groupe = (partie: Partial<SaisieVenteGroupee> = {}): SaisieVenteGroupee => ({
+    ...SAISIE_GROUPEE_VIDE,
+    clientId: "client-1",
+    motos: [
+      { motoId: "moto-1", prixConvenu: "800000" },
+      { motoId: "moto-2", prixConvenu: "1200000" },
+    ],
+    montantEncaisse: "2000000",
+    ...partie,
+  });
+
+  describe("le total et la répartition de l’acompte", () => {
+    it("additionne les prix lus", () => {
+      expect(totalGroupe(groupe().motos)).toBe(2_000_000);
+    });
+
+    it("compte zéro pour un prix encore vide", () => {
+      /* Un total qui refuserait de s'afficher tant qu'une ligne est vide
+         cacherait ce qui est déjà saisi : on compte ce qu'on sait. */
+      const motos = [
+        { motoId: "m", prixConvenu: "" },
+        { motoId: "n", prixConvenu: "500" },
+      ];
+      expect(totalGroupe(motos)).toBe(500);
+    });
+
+    /**
+     * L'acompte se pose sur la première moto, puis déborde sur la suivante.
+     *
+     * **Pourquoi une règle et non un champ par moto.** Le client dépose une
+     * somme pour l'ensemble ; lui demander « combien pour la rouge ? » serait
+     * inventer une répartition que personne n'a décidée. La règle, elle, se dit
+     * en une phrase, et l'écran montre son résultat ligne par ligne avant
+     * qu'on valide.
+     */
+    it("solde la première moto avant d’entamer la suivante", () => {
+      expect(repartirEncaisse(1_000_000, [800_000, 1_200_000])).toEqual([800_000, 200_000]);
+    });
+
+    it("laisse les suivantes à zéro quand l’acompte est petit", () => {
+      expect(repartirEncaisse(300_000, [800_000, 1_200_000])).toEqual([300_000, 0]);
+    });
+
+    it("solde tout le monde quand l’acompte vaut le total", () => {
+      expect(repartirEncaisse(2_000_000, [800_000, 1_200_000])).toEqual([800_000, 1_200_000]);
+    });
+
+    it("ne distribue jamais plus que le prix d’une ligne", () => {
+      /* Un dépassement n'est pas réparti : il est refusé par la validation. Si
+         la règle le laissait passer, une vente naîtrait trop payée. */
+      expect(repartirEncaisse(5_000_000, [800_000])).toEqual([800_000]);
+    });
+  });
+
+  describe("validerVenteGroupee", () => {
+    it("accepte deux motos payées comptant", () => {
+      expect(validerVenteGroupee(groupe())).toBeNull();
+    });
+
+    it("refuse une vente sans moto", () => {
+      const refus = validerVenteGroupee(groupe({ motos: [], montantEncaisse: "" }));
+      expect(refus?.message).toMatch(/moto/i);
+    });
+
+    it("refuse la même moto deux fois", () => {
+      /* Deux lignes sur la même moto feraient deux ventes du même engin, et la
+         seconde écraserait le statut de la première sans rien signaler. */
+      const refus = validerVenteGroupee(
+        groupe({
+          motos: [
+            { motoId: "moto-1", prixConvenu: "800000" },
+            { motoId: "moto-1", prixConvenu: "800000" },
+          ],
+          montantEncaisse: "1600000",
+        }),
+      );
+      expect(refus?.message).toMatch(/deux fois/i);
+      expect(refus?.rang).toBe(1);
+    });
+
+    it("refuse plus de motos que le plafond", () => {
+      const motos = Array.from({ length: MOTOS_PAR_VENTE_MAX + 1 }, (_, rang) => ({
+        motoId: `moto-${rang}`,
+        prixConvenu: "100000",
+      }));
+      const refus = validerVenteGroupee(groupe({ motos, montantEncaisse: "" }));
+      expect(refus?.message).toMatch(new RegExp(String(MOTOS_PAR_VENTE_MAX)));
+    });
+
+    it("nomme la ligne dont le prix manque", () => {
+      const refus = validerVenteGroupee(
+        groupe({
+          motos: [
+            { motoId: "moto-1", prixConvenu: "800000" },
+            { motoId: "moto-2", prixConvenu: "" },
+          ],
+          montantEncaisse: "",
+        }),
+      );
+      expect(refus?.rang).toBe(1);
+      expect(refus?.message).toMatch(/prix/i);
+    });
+
+    it("refuse un prix nul ou à virgule", () => {
+      const nul = groupe({ motos: [{ motoId: "m", prixConvenu: "0" }], montantEncaisse: "0" });
+      expect(validerVenteGroupee(nul)?.message).toMatch(/supérieur à zéro/i);
+      const virgule = groupe({
+        motos: [{ motoId: "m", prixConvenu: "1200.5" }],
+        montantEncaisse: "",
+      });
+      expect(validerVenteGroupee(virgule)?.message).toMatch(/entiers/i);
+    });
+
+    it("refuse un acompte au-delà du total de la vente", () => {
+      const refus = validerVenteGroupee(groupe({ montantEncaisse: "2000001" }));
+      expect(refus?.message).toMatch(/total/i);
+      /* Le refus ne vise aucune ligne : c'est le montant d'ensemble qui cloche. */
+      expect(refus?.rang).toBeNull();
+    });
+
+    it("exige le total entier au comptant", () => {
+      const refus = validerVenteGroupee(groupe({ montantEncaisse: "1500000" }));
+      expect(refus?.message).toMatch(/comptant/i);
+    });
+
+    it("accepte un acompte partiel à crédit, et rien du tout", () => {
+      const credit = groupe({ modePaiement: "credit", montantEncaisse: "500000" });
+      expect(validerVenteGroupee(credit)).toBeNull();
+      const tranches = groupe({ modePaiement: "tranches", montantEncaisse: "" });
+      expect(validerVenteGroupee(tranches)).toBeNull();
+    });
+
+    it("refuse une vente sans client", () => {
+      expect(validerVenteGroupee(groupe({ clientId: "" }))?.message).toMatch(/client/i);
+    });
+  });
+
+  describe("ventesDuGroupe", () => {
+    it("rend une vente par moto, chacune avec son prix", () => {
+      const ventes = ventesDuGroupe(groupe());
+      expect(ventes).toHaveLength(2);
+      expect(ventes[0].motoId).toBe("moto-1");
+      expect(ventes[0].prixConvenu).toBe("800000");
+      expect(ventes[1].prixConvenu).toBe("1200000");
+    });
+
+    it("donne à chacune sa part de l’acompte", () => {
+      const ventes = ventesDuGroupe(groupe({ modePaiement: "credit", montantEncaisse: "1000000" }));
+      expect(ventes[0].montantEncaisse).toBe("800000");
+      expect(ventes[1].montantEncaisse).toBe("200000");
+    });
+
+    it("recopie sur chacune ce qui est commun à la vente", () => {
+      const ventes = ventesDuGroupe(
+        groupe({ modePaiement: "credit", moyenPaiement: "wave", reference: "TX-9", casque: false }),
+      );
+      for (const vente of ventes) {
+        expect(vente.clientId).toBe("client-1");
+        expect(vente.modePaiement).toBe("credit");
+        expect(vente.moyenPaiement).toBe("wave");
+        expect(vente.reference).toBe("TX-9");
+        expect(vente.casque).toBe(false);
+        expect(vente.carteGrise).toBe(true);
+      }
+    });
+
+    /* Le pont avec l'existant : chaque vente projetée doit franchir la
+       validation d'une vente seule, sans quoi le serveur refuserait au milieu
+       du lot ce que l'écran a laissé passer. */
+    it("rend des ventes que `validerVente` accepte une à une", () => {
+      for (const vente of ventesDuGroupe(groupe())) {
+        expect(validerVente(vente), vente.motoId).toBeNull();
+      }
+      const credit = groupe({ modePaiement: "credit", montantEncaisse: "1000000" });
+      for (const vente of ventesDuGroupe(credit)) {
+        expect(validerVente(vente), vente.motoId).toBeNull();
+      }
+    });
+  });
+
+  describe("appliquerSaisieGroupee", () => {
+    const uneMoto = [{ motoId: "m", prixConvenu: "900000" }];
+
+    it("pose le total au comptant tant que le montant n’a pas été tapé", () => {
+      const apres = appliquerSaisieGroupee(SAISIE_GROUPEE_VIDE, { motos: uneMoto }, false);
+      expect(apres.montantEncaisse).toBe("900000");
+    });
+
+    it("suit le total quand une moto s’ajoute", () => {
+      /* Le défaut que `appliquerSaisieVente` corrigeait pour une moto vaut
+         pour N : le montant doit suivre le prix, pas l'inverse. */
+      let etat = appliquerSaisieGroupee(SAISIE_GROUPEE_VIDE, { motos: uneMoto }, false);
+      const deux = [...etat.motos, { motoId: "n", prixConvenu: "100000" }];
+      etat = appliquerSaisieGroupee(etat, { motos: deux }, false);
+      expect(etat.montantEncaisse).toBe("1000000");
+    });
+
+    it("vide le montant hors du comptant", () => {
+      const comptant = appliquerSaisieGroupee(SAISIE_GROUPEE_VIDE, { motos: uneMoto }, false);
+      const credit = appliquerSaisieGroupee(comptant, { modePaiement: "credit" }, false);
+      expect(credit.montantEncaisse).toBe("");
+    });
+
+    it("rend la main dès que le montant a été tapé", () => {
+      const tape = { ...SAISIE_GROUPEE_VIDE, montantEncaisse: "500000" };
+      const apres = appliquerSaisieGroupee(tape, { motos: uneMoto }, true);
+      expect(apres.montantEncaisse).toBe("500000");
+    });
+  });
+});
+
+describe("groupeDepuisDepart", () => {
+  it("fait une ligne de la moto que l’assistant propose", () => {
+    const partie = groupeDepuisDepart({ motoId: "moto-7", prixConvenu: "750000" });
+    expect(partie.motos).toEqual([{ motoId: "moto-7", prixConvenu: "750000" }]);
+  });
+
+  it("laisse le montant reçu absent, pour que la règle le pose", () => {
+    /* Le poser ici court-circuiterait `appliquerSaisieGroupee` : une vente au
+       comptant s’ouvrirait avec un montant vide et serait refusée. */
+    const partie = groupeDepuisDepart({ motoId: "m", prixConvenu: "900000" });
+    expect(partie.montantEncaisse).toBeUndefined();
+    const etat = appliquerSaisieGroupee(SAISIE_GROUPEE_VIDE, partie, false);
+    expect(etat.montantEncaisse).toBe("900000");
+  });
+
+  it("ne garde rien quand l’adresse ne portait rien de lisible", () => {
+    expect(groupeDepuisDepart({})).toEqual({});
   });
 });

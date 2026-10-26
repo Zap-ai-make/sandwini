@@ -9,6 +9,7 @@ import {
   updateDoc,
   where,
   writeBatch,
+  type WriteBatch,
   type DocumentData,
   type DocumentSnapshot,
   type QueryDocumentSnapshot,
@@ -400,53 +401,59 @@ export function ecouterMargeVente(
   );
 }
 
-export type ContexteVente = {
+export type ContexteVentes = {
   /** La boutique où la vente a lieu, et dont le compteur de numéros est tiré. */
   boutique: Numeroteur;
   /** Les numéros déjà connus de cet appareil, lus dans le cache Firestore (S7). */
   numerosConnus: readonly string[];
-  /**
-   * Ce que le dossier de carte grise **recopie** : le propriétaire et la moto
-   * en clair.
-   *
-   * Fourni par l'écran, qui les a déjà sous les yeux, plutôt que relu ici. La
-   * personne des cartes grises ne lit ni le fichier des clients ni le stock —
-   * c'est tout l'objet de son cloisonnement — donc sans cette copie sa liste
-   * afficherait des identifiants.
-   */
+};
+
+/**
+ * Une vente à écrire : sa saisie, et ce que son dossier recopie.
+ *
+ * Le dossier de carte grise porte le propriétaire et la moto **en clair**.
+ * Fournis par l'écran, qui les a déjà sous les yeux, plutôt que relus ici : la
+ * personne des cartes grises ne lit ni le fichier des clients ni le stock —
+ * c'est tout l'objet de son cloisonnement — donc sans cette copie sa liste
+ * afficherait des identifiants.
+ */
+export type VenteAEcrire = {
+  saisie: SaisieVente;
   dossier: { clientNom: string; motoLibelle: string; numeroChassis: string };
 };
 
 /**
- * Enregistre une vente, son dossier et son premier versement — en un seul lot.
+ * Écrit une vente, son dossier et son premier versement dans un lot déjà ouvert.
  *
- * Le numéro est **réservé ici**, au moment de valider, et pas avant : un numéro
- * montré puis abandonné laisserait un trou dans la série. `numero` et
- * `numeroInitial` sont égaux à la création ; seul le premier peut être corrigé
- * par le serveur en cas de collision, et c'est le second qui sert de clé de
- * rapprochement (D44).
+ * Un seul endroit connaît la forme de ces documents, comme `ecrireMotoDansLot`
+ * pour les motos : la vente seule et la vente de plusieurs motos la partagent,
+ * pour qu'un champ ajouté ici ne s'oublie pas là-bas.
+ *
+ * Le numéro est **réservé par l'appelant**, qui en tire un par moto : réservé
+ * ici, il le serait avant de savoir si le lot entier part.
  *
  * Les dates métier viennent de l'appareil (D38) : une vente conclue lundi sans
  * réseau et synchronisée mercredi a bien eu lieu lundi. Seuls les horodatages
- * d'audit, qui disent quand la donnée a été écrite, viennent du serveur.
+ * d'audit, qui disent quand la donnée a été écrite, viennent du serveur. Toutes
+ * les motos d'une même vente portent le **même** instant : c'est un seul geste
+ * de comptoir, et deux dates à la seconde près les feraient paraître distincts.
  */
-export function enregistrerVente(
-  saisie: SaisieVente,
-  contexte: ContexteVente,
+function ecrireVenteDansLot(
+  lot: WriteBatch,
+  aEcrire: VenteAEcrire,
+  boutiqueId: string,
+  numero: string,
+  maintenant: Timestamp,
   auteur: Auteur,
-): { id: string; numero: string; enregistre: Promise<void> } {
-  const boutiqueId = contexte.boutique.boutiqueId;
+): string {
+  const { saisie, dossier } = aEcrire;
   const reference = doc(collection(db(), "ventesMotos"));
-  const numero = reserverNumero(contexte.boutique, contexte.numerosConnus);
 
   const prixConvenu = lireMontant(saisie.prixConvenu) ?? 0;
   const montantEncaisse = lireMontantEncaisse(saisie.montantEncaisse) ?? 0;
   const versements = montantEncaisse > 0 ? [{ montant: montantEncaisse }] : [];
   const { totalPaye, resteDu, statutPaiement } = agregatsPaiement(prixConvenu, versements);
-
-  const maintenant = Timestamp.fromDate(new Date());
   const motoRemise = motoRemiseA(saisie.modePaiement);
-  const lot = writeBatch(db());
 
   lot.set(reference, {
     numero,
@@ -509,18 +516,18 @@ export function enregistrerVente(
      vente enregistrée aujourd'hui ne sera pas migrée deux fois : le script
      écrit avec `create`, et trouvera le document déjà là.
 
-     **Le document sous la vente continue d'être écrit, et ce n'est pas un
-     oubli.** Les écrans d'avant la bascule le lisent encore ; les deux
-     coexistent le temps que la migration passe. C'est la ligne à retirer quand
-     tout lira la nouvelle collection. */
+     **Chaque moto a son dossier.** Une vente groupée en ouvre autant qu'elle
+     porte de motos : les papiers d'une moto suivent la moto, et la personne des
+     cartes grises les traite une par une, chez des prestataires différents s'il
+     le faut. */
   lot.set(doc(db(), "dossiersCarteGrise", reference.id), {
     ...champsDossierNeuf({
       boutiqueId,
       venteId: reference.id,
       origine: "vente",
-      clientNom: contexte.dossier.clientNom,
-      motoLibelle: contexte.dossier.motoLibelle,
-      numeroChassis: contexte.dossier.numeroChassis,
+      clientNom: dossier.clientNom,
+      motoLibelle: dossier.motoLibelle,
+      numeroChassis: dossier.numeroChassis,
       statut: statutCarteGrise === "non_applicable" ? "non_applicable" : "a_faire",
     }),
     ...traceCreation(auteur),
@@ -583,10 +590,51 @@ export function enregistrerVente(
     ...traceModification(auteur),
   });
 
-  /* Le numéro et l'identifiant existent tout de suite ; l'écriture se termine
-     plus tard. Hors ligne, la promesse ne se résout qu'au retour du réseau —
-     mais le gérant peut déjà annoncer le numéro et remettre les clés. */
-  return { id: reference.id, numero, enregistre: suivreEcriture(lot.commit()) };
+  return reference.id;
+}
+
+/**
+ * Enregistre une vente — une moto, ou plusieurs — en un seul lot d'écriture.
+ *
+ * **Plusieurs motos font plusieurs ventes** (arbitrage du 26 octobre 2026,
+ * option A) : « souvent une seule personne peut acheter 2-3 motos en même
+ * temps ». Chacune garde son numéro, son reçu, son dossier de carte grise et
+ * son crédit, parce que les papiers d'une moto suivent la moto et que le client
+ * peut revendre l'une sans les autres. `ventesDuGroupe` a fait la projection ;
+ * ici, il n'y a plus que des ventes.
+ *
+ * **Un seul lot, et c'est ce qui compte.** Trois motos remises au comptoir
+ * contre un acompte, et deux ventes écrites sur trois : la troisième moto
+ * resterait en stock, vendable à quelqu'un d'autre, pendant que le client
+ * repart avec elle. Le lot garantit que tout arrive ou que rien n'arrive —
+ * hors ligne y compris, Firestore le gardant entier dans sa file.
+ *
+ * **Un numéro par moto, réservé ici** et pas avant : un numéro montré puis
+ * abandonné laisserait un trou dans la série. Chaque appel à `reserverNumero`
+ * retire le sien de la circulation sur cet appareil, donc deux motos de la même
+ * vente ne peuvent pas porter le même. `numero` et `numeroInitial` sont égaux à
+ * la création ; seul le premier peut être corrigé par le serveur en cas de
+ * collision, et c'est le second qui sert de clé de rapprochement (D44).
+ */
+export function enregistrerVentes(
+  aEcrire: readonly VenteAEcrire[],
+  contexte: ContexteVentes,
+  auteur: Auteur,
+): { ventes: { id: string; numero: string }[]; enregistre: Promise<void> } {
+  const boutiqueId = contexte.boutique.boutiqueId;
+  const maintenant = Timestamp.fromDate(new Date());
+  const lot = writeBatch(db());
+
+  const ventes = aEcrire.map((vente) => {
+    const numero = reserverNumero(contexte.boutique, contexte.numerosConnus);
+    return { id: ecrireVenteDansLot(lot, vente, boutiqueId, numero, maintenant, auteur), numero };
+  });
+
+  /* Les numéros et les identifiants existent tout de suite ; l'écriture se
+     termine plus tard. Hors ligne, la promesse ne se résout qu'au retour du
+     réseau — mais le gérant peut déjà annoncer les numéros et remettre les
+     clés. */
+  return { ventes, enregistre: suivreEcriture(lot.commit()) };
 }
 
 /**

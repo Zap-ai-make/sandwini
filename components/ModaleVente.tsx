@@ -1,6 +1,6 @@
 "use client";
 
-import { Bike, Lock, Search, UserRound } from "lucide-react";
+import { Bike, Lock, Search, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { ChampsClient, FicheReconnue } from "@/components/FormulaireClient";
@@ -22,7 +22,7 @@ import {
   type SaisieClient,
 } from "@/lib/domain/client";
 import { creerClient, messageErreurClient } from "@/lib/repositories/clients";
-import { formaterMontant } from "@/lib/domain/format";
+import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { normaliserChassis, type Moto } from "@/lib/domain/moto";
 import {
   LIBELLE_INCLUSION,
@@ -30,16 +30,23 @@ import {
   LIBELLE_MOYEN,
   MODES_PAIEMENT,
   MOYENS_PAIEMENT,
-  SAISIE_VENTE_VIDE,
-  agregatsPaiement,
-  appliquerSaisieVente,
+  MOTOS_PAR_VENTE_MAX,
+  SAISIE_GROUPEE_VIDE,
+  appliquerSaisieGroupee,
+  groupeDepuisDepart,
   lireMontant,
   lireMontantEncaisse,
   motoRemiseA,
-  validerVente,
+  repartirEncaisse,
+  totalGroupe,
+  validerVenteGroupee,
+  ventesDuGroupe,
+  type LigneMotoVendue,
   type ModePaiement,
   type MoyenPaiement,
+  type RefusGroupe,
   type SaisieVente,
+  type SaisieVenteGroupee,
   type Vente,
 } from "@/lib/domain/vente";
 import type { VentePiece } from "@/lib/domain/vente-piece";
@@ -49,7 +56,7 @@ import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
-import { ecouterVentes, enregistrerVente, messageErreurVente } from "@/lib/repositories/ventes";
+import { ecouterVentes, enregistrerVentes, messageErreurVente } from "@/lib/repositories/ventes";
 import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
 
 /**
@@ -82,6 +89,19 @@ import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
  *   `EFFET_MODE` plus un bandeau qui les redisait tenaient un tiers de l'écran
  *   pour une phrase. La conséquence est dans le récapitulatif, où elle se lit
  *   au moment de valider — et le comportement, lui, est intact.
+ *
+ * **Plusieurs motos dans une vente (26 octobre 2026).** « Souvent une seule
+ * personne peut acheter 2-3 motos en même temps. » La liste du stock est donc
+ * un jeu de cases à cocher, et chaque moto retenue prend sa ligne avec son
+ * propre prix. Le commanditaire a tranché l'option A : **une saisie, plusieurs
+ * ventes** — chacune garde son numéro, son reçu, son dossier de carte grise et
+ * son crédit, parce que les papiers d'une moto suivent la moto et que le client
+ * peut revendre l'une sans les autres. `ventesDuGroupe` fait la projection, et
+ * au-delà d'elle plus rien dans le produit ne sait qu'il y en avait plusieurs.
+ *
+ * L'acompte, lui, reste unique : le client dépose une somme pour l'ensemble.
+ * Elle se répartit dans l'ordre des lignes, et le tableau montre le résultat —
+ * qui est soldée, qui garde une dette — avant qu'on valide.
  *
  * **Deux choses ne bougent pas, et elles sont délibérées.**
  *
@@ -183,8 +203,10 @@ export function ModaleVente({
   /* Le départ passe par `appliquerSaisieVente` et non par un étalement : c'est
      lui qui tient la règle du montant reçu selon le mode de paiement, et la
      contourner poserait un acompte incohérent avec le prix pré-rempli. */
-  const [saisie, setSaisie] = useState<SaisieVente>(() =>
-    depart ? appliquerSaisieVente(SAISIE_VENTE_VIDE, depart, false) : SAISIE_VENTE_VIDE,
+  const [saisie, setSaisie] = useState<SaisieVenteGroupee>(() =>
+    depart
+      ? appliquerSaisieGroupee(SAISIE_GROUPEE_VIDE, groupeDepuisDepart(depart), false)
+      : SAISIE_GROUPEE_VIDE,
   );
   /* **La saisie du client vit ici, et pas dans un formulaire à part.** C'est ce
      que le commanditaire a demandé après essai : le client neuf n'a pas
@@ -198,8 +220,12 @@ export function ModaleVente({
   const [rapproche, setRapproche] = useState<Client | null>(null);
   const [rechercheMoto, setRechercheMoto] = useState("");
   const [rechercheClient, setRechercheClient] = useState("");
-  const [erreur, setErreur] = useState<string | null>(null);
-  const [enregistree, setEnregistree] = useState<{ id: string; numero: string } | null>(null);
+  /* **Le refus porte la ligne qu'il vise.** Avec une moto, « le prix convenu
+     est obligatoire » suffisait ; avec trois, il faut dire laquelle — sinon on
+     relit les trois lignes pour trouver celle qui manque (`DESIGN.md` §5). Les
+     messages qui ne visent aucune ligne portent `rang: null`. */
+  const [refus, setRefus] = useState<RefusGroupe | null>(null);
+  const [enregistrees, setEnregistrees] = useState<{ id: string; numero: string }[] | null>(null);
 
   /* Le montant reçu a-t-il été tapé à la main ? Tant que non, il suit le mode
      de paiement — voir `changer` juste en dessous. */
@@ -208,21 +234,24 @@ export function ModaleVente({
   /* La règle du montant reçu vit dans le domaine, où un test unitaire peut
      l'atteindre : elle a traversé tout un lot sans jouer, faute de pouvoir
      être éprouvée ailleurs qu'à l'écran. */
-  const changer = (partie: Partial<SaisieVente>) =>
-    setSaisie((actuel) => appliquerSaisieVente(actuel, partie, montantTouche));
+  const changer = (partie: Partial<SaisieVenteGroupee>) =>
+    setSaisie((actuel) => appliquerSaisieGroupee(actuel, partie, montantTouche));
+
+  /** Un message qui ne vise aucune ligne : le client, le stock, le serveur. */
+  const dire = (message: string) => setRefus({ message, rang: null });
 
   const changerClient = (partie: Partial<SaisieClient>) =>
     setClient((actuel) => ({ ...actuel, ...partie }));
 
   function repartirDeZero() {
-    setSaisie(SAISIE_VENTE_VIDE);
+    setSaisie(SAISIE_GROUPEE_VIDE);
     setMontantTouche(false);
     setClient(SAISIE_CLIENT_VIDE);
     setRapproche(null);
     setRechercheMoto("");
     setRechercheClient("");
-    setErreur(null);
-    setEnregistree(null);
+    setRefus(null);
+    setEnregistrees(null);
   }
 
   /* Pas de remise à zéro ici : la modale se démonte en se fermant, et l'état
@@ -238,6 +267,7 @@ export function ModaleVente({
     [stock],
   );
 
+  const auPlafond = saisie.motos.length >= MOTOS_PAR_VENTE_MAX;
   const chercheMoto = rechercheMoto.trim().length > 0;
   const motosTrouvees = useMemo(() => {
     const cherche = normaliserChassis(rechercheMoto);
@@ -258,7 +288,18 @@ export function ModaleVente({
   );
   const resultatsClients = clientsTrouves.slice(0, PREMIERS_RESULTATS);
 
-  const motoChoisie = vendables.find((moto) => moto.id === saisie.motoId);
+  /* Les motos retenues, dans l'ordre où elles ont été cochées — celui des
+     lignes, donc celui dans lequel l'acompte se répartit. Une moto qu'un autre
+     comptoir vient de vendre disparaît de `vendables` : la ligne reste, et
+     `enregistrer` la refuse en la nommant plutôt que de la vendre deux fois. */
+  const motosRetenues = useMemo(
+    () =>
+      saisie.motos.map((ligne) => ({
+        ligne,
+        moto: vendables.find((moto) => moto.id === ligne.motoId),
+      })),
+    [saisie.motos, vendables],
+  );
   const clientChoisi = clients.find((client) => client.id === saisie.clientId);
 
   const estGerant = session.statut === "connecte" && session.utilisateur.role === "gerant";
@@ -268,16 +309,43 @@ export function ModaleVente({
       ? prochainNumero({ boutiqueId, code: perimetre.code }, numerosConnus)
       : null;
 
-  function choisirMoto(moto: Moto) {
-    /* Le prix conseillé s'installe comme point de départ, jamais comme verrou :
-       c'est un repère de vente, et le prix réel se négocie. On ne l'écrase pas
-       si le gérant a déjà tapé un montant. */
-    const prixConvenu =
-      saisie.prixConvenu.trim() === "" && moto.prixVenteConseille !== null
-        ? String(moto.prixVenteConseille)
-        : saisie.prixConvenu;
-    changer({ motoId: moto.id, prixConvenu });
-    setErreur(null);
+  /**
+   * Cocher une moto l'ajoute à la vente ; la recocher la retire.
+   *
+   * **Plusieurs motos dans une vente** (26 octobre 2026) : « souvent une seule
+   * personne peut acheter 2-3 motos en même temps ». La liste n'est plus un
+   * choix exclusif, et chaque moto cochée prend sa ligne avec son propre prix —
+   * deux motos du même lot ne se vendent pas au même prix.
+   *
+   * Le prix conseillé s'installe comme point de départ, jamais comme verrou :
+   * c'est un repère de vente, et le prix réel se négocie.
+   */
+  function basculerMoto(moto: Moto) {
+    const deja = saisie.motos.some((ligne) => ligne.motoId === moto.id);
+    const motos = deja
+      ? saisie.motos.filter((ligne) => ligne.motoId !== moto.id)
+      : [
+          ...saisie.motos,
+          {
+            motoId: moto.id,
+            prixConvenu: moto.prixVenteConseille !== null ? String(moto.prixVenteConseille) : "",
+          },
+        ];
+    changer({ motos });
+    setRefus(null);
+  }
+
+  function changerPrix(rang: number, prixConvenu: string) {
+    changer({
+      motos: saisie.motos.map((ligne, index) =>
+        index === rang ? { ...ligne, prixConvenu } : ligne,
+      ),
+    });
+  }
+
+  function retirerMoto(rang: number) {
+    changer({ motos: saisie.motos.filter((_, index) => index !== rang) });
+    setRefus(null);
   }
 
   /**
@@ -292,6 +360,12 @@ export function ModaleVente({
    * cosmétique : créer le client d'abord, puis buter sur un montant refusé,
    * laisserait derrière soi une fiche sans vente — et le fichier clients se
    * remplirait de gens qui ne sont jamais venus.
+   *
+   * **Plusieurs motos font plusieurs ventes, en une écriture.** L'arbitrage du
+   * 26 octobre 2026 (option A) : chacune garde son numéro, son reçu, son
+   * dossier et son crédit. Le lot garantit qu'elles partent toutes ou aucune —
+   * deux ventes écrites sur trois laisseraient la troisième moto en stock,
+   * vendable à quelqu'un d'autre, pendant que le client repart avec elle.
    */
   function enregistrer() {
     if (session.statut !== "connecte" || !boutiqueId || perimetre.type !== "boutique") return;
@@ -302,28 +376,40 @@ export function ModaleVente({
     if (clientANaitre) {
       const problemeClient = validerClient(client);
       if (problemeClient) {
-        setErreur(problemeClient);
+        dire(problemeClient);
         return;
       }
       /* Un fichier pas encore lu n'est pas un fichier vide : sans ce garde, le
          rapprochement répondrait « numéro libre » sur une liste qu'il n'a pas
          lue, et la même personne existerait deux fois (D95). */
       if (lus === null) {
-        setErreur("Le fichier clients n’a pas fini d’arriver. Réessayez dans un instant.");
+        dire("Le fichier clients n’a pas fini d’arriver. Réessayez dans un instant.");
         return;
       }
     }
 
     /* Le client n'existe pas encore, mais il existera : la vente se valide
        avec un identifiant de remplacement, pour que le contrôle porte sur ce
-       qui reste — la moto, le prix, le montant reçu. */
-    const probleme = validerVente({ ...saisie, clientId: clientRetenu || "client-a-naitre" });
+       qui reste — les motos, les prix, le montant reçu. */
+    const probleme = validerVenteGroupee({
+      ...saisie,
+      clientId: clientRetenu || "client-a-naitre",
+    });
     if (probleme) {
-      setErreur(probleme);
+      setRefus(probleme);
       return;
     }
-    if (!motoChoisie) {
-      setErreur("Cette moto n’est plus disponible à la vente. Choisissez-en une autre.");
+
+    /* **Nommée, et non comptée.** Une moto cochée puis vendue ailleurs pendant
+       la saisie a disparu du stock vendable. Refuser « une moto n'est plus
+       disponible » obligerait à comparer trois lignes à une liste ; on dit
+       laquelle, et on allume sa ligne. */
+    const perdue = motosRetenues.findIndex((retenue) => retenue.moto === undefined);
+    if (perdue >= 0) {
+      setRefus({
+        message: "Cette moto n’est plus disponible à la vente. Retirez-la, ou choisissez-en une autre.",
+        rang: perdue,
+      });
       return;
     }
 
@@ -337,18 +423,19 @@ export function ModaleVente({
       const doublon = nipDejaPris(client.nip, lus) ?? telephoneDejaPris(client.telephone, lus);
       if (doublon) {
         setRapproche(doublon);
-        setErreur(null);
+        setRefus(null);
         return;
       }
       /* L'identifiant existe avant que l'écriture n'aboutisse : c'est ce qui
          rattache la vente au client créé à l'instant, réseau ou pas (D66). */
       const cree = creerClient(client, auteur);
-      cree.enregistre.catch((cause) => setErreur(messageErreurClient(cause)));
+      cree.enregistre.catch((cause: unknown) => dire(messageErreurClient(cause)));
       clientId = cree.id;
     }
 
-    setErreur(null);
+    setRefus(null);
     setRapproche(null);
+
     /* **Recopié, et non pointé.** Le dossier de carte grise porte le nom du
        propriétaire et la moto en clair : celle qui traite les papiers ne lit ni
        le fichier des clients ni le stock, et sans cette copie sa liste
@@ -357,36 +444,46 @@ export function ModaleVente({
        Le client vient de `clientChoisi` quand il existe déjà, et de la saisie
        quand il naît avec la vente — c'est le même nom, lu à deux endroits selon
        le chemin pris. */
-    const { id, numero, enregistre } = enregistrerVente(
-      { ...saisie, clientId },
-      {
-        boutique: { boutiqueId, code: perimetre.code },
-        numerosConnus,
+    const clientNom = nomComplet(clientChoisi ?? client);
+    const aEcrire = ventesDuGroupe({ ...saisie, clientId }).map((vente, rang) => {
+      const moto = motosRetenues[rang].moto as Moto;
+      return {
+        saisie: vente,
         dossier: {
-          clientNom: nomComplet(clientChoisi ?? client),
-          motoLibelle: `${catalogue.nomMarque(motoChoisie.marqueId)} ${catalogue.nomModele(
-            motoChoisie.modeleId,
+          clientNom,
+          motoLibelle: `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(
+            moto.modeleId,
           )}`.trim(),
-          numeroChassis: motoChoisie.numeroChassis,
+          numeroChassis: moto.numeroChassis,
         },
-      },
+      };
+    });
+
+    const { ventes: ecrites, enregistre } = enregistrerVentes(
+      aEcrire,
+      { boutique: { boutiqueId, code: perimetre.code }, numerosConnus },
       auteur,
     );
-    enregistre.catch((cause) => setErreur(messageErreurVente(cause)));
+    enregistre.catch((cause: unknown) => dire(messageErreurVente(cause)));
 
-    setEnregistree({ id, numero });
-    setSaisie(SAISIE_VENTE_VIDE);
+    setEnregistrees(ecrites);
+    setSaisie(SAISIE_GROUPEE_VIDE);
+    setMontantTouche(false);
     setClient(SAISIE_CLIENT_VIDE);
     setRechercheMoto("");
     setRechercheClient("");
   }
 
-  const prixConvenu = lireMontant(saisie.prixConvenu) ?? 0;
+  const total = totalGroupe(saisie.motos);
   const encaisse = lireMontantEncaisse(saisie.montantEncaisse) ?? 0;
-  const { resteDu } = agregatsPaiement(
-    prixConvenu,
-    encaisse > 0 && encaisse <= prixConvenu ? [{ montant: encaisse }] : [],
+  /* Les parts servent à deux endroits — les lignes et le récapitulatif — et
+     c'est la même règle que celle qui sera écrite : elles sont calculées une
+     fois, ici, plutôt que redites à chaque place. */
+  const parts = repartirEncaisse(
+    encaisse,
+    saisie.motos.map((ligne) => lireMontant(ligne.prixConvenu) ?? 0),
   );
+  const resteDu = Math.max(total - Math.min(encaisse, total), 0);
 
   if (perimetre.type !== "boutique") {
     return (
@@ -409,12 +506,13 @@ export function ModaleVente({
     );
   }
 
-  if (enregistree) {
+  if (enregistrees) {
+    const seule = enregistrees.length === 1;
     return (
       <Modale
         ouvert
         onFermer={fermer}
-        titre="Vente enregistrée"
+        titre={seule ? "Vente enregistrée" : `${enregistrees.length} ventes enregistrées`}
         taille="moyenne"
         pied={
           <>
@@ -424,24 +522,37 @@ export function ModaleVente({
             {/* `repartirDeZero` et non `fermer` : le lien enlève déjà
                 `?nouvelle=1` de l'adresse, ce qui referme la modale. Appeler
                 la fermeture ici lancerait un second changement d'adresse en
-                même temps que la navigation, et les deux se disputeraient. */}
+                même temps que la navigation, et les deux se disputeraient.
+
+                Plusieurs ventes n'ont pas de fiche commune à ouvrir : le lien
+                mène alors à la liste, où elles sont les premières. */}
             <Link
-              href={`/motos/ventes?vente=${enregistree.id}`}
+              href={seule ? `/motos/ventes?vente=${enregistrees[0].id}` : "/motos/ventes"}
               onClick={repartirDeZero}
               className="ml-auto bouton bouton-principal"
             >
-              Voir la vente
+              {seule ? "Voir la vente" : "Voir les ventes"}
             </Link>
           </>
         }
       >
         <div role="status">
+          {/* **Tous les numéros, et non un décompte.** Ce sont les numéros
+              qu'on dicte au client et qu'on écrit sur les reçus : « 2 ventes
+              enregistrées » obligerait à aller les chercher dans la liste. */}
           <p className="font-medium text-encre">
-            Vente enregistrée — <span className="plaque-code">{enregistree.numero}</span>
+            {seule ? "Vente enregistrée" : "Ventes enregistrées"} —{" "}
+            {enregistrees.map((vente, rang) => (
+              <span key={vente.id}>
+                {rang > 0 && " · "}
+                <span className="plaque-code">{vente.numero}</span>
+              </span>
+            ))}
           </p>
           <p className="mt-1 max-w-prose text-corps text-encre-doux">
-            Le dossier est ouvert avec ses trois documents à traiter. Si le réseau manque, la vente
-            partira seule dès son retour.
+            {seule
+              ? "Le dossier de carte grise est ouvert. Si le réseau manque, la vente partira seule dès son retour."
+              : "Chaque moto a son reçu et son dossier de carte grise. Si le réseau manque, les ventes partiront ensemble dès son retour."}
           </p>
         </div>
       </Modale>
@@ -453,7 +564,11 @@ export function ModaleVente({
       ouvert
       onFermer={fermer}
       titre="Nouvelle vente"
-      description="Le numéro de la pièce sera attribué à l’enregistrement, même sans réseau."
+      description={
+        saisie.motos.length > 1
+          ? `${saisie.motos.length} motos, donc ${saisie.motos.length} ventes : chacune aura son numéro, son reçu et son dossier.`
+          : "Le numéro de la pièce sera attribué à l’enregistrement, même sans réseau."
+      }
       taille="large"
       pied={
         <>
@@ -461,7 +576,7 @@ export function ModaleVente({
               message resté en haut d'un formulaire long ne serait jamais lu.
               Elle ne réserve pas sa ligne — le pied est ancré en bas et grandit
               vers le haut, donc le bouton ne se dérobe pas sous le doigt. */}
-          {erreur && <EtatErreurSaisie message={erreur} className="w-full" />}
+          {refus && <EtatErreurSaisie message={refus.message} className="w-full" />}
           <p className="flex items-baseline gap-2">
             <span className="text-corps text-encre-doux">Reste dû</span>
             <span className="font-code text-bloc font-medium whitespace-nowrap text-encre">
@@ -599,12 +714,19 @@ export function ModaleVente({
                 <ChampRecherche
                   id="recherche-moto-vente"
                   libelle="Chercher dans le stock"
-                  aide={`Châssis, marque ou modèle. ${vendables.length} motos en stock à ${perimetre.nom}.`}
+                  aide={`Châssis, marque ou modèle. Cochez-en plusieurs si le client en achète plusieurs. ${vendables.length} motos en stock à ${perimetre.nom}.`}
                   placeholder="Châssis, marque ou modèle"
                   valeur={rechercheMoto}
                   changer={setRechercheMoto}
                   monospace
                 />
+
+                {auPlafond && (
+                  <p className="mt-3 text-corps text-encre-doux">
+                    {MOTOS_PAR_VENTE_MAX} motos dans cette vente, c’est le maximum. Enregistrez-la,
+                    puis commencez-en une seconde.
+                  </p>
+                )}
 
                 {!chercheMoto ? (
                   /* L'état d'attente est une invitation, pas un trou
@@ -626,8 +748,15 @@ export function ModaleVente({
                         <li key={moto.id}>
                           <Choix
                             nom="moto-vendue"
-                            choisi={saisie.motoId === moto.id}
-                            surChoix={() => choisirMoto(moto)}
+                            multiple
+                            choisi={saisie.motos.some((ligne) => ligne.motoId === moto.id)}
+                            /* Le plafond s'oppose ici, pas à la validation : un
+                               refus découvert après avoir coché onze motos
+                               ferait tout reprendre (`DESIGN.md` §10). */
+                            desactive={
+                              auPlafond && !saisie.motos.some((ligne) => ligne.motoId === moto.id)
+                            }
+                            surChoix={() => basculerMoto(moto)}
                           >
                             <span className="plaque-code shrink-0 text-legende leading-none text-encre">
                               {moto.numeroChassis}
@@ -665,19 +794,24 @@ export function ModaleVente({
             )}
           </Groupe>
 
-          <Groupe titre="Le prix">
-            <div className="max-w-[16rem]">
-              <Champ id="prix-convenu" libelle="Prix convenu" aide="En FCFA entiers, sans centimes.">
-                <input
-                  id="prix-convenu"
-                  inputMode="numeric"
-                  aria-describedby="prix-convenu-aide"
-                  value={saisie.prixConvenu}
-                  onChange={(evenement) => changer({ prixConvenu: evenement.target.value })}
-                  className="plaque-code saisie"
-                />
-              </Champ>
-            </div>
+          <Groupe titre={saisie.motos.length > 1 ? "Les prix" : "Le prix"}>
+            {saisie.motos.length === 0 ? (
+              <p className="text-corps text-encre-doux">
+                Cochez une moto ci-dessus — ou plusieurs — pour en fixer le prix.
+              </p>
+            ) : (
+              <LignesVendues
+                lignes={saisie.motos}
+                motos={motosRetenues.map((retenue) => retenue.moto)}
+                parts={parts}
+                total={total}
+                catalogue={catalogue}
+                rangFautif={refus?.rang ?? null}
+                acompte={encaisse}
+                changerPrix={changerPrix}
+                retirer={retirerMoto}
+              />
+            )}
 
             {/* La frontière de D2, dite là où la question se pose — devant le
                 montant. Un gérant qui ne voit pas de marge doit savoir qu'elle
@@ -685,12 +819,16 @@ export function ModaleVente({
             {estGerant && (
               <p className="mt-2 flex items-center gap-2 text-legende text-encre-doux">
                 <Lock aria-hidden="true" className="size-3.5 shrink-0" />
-                La marge de cette vente est calculée pour le responsable seul.
+                La marge de ces ventes est calculée pour le responsable seul.
               </p>
             )}
           </Groupe>
 
-          <Groupe titre="Ce qui part avec la moto">
+          <Groupe
+            titre={
+              saisie.motos.length > 1 ? "Ce qui part avec chaque moto" : "Ce qui part avec la moto"
+            }
+          >
             {/* Deux cases fixes, cochées : c'est le cas ordinaire, et le
                 décocher est le geste rare. Ce sont de vraies cases à cocher —
                 les deux sont indépendantes, contrairement au mode de paiement
@@ -783,14 +921,187 @@ export function ModaleVente({
         <aside className="min-w-0 xl:sticky xl:top-0">
           <Recapitulatif
             saisie={saisie}
-            moto={motoChoisie}
+            motos={motosRetenues.map((retenue) => retenue.moto)}
             client={clientChoisi}
             catalogue={catalogue}
             numero={numeroAVenir}
+            total={total}
+            encaisse={encaisse}
           />
         </aside>
       </div>
     </Modale>
+  );
+}
+
+/**
+ * Les motos de la vente, une ligne chacune, avec leur prix (26 octobre 2026).
+ *
+ * **Un champ par moto, et non un prix pour l'ensemble.** Deux motos du même lot
+ * ne se vendent pas au même prix, et c'est le prix de *cette* moto qui
+ * s'imprime sur *son* reçu. Un total divisé par trois aurait fabriqué trois
+ * prix que personne n'a convenus.
+ *
+ * **La répartition de l'acompte se lit avant d'être écrite.** Le client dépose
+ * une somme pour l'ensemble ; la règle la pose sur la première moto puis la
+ * fait déborder. Ces deux colonnes montrent le résultat ligne par ligne — qui
+ * est soldée, qui garde une dette — pour que rien ne s'écrive que le gérant
+ * n'ait pu lire. Elles n'apparaissent qu'à partir de deux motos : sur une
+ * seule, le pied de la modale dit déjà le reste dû.
+ *
+ * La grille est celle du classeur des cartes grises (S59) : la forme que le
+ * commanditaire lit sans l'apprendre.
+ */
+function LignesVendues({
+  lignes,
+  motos,
+  parts,
+  total,
+  catalogue,
+  rangFautif,
+  acompte,
+  changerPrix,
+  retirer,
+}: {
+  lignes: LigneMotoVendue[];
+  /** La moto de chaque ligne, ou `undefined` si elle a quitté le stock entre-temps. */
+  motos: (Moto | undefined)[];
+  parts: number[];
+  total: number;
+  catalogue: Catalogue;
+  rangFautif: number | null;
+  acompte: number;
+  changerPrix: (rang: number, valeur: string) => void;
+  retirer: (rang: number) => void;
+}) {
+  const detaille = lignes.length > 1;
+
+  return (
+    <>
+      <div className="cadre-grille">
+        <table className="grille-saisie">
+          <caption className="sr-only">
+            Les motos de cette vente, une ligne chacune, avec le prix convenu de chacune.
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col" className="gouttiere">
+                <span className="sr-only">Ligne</span>
+                <span aria-hidden="true">#</span>
+              </th>
+              <th scope="col" style={{ width: "13rem" }}>
+                Moto
+              </th>
+              <th scope="col" style={{ width: "9rem" }}>
+                Prix convenu
+              </th>
+              {detaille && (
+                <>
+                  <th scope="col" style={{ width: "7rem" }}>
+                    Reçu
+                  </th>
+                  <th scope="col" style={{ width: "7rem" }}>
+                    Reste
+                  </th>
+                </>
+              )}
+              <th scope="col" style={{ width: "2.75rem" }}>
+                <span className="sr-only">Retirer la moto</span>
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {lignes.map((ligne, rang) => {
+              const moto = motos[rang];
+              const prix = lireMontant(ligne.prixConvenu) ?? 0;
+              const part = parts[rang] ?? 0;
+              return (
+                <tr
+                  key={ligne.motoId}
+                  className={rangFautif === rang ? "ligne-fautive" : undefined}
+                >
+                  <td className="gouttiere">{rang + 1}</td>
+
+                  <td className="px-2.5 py-1.5">
+                    {moto ? (
+                      <>
+                        <span className="block font-code text-legende break-all text-encre">
+                          {moto.numeroChassis}
+                        </span>
+                        <span className="block text-corps text-encre-doux">
+                          {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
+                        </span>
+                      </>
+                    ) : (
+                      /* Elle a été vendue ailleurs pendant la saisie. Nommée et
+                         non effacée : effacer la ligne sous les doigts ferait
+                         disparaître un prix déjà tapé sans rien expliquer. */
+                      <span className="text-corps text-alerte">
+                        Cette moto n’est plus disponible. Retirez-la.
+                      </span>
+                    )}
+                  </td>
+
+                  <td>
+                    <input
+                      inputMode="numeric"
+                      value={ligne.prixConvenu}
+                      onChange={(evenement) => changerPrix(rang, evenement.target.value)}
+                      className="cellule font-code tabular-nums"
+                      aria-label={`Prix convenu, ligne ${rang + 1}`}
+                    />
+                  </td>
+
+                  {detaille && (
+                    <>
+                      <td className="px-2.5 font-code text-corps tabular-nums text-encre-doux">
+                        {formaterNombre(part)}
+                      </td>
+                      <td className="px-2.5 font-code text-corps tabular-nums text-encre-doux">
+                        {formaterNombre(Math.max(prix - part, 0))}
+                      </td>
+                    </>
+                  )}
+
+                  <td>
+                    <button
+                      type="button"
+                      onClick={() => retirer(rang)}
+                      className="flex h-11 w-full items-center justify-center text-encre-doux transition hover:text-alerte"
+                    >
+                      <X aria-hidden="true" className="size-4" />
+                      <span className="sr-only">Retirer la moto de la ligne {rang + 1}</span>
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {detaille && (
+        <p className="mt-2 flex flex-wrap items-baseline justify-end gap-x-4 gap-y-1">
+          <span className="text-corps text-encre-doux">
+            {lignes.length} motos · acompte réparti dans l’ordre des lignes
+          </span>
+          <span className="text-corps text-encre-doux">Total</span>
+          <span className="font-code text-bloc font-medium whitespace-nowrap text-encre">
+            {formaterMontant(total)}
+          </span>
+        </p>
+      )}
+
+      {detaille && acompte > 0 && acompte < total && (
+        /* La règle, dite là où on en voit l'effet. Sans elle, les deux colonnes
+           paraîtraient arbitraires — or elles sont prévisibles, et c'est ce qui
+           permet de les contredire en changeant les prix ou l'ordre. */
+        <p className="mt-1 text-right text-legende text-encre-doux">
+          L’acompte solde les premières lignes avant d’entamer les suivantes.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -830,28 +1141,29 @@ function ClientRetenu({ client, surChangement }: { client: Client; surChangement
  */
 function Recapitulatif({
   saisie,
-  moto,
+  motos,
   client,
   catalogue,
   numero,
+  total,
+  encaisse,
 }: {
-  saisie: SaisieVente;
-  moto: Moto | undefined;
+  saisie: SaisieVenteGroupee;
+  /** Les motos retenues, dans l'ordre des lignes. Les disparues sont omises. */
+  motos: (Moto | undefined)[];
   client: Client | undefined;
   catalogue: Catalogue;
   numero: string | null;
+  total: number;
+  encaisse: number;
 }) {
-  const prixConvenu = lireMontant(saisie.prixConvenu) ?? 0;
-  const encaisse = lireMontantEncaisse(saisie.montantEncaisse) ?? 0;
-  const { totalPaye } = agregatsPaiement(
-    prixConvenu,
-    encaisse > 0 && encaisse <= prixConvenu ? [{ montant: encaisse }] : [],
-  );
   const remise = motoRemiseA(saisie.modePaiement);
   const inclusions = [
     saisie.carteGrise ? LIBELLE_INCLUSION.carteGrise : null,
     saisie.casque ? LIBELLE_INCLUSION.casque : null,
   ].filter(Boolean);
+  const connues = motos.filter((moto): moto is Moto => moto !== undefined);
+  const plusieurs = saisie.motos.length > 1;
 
   return (
     <section aria-label="Récapitulatif de la vente" className="cadre rounded-carte p-5">
@@ -861,36 +1173,46 @@ function Recapitulatif({
             voit la numérotation hors ligne de S7, depuis que l'écran de
             diagnostic a disparu (S54). Rien d'autre ne le distingue d'une
             plaque de code quelconque, et la suite bout en bout doit pouvoir le
-            viser sans dépendre de sa mise en forme. */}
+            viser sans dépendre de sa mise en forme.
+
+            Avec plusieurs motos, c'est le **premier** d'une série : les
+            suivants se tirent du même compteur, à l'enregistrement. */}
         {numero && (
-          <span
-            data-test="prochain-numero"
-            className="plaque-code text-legende text-encre-doux"
-          >
-            {numero}
+          <span data-test="prochain-numero" className="plaque-code text-legende text-encre-doux">
+            {plusieurs ? `à partir de ${numero}` : numero}
           </span>
         )}
       </div>
 
       <dl className="mt-4 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2">
-        <LigneRecap titre="Client" valeur={client ? nomComplet(client) : "à choisir"} absent={!client} />
         <LigneRecap
-          titre="Moto"
+          titre="Client"
+          valeur={client ? nomComplet(client) : "à choisir"}
+          absent={!client}
+        />
+        <LigneRecap
+          titre={plusieurs ? `Motos (${saisie.motos.length})` : "Moto"}
           valeur={
-            moto
-              ? `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)}`
+            connues.length > 0
+              ? connues
+                  .map((moto) =>
+                    `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(
+                      moto.modeleId,
+                    )}`.trim(),
+                  )
+                  .join(" · ")
               : "à choisir"
           }
-          absent={!moto}
+          absent={connues.length === 0}
         />
         <LigneRecap titre="Mode" valeur={LIBELLE_MODE[saisie.modePaiement]} />
         <LigneRecap
-          titre="Prix convenu"
-          valeur={prixConvenu > 0 ? formaterMontant(prixConvenu) : "à saisir"}
-          absent={prixConvenu <= 0}
-          montant={prixConvenu > 0}
+          titre={plusieurs ? "Total convenu" : "Prix convenu"}
+          valeur={total > 0 ? formaterMontant(total) : "à saisir"}
+          absent={total <= 0}
+          montant={total > 0}
         />
-        <LigneRecap titre="Versement" valeur={formaterMontant(totalPaye)} montant />
+        <LigneRecap titre="Versement" valeur={formaterMontant(Math.min(encaisse, total))} montant />
         <LigneRecap
           titre="Avec la moto"
           valeur={inclusions.length > 0 ? inclusions.join(" · ") : "rien"}
@@ -903,9 +1225,22 @@ function Recapitulatif({
           tranches, elle reste — et elle se paie au comptoir, pas ici. */}
       <p className="mt-4 border-t border-bord pt-3 text-corps text-encre-doux">
         {remise
-          ? "Le client repart avec la moto. Elle passera au statut « vendue »."
-          : "La moto reste au magasin, réservée, jusqu’au dernier versement. L’argent reçu est un engagement, pas une recette."}
+          ? plusieurs
+            ? "Le client repart avec les motos. Elles passeront au statut « vendue »."
+            : "Le client repart avec la moto. Elle passera au statut « vendue »."
+          : plusieurs
+            ? "Les motos restent au magasin, réservées, jusqu’au dernier versement. L’argent reçu est un engagement, pas une recette."
+            : "La moto reste au magasin, réservée, jusqu’au dernier versement. L’argent reçu est un engagement, pas une recette."}
       </p>
+
+      {plusieurs && (
+        /* Ce que l'option A veut dire, dit là où on valide : le commanditaire
+           l'a choisie pour cela, et c'est ce qui se vérifiera à la caisse. */
+        <p className="mt-2 text-corps text-encre-doux">
+          {saisie.motos.length} ventes distinctes seront enregistrées : un reçu, un dossier de
+          carte grise et un crédit par moto.
+        </p>
+      )}
     </section>
   );
 }
@@ -948,27 +1283,45 @@ function Choix({
   nom,
   choisi,
   surChoix,
+  multiple = false,
+  desactive = false,
   children,
 }: {
   nom: string;
   choisi: boolean;
   surChoix: () => void;
+  /**
+   * Plusieurs lignes à la fois — les motos d'une même vente (26 octobre 2026).
+   *
+   * **Une case à cocher, et non un radio qu'on décocherait.** Un groupe de
+   * radios dit « une seule parmi celles-ci » : aux lecteurs d'écran comme aux
+   * flèches du clavier, qui déplacent *et* choisissent. Pour une liste où l'on
+   * en prend plusieurs, c'est faux — et la touche ne peut pas, dans un groupe
+   * de radios, parcourir sans cocher.
+   */
+  multiple?: boolean;
+  /** Proposé mais pas cochable — le plafond d'une vente est atteint. */
+  desactive?: boolean;
   children: React.ReactNode;
 }) {
   return (
     <label
       className={[
-        "flex cursor-pointer items-center gap-3 rounded-champ border px-4 py-3",
+        "flex items-center gap-3 rounded-champ border px-4 py-3",
+        desactive ? "cursor-not-allowed opacity-50" : "cursor-pointer",
         "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-encre",
         choisi
           ? "border-2 border-encre bg-papier px-[15px] py-[11px]"
-          : "border-bord bg-papier hover:bg-survol",
+          : desactive
+            ? "border-bord bg-papier"
+            : "border-bord bg-papier hover:bg-survol",
       ].join(" ")}
     >
       <input
-        type="radio"
-        name={nom}
+        type={multiple ? "checkbox" : "radio"}
+        name={multiple ? undefined : nom}
         checked={choisi}
+        disabled={desactive}
         onChange={surChoix}
         className="size-[18px] shrink-0 accent-encre"
       />
