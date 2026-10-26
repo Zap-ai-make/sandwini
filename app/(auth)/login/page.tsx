@@ -4,7 +4,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { LoaderCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Monogramme } from "@/components/Monogramme";
+import { LogoEntreprise } from "@/components/LogoEntreprise";
 import { Avis, type TonAvis } from "@/components/patrons/Avis";
 import { Champ } from "@/components/patrons/Champ";
 import { seDeconnecter, useSession } from "@/lib/auth/session";
@@ -244,7 +244,7 @@ export default function Connexion() {
 function PanneauMarque() {
   return (
     <div className="flex flex-col bg-nuit px-6 py-8 text-coquille-encre md:px-10 md:py-14 [--color-focus-halo:var(--color-nuit)] [--color-focus-trait:#ffffff]">
-      <Monogramme className="mb-6 w-24 md:mb-10 md:w-42" titre="Sandwidi et Frères" />
+      <LogoEntreprise className="mb-6 w-28 rounded md:mb-10 md:w-44" titre="Sandwidi Entreprise" />
       <p className="font-display text-bloc font-bold tracking-tight md:text-ecran">
         {IDENTITE.raisonSociale}
       </p>

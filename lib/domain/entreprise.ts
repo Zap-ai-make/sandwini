@@ -34,17 +34,34 @@ export const IDENTITE = {
      document commercial. Seule la casse est adoucie, l'acte étant en
      capitales par convention de formulaire, pas par choix de nom. */
   raisonSociale: "ETS Sandwidi et Frères",
-  activite: "Vente de motos et pièces détachées",
-  siege: "BP 41 — Pouytenga",
+  /* **Le nom sous lequel la maison est connue** (26 octobre 2026). Il s'ajoute
+     au nom légal au lieu de le remplacer : c'est l'acte qui nomme le vendeur
+     en tête d'une pièce commerciale, et c'est l'enseigne que le client
+     reconnaît. Les deux ont donc leur ligne, dans cet ordre. */
+  nomCommercial: "Saidou Ghana motos",
+  activite: "Vente de motocycle, cycle moteur et de véhicules de toutes marques",
+  /* Les deux villes où la maison reçoit, telles que le responsable les
+     dicte — et non une adresse postale, qui ne servait à personne. */
+  siege: "Pouytenga / Ouagadougou, Burkina Faso",
   /* Les quatre numéros professionnels de l'entreprise, désignés comme tels par
      le responsable. Ils valent pour toutes les boutiques — d'où le pluriel, et
      d'où le fait qu'ils s'impriment sur chaque reçu : un client qui rappelle ne
      doit pas dépendre du fait que la ligne d'un comptoir sonne ce jour-là.
 
-     Celui de l'acte scanné (70 28 46 50) n'y figure pas : il n'a pas été redit
-     dans cette liste, et un numéro qui ne répond plus est pire qu'un numéro
-     absent. L'y remettre est une ligne, s'il est toujours en service. */
-  telephones: ["72946323", "76217668", "70246397", "57069794"] as readonly string[],
+     Celui de l'acte scanné (70 28 46 50) y est revenu le 26 octobre 2026, avec
+     un cinquième, le responsable ayant redit la liste entière. Le numéro du
+     secrétariat en est sorti : il a sa ligne à lui, parce qu'on ne demande pas
+     la même chose aux deux. */
+  telephones: [
+    "72946323",
+    "70284650",
+    "76217668",
+    "70142523",
+    "70246397",
+  ] as readonly string[],
+  /* **Le secrétariat se nomme** (26 octobre 2026). Mêlé aux autres, on
+     l'appelait pour un prix ; nommé, on l'appelle pour un papier. */
+  secretariat: "57069794",
   email: "sandwidimoustapha72@gmail.com",
   ifu: "00084905D",
   rccm: "BFTNK2016A495",
@@ -65,9 +82,11 @@ export const IDENTITE_A_CONFIRMER: readonly (keyof typeof IDENTITE)[] = [];
 
 export const LIBELLE_IDENTITE: Record<keyof typeof IDENTITE, string> = {
   raisonSociale: "Raison sociale",
+  nomCommercial: "Nom commercial",
   activite: "Activité",
   siege: "Siège",
   telephones: "Téléphones",
+  secretariat: "Secrétariat",
   email: "E-mail",
   ifu: "IFU",
   rccm: "RCCM",

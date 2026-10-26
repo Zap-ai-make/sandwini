@@ -1258,6 +1258,244 @@
   }
 
   /* --------------------------------------------------------------------------
+     La facture, telle que le carnet du commanditaire la dessine (26 octobre 2026).
+
+     « Le reçu doit être exactement pareil » — suivait une photographie de son
+     carnet à souches : cadre bleu, intitulés bleus, cases JOUR/MOIS/AN,
+     tableau QTÉ/DÉSIGNATION, totaux en pastilles, somme en toutes lettres.
+     C'est le document que ses clients reconnaissent et que son comptable
+     classe depuis des années ; un reçu « mieux dessiné » mais étranger leur
+     ferait douter de sa provenance.
+
+     **Un bleu littéral, et c'est délibéré.** La palette du produit n'en a pas,
+     et n'a pas à en gagner un pour ce seul document : ce bleu n'est pas une
+     couleur de l'application, c'est l'encre d'un imprimeur de Pouytenga. Il
+     est donc écrit ici en toutes lettres plutôt que posé en jeton de thème, et
+     il ne suit pas le thème sombre — une facture est un objet de papier.
+
+     **Tout tient à l'impression.** Pas d'image de fond, pas d'ombre, pas de
+     dégradé : des traits et des cadres, qui sortent identiques d'une
+     imprimante à jet comme d'une photocopie.
+     -------------------------------------------------------------------------- */
+  .facture {
+    --facture-encre: #11379b;
+    --facture-trait: #11379b;
+    /* Blanc littéral : ce document ne suit pas le thème. Sur un écran sombre,
+       il reste la feuille qu'il sera. */
+    background: #fff;
+    color: #111;
+    border: 2px solid var(--facture-trait);
+    border-radius: 6px;
+    padding: 1.25rem;
+  }
+
+  .facture-titre,
+  .facture-intitule {
+    color: var(--facture-encre);
+  }
+
+  /* L'en-tête : le logo à gauche, l'identité alignée à droite comme sur le
+     carnet. Sur un téléphone, les deux s'empilent plutôt que de se serrer. */
+  .facture-entete {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .facture-logo {
+    width: 7.5rem;
+    height: auto;
+    flex-shrink: 0;
+    border-radius: 4px;
+  }
+
+  .facture-identite {
+    min-width: 0;
+    text-align: right;
+    font-size: var(--text-legende);
+    line-height: 1.35;
+  }
+
+  .facture-raison {
+    font-size: var(--text-bloc);
+    font-weight: 700;
+    line-height: 1.15;
+    color: var(--facture-encre);
+  }
+
+  .facture-enseigne {
+    font-weight: 600;
+    color: #111;
+  }
+
+  /* Les trois cases de la date, cadrées comme sur le carnet. */
+  .facture-date {
+    border-collapse: collapse;
+    border: 1px solid var(--facture-trait);
+    border-radius: 4px;
+  }
+
+  .facture-date th,
+  .facture-date td {
+    border: 1px solid var(--facture-trait);
+    padding: 0.2rem 0.75rem;
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  .facture-date th {
+    font-size: var(--text-micro);
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--facture-encre);
+  }
+
+  .facture-date td {
+    font-family: var(--font-code);
+    font-size: var(--text-corps);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Le numéro de pièce dans sa pastille — la souche crantée du produit ne
+     figure pas sur son carnet, et c'est son carnet qu'on reproduit. */
+  .facture-numero {
+    display: inline-block;
+    padding: 0.3rem 1rem;
+    border: 1px solid var(--facture-trait);
+    border-radius: 999px;
+    font-family: var(--font-code);
+    font-weight: 700;
+    white-space: nowrap;
+    color: var(--facture-encre);
+  }
+
+  /* Les champs du client : un intitulé, puis un trait sur lequel la valeur est
+     posée. Le trait est ce qui fait reconnaître le formulaire. */
+  .facture-champ {
+    display: flex;
+    align-items: baseline;
+    gap: 0.5rem;
+    border-bottom: 1px solid var(--facture-trait);
+    padding-bottom: 0.2rem;
+    min-width: 0;
+  }
+
+  .facture-champ > span:first-child {
+    color: var(--facture-encre);
+    font-size: var(--text-legende);
+    flex-shrink: 0;
+  }
+
+  .facture-champ > span:last-child {
+    font-weight: 700;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  /* Le tableau des lignes vendues. Les rangées vides en font partie : sur le
+     carnet, elles disent qu'il n'y avait rien de plus, et laissent la place
+     d'une mention manuscrite. */
+  .facture-lignes {
+    width: 100%;
+    border-collapse: collapse;
+    border: 1px solid var(--facture-trait);
+    font-size: var(--text-corps);
+  }
+
+  .facture-lignes th,
+  .facture-lignes td {
+    border: 1px solid var(--facture-trait);
+    padding: 0.4rem 0.6rem;
+    vertical-align: top;
+  }
+
+  .facture-lignes th {
+    font-size: var(--text-legende);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-align: center;
+    color: var(--facture-encre);
+  }
+
+  .facture-lignes .facture-nombre {
+    text-align: right;
+    font-family: var(--font-code);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .facture-lignes .facture-quantite {
+    text-align: center;
+    font-family: var(--font-code);
+  }
+
+  /* Une rangée laissée libre : sa hauteur est tenue, sinon elle s'écrase. */
+  .facture-lignes .facture-vide td {
+    height: 2rem;
+  }
+
+  /* Les trois totaux, chacun dans sa pastille, alignés à droite. */
+  .facture-total {
+    display: flex;
+    align-items: baseline;
+    justify-content: flex-end;
+    gap: 1rem;
+  }
+
+  .facture-total dt {
+    color: var(--facture-encre);
+    font-weight: 600;
+  }
+
+  .facture-total dd {
+    min-width: 11rem;
+    padding: 0.3rem 1rem;
+    border: 1px solid var(--facture-trait);
+    border-radius: 999px;
+    text-align: center;
+    font-family: var(--font-code);
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  /* Le total de la facture se détache des deux autres : c'est la somme due. */
+  .facture-total.facture-total-fort dt,
+  .facture-total.facture-total-fort dd {
+    font-size: var(--text-bloc);
+  }
+
+  .facture-signature {
+    border-top: 1px solid #111;
+    padding-top: 0.3rem;
+    text-align: center;
+    font-size: var(--text-legende);
+    color: #333;
+  }
+
+  .facture-acquitte {
+    text-align: center;
+    font-size: var(--text-bloc);
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    color: var(--facture-encre);
+  }
+
+  /* Le cadre et les traits doivent sortir de l'imprimante : par défaut, les
+     navigateurs n'impriment pas les fonds, mais ils impriment les bordures.
+     On force tout de même l'exactitude des couleurs, le bleu étant ce qui
+     fait reconnaître le document. */
+  @media print {
+    .facture {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      border-radius: 0;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
      Les filtres d'une liste.
 
      Ils restent posés au-dessus du tableau, valeur visible : un filtre replié
