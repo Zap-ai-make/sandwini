@@ -1,17 +1,9 @@
 "use client";
 
-import { CloudUpload, ExternalLink, LoaderCircle, WifiOff } from "lucide-react";
+import { WifiOff } from "lucide-react";
 import { useState } from "react";
-import { useSession } from "@/lib/auth/session";
-import {
-  CHAMP_PAPIER,
-  LIBELLE_PAPIER,
-  PAPIERS_MOTO,
-  validerFichierPapier,
-  type Moto,
-  type PapierMoto,
-} from "@/lib/domain/moto";
-import { envoyerPapierMoto, lireUrlPapier } from "@/lib/repositories/motos";
+import { BoutonScanPapier } from "@/components/BoutonScanPapier";
+import { CHAMP_PAPIER, LIBELLE_PAPIER, PAPIERS_MOTO, type Moto, type PapierMoto } from "@/lib/domain/moto";
 import { useEtatReseau } from "@/lib/reseau/etat-reseau";
 import { EtatErreur } from "@/components/patrons/Etats";
 
@@ -47,88 +39,20 @@ export function PapiersMoto({ moto }: { moto: Moto }) {
 }
 
 function LignePapier({ moto, papier }: { moto: Moto; papier: PapierMoto }) {
-  const session = useSession();
   const { enLigne } = useEtatReseau();
-  const [envoi, setEnvoi] = useState(false);
+  /* Le geste lui-même — envoyer, ouvrir — vit dans `BoutonScanPapier`, que
+     l'inspection d'un lot partage. Ici restent le libellé, la phrase du
+     hors-ligne et la place où le refus s'affiche. */
   const [erreur, setErreur] = useState<string | null>(null);
 
   const chemin = moto[CHAMP_PAPIER[papier]];
-
-  async function envoyer(fichier: File) {
-    if (session.statut !== "connecte") return;
-    setErreur(null);
-    const probleme = validerFichierPapier(fichier);
-    if (probleme) {
-      setErreur(probleme);
-      return;
-    }
-    setEnvoi(true);
-    try {
-      await envoyerPapierMoto(moto.id, papier, fichier, {
-        uid: session.utilisateur.uid,
-        nom: session.utilisateur.nom,
-      });
-    } catch {
-      /* Le message ne parle pas d'un « échec » sec : l'envoi peut être repris
-         tel quel plus tard, et c'est la seule chose utile à savoir ici. */
-      setErreur(
-        "Le fichier n’est pas parti. Storage n’a pas de file d’attente : réessayez quand le réseau sera revenu, le reste de la fiche est déjà enregistré.",
-      );
-    } finally {
-      setEnvoi(false);
-    }
-  }
-
-  async function ouvrir() {
-    if (!chemin) return;
-    setErreur(null);
-    try {
-      const url = await lireUrlPapier(chemin);
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch {
-      setErreur("Le document ne s’ouvre qu’avec du réseau : son adresse se redemande à chaque fois.");
-    }
-  }
 
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <span className="font-medium text-encre">{LIBELLE_PAPIER[papier]}</span>
 
-        {chemin ? (
-          <button
-            type="button"
-            onClick={() => void ouvrir()}
-            className="inline-flex h-11 items-center gap-2 rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-          >
-            <ExternalLink aria-hidden="true" className="size-4" />
-            Ouvrir le document
-          </button>
-        ) : (
-          <label
-            className={`inline-flex h-11 items-center gap-2 rounded-plaque border border-bord px-3 text-sm font-medium text-encre ${
-              enLigne && !envoi ? "cursor-pointer hover:bg-fond" : "opacity-60"
-            }`}
-          >
-            {envoi ? (
-              <LoaderCircle aria-hidden="true" className="size-4 animate-spin" />
-            ) : (
-              <CloudUpload aria-hidden="true" className="size-4" />
-            )}
-            {envoi ? "Envoi…" : "Envoyer le scan"}
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,application/pdf"
-              disabled={!enLigne || envoi}
-              className="sr-only"
-              onChange={(evenement) => {
-                const fichier = evenement.target.files?.[0];
-                evenement.target.value = "";
-                if (fichier) void envoyer(fichier);
-              }}
-            />
-          </label>
-        )}
+        <BoutonScanPapier moto={moto} papier={papier} onErreur={setErreur} />
       </div>
 
       {!chemin && !enLigne && (

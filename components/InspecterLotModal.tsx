@@ -2,6 +2,7 @@
 
 import { Ban, Pencil, Printer, RotateCcw, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { BoutonScanPapier } from "@/components/BoutonScanPapier";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { completudePapiers, ecoulement, type Arrivage } from "@/lib/domain/arrivage";
@@ -208,25 +209,43 @@ export function InspecterLotModal({
                         const nom = LIBELLE_PAPIER[papier];
                         return (
                           <td key={papier} className="p-2">
-                            <label className="inline-flex cursor-pointer items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={enMain}
-                                disabled={!auteur}
-                                onChange={(evenement) =>
-                                  basculerPapier(moto, papier, evenement.target.checked)
-                                }
-                                className="size-4 accent-[var(--color-solde)]"
-                                aria-label={`${nom} reçu, moto ${moto.numeroChassis}`}
+                            {/* **Deux choses distinctes, côte à côte.** La case
+                                dit que le papier est dans le tiroir ; le bouton
+                                joint sa photo. On peut avoir reçu la quittance
+                                sans l'avoir scannée, et l'inverse — c'est écrit
+                                sur `cmcRecu` dans le domaine, et l'écran doit
+                                le laisser voir. Le bouton d'envoi était jusqu'ici
+                                sur la fiche de la moto seulement, et il fallait
+                                en rouvrir trente : « ajoute un bouton upload à
+                                côté de quittance » (26 octobre 2026). */}
+                            <div className="flex items-center gap-2">
+                              <label className="inline-flex cursor-pointer items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  checked={enMain}
+                                  disabled={!auteur}
+                                  onChange={(evenement) =>
+                                    basculerPapier(moto, papier, evenement.target.checked)
+                                  }
+                                  className="size-4 accent-[var(--color-solde)]"
+                                  aria-label={`${nom} reçu, moto ${moto.numeroChassis}`}
+                                />
+                                <span
+                                  className={
+                                    enMain ? "pastille pastille-solde" : "pastille pastille-retard"
+                                  }
+                                >
+                                  {enMain ? `${nom} reçu` : `${nom} manquant`}
+                                </span>
+                              </label>
+
+                              <BoutonScanPapier
+                                moto={moto}
+                                papier={papier}
+                                compact
+                                onErreur={setErreur}
                               />
-                              <span
-                                className={
-                                  enMain ? "pastille pastille-solde" : "pastille pastille-retard"
-                                }
-                              >
-                                {enMain ? `${nom} reçu` : `${nom} manquant`}
-                              </span>
-                            </label>
+                            </div>
                           </td>
                         );
                       })}

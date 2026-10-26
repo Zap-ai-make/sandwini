@@ -13,12 +13,15 @@
  */
 
 import {
+  ANNEE_MIN,
+  LONGUEUR_CHASSIS_MAX,
   LONGUEUR_TEXTE_MAX,
   MONTANT_MAX,
   chassisDejaPris,
   lireEntier,
   normaliserChassis,
   validerChassis,
+  type EtatMoto,
   type Moto,
   type StatutMoto,
 } from "./moto";
@@ -395,4 +398,175 @@ export function preparerLot(
   }
 
   return { ok: true, motos };
+}
+
+/* --- Corriger les motos d'un lot (26 octobre 2026) ------------------------ */
+
+/**
+ * Une moto du lot, telle qu'on la reprend ligne par ligne.
+ *
+ * **Pourquoi ce geste n'existait pas, et pourquoi il manquait.** Une moto
+ * s'écrivait une fois, à la réception, et plus rien ne reprenait son identité :
+ * ni la fiche, ni l'arrivage, dont la modale annonçait « l'entête seule ». Or
+ * un châssis se relève à la main sur un cadre, parfois sous la poussière — le
+ * commanditaire l'a dit ainsi : « au cas où si le client se trompe à
+ * l'enregistrement ». Un chiffre faux restait faux pour toujours, sur
+ * l'identité physique de l'engin.
+ *
+ * **Tout ce qui décrit la moto, et rien de ce qui lui est arrivé.** Marque,
+ * modèle, châssis, moteur, couleur, année, état : ce que la réception a saisi.
+ * Le statut, la boutique, les papiers, le coût et la date d'entrée n'y sont
+ * pas — ce sont des faits qui se sont produits, pas des cases qu'on remplit, et
+ * chacun a son geste ailleurs. Le coût en particulier vit dans une
+ * sous-collection que le gérant ne lit pas (D2).
+ *
+ * Les montants sont du texte, comme partout dans les saisies de ce dépôt : un
+ * champ vidé doit pouvoir rester vide sans devenir zéro.
+ */
+export type LigneCorrection = {
+  motoId: string;
+  marqueId: string;
+  modeleId: string;
+  numeroChassis: string;
+  numeroMoteur: string;
+  couleur: string;
+  annee: string;
+  etat: EtatMoto;
+};
+
+/** Ce qui part en base pour une moto corrigée — l'année déjà lue. */
+export type ChampsCorrectionMoto = Omit<LigneCorrection, "annee"> & { annee: number | null };
+
+export type CorrectionLot =
+  | { ok: true; corrigees: ChampsCorrectionMoto[] }
+  /** `rang` est l'indice de la ligne fautive : la grille l'allume. */
+  | { ok: false; erreur: string; rang: number | null };
+
+/** Les lignes de départ : ce que les motos du lot portent aujourd'hui. */
+export function lignesDuLot(motos: readonly Moto[]): LigneCorrection[] {
+  return motos.map((moto) => ({
+    motoId: moto.id,
+    marqueId: moto.marqueId,
+    modeleId: moto.modeleId,
+    numeroChassis: moto.numeroChassis,
+    numeroMoteur: moto.numeroMoteur,
+    couleur: moto.couleur,
+    /* `null` veut dire « on ne sait pas » (D82) et s'écrit vide : un champ ne
+       sait pas afficher l'ignorance autrement, et « 0 » serait une date. */
+    annee: moto.annee === null ? "" : String(moto.annee),
+    etat: moto.etat,
+  }));
+}
+
+function ligneInchangee(ligne: LigneCorrection, avant: Moto): boolean {
+  return (
+    ligne.marqueId === avant.marqueId &&
+    ligne.modeleId === avant.modeleId &&
+    normaliserChassis(ligne.numeroChassis) === avant.numeroChassis &&
+    normaliserChassis(ligne.numeroMoteur) === avant.numeroMoteur &&
+    ligne.couleur.trim() === avant.couleur &&
+    ligne.annee.trim() === (avant.annee === null ? "" : String(avant.annee)) &&
+    ligne.etat === avant.etat
+  );
+}
+
+/**
+ * Valide la reprise d'un lot et rend les seules motos qui ont changé.
+ *
+ * **Seules celles qui ont changé.** Réécrire les trente motos d'un lot pour
+ * une faute de frappe sur une seule gonflerait le lot d'écritures et salirait
+ * la trace des vingt-neuf autres : leur `updatedAt` dirait qu'on les a
+ * touchées, ce qui est faux et se lit ensuite comme un indice.
+ *
+ * **L'unicité du châssis est vérifiée contre tout le stock**, chaque moto
+ * étant exemptée d'elle-même : sans cette exemption, corriger une couleur
+ * ferait refuser la ligne pour un doublon avec elle-même. Un stock pas encore
+ * lu (`null`) ne laisse rien décider — c'est D95, comme les six contrôles
+ * d'unicité de S40.
+ *
+ * **Rien n'est bloqué sur le statut.** Une moto vendue au châssis faux est
+ * précisément le cas qu'il faut pouvoir réparer : la vente pointe la moto par
+ * son identifiant, jamais par son châssis, donc la correction remonte partout
+ * d'un coup.
+ */
+export function preparerCorrectionLot(
+  lignes: readonly LigneCorrection[],
+  avant: readonly Moto[],
+  stock: Moto[] | null,
+): CorrectionLot {
+  if (stock === null) {
+    return {
+      ok: false,
+      erreur: "Le stock n’a pas fini d’arriver. Réessayez dans un instant.",
+      rang: null,
+    };
+  }
+
+  const parId = new Map(avant.map((moto) => [moto.id, moto]));
+  const corrigees: ChampsCorrectionMoto[] = [];
+  const vus = new Set<string>();
+  const limiteAnnee = new Date().getFullYear() + 1;
+
+  for (const [rang, ligne] of lignes.entries()) {
+    const precedente = parId.get(ligne.motoId);
+    if (!precedente) {
+      return { ok: false, erreur: "Cette moto n’est plus dans le lot.", rang };
+    }
+
+    if (!ligne.marqueId) {
+      return { ok: false, erreur: "Choisissez une marque : une moto en a toujours une.", rang };
+    }
+
+    const messageChassis = validerChassis(ligne.numeroChassis);
+    if (messageChassis) return { ok: false, erreur: messageChassis, rang };
+
+    const chassis = normaliserChassis(ligne.numeroChassis);
+    if (vus.has(chassis)) {
+      return { ok: false, erreur: `Le châssis ${chassis} apparaît deux fois dans le lot.`, rang };
+    }
+    vus.add(chassis);
+
+    if (chassisDejaPris(chassis, stock, ligne.motoId)) {
+      return { ok: false, erreur: `Le châssis ${chassis} est déjà en stock.`, rang };
+    }
+
+    const moteur = normaliserChassis(ligne.numeroMoteur);
+    if (moteur.length > LONGUEUR_CHASSIS_MAX) {
+      return {
+        ok: false,
+        erreur: `Le numéro de moteur dépasse ${LONGUEUR_CHASSIS_MAX} caractères.`,
+        rang,
+      };
+    }
+    if (ligne.couleur.trim().length > LONGUEUR_TEXTE_MAX) {
+      return { ok: false, erreur: `La couleur dépasse ${LONGUEUR_TEXTE_MAX} caractères.`, rang };
+    }
+
+    let annee: number | null = null;
+    if (ligne.annee.trim()) {
+      annee = lireEntier(ligne.annee);
+      if (annee === null || annee < ANNEE_MIN || annee > limiteAnnee) {
+        return {
+          ok: false,
+          erreur: `L’année doit être comprise entre ${ANNEE_MIN} et ${limiteAnnee}.`,
+          rang,
+        };
+      }
+    }
+
+    if (ligneInchangee(ligne, precedente)) continue;
+
+    corrigees.push({
+      motoId: ligne.motoId,
+      marqueId: ligne.marqueId,
+      modeleId: ligne.modeleId,
+      numeroChassis: chassis,
+      numeroMoteur: moteur,
+      couleur: ligne.couleur.trim(),
+      annee,
+      etat: ligne.etat,
+    });
+  }
+
+  return { ok: true, corrigees };
 }

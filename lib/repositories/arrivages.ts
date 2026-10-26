@@ -13,7 +13,12 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import { construireCout } from "@/lib/domain/moto";
-import type { Arrivage, MotoDuLot, SaisieArrivage } from "@/lib/domain/arrivage";
+import type {
+  Arrivage,
+  ChampsCorrectionMoto,
+  MotoDuLot,
+  SaisieArrivage,
+} from "@/lib/domain/arrivage";
 import { ecrireMotoDansLot } from "./motos";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
@@ -129,29 +134,57 @@ export function enregistrerArrivage(
 }
 
 /**
- * Corrige l'entête d'un arrivage (S43) : nom, fournisseur, date, description.
+ * Corrige un lot — son entête **et** les motos qu'il porte (26 octobre 2026).
  *
- * Mise à jour partielle : les motos du lot ne bougent pas, seule l'entête change.
- * Déjà permis au responsable comme au gérant de la boutique du lot.
+ * **Pourquoi les deux ensemble.** La modale ne corrigeait que l'entête : « il
+ * faut pouvoir modifier tous les éléments, pas uniquement nom, fournisseur…
+ * même les motos, numéro… au cas où si le client se trompe à
+ * l'enregistrement ». C'est une seule relecture du bordereau, donc une seule
+ * écriture. Deux écritures séparées pourraient laisser l'entête corrigée et
+ * les motos non, sans que rien à l'écran dise où en est la correction. Hors
+ * ligne, Firestore garde le lot entier et le rejoue tel quel.
+ *
+ * **Seules les motos changées y entrent** — `preparerCorrectionLot` les a déjà
+ * triées. Le plafond est celui de la saisie d'un lot (80 motos), loin des 500
+ * opérations d'un lot Firestore.
+ *
+ * **Le coût n'est pas touché** : il vit dans `motos/{id}/prive/cout`, où le
+ * gérant n'a pas accès (D2), et aucune colonne de la grille ne le concerne.
  */
-export function modifierArrivage(
-  id: string,
+export function corrigerLot(
+  arrivageId: string,
   saisie: SaisieArrivage,
+  corrigees: readonly ChampsCorrectionMoto[],
   auteur: Auteur,
 ): { enregistre: Promise<void> } {
-  return {
-    enregistre: suivreEcriture(
-      updateDoc(doc(db(), "arrivages", id), {
-        nom: saisie.nom.trim(),
-        fournisseurId: saisie.fournisseurId,
-        date: saisie.date.trim()
-          ? Timestamp.fromDate(new Date(`${saisie.date.trim()}T00:00:00`))
-          : null,
-        description: saisie.description.trim(),
-        ...traceModification(auteur),
-      }),
-    ),
-  };
+  const lot = writeBatch(db());
+
+  lot.update(doc(db(), "arrivages", arrivageId), {
+    nom: saisie.nom.trim(),
+    fournisseurId: saisie.fournisseurId,
+    date: saisie.date.trim()
+      ? Timestamp.fromDate(new Date(`${saisie.date.trim()}T00:00:00`))
+      : null,
+    description: saisie.description.trim(),
+    ...traceModification(auteur),
+  });
+
+  for (const champs of corrigees) {
+    /* Une mise à jour partielle, et non une réécriture : le statut, la
+       boutique, les papiers, les scans et la date d'entrée de la moto ne sont
+       pas dans cette grille et ne doivent pas repartir de zéro. */
+    lot.update(doc(db(), "motos", champs.motoId), {
+      marqueId: champs.marqueId,
+      modeleId: champs.modeleId,
+      numeroChassis: champs.numeroChassis,
+      numeroMoteur: champs.numeroMoteur,
+      couleur: champs.couleur,
+      annee: champs.annee,
+      etat: champs.etat,
+      ...traceModification(auteur),
+    });
+  }
+  return { enregistre: suivreEcriture(lot.commit()) };
 }
 
 /**

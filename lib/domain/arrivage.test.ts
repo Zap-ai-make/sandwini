@@ -14,6 +14,8 @@ import {
   estEcoule,
   filtrerArrivages,
   ligneEngagee,
+  lignesDuLot,
+  preparerCorrectionLot,
   preparerLot,
   validerArrivage,
   validerLigneLot,
@@ -514,5 +516,154 @@ describe("lotsDuFournisseur", () => {
     const lots = lotsDuFournisseur("f1", arrivages, []);
     expect(lots).toHaveLength(1);
     expect(lots[0].arrivage.annule).toBe(true);
+  });
+});
+
+/**
+ * Corriger les motos d'un lot (26 octobre 2026, demande du commanditaire).
+ *
+ * « Modifier doit pouvoir modifier tous les éléments, pas uniquement nom,
+ * fournisseur… même les motos, numéro… au cas où si le client se trompe à
+ * l'enregistrement. » Rien ne permettait de reprendre l'identité d'une moto
+ * déjà entrée : un châssis mal relevé sous la poussière restait faux pour
+ * toujours, et c'est l'identité physique de l'engin.
+ */
+describe("corriger les motos d’un lot", () => {
+  const duLot = (id: string, p: Partial<Moto> = {}): Moto =>
+    ({
+      id,
+      arrivageId: "a1",
+      statut: "en_stock",
+      etat: "neuve",
+      marqueId: "m1",
+      modeleId: "mo1",
+      couleur: "rouge",
+      annee: null,
+      numeroChassis: `LC6PCJ1A9K000000${id}`,
+      numeroMoteur: "",
+      ...p,
+    }) as unknown as Moto;
+
+  it("part de ce que les motos portent déjà", () => {
+    const lignes = lignesDuLot([duLot("1"), duLot("2", { annee: 2024 })]);
+    expect(lignes).toHaveLength(2);
+    expect(lignes[0].motoId).toBe("1");
+    expect(lignes[0].numeroChassis).toBe("LC6PCJ1A9K0000001");
+    /* Une année inconnue est `null` en base et vide à l'écran : un champ date
+       ne sait pas afficher « je ne sais pas » autrement. */
+    expect(lignes[0].annee).toBe("");
+    expect(lignes[1].annee).toBe("2024");
+  });
+
+  it("ne rend que les motos qui ont vraiment changé", () => {
+    /* Réécrire les trente motos d'un lot pour une faute de frappe sur une
+       seule gonflerait le lot d'écritures et salirait la trace des
+       vingt-neuf autres, qui n'ont pas été touchées. */
+    const avant = [duLot("1"), duLot("2")];
+    const lignes = lignesDuLot(avant);
+    lignes[1] = { ...lignes[1], couleur: "noir" };
+    const resultat = preparerCorrectionLot(lignes, avant, []);
+    expect(resultat.ok).toBe(true);
+    if (!resultat.ok) return;
+    expect(resultat.corrigees).toHaveLength(1);
+    expect(resultat.corrigees[0]).toMatchObject({ motoId: "2", couleur: "noir" });
+  });
+
+  it("ne rend rien quand rien n’a bougé", () => {
+    const avant = [duLot("1")];
+    const resultat = preparerCorrectionLot(lignesDuLot(avant), avant, []);
+    expect(resultat.ok && resultat.corrigees).toEqual([]);
+  });
+
+  it("normalise le châssis corrigé, comme à la saisie", () => {
+    const avant = [duLot("1")];
+    const lignes = [{ ...lignesDuLot(avant)[0], numeroChassis: " lc6pcj1a9k0000999 " }];
+    const resultat = preparerCorrectionLot(lignes, avant, []);
+    expect(resultat.ok && resultat.corrigees[0].numeroChassis).toBe("LC6PCJ1A9K0000999");
+  });
+
+  /* Le rang voyage avec le refus : la grille allume la ligne fautive, elle ne
+     laisse pas chercher laquelle des trente l'est (`DESIGN.md` §5). */
+  it("refuse un châssis vide et dit quelle ligne", () => {
+    const avant = [duLot("1"), duLot("2")];
+    const lignes = lignesDuLot(avant);
+    lignes[1] = { ...lignes[1], numeroChassis: "   " };
+    const resultat = preparerCorrectionLot(lignes, avant, []);
+    expect(resultat.ok).toBe(false);
+    if (resultat.ok) return;
+    expect(resultat.rang).toBe(1);
+    expect(resultat.erreur).toMatch(/châssis/i);
+  });
+
+  it("refuse une ligne sans marque", () => {
+    const avant = [duLot("1")];
+    const lignes = [{ ...lignesDuLot(avant)[0], marqueId: "" }];
+    const resultat = preparerCorrectionLot(lignes, avant, []);
+    expect(resultat.ok).toBe(false);
+    if (resultat.ok) return;
+    expect(resultat.erreur).toMatch(/marque/i);
+  });
+
+  it("refuse deux motos du lot au même châssis", () => {
+    const avant = [duLot("1"), duLot("2")];
+    const lignes = lignesDuLot(avant);
+    lignes[1] = { ...lignes[1], numeroChassis: lignes[0].numeroChassis };
+    const resultat = preparerCorrectionLot(lignes, avant, []);
+    expect(resultat.ok).toBe(false);
+    if (resultat.ok) return;
+    expect(resultat.rang).toBe(1);
+    expect(resultat.erreur).toMatch(/deux fois/i);
+  });
+
+  it("refuse un châssis déjà porté par une autre moto du stock", () => {
+    const avant = [duLot("1")];
+    const lignes = [{ ...lignesDuLot(avant)[0], numeroChassis: "LC6PCJ1A9K0000777" }];
+    const stock = [...avant, enStock("autre", "LC6PCJ1A9K0000777")];
+    const resultat = preparerCorrectionLot(lignes, avant, stock);
+    expect(resultat.ok).toBe(false);
+    if (resultat.ok) return;
+    expect(resultat.erreur).toMatch(/déjà en stock/i);
+  });
+
+  it("ne se refuse pas son propre châssis", () => {
+    /* La moto corrigée est dans le stock : se comparer à elle-même ferait
+       refuser toute correction d'une autre colonne. */
+    const avant = [duLot("1")];
+    const lignes = [{ ...lignesDuLot(avant)[0], couleur: "bleu" }];
+    const resultat = preparerCorrectionLot(lignes, avant, avant);
+    expect(resultat.ok).toBe(true);
+  });
+
+  /* Comme les six contrôles d'unicité de S40 (D95) : sans le stock, on ne
+     décide pas — on dit d'attendre. */
+  it("refuse de décider quand le stock n’est pas encore lu", () => {
+    const avant = [duLot("1")];
+    const lignes = [{ ...lignesDuLot(avant)[0], numeroChassis: "LC6PCJ1A9K0000888" }];
+    const resultat = preparerCorrectionLot(lignes, avant, null);
+    expect(resultat.ok).toBe(false);
+    if (resultat.ok) return;
+    expect(resultat.erreur).toMatch(/stock/i);
+  });
+
+  it("lit l’année saisie, et accepte qu’on la vide", () => {
+    const avant = [duLot("1", { annee: 2024 }), duLot("2")];
+    const lignes = lignesDuLot(avant);
+    lignes[0] = { ...lignes[0], annee: "" };
+    lignes[1] = { ...lignes[1], annee: "2025" };
+    const resultat = preparerCorrectionLot(lignes, avant, []);
+    expect(resultat.ok).toBe(true);
+    if (!resultat.ok) return;
+    expect(resultat.corrigees).toHaveLength(2);
+    expect(resultat.corrigees[0].annee).toBeNull();
+    expect(resultat.corrigees[1].annee).toBe(2025);
+  });
+
+  it("refuse une année impossible", () => {
+    const avant = [duLot("1")];
+    const lignes = [{ ...lignesDuLot(avant)[0], annee: "1899" }];
+    const resultat = preparerCorrectionLot(lignes, avant, []);
+    expect(resultat.ok).toBe(false);
+    if (resultat.ok) return;
+    expect(resultat.erreur).toMatch(/année/i);
   });
 });

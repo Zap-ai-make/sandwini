@@ -475,11 +475,20 @@ export default function PageArrivages() {
 
       {modifierArr && (
         <ModifierArrivageModal
+          /* **La clé remonte la modale quand le stock arrive.** Elle sème sa
+             grille à l'ouverture, depuis les motos du lot ; ouverte avant que
+             le stock soit lu — démarrage hors ligne, où les arrivages sortent
+             du cache avant les motos — elle resterait vide pour toujours. */
+          key={stock === null ? "attente-stock" : "stock-lu"}
           arrivage={modifierArr}
+          stock={stock}
           fournisseurs={fournisseurs}
+          marques={catalogue.lues.marques}
+          modeles={catalogue.lues.modeles}
           auteur={auteur}
           onFermer={() => setModifierArr(null)}
           onModifie={() => undefined}
+          onEchec={setErreurAction}
         />
       )}
       </div>
