@@ -1,14 +1,19 @@
 "use client";
 
-import { Phone, Plus, Search, UserPlus } from "lucide-react";
-import { useMemo, useState } from "react";
+import { MoreHorizontal, Phone, Plus, Search, ShoppingBag, UserPlus } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { FormulaireClient } from "@/components/FormulaireClient";
 import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { chercherClients, formaterTelephone, nomComplet, type Client } from "@/lib/domain/client";
+import { formaterDateCourte } from "@/lib/domain/format";
+import type { Vente } from "@/lib/domain/vente";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
+import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
+import { ecouterVentes } from "@/lib/repositories/ventes";
 
 /**
  * Le fichier clients.
@@ -24,12 +29,52 @@ import { useFichierClients } from "@/lib/repositories/fichier-clients";
  */
 export default function PageClients() {
   const { clients, lus, chargement, erreur } = useFichierClients();
+  const { perimetre } = usePerimetre();
   const [recherche, setRecherche] = useState("");
   const [creation, setCreation] = useState(false);
   const [ouvert, setOuvert] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<string | null>(null);
 
   const resultats = useMemo(() => chercherClients(clients, recherche), [clients, recherche]);
+
+  /**
+   * Les dates d'achat, lisibles sans entrer dans la fiche (26 octobre 2026).
+   *
+   * **Le fichier est commun, les ventes ne le sont pas.** Le fichier clients
+   * traverse les boutiques (D16) ; les ventes, non — un gérant ne lit que
+   * celles de la sienne (D2). Cette ligne montre donc ce que le compte a le
+   * droit de voir : tout pour le responsable, sa boutique pour un gérant. Ce
+   * n'est pas une approximation, c'est le cloisonnement qui s'applique.
+   *
+   * Les règles tranchent de toute façon ; ici on ne pose que la question la
+   * plus large qu'on ait le droit de poser — une requête sur toutes les
+   * boutiques serait refusée en bloc à un gérant, et la liste n'afficherait
+   * plus aucune date.
+   */
+  const portee = perimetre.type === "toutes" ? null : perimetre.boutiqueId;
+  const souscrireVentes = useCallback(
+    (auChangement: (ventes: Vente[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterVentes(portee, auChangement, enErreur),
+    [portee],
+  );
+  const { valeur: ventes } = useAbonnement(
+    souscrireVentes,
+    "Les achats n’ont pas pu être lus.",
+  );
+
+  const achatsParClient = useMemo(() => {
+    const table = new Map<string, Date[]>();
+    for (const vente of ventes ?? []) {
+      if (!vente.date) continue;
+      const deja = table.get(vente.clientId);
+      if (deja) deja.push(vente.date);
+      else table.set(vente.clientId, [vente.date]);
+    }
+    /* Du plus récent au plus ancien : au comptoir, « il est venu quand déjà ? »
+       veut dire la dernière fois. */
+    for (const dates of table.values()) dates.sort((a, b) => b.getTime() - a.getTime());
+    return table;
+  }, [ventes]);
 
   return (
     <div>
@@ -132,6 +177,7 @@ export default function PageClients() {
                 key={client.id}
                 client={client}
                 clients={clients}
+                achats={achatsParClient.get(client.id)}
                 ouvert={ouvert === client.id}
                 basculer={() => setOuvert((actuel) => (actuel === client.id ? null : client.id))}
               />
@@ -146,11 +192,14 @@ export default function PageClients() {
 function LigneClient({
   client,
   clients,
+  achats,
   ouvert,
   basculer,
 }: {
   client: Client;
   clients: Client[];
+  /** Les dates d'achat du client, de la plus récente à la plus ancienne. */
+  achats: Date[] | undefined;
   ouvert: boolean;
   basculer: () => void;
 }) {
@@ -158,32 +207,42 @@ function LigneClient({
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <span className="min-w-0 flex-1">
-          {/* Le nom mène à la fiche (S54) : c'est le geste qu'on fait dix fois
-              par jour, et il n'avait jusqu'ici aucune destination. */}
-          <Link href={`/clients/${client.id}`} className="lien block font-medium">
-            {nomComplet(client)}
-          </Link>
+          {/* **Le nom n'est plus un lien** (26 octobre 2026, demande du
+              commanditaire) : deux gestes partaient de la même ligne — ouvrir
+              la fiche et corriger — et seul le premier se voyait. Les deux sont
+              maintenant dans le menu, nommés, à la même place. */}
+          <span className="block font-medium text-encre">{nomComplet(client)}</span>
           <span className="flex items-center gap-1.5 text-sm text-encre-doux">
             <Phone aria-hidden="true" className="size-3.5 shrink-0" />
             <span className="plaque-code">{formaterTelephone(client.telephone)}</span>
             {client.telephone2 && <span>· {formaterTelephone(client.telephone2)}</span>}
           </span>
+          {achats !== undefined && achats.length > 0 && (
+            /* **Toutes les dates, et non la dernière**, c'est la demande : on
+               veut savoir d'un coup d'œil si quelqu'un est un habitué. */
+            <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-sm text-encre-doux">
+              <ShoppingBag aria-hidden="true" className="size-3.5 shrink-0" />
+              <span className="sr-only">
+                {achats.length === 1 ? "Un achat le" : `${achats.length} achats, les`}
+              </span>
+              {achats.map((date, rang) => (
+                <span key={date.getTime() + "-" + rang} className="plaque-code">
+                  {formaterDateCourte(date)}
+                  {rang < achats.length - 1 ? " ·" : ""}
+                </span>
+              ))}
+            </span>
+          )}
           {client.adresse && (
             <span className="block text-sm text-encre-doux">{client.adresse}</span>
           )}
           {client.note && <span className="block text-sm text-encre-doux">{client.note}</span>}
         </span>
 
-        <button
-          type="button"
-          onClick={basculer}
-          className="inline-flex h-11 shrink-0 items-center rounded-plaque border border-bord px-3 text-sm font-medium text-encre hover:bg-fond"
-        >
-          Corriger
-        </button>
+        <MenuClient client={client} surModifier={basculer} />
       </div>
 
-      <Modale ouvert={ouvert} onFermer={basculer} titre={`Corriger ${nomComplet(client)}`}>
+      <Modale ouvert={ouvert} onFermer={basculer} titre={`Modifier ${nomComplet(client)}`}>
         <FormulaireClient
           clients={clients}
           existant={client}
@@ -192,5 +251,82 @@ function LigneClient({
         />
       </Modale>
     </li>
+  );
+}
+
+/**
+ * Les deux gestes d'une ligne, rangés derrière trois points.
+ *
+ * **Pourquoi un menu plutôt que deux boutons.** « Corriger » occupait le bout
+ * de la ligne et « Voir » n'existait que sous le nom, invisible comme lien.
+ * Deux boutons côte à côte auraient tenu, mais la liste s'allonge et chaque
+ * ligne aurait porté deux cibles de quarante-quatre pixels pour un geste
+ * qu'on fait rarement.
+ *
+ * **Il se ferme comme on s'y attend** : Échap, un clic à côté, ou le choix
+ * d'une entrée. Sans ces trois-là, un menu ouvert suit le doigt d'écran en
+ * écran.
+ */
+function MenuClient({ client, surModifier }: { client: Client; surModifier: () => void }) {
+  const [ouvert, setOuvert] = useState(false);
+  const boite = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ouvert) return;
+
+    function auClic(evenement: MouseEvent) {
+      if (!boite.current?.contains(evenement.target as Node)) setOuvert(false);
+    }
+    function auClavier(evenement: KeyboardEvent) {
+      if (evenement.key === "Escape") setOuvert(false);
+    }
+
+    document.addEventListener("mousedown", auClic);
+    document.addEventListener("keydown", auClavier);
+    return () => {
+      document.removeEventListener("mousedown", auClic);
+      document.removeEventListener("keydown", auClavier);
+    };
+  }, [ouvert]);
+
+  return (
+    <div ref={boite} className="relative shrink-0">
+      <button
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={ouvert}
+        onClick={() => setOuvert((avant) => !avant)}
+        className="inline-flex size-11 items-center justify-center rounded-plaque border border-bord text-encre hover:bg-fond"
+      >
+        <MoreHorizontal aria-hidden="true" className="size-4" />
+        <span className="sr-only">Actions pour {nomComplet(client)}</span>
+      </button>
+
+      {ouvert && (
+        <div
+          role="menu"
+          className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-carte border border-bord bg-papier shadow-panneau"
+        >
+          <Link
+            role="menuitem"
+            href={`/clients/${client.id}`}
+            className="block px-3 py-2.5 text-corps text-encre hover:bg-survol"
+          >
+            Voir
+          </Link>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setOuvert(false);
+              surModifier();
+            }}
+            className="block w-full px-3 py-2.5 text-left text-corps text-encre hover:bg-survol"
+          >
+            Modifier
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

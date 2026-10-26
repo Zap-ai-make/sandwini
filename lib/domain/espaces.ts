@@ -528,17 +528,11 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
           capacite: "gerer_utilisateurs",
           quoi: "Créer un gérant, désactiver un compte",
         },
-        /* **Une reprise de données, et un écran pour la lancer** (S59). Elle
-           n'a pas d'autre maison : ce n'est ni un réglage ni un métier, c'est
-           un geste d'administration qu'on fait une fois. Rangée ici parce que
-           c'est le seul endroit du produit qui parle de l'entreprise plutôt que
-           de son commerce, et gardée par la même capacité que les boutiques. */
-        {
-          href: "/parametres/cartes-grises",
-          libelle: "Reprendre les cartes grises",
-          capacite: "gerer_boutiques",
-          quoi: "Faire entrer les dossiers existants dans leur collection",
-        },
+        /* **« Reprendre les cartes grises » a quitté ce menu** le 26 octobre
+           2026, à la demande du commanditaire. L'écran existe toujours à son
+           adresse — c'est une reprise de données qu'on lance une fois, et la
+           retirer du menu ne la supprime pas. Il ouvre `/parametres/cartes-grises`
+           le jour où elle servira. */
       ],
     },
     /*

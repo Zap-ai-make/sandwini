@@ -164,7 +164,7 @@ function Ecran() {
             n'a rien, alors que c'est la recherche qui a tout mangé. */}
         <p aria-live="polite" className="mt-1.5 text-legende text-encre-doux">
           {cherche
-            ? `${cours.length + termines.length} ligne(s) trouvée(s) — ${cours.length} en cours, ${termines.length} terminée(s).`
+            ? `${cours.length + termines.length} ligne(s) trouvée(s) — ${cours.length} au dépôt, ${termines.length} au retrait.`
             : "Tape n’importe quoi qui figure sur la ligne : la recherche regarde toutes les colonnes."}
         </p>
       </div>
@@ -191,15 +191,15 @@ function Ecran() {
           onglets={[
             {
               valeur: "cours",
-              libelle: `En cours${cours.length > 0 ? ` (${cours.length})` : ""}`,
+              libelle: `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}`,
               contenu: (
                 <Liste
                   dossiers={cours}
                   chargement={valeur === null}
                   vide={
                     cherche
-                      ? "Aucun dossier en cours ne correspond à cette recherche."
-                      : "Aucun dossier en cours. Tout ce qui est parti est revenu et a été remis."
+                      ? "Aucun dossier au dépôt ne correspond à cette recherche."
+                      : "Rien au dépôt. Tout ce qui est parti est revenu et a été repris."
                   }
                   boutiqueId={boutiqueId}
                   prestataires={connus}
@@ -209,15 +209,15 @@ function Ecran() {
             },
             {
               valeur: "historique",
-              libelle: `Terminés${termines.length > 0 ? ` (${termines.length})` : ""}`,
+              libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
               contenu: (
                 <Liste
                   dossiers={termines}
                   chargement={valeur === null}
                   vide={
                     cherche
-                      ? "Aucun dossier terminé ne correspond à cette recherche."
-                      : "Rien de terminé pour l’instant."
+                      ? "Aucun retrait ne correspond à cette recherche."
+                      : "Aucun papier repris pour l’instant."
                   }
                   boutiqueId={boutiqueId}
                   prestataires={connus}

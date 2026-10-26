@@ -235,7 +235,7 @@ export function LigneModale({
 
           {correction && !fini && (
             <p className="ml-auto text-legende text-encre-doux">
-              « Terminer » date le retrait d’aujourd’hui et range la ligne dans Terminés.
+              « Terminer » date le retrait d’aujourd’hui et range la ligne dans Retrait.
             </p>
           )}
         </div>

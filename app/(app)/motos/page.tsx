@@ -29,7 +29,11 @@ import {
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useCatalogue } from "@/lib/repositories/catalogue";
 import { useAbonnement } from "@/lib/repositories/abonnement";
+import { ecouterArrivages } from "@/lib/repositories/arrivages";
+import { ecouterFournisseurs } from "@/lib/repositories/fournisseurs";
 import { ecouterStock } from "@/lib/repositories/motos";
+import type { Arrivage } from "@/lib/domain/arrivage";
+import type { Fournisseur } from "@/lib/domain/fournisseur";
 
 /**
  * Le stock.
@@ -111,6 +115,50 @@ function Stock() {
     reessayer,
   } = useAbonnement(souscrire, "Le stock n’a pas pu être chargé.");
 
+  /**
+   * De qui vient cette moto — la colonne qui remplace « État » et « Année ».
+   *
+   * **Deux lectures pour un nom, et c'est le chemin qu'il faut.** La moto ne
+   * porte pas son fournisseur : elle porte son arrivage, et c'est l'arrivage
+   * qui sait de qui le lot vient. Recopier le nom sur chaque moto aurait fait
+   * mentir le stock le jour où un fournisseur est renommé.
+   *
+   * Une moto entrée à la main n'a pas d'arrivage : elle n'a donc pas de
+   * fournisseur à montrer, et la cellule le dit par un tiret plutôt que par un
+   * vide qu'on prendrait pour un chargement.
+   */
+  const souscrireArrivages = useCallback(
+    (auChangement: (arrivages: Arrivage[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterArrivages(boutiqueId, auChangement, enErreur),
+    [boutiqueId],
+  );
+  const { valeur: arrivages } = useAbonnement(
+    souscrireArrivages,
+    "Les arrivages n’ont pas pu être chargés.",
+  );
+
+  const souscrireFournisseurs = useCallback(
+    (auChangement: (fournisseurs: Fournisseur[]) => void, enErreur: (cause: unknown) => void) =>
+      ecouterFournisseurs(auChangement, enErreur),
+    [],
+  );
+  const { valeur: fournisseurs } = useAbonnement(
+    souscrireFournisseurs,
+    "Les fournisseurs n’ont pas pu être chargés.",
+  );
+
+  const fournisseurDe = useMemo(() => {
+    const nomParId = new Map((fournisseurs ?? []).map((f) => [f.id, f.nom]));
+    const fournisseurParArrivage = new Map(
+      (arrivages ?? []).map((arrivage) => [arrivage.id, arrivage.fournisseurId]),
+    );
+    return (arrivageId: string | null) => {
+      if (!arrivageId) return "—";
+      const id = fournisseurParArrivage.get(arrivageId);
+      return (id && nomParId.get(id)) || "—";
+    };
+  }, [arrivages, fournisseurs]);
+
   const resultats = useMemo(() => filtrerMotos(stock ?? [], filtres), [stock, filtres]);
   const modelesDeLaMarque = filtres.marqueId
     ? catalogue.modeles.filter((modele) => modele.marqueId === filtres.marqueId)
@@ -170,9 +218,17 @@ function Stock() {
         rendu: (moto) =>
           `${catalogue.nomMarque(moto.marqueId)} ${catalogue.nomModele(moto.modeleId)}`,
       },
-      { cle: "etat", titre: "État", rendu: (moto) => LIBELLE_ETAT[moto.etat] },
+      /* **« État » et « Année » ont cédé la place au fournisseur** (26 octobre
+         2026, demande du commanditaire). Les deux premières se lisaient sur la
+         fiche sans qu'on les compare jamais d'une ligne à l'autre ; de qui
+         vient une moto est au contraire la question qu'on se pose en balayant
+         le stock. Elles restent sur la fiche de la moto. */
+      {
+        cle: "fournisseur",
+        titre: "Fournisseur",
+        rendu: (moto) => fournisseurDe(moto.arrivageId),
+      },
       { cle: "couleur", titre: "Couleur", rendu: (moto) => moto.couleur || "—" },
-      { cle: "annee", titre: "Année", chiffre: true, rendu: (moto) => moto.annee ?? "—" },
       {
         /* La devise est titrée une fois, en tête de colonne : « 695 000 FCFA »
            répété cent fois ne dit rien de plus et casse l'alignement. */
@@ -204,7 +260,7 @@ function Stock() {
       });
     }
     return liste;
-  }, [catalogue, toutesBoutiques, cochees, basculer]);
+  }, [catalogue, toutesBoutiques, cochees, basculer, fournisseurDe]);
 
   if (sansPerimetre)
     return (

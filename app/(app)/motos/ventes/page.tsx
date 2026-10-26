@@ -20,7 +20,12 @@ import {
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { nomDuClient, normaliserNom, type Client } from "@/lib/domain/client";
+import {
+  formaterTelephone,
+  nomDuClient,
+  normaliserNom,
+  type Client,
+} from "@/lib/domain/client";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
@@ -172,25 +177,32 @@ function Ventes() {
 
   const colonnes = useMemo<Colonne<Cherchable>[]>(() => {
     const liste: Colonne<Cherchable>[] = [
+      /* **La colonne « Pièce » est partie** (26 octobre 2026, demande du
+         commanditaire). Le numéro de reçu reste dans le panneau de la vente,
+         où on le lit quand on en a besoin ; en tête de liste il servait
+         surtout de poignée pour ouvrir la ligne. C'est donc le nom du client
+         qui porte le lien désormais — c'est par lui qu'on cherche. */
       {
-        cle: "numero",
-        titre: "Pièce",
+        cle: "client",
+        titre: "Client",
         principal: true,
         rendu: (ligne) => (
           <Link
             href={`/motos/ventes?vente=${ligne.vente.id}`}
             aria-current={ligne.vente.id === venteOuverte ? "true" : undefined}
-            className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
+            className="block text-encre underline-offset-2 hover:underline"
           >
-            {ligne.vente.numero}
+            {nomDuClient(ligne.client)}
+            {/* Le numéro sous le nom : au comptoir, deux clients portent le
+                même nom et c'est le téléphone qui les départage — c'est aussi
+                ce qu'on compose pour rappeler un impayé. */}
+            {ligne.client?.telephone && (
+              <span className="block font-code text-legende font-normal text-encre-doux">
+                {formaterTelephone(ligne.client.telephone)}
+              </span>
+            )}
           </Link>
         ),
-      },
-      {
-        cle: "client",
-        titre: "Client",
-        principal: true,
-        rendu: (ligne) => nomDuClient(ligne.client),
       },
       {
         /* Le modèle seul. Le châssis y a figuré une capture durant — la
@@ -207,15 +219,44 @@ function Ventes() {
             ? `${catalogue.nomMarque(ligne.moto.marqueId)} ${catalogue.nomModele(ligne.moto.modeleId)}`
             : "Moto hors de ce périmètre",
       },
-      { cle: "mode", titre: "Mode", rendu: (ligne) => LIBELLE_MODE[ligne.vente.modePaiement] },
+      /* **Le châssis revient, et il coûte de la largeur.** Il avait été retiré
+         parce que dix-sept caractères insécables poussaient « Paiement » hors
+         du cadre. Le commanditaire le redemande : c'est par lui qu'on relie un
+         papier à une ligne. Le tableau défile donc de côté sur un petit écran,
+         et c'est le prix assumé. */
       {
-        /* La devise est titrée une fois, en tête de colonne. Le tiret dit
-           « rien à percevoir » sans faire croire à une donnée manquante. */
+        cle: "chassis",
+        titre: "Numéro de châssis",
+        titreReplie: "Châssis",
+        chiffre: true,
+        rendu: (ligne) => ligne.moto?.numeroChassis ?? "—",
+      },
+      { cle: "mode", titre: "Mode", rendu: (ligne) => LIBELLE_MODE[ligne.vente.modePaiement] },
+      /* **Les trois montants se lisent ensemble, dans cet ordre** : ce qui a
+         été convenu, ce qui est rentré, ce qui manque. Pris isolément, « reste
+         dû : 415 000 » ne dit pas si le client a versé la moitié ou rien. */
+      {
+        cle: "prix",
+        titre: "Prix de vente (FCFA)",
+        titreReplie: "Prix de vente",
+        chiffre: true,
+        rendu: (ligne) => formaterNombre(ligne.vente.prixConvenu),
+      },
+      {
+        cle: "verse",
+        titre: "Versé (FCFA)",
+        titreReplie: "Versé",
+        chiffre: true,
+        rendu: (ligne) => formaterNombre(ligne.vente.totalPaye),
+      },
+      {
+        /* La devise est titrée une fois, en tête de colonne. **Zéro et non un
+           tiret** : le tiret se lisait « on ne sait pas », là où une vente
+           soldée dit quelque chose de précis — il ne reste rien à percevoir. */
         cle: "reste",
         titre: "Reste dû (FCFA)",
         chiffre: true,
-        rendu: (ligne) =>
-          ligne.vente.resteDu === 0 ? "—" : formaterNombre(ligne.vente.resteDu),
+        rendu: (ligne) => formaterNombre(ligne.vente.resteDu),
       },
       {
         cle: "paiement",
