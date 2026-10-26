@@ -12,7 +12,7 @@ import {
   papiersEmportesDeVente,
   type Vente,
 } from "@/lib/domain/vente";
-import { LogoEntreprise } from "@/components/LogoEntreprise";
+import { Monogramme } from "@/components/Monogramme";
 
 /**
  * Le reçu tel qu'il sort de l'imprimante (`prompt.md` §10).
@@ -92,7 +92,7 @@ export function Recu({
       className="facture mx-auto max-w-[170mm]"
     >
       <header className="facture-entete">
-        <LogoEntreprise className="facture-logo" />
+        <Monogramme className="facture-logo" />
         <div className="facture-identite">
           {/* **Les deux noms, dans cet ordre** (26 octobre 2026). C'est l'acte
               qui nomme le vendeur en tête d'une pièce commerciale ; l'enseigne

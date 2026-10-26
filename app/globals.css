@@ -1258,6 +1258,40 @@
   }
 
   /* --------------------------------------------------------------------------
+     Le logo sur une surface qui suit le thème.
+
+     La moitié basse du SE est d'un vert ardoise profond : lisible sur du
+     papier, perdue sur un fond de nuit. Deux fichiers répondent à ce seul
+     problème, et c'est la feuille de style qui choisit — un composant qui
+     lirait le thème redeviendrait client et clignoterait au premier rendu.
+
+     Le défaut est le fond clair, comme partout dans ce thème : `data-theme`
+     absent vaut clair.
+     -------------------------------------------------------------------------- */
+  .logo-fond-sombre {
+    display: none;
+  }
+
+  :root[data-theme="sombre"] .logo-fond-clair {
+    display: none;
+  }
+
+  :root[data-theme="sombre"] .logo-fond-sombre {
+    display: block;
+  }
+
+  /* Sur le papier, le thème ne compte plus : c'est le logo d'encre qui sort. */
+  @media print {
+    .logo-fond-clair {
+      display: block;
+    }
+
+    .logo-fond-sombre {
+      display: none;
+    }
+  }
+
+  /* --------------------------------------------------------------------------
      La facture, telle que le carnet du commanditaire la dessine (26 octobre 2026).
 
      « Le reçu doit être exactement pareil » — suivait une photographie de son
@@ -1303,11 +1337,11 @@
     gap: 1rem;
   }
 
+  /* Le logo est détouré : il n'a pas de fond, donc rien à arrondir. */
   .facture-logo {
     width: 7.5rem;
     height: auto;
     flex-shrink: 0;
-    border-radius: 4px;
   }
 
   .facture-identite {

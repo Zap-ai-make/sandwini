@@ -165,7 +165,7 @@ function Marque() {
       className="mb-3 block w-10 text-coquille-encre max-lg:hidden"
       title="Sandwidi et Frères"
     >
-      <Monogramme className="block w-full" />
+      <Monogramme fond="sombre" className="block h-auto w-full" />
     </span>
   );
 }
