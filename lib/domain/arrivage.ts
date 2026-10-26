@@ -21,10 +21,10 @@ import {
   lireEntier,
   normaliserChassis,
   validerChassis,
-  type EtatMoto,
   type Moto,
   type StatutMoto,
 } from "./moto";
+import { normaliserNom } from "./client";
 
 export type Arrivage = {
   id: string;
@@ -414,7 +414,7 @@ export function preparerLot(
  * l'identité physique de l'engin.
  *
  * **Tout ce qui décrit la moto, et rien de ce qui lui est arrivé.** Marque,
- * modèle, châssis, moteur, couleur, année, état : ce que la réception a saisi.
+ * modèle, châssis, moteur, couleur, année : ce que la réception a saisi.
  * Le statut, la boutique, les papiers, le coût et la date d'entrée n'y sont
  * pas — ce sont des faits qui se sont produits, pas des cases qu'on remplit, et
  * chacun a son geste ailleurs. Le coût en particulier vit dans une
@@ -431,7 +431,6 @@ export type LigneCorrection = {
   numeroMoteur: string;
   couleur: string;
   annee: string;
-  etat: EtatMoto;
 };
 
 /** Ce qui part en base pour une moto corrigée — l'année déjà lue. */
@@ -454,7 +453,6 @@ export function lignesDuLot(motos: readonly Moto[]): LigneCorrection[] {
     /* `null` veut dire « on ne sait pas » (D82) et s'écrit vide : un champ ne
        sait pas afficher l'ignorance autrement, et « 0 » serait une date. */
     annee: moto.annee === null ? "" : String(moto.annee),
-    etat: moto.etat,
   }));
 }
 
@@ -465,8 +463,7 @@ function ligneInchangee(ligne: LigneCorrection, avant: Moto): boolean {
     normaliserChassis(ligne.numeroChassis) === avant.numeroChassis &&
     normaliserChassis(ligne.numeroMoteur) === avant.numeroMoteur &&
     ligne.couleur.trim() === avant.couleur &&
-    ligne.annee.trim() === (avant.annee === null ? "" : String(avant.annee)) &&
-    ligne.etat === avant.etat
+    ligne.annee.trim() === (avant.annee === null ? "" : String(avant.annee))
   );
 }
 
@@ -564,9 +561,37 @@ export function preparerCorrectionLot(
       numeroMoteur: moteur,
       couleur: ligne.couleur.trim(),
       annee,
-      etat: ligne.etat,
     });
   }
 
   return { ok: true, corrigees };
+}
+
+/**
+ * Cherche un lot par son nom ou par celui de son fournisseur (26 octobre 2026).
+ *
+ * **La barre ne retrouvait qu'une moto, par son châssis.** Le commanditaire
+ * cherche aussi un lot — « la barre de recherche de l'arrivage, elle doit faire
+ * la recherche par nom d'arrivage, nom du fournisseur ». C'est ainsi qu'on
+ * parle d'un lot au comptoir : « celui de Bohary », « l'arrivage de mars ».
+ *
+ * Le nom du fournisseur ne vit pas sur l'arrivage, qui n'en porte que
+ * l'identifiant : il est fourni par l'écran, qui tient déjà la table.
+ *
+ * Chaque mot doit se retrouver, dans l'un ou dans l'autre : « bohary mars »
+ * trouve le lot de mars pris chez Bohary, et rien d'autre. Sans accents ni
+ * casse — « ouedraogo » doit trouver « Ouédraogo », qui ne se tape pas
+ * accentué sur un clavier de comptoir.
+ */
+export function chercherArrivages(
+  arrivages: readonly Arrivage[],
+  requete: string,
+  nomFournisseur: (id: string) => string,
+): Arrivage[] {
+  const mots = normaliserNom(requete).split(" ").filter(Boolean);
+  if (mots.length === 0) return [];
+  return arrivages.filter((arrivage) => {
+    const foin = normaliserNom(`${arrivage.nom} ${nomFournisseur(arrivage.fournisseurId)}`);
+    return mots.every((mot) => foin.includes(mot));
+  });
 }

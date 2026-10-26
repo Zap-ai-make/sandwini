@@ -10,7 +10,7 @@ import { PoserCoutModal } from "@/components/PoserCoutModal";
 import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
-import { LIBELLE_ETAT, LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
+import { LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
 import { destinationsPossibles, raisonDeNePasPartir, type Transfert } from "@/lib/domain/transfert";
 import type { Boutique } from "@/lib/domain/boutique";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -93,7 +93,6 @@ export function FicheMoto({ id }: { id: string }) {
           </h1>
 
           <dl className="mt-6 cadre cadre-liste">
-            <Ligne titre="État" valeur={LIBELLE_ETAT[moto.etat]} />
             <Ligne titre="Statut" valeur={LIBELLE_STATUT[moto.statut]} />
             <Ligne titre="Boutique" valeur={moto.boutiqueId} code />
             <Ligne titre="Provenance" valeur={catalogue.nomProvenance(moto.provenanceId)} />

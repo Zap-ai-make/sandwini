@@ -26,7 +26,7 @@
  */
 
 import type { Moto } from "./moto";
-import { LIBELLE_ETAT, LIBELLE_STATUT } from "./moto";
+import { LIBELLE_STATUT } from "./moto";
 import { classeur, type Cellule } from "./xlsx";
 
 export const EN_TETE_EXPORT = [
@@ -35,7 +35,6 @@ export const EN_TETE_EXPORT = [
   "Modèle",
   "Couleur",
   "Année",
-  "État",
   "Statut",
   "Boutique",
   "Moteur",
@@ -80,7 +79,6 @@ export function lignesMotosExport(
       /* Un nombre, pas une chaîne : une année en texte se trierait comme du
          texte, et c'est le genre de colonne qu'on trie. */
       moto.annee,
-      LIBELLE_ETAT[moto.etat],
       LIBELLE_STATUT[moto.statut],
       moto.boutiqueId,
       moto.numeroMoteur,

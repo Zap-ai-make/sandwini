@@ -8,6 +8,7 @@ import {
   SOUS_LOT_VIDE,
   ajusterNombreDeLignes,
   bilanArrivages,
+  chercherArrivages,
   chercherMotoParChassis,
   completudePapiers,
   ecoulement,
@@ -665,5 +666,36 @@ describe("corriger les motos d’un lot", () => {
     expect(resultat.ok).toBe(false);
     if (resultat.ok) return;
     expect(resultat.erreur).toMatch(/année/i);
+  });
+});
+
+describe("chercherArrivages", () => {
+  const nomFournisseur = (id: string) => (id === "f1" ? "Bohary" : "Ouédraogo");
+  const lots = [
+    arr("a1", { nom: "Arrivage mars 2026", fournisseurId: "f1" }),
+    arr("a2", { nom: "Arrivage avril 2026", fournisseurId: "f2" }),
+  ];
+
+  it("trouve un lot par son nom", () => {
+    expect(chercherArrivages(lots, "avril", nomFournisseur).map((l) => l.id)).toEqual(["a2"]);
+  });
+
+  it("trouve un lot par le nom de son fournisseur", () => {
+    /* C'est ainsi qu'on parle d'un lot au comptoir : « celui de Bohary ». */
+    expect(chercherArrivages(lots, "bohary", nomFournisseur).map((l) => l.id)).toEqual(["a1"]);
+  });
+
+  it("ignore les accents et la casse", () => {
+    /* « Ouédraogo » ne se tape pas accentué sur un clavier de comptoir. */
+    expect(chercherArrivages(lots, "OUEDRAOGO", nomFournisseur).map((l) => l.id)).toEqual(["a2"]);
+  });
+
+  it("exige que chaque mot se retrouve", () => {
+    expect(chercherArrivages(lots, "bohary mars", nomFournisseur)).toHaveLength(1);
+    expect(chercherArrivages(lots, "bohary avril", nomFournisseur)).toHaveLength(0);
+  });
+
+  it("ne rend rien sur une recherche vide", () => {
+    expect(chercherArrivages(lots, "   ", nomFournisseur)).toEqual([]);
   });
 });

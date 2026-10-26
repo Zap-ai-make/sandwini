@@ -18,10 +18,10 @@ import { db, stockage } from "@/lib/firebase/client";
 import {
   construireCout,
   lireEntier,
-  lirePapiers,
   normaliserChassis,
   normaliserPlaque,
   type CoutMoto,
+  ETAT_PAR_DEFAUT,
   type EtatMoto,
   type Moto,
   type SaisieMoto,
@@ -269,7 +269,10 @@ export function entrerEnStock(
     lot,
     {
       boutiqueId,
-      etat: saisie.etat,
+      /* Plus de choix à l'écran depuis le 26 octobre 2026 : la maison ne vend
+         que du neuf. Le champ reste écrit, les règles le valident, et les
+         motos déjà en base gardent le leur. */
+      etat: ETAT_PAR_DEFAUT,
       marqueId: saisie.marqueId,
       modeleId: saisie.modeleId,
       couleur: saisie.couleur,
@@ -279,7 +282,9 @@ export function entrerEnStock(
       prixVenteConseille: conseille,
       provenanceId: saisie.provenanceId,
       arrivageId: null,
-      papiersFournis: saisie.etat === "occasion" ? lirePapiers(saisie.papiersFournis) : [],
+      /* Les notes du vendeur ne se saisissent plus : elles n'apparaissaient que
+         pour une moto d'occasion. Celles déjà écrites restent lisibles. */
+      papiersFournis: [],
     },
     construireCout(saisie),
     auteur,

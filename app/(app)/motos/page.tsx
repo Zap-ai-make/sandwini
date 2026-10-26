@@ -19,9 +19,7 @@ import { Statut } from "@/components/StatutMoto";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import {
-  ETATS,
   FILTRES_VIDES,
-  LIBELLE_ETAT,
   filtrerMotos,
   type Filtres,
   type Moto,
@@ -363,28 +361,6 @@ function Stock() {
               role="group"
               aria-label="Filtrer le stock"
             >
-              <button
-                type="button"
-                className="filtre"
-                aria-pressed={filtres.etat === ""}
-                onClick={() => setFiltres((actuel) => ({ ...actuel, etat: "" }))}
-              >
-                Tous les états
-              </button>
-              {ETATS.map((etat) => (
-                <button
-                  key={etat}
-                  type="button"
-                  className="filtre"
-                  aria-pressed={filtres.etat === etat}
-                  onClick={() =>
-                    setFiltres((actuel) => ({ ...actuel, etat: actuel.etat === etat ? "" : etat }))
-                  }
-                >
-                  {LIBELLE_ETAT[etat]}
-                </button>
-              ))}
-
               <Filtre
                 id="filtre-marque"
                 libelle="Marque"

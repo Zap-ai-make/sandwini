@@ -9,8 +9,6 @@ import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterMontant } from "@/lib/domain/format";
 import {
-  ETATS,
-  LIBELLE_ETAT,
   LONGUEUR_CHASSIS_MAX,
   LONGUEUR_TEXTE_MAX,
   SAISIE_VIDE,
@@ -19,7 +17,6 @@ import {
   coutTotalSaisie,
   normaliserChassis,
   validerMoto,
-  type EtatMoto,
   type Moto,
   type SaisieMoto,
 } from "@/lib/domain/moto";
@@ -213,33 +210,6 @@ export default function PageNouvelleMoto() {
         <fieldset className="cadre p-4">
           <legend className="px-1 font-semibold text-encre">La moto</legend>
 
-          <div className="mt-2">
-            <span className="block text-sm font-medium text-encre">État</span>
-            <div className="mt-1.5 flex gap-2">
-              {ETATS.map((etat) => (
-                <label
-                  key={etat}
-                  className={[
-                    "flex h-12 flex-1 cursor-pointer items-center justify-center rounded-plaque border font-medium",
-                    saisie.etat === etat
-                      ? "border-2 border-encre bg-papier font-semibold text-encre"
-                      : "border-bord bg-papier text-encre hover:bg-fond",
-                  ].join(" ")}
-                >
-                  <input
-                    type="radio"
-                    name="etat"
-                    value={etat}
-                    checked={saisie.etat === etat}
-                    onChange={() => changer({ etat: etat as EtatMoto })}
-                    className="sr-only"
-                  />
-                  {LIBELLE_ETAT[etat]}
-                </label>
-              ))}
-            </div>
-          </div>
-
           {/* Marque et modèle sont une seule étape, et se lisent comme telle.
               Le modèle paraissait verrouillé : il était `disabled` tant
               qu'aucune marque n'était choisie, et le gris s'interprétait comme
@@ -364,26 +334,12 @@ export default function PageNouvelleMoto() {
             />
           </div>
 
-          {saisie.etat === "occasion" && (
-            <div className="mt-4">
-              {/* « Notes du vendeur » : voir `FicheMoto.tsx`. Le mot
-                  « papiers » le faisait confondre avec les documents du
-                  dossier (S53). */}
-              <label htmlFor="papiers" className="block text-sm font-medium text-encre">
-                Notes du vendeur
-              </label>
-              <textarea
-                id="papiers"
-                rows={3}
-                value={saisie.papiersFournis}
-                onChange={(evenement) => changer({ papiersFournis: evenement.target.value })}
-                className="saisie mt-1.5"
-              />
-              <p className="mt-1 text-sm text-encre-doux">
-                Un par ligne : ce qui accompagne la moto au moment où elle entre.
-              </p>
-            </div>
-          )}
+          {/* **Les notes du vendeur sont parties avec l'occasion**
+              (26 octobre 2026). Elles ne s'affichaient que pour une moto
+              d'occasion — « ce qui accompagne la moto au moment où elle
+              entre » — et cet état n'existe plus. Les motos déjà saisies
+              gardent les leurs, et la fiche les montre toujours. */
+          }
         </fieldset>
 
         <fieldset className="mt-6 cadre p-4">

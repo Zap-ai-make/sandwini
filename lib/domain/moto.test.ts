@@ -267,14 +267,16 @@ describe("filtrerMotos", () => {
     expect(filtrerMotos(stock, FILTRES_VIDES)).toHaveLength(3);
   });
 
-  it("filtre par état, par marque et par modèle", () => {
-    expect(filtrerMotos(stock, { ...FILTRES_VIDES, etat: "occasion" })).toHaveLength(2);
+  /* **Le filtre par état a disparu** (26 octobre 2026) : « supprime neuve et
+     occasion partout dans le site ». Le champ reste en base, plus rien ne le
+     lit pour trier. */
+  it("filtre par marque et par modèle", () => {
     expect(filtrerMotos(stock, { ...FILTRES_VIDES, marqueId: "m1" })).toHaveLength(2);
     expect(filtrerMotos(stock, { ...FILTRES_VIDES, modeleId: "mo3" })).toHaveLength(1);
   });
 
   it("combine les filtres", () => {
-    const trouve = filtrerMotos(stock, { ...FILTRES_VIDES, etat: "occasion", marqueId: "m1" });
+    const trouve = filtrerMotos(stock, { ...FILTRES_VIDES, marqueId: "m1", modeleId: "mo2" });
     expect(trouve.map((m) => m.id)).toEqual(["2"]);
   });
 

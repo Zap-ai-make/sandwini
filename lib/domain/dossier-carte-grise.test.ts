@@ -34,19 +34,23 @@ import {
 describe("les dix colonnes de son classeur", () => {
   it("garde ses noms, fautes comprises, et son ordre", () => {
     /* **Fautes comprises, et c'est la demande.** Il s'est familiarisé avec son
-       fichier et ne veut pas en changer. `CHASIS` sans S, `Reci` pour reçu,
-       `TRANSITE` pour le prestataire : les corriger ferait un écran qu'il ne
-       reconnaît plus. */
+       fichier et ne veut pas en changer. `CHASIS` sans S, `TRANSITE` pour le
+       prestataire : les corriger ferait un écran qu'il ne reconnaît plus.
+
+       **Deux exceptions, demandées par lui le 26 octobre 2026.** `Reci`
+       devient `Reçu` — c'était une faute de frappe, pas un mot à lui — et
+       `RECEPTION` passe entre `Depot` et `retrait`, l'ordre du trajet du
+       dossier : on dépose, la carte revient, le client l'emporte. */
     expect(ORDRE_LIGNE.map((cle) => ENTETES_LIGNE[cle])).toEqual([
       "Tel",
       "client",
       "MOTO",
       "CHASIS",
-      "Reci",
+      "Reçu",
       "Credit",
+      "Depot",
       "RECEPTION",
       "retrait",
-      "Depot",
       "Immatriculation",
       "TRANSITE",
     ]);

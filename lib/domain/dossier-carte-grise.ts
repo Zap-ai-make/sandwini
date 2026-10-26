@@ -254,11 +254,13 @@ export const ENTETES_LIGNE = {
   client: "client",
   moto: "MOTO",
   chassis: "CHASIS",
-  recu: "Reci",
+  /* « Reci » dans le classeur : une faute de frappe que le commanditaire a
+     demandé de corriger le 26 octobre 2026, et non un mot à lui. */
+  recu: "Reçu",
   credit: "Credit",
+  depot: "Depot",
   reception: "RECEPTION",
   retrait: "retrait",
-  depot: "Depot",
   immatriculation: "Immatriculation",
   transite: "TRANSITE",
 } as const;
@@ -270,9 +272,14 @@ export const ORDRE_LIGNE = [
   "chassis",
   "recu",
   "credit",
+  /* **Dépôt, réception, retrait** — l'ordre du trajet, et non celui du
+     classeur, à la demande du commanditaire (26 octobre 2026) : « mets
+     réception entre dépôt et retrait ». On dépose chez le prestataire, la
+     carte revient, le client l'emporte. Lues dans cet ordre, les trois dates
+     d'une ligne se vérifient d'un coup d'œil. */
+  "depot",
   "reception",
   "retrait",
-  "depot",
   "immatriculation",
   "transite",
 ] as const;

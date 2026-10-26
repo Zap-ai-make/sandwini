@@ -180,7 +180,6 @@ export function corrigerLot(
       numeroMoteur: champs.numeroMoteur,
       couleur: champs.couleur,
       annee: champs.annee,
-      etat: champs.etat,
       ...traceModification(auteur),
     });
   }

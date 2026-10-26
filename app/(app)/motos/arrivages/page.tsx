@@ -16,6 +16,7 @@ import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
 import {
   bilanArrivages,
+  chercherArrivages,
   chercherMotoParChassis,
   completudePapiers,
   ecoulement,
@@ -139,6 +140,10 @@ export default function PageArrivages() {
   const resultats = useMemo(
     () => (recherche.trim() ? chercherMotoParChassis(stock ?? [], recherche).slice(0, 8) : []),
     [recherche, stock],
+  );
+  const lotsTrouves = useMemo(
+    () => chercherArrivages(arrivages ?? [], recherche, nomFournisseur).slice(0, 8),
+    [arrivages, recherche, nomFournisseur],
   );
 
   const arrivageInspecte = inspectId ? (arrivagesParId.get(inspectId) ?? null) : null;
@@ -314,45 +319,97 @@ export default function PageArrivages() {
         <>
           <CartesArrivages bilan={bilan} />
 
+          {/* **Une seule barre pour les deux questions** (26 octobre 2026).
+              Elle ne retrouvait qu'une moto par son châssis ; le commanditaire
+              cherche aussi un lot — « par nom d'arrivage, nom du fournisseur ».
+              Deux champs côte à côte auraient obligé à savoir, avant de taper,
+              lequel des deux répond. */}
           <div className="mb-5 cadre p-4">
             <label htmlFor="rech-moto" className="block font-medium text-encre">
-              Retrouver une moto
+              Retrouver un lot ou une moto
             </label>
-            <p className="text-corps text-encre-doux">Par numéro de cadre complet ou par ses derniers caractères.</p>
+            <p className="text-corps text-encre-doux">
+              Le nom d’un arrivage, celui d’un fournisseur, ou un numéro de cadre — complet ou par
+              ses derniers caractères.
+            </p>
             <input
               id="rech-moto"
               value={recherche}
               autoComplete="off"
-              placeholder="Ex. les 5 derniers chiffres"
+              placeholder="Ex. Bohary, ou les 5 derniers chiffres"
               onChange={(evenement) => setRecherche(evenement.target.value)}
               className="saisie mt-2"
             />
             {recherche.trim() && (
               <div className="mt-3">
-                {resultats.length === 0 ? (
-                  <p className="text-corps text-encre-doux">Aucune moto ne correspond.</p>
+                {lotsTrouves.length === 0 && resultats.length === 0 ? (
+                  <p className="text-corps text-encre-doux">Aucun lot ni aucune moto ne correspond.</p>
                 ) : (
-                  <ul className="grid gap-2">
-                    {resultats.map((moto) => (
-                      <li key={moto.id}>
-                        <button
-                          type="button"
-                          disabled={!moto.arrivageId}
-                          onClick={() => moto.arrivageId && setInspectId(moto.arrivageId)}
-                          className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-plaque border border-bord px-3 py-2 text-left hover:bg-survol disabled:opacity-70"
-                        >
-                          <span className="font-code break-all text-encre">{moto.numeroChassis}</span>
-                          <span className="text-corps text-encre-doux">{nomMarque(moto.marqueId)}</span>
-                          <span className="ml-auto text-legende text-encre-doux">
-                            {moto.arrivageId
-                              ? (arrivagesParId.get(moto.arrivageId)?.nom ?? "lot inconnu")
-                              : "hors lot"}{" "}
-                            · {LIBELLE_STATUT[moto.statut]}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
+                  <div className="grid gap-4">
+                    {lotsTrouves.length > 0 && (
+                      /* Les lots d'abord : une recherche par nom vise le lot,
+                         et le faire descendre sous dix motos le ferait manquer. */
+                      <section aria-label="Lots trouvés">
+                        <h3 className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
+                          Lots
+                        </h3>
+                        <ul className="mt-2 grid gap-2">
+                          {lotsTrouves.map((lot) => (
+                            <li key={lot.id}>
+                              <button
+                                type="button"
+                                onClick={() => setInspectId(lot.id)}
+                                className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-plaque border border-bord px-3 py-2 text-left hover:bg-survol"
+                              >
+                                <span className="font-medium text-encre">{lot.nom}</span>
+                                <span className="text-corps text-encre-doux">
+                                  {nomFournisseur(lot.fournisseurId)}
+                                </span>
+                                <span className="ml-auto text-legende text-encre-doux">
+                                  {formaterNombre(ecoulement(stock ?? [], lot.id).total)} moto(s)
+                                  {lot.date ? ` · ${formaterDateCourte(lot.date)}` : ""}
+                                  {lot.annule ? " · annulé" : ""}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+
+                    {resultats.length > 0 && (
+                      <section aria-label="Motos trouvées">
+                        <h3 className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
+                          Motos
+                        </h3>
+                        <ul className="mt-2 grid gap-2">
+                          {resultats.map((moto) => (
+                            <li key={moto.id}>
+                              <button
+                                type="button"
+                                disabled={!moto.arrivageId}
+                                onClick={() => moto.arrivageId && setInspectId(moto.arrivageId)}
+                                className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-plaque border border-bord px-3 py-2 text-left hover:bg-survol disabled:opacity-70"
+                              >
+                                <span className="font-code break-all text-encre">
+                                  {moto.numeroChassis}
+                                </span>
+                                <span className="text-corps text-encre-doux">
+                                  {nomMarque(moto.marqueId)}
+                                </span>
+                                <span className="ml-auto text-legende text-encre-doux">
+                                  {moto.arrivageId
+                                    ? (arrivagesParId.get(moto.arrivageId)?.nom ?? "lot inconnu")
+                                    : "hors lot"}{" "}
+                                  · {LIBELLE_STATUT[moto.statut]}
+                                </span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    )}
+                  </div>
                 )}
               </div>
             )}

@@ -17,14 +17,7 @@ import {
 import { Modale } from "@/components/patrons/Modale";
 import type { Fournisseur } from "@/lib/domain/fournisseur";
 import { jourLocal } from "@/lib/domain/format";
-import {
-  ETATS,
-  LIBELLE_ETAT,
-  LONGUEUR_CHASSIS_MAX,
-  LONGUEUR_TEXTE_MAX,
-  type EtatMoto,
-  type Moto,
-} from "@/lib/domain/moto";
+import { LONGUEUR_CHASSIS_MAX, LONGUEUR_TEXTE_MAX, type Moto } from "@/lib/domain/moto";
 import type { Modele, Referentiel } from "@/lib/domain/referentiel";
 import { corrigerLot, messageErreurArrivage } from "@/lib/repositories/arrivages";
 import type { Auteur } from "@/lib/repositories/referentiels";
@@ -236,7 +229,6 @@ const COLONNES: { cle: keyof LigneCorrection; titre: string; largeur: string }[]
   { cle: "numeroMoteur", titre: "N° moteur", largeur: "12rem" },
   { cle: "couleur", titre: "Couleur", largeur: "9rem" },
   { cle: "annee", titre: "Année", largeur: "6rem" },
-  { cle: "etat", titre: "État", largeur: "8rem" },
 ];
 
 function GrilleMotos({
@@ -365,22 +357,6 @@ function GrilleMotos({
                 />
               </td>
 
-              <td>
-                <select
-                  value={ligne.etat}
-                  onChange={(evenement) =>
-                    changer(rang, { etat: evenement.target.value as EtatMoto })
-                  }
-                  className="cellule"
-                  aria-label={`État, ligne ${rang + 1}`}
-                >
-                  {ETATS.map((etat) => (
-                    <option key={etat} value={etat}>
-                      {LIBELLE_ETAT[etat]}
-                    </option>
-                  ))}
-                </select>
-              </td>
             </tr>
           ))}
         </tbody>

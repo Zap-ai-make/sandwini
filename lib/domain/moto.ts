@@ -13,13 +13,24 @@
 
 import { ecrireLignes, lireLignes } from "./saisie";
 
+/**
+ * Le vocabulaire de la base, que plus aucun écran ne montre (26 octobre 2026).
+ *
+ * **« Supprime neuve et occasion partout dans le site, ça doit plus
+ * exister. »** La maison ne vend que du neuf : la distinction faisait un choix
+ * à faire à chaque entrée en stock, un filtre de plus sur la liste et une
+ * colonne de plus à l'export, pour une réponse toujours la même.
+ *
+ * Le champ, lui, reste en base et vaut `neuve` : des milliers de motos le
+ * portent déjà, les règles Firestore le valident, et l'effacer demanderait une
+ * migration pour ne rien gagner. Ce qui a disparu, c'est son libellé — il n'y
+ * a plus rien pour l'afficher.
+ */
 export const ETATS = ["neuve", "occasion"] as const;
 export type EtatMoto = (typeof ETATS)[number];
 
-export const LIBELLE_ETAT: Record<EtatMoto, string> = {
-  neuve: "Neuve",
-  occasion: "Occasion",
-};
+/** Ce que porte une moto entrée depuis cette version. */
+export const ETAT_PAR_DEFAUT: EtatMoto = "neuve";
 
 /** Les quatre statuts du cahier des charges. S5 n'en produit qu'un. */
 export const STATUTS = ["en_stock", "reservee", "vendue", "transferee"] as const;
@@ -153,7 +164,6 @@ export type SaisieCout = {
 export const COUT_VIDE: SaisieCout = { prixAchat: "", fraisEntree: [] };
 
 export type SaisieMoto = SaisieCout & {
-  etat: EtatMoto;
   marqueId: string;
   modeleId: string;
   couleur: string;
@@ -162,11 +172,9 @@ export type SaisieMoto = SaisieCout & {
   numeroMoteur: string;
   prixVenteConseille: string;
   provenanceId: string;
-  papiersFournis: string;
 };
 
 export const SAISIE_VIDE: SaisieMoto = {
-  etat: "neuve",
   marqueId: "",
   modeleId: "",
   couleur: "",
@@ -175,7 +183,6 @@ export const SAISIE_VIDE: SaisieMoto = {
   numeroMoteur: "",
   prixVenteConseille: "",
   provenanceId: "",
-  papiersFournis: "",
   ...COUT_VIDE,
 };
 
@@ -353,12 +360,11 @@ export function coutTotalSaisie(saisie: SaisieCout): number {
 
 export type Filtres = {
   recherche: string;
-  etat: EtatMoto | "";
   marqueId: string;
   modeleId: string;
 };
 
-export const FILTRES_VIDES: Filtres = { recherche: "", etat: "", marqueId: "", modeleId: "" };
+export const FILTRES_VIDES: Filtres = { recherche: "", marqueId: "", modeleId: "" };
 
 /**
  * Filtre le stock en mémoire.
@@ -374,7 +380,6 @@ export const FILTRES_VIDES: Filtres = { recherche: "", etat: "", marqueId: "", m
 export function filtrerMotos(motos: Moto[], filtres: Filtres): Moto[] {
   const recherche = normaliserChassis(filtres.recherche);
   return motos.filter((moto) => {
-    if (filtres.etat && moto.etat !== filtres.etat) return false;
     if (filtres.marqueId && moto.marqueId !== filtres.marqueId) return false;
     if (filtres.modeleId && moto.modeleId !== filtres.modeleId) return false;
     if (recherche && !moto.numeroChassis.includes(recherche)) return false;
