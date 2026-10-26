@@ -3,114 +3,145 @@
 import { useId } from "react";
 
 /**
- * Le monogramme SE — la marque du client, dessinée une fois.
+ * Le monogramme SE, redessiné d'après le logo gravé (26 octobre 2026).
  *
- * Deux formes, deux chemins : la goutte (dessous), puis le S et le E fondus en
- * une seule silhouette qui partage la barre haute et la barre basse.
- * `design/marque/monogramme-se.svg` reste la source de vérité du dessin ; ce
- * fichier en est la transcription pour l’application.
+ * **Pourquoi un tracé et non la photographie.** Le commanditaire avait d'abord
+ * retenu la photo telle quelle ; elle portait son fond de mur, pesait 200 Ko
+ * et restait illisible à 40 px dans le rail — « le logo n'a pas été changé,
+ * c'est mieux de reconstruire en SVG toi-même ». Un tracé est là avant la
+ * première requête réseau, s'imprime net, suit la taille qu'on lui donne et
+ * reste lisible au plus petit format de la coquille.
  *
- * **Il porte ses deux dégradés, et c’est le sujet de S31.** Il les avait
- * perdus : les tracés étaient repris, les `linearGradient` non, et le
- * monogramme sortait blanc à plat dans la coquille. Le commentaire assumait ce
- * choix — « sans qu’on ait à maintenir trois fichiers pour trois fonds » —
- * mais il contredisait D70, *la marque prend la coquille*. Un monogramme sans
- * ses couleurs n’est plus la marque, c’est une silhouette, et c’est le premier
- * reproche que le commanditaire a formulé en ouvrant la préversion.
+ * **Le dessin en trois pièces**, comme sur la gravure : les lettres SE, une
+ * vague bleue qui les traverse, et le partage des couleurs de part et d'autre
+ * de cette vague — bleu au-dessus, sombre au-dessous. Le trait est obtenu en
+ * dessinant les lettres deux fois, chaque copie découpée par un rectangle :
+ * deux glyphes exactement superposés, donc aucune jointure à ajuster.
  *
- * **Pourquoi en ligne plutôt qu’un `<img>`.** Le reçu s’imprime, et un
- * navigateur qui n’a pas fini de charger une image l’imprime blanche : la
- * leçon de S10. Un tracé SVG dans le document est là avant la première requête
- * réseau, ce qui est aussi ce que promet une application qui marche hors
- * ligne. Les dégradés ne changent rien à cela — ils voyagent dans le même
- * document que les tracés.
+ * **La moitié sombre prend `currentColor`, et c'est ce qui la sauve.** Le vert
+ * ardoise de la gravure disparaîtrait sur le rail, qui est sombre. En suivant
+ * l'encre du contexte, la lettre reste lisible partout — claire sur le rail,
+ * noire sur le reçu — sans qu'on ait à maintenir trois fichiers pour trois
+ * fonds. Le bleu, lui, est la marque : il ne bouge pas.
  *
- * **Le dégradé reste enfermé dans le monogramme** (`CAHIER-UI.md` §4). Il ne
- * s’étale nulle part ailleurs, à une exception près, écrite dans
- * `globals.css` : le filet de 2 px en tête de coquille.
- *
- * `aria-hidden` par défaut, et c’est presque toujours le bon choix : la raison
+ * `aria-hidden` par défaut, et c'est presque toujours le bon choix : la raison
  * sociale est écrite à côté en toutes lettres. Le seul cas où il porte un nom
- * est celui où il est seul à l’écran.
+ * est celui où il est seul à l'écran.
  */
+
+/** Le bleu de la gravure. Une valeur littérale : c'est une marque, pas un ton du thème. */
+export const BLEU_MARQUE = "#1C7FC0";
+
 export function Monogramme({
   className,
   titre,
   variante = "couleur",
+  avecNom = false,
 }: {
   className?: string;
   /** Donné seulement quand aucun texte à côté ne dit déjà le nom. */
   titre?: string;
   /**
-   * `couleur` — les deux dégradés du fichier de marque. La coquille, l’écran
-   * de connexion : partout où la marque doit être la marque.
+   * `couleur` — le bleu de la marque au-dessus de la vague, l'encre du
+   * contexte au-dessous.
    *
-   * `monochrome` — un seul ton, pris sur `currentColor`. C’est la variante du
-   * reçu, et la maquette `c4-recu.html` la sert telle quelle : un aplat de
-   * couleur sur du papier vide une cartouche pour rien, et le reçu sort
-   * souvent en noir et blanc. La goutte y passe à 55 % d’opacité — à plat elle
-   * se confondrait avec le S qu’elle touche, et le monogramme deviendrait une
-   * tache. C’est le bleu qui fait ce travail dans la version couleur.
+   * `monochrome` — un seul ton, pris sur `currentColor`, pour un document tiré
+   * en noir et blanc. La vague y passe à 45 % d'opacité : à plat, elle se
+   * confondrait avec les lettres qu'elle touche et le monogramme deviendrait
+   * une tache.
    */
   variante?: "couleur" | "monochrome";
+  /**
+   * Ajoute « Sandwidi Entreprise » sous le monogramme, comme sur la gravure.
+   *
+   * **Dans le même SVG, et c'est le point.** Posé en texte HTML à côté, le nom
+   * aurait fallu lier sa taille à celle du dessin — par une requête de
+   * conteneur, ou par une taille fixe qui ne vaut qu'à une échelle. Dans le
+   * tracé, il suit le `viewBox` : le logo se pose aussi bien sur 56 px que sur
+   * 180 sans qu'aucune règle n'ait à le savoir.
+   */
+  avecNom?: boolean;
 }) {
-  /* Les identifiants de dégradé sont uniques par instance. Trois monogrammes
-     vivent parfois dans le même document — le rail, le reçu ouvert en panneau,
-     et l’en-tête de ce reçu : des `id` figés y seraient dupliqués, et le jour
-     où la première instance se démonte, les autres pointeraient vers une
-     définition disparue. `useId` coûte une chaîne et supprime la classe de
-     défaut entière. */
-  const cle = useId();
-  const metal = `metal-${cle}`;
-  const goutte = `goutte-${cle}`;
+  /* Les identifiants de découpe sont uniques par instance : plusieurs
+     monogrammes vivent parfois dans le même document — le rail, le reçu ouvert
+     en panneau, l'en-tête de ce reçu. Des `id` figés y seraient dupliqués, et
+     le jour où la première instance se démonte, les autres pointeraient vers
+     une définition disparue. */
+  const cle = useId().replace(/:/g, "");
+  const haut = `se-haut-${cle}`;
+  const bas = `se-bas-${cle}`;
   const monochrome = variante === "monochrome";
+  const bleu = monochrome ? "currentColor" : BLEU_MARQUE;
 
   return (
     <svg
-      viewBox="0 0 546 402"
+      viewBox={avecNom ? "0 0 220 196" : "0 0 220 150"}
       className={className}
       role={titre ? "img" : undefined}
       aria-hidden={titre ? undefined : "true"}
       aria-label={titre}
     >
-      {!monochrome && (
-        <defs>
-          {/* Les cinq arrêts du fichier de marque, dans l’ordre : l’or tient
-              toute la moitié gauche avant de virer, comme sur l’original.
+      <defs>
+        {/* Le partage se fait à 70 : à peu près la taille d'x des lettres,
+            là où la vague les traverse sur la gravure. */}
+        <clipPath id={haut}>
+          <rect x="0" y="0" width="220" height="70" />
+        </clipPath>
+        <clipPath id={bas}>
+          <rect x="0" y="70" width="220" height="80" />
+        </clipPath>
+      </defs>
 
-              **Ces cinq valeurs sont recopiées dans `globals.css`**, section
-              A10.5, qui les rallume une à une pour faire passer un reflet dans
-              la marque. Les deux listes bougent ensemble ou pas du tout : une
-              couleur changée ici et pas là-bas ferait clignoter le monogramme
-              vers une teinte qu’il n’a jamais eue. La source reste
-              `design/marque/monogramme-se.svg`. */}
-          <linearGradient id={metal} className="marque-metal" x1="0" y1="0" x2="1" y2="0">
-            <stop offset="0" stopColor="#E0A81A" />
-            <stop offset="0.5" stopColor="#DFA01C" />
-            <stop offset="0.63" stopColor="#DD7A28" />
-            <stop offset="0.82" stopColor="#D3592C" />
-            <stop offset="1" stopColor="#C93C2E" />
-          </linearGradient>
-          <linearGradient id={goutte} x1="0.1" y1="0" x2="0.9" y2="1">
-            <stop offset="0" stopColor="#2E9BC4" />
-            <stop offset="1" stopColor="#1F52A8" />
-          </linearGradient>
-        </defs>
+      {/* Les lettres, deux fois. `textLength` fige la largeur : sans lui, une
+          police de repli — sur un appareil qui n'a pas fini de charger la
+          nôtre — déplacerait les glyphes sous la vague, qui ne les traverserait
+          plus au bon endroit. */}
+      <g
+        fontFamily="var(--font-display), ui-sans-serif, system-ui, sans-serif"
+        fontSize="132"
+        fontWeight="800"
+        textAnchor="middle"
+        letterSpacing="-6"
+      >
+        <text x="110" y="120" textLength="196" lengthAdjust="spacingAndGlyphs" fill={bleu} clipPath={`url(#${haut})`}>
+          SE
+        </text>
+        <text
+          x="110"
+          y="120"
+          textLength="196"
+          lengthAdjust="spacingAndGlyphs"
+          fill="currentColor"
+          clipPath={`url(#${bas})`}
+        >
+          SE
+        </text>
+      </g>
+
+      {/* La vague : elle part épaisse à gauche, traverse les lettres et file
+          vers le haut à droite. C'est elle qui fait reconnaître la marque. */}
+      <path
+        fill={bleu}
+        fillOpacity={monochrome ? 0.45 : undefined}
+        d="M2 99C27 68 78 56 129 64C169 70 199 66 218 47C206 85 163 103 119 96C75 89 38 90 14 111Z"
+      />
+
+      {avecNom && (
+        /* Le nom en deux tons, comme la gravure : « Sandwidi » dans l'encre du
+           contexte, « Entreprise » dans le bleu de la marque. */
+        <text
+          x="110"
+          y="186"
+          textAnchor="middle"
+          fontFamily="var(--font-display), ui-sans-serif, system-ui, sans-serif"
+          fontSize="34"
+          fontWeight="800"
+          letterSpacing="-1"
+          fill="currentColor"
+        >
+          Sandwidi <tspan fill={bleu}>Entreprise</tspan>
+        </text>
       )}
-
-      {/* La goutte : la trace, ce qui file vers la gauche. Un croissant,
-          pointe en haut. */}
-      <path
-        fill={monochrome ? "currentColor" : `url(#${goutte})`}
-        fillOpacity={monochrome ? 0.55 : undefined}
-        d="M6 126C3 160 4 210 20 246C36 285 75 315 151 334C190 331 221 314 221 286C200 258 130 236 60 212C30 196 12 162 6 126Z"
-      />
-
-      {/* Le S et le E fondus : ils partagent la barre haute et la barre basse. */}
-      <path
-        fill={monochrome ? "currentColor" : `url(#${metal})`}
-        d="M204 4H540C540 44 518 74 467 94L387 98V156H514C514 192 492 228 451 242L387 246V304L468 308C512 318 538 344 540 391V396H219C270 374 303 330 307 276C307 248 293 228 273 206C240 186 185 166 128 152C105 142 96 124 96 106C96 84 130 74 165 78C195 82 220 96 246 114L250 119L253 113L293 57C265 38 235 20 204 4Z"
-      />
     </svg>
   );
 }

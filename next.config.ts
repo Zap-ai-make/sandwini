@@ -313,16 +313,6 @@ const ECRANS_HORS_LIGNE = [
   "/parametres/cartes-grises",
 ];
 
-/* Les fichiers — et non les écrans — qu'un appareil doit avoir avant d'en
-   avoir besoin (26 octobre 2026).
-
-   Le logo s'imprime en tête de chaque reçu. Le cache de Serwist le garderait
-   de toute façon après un premier affichage, mais « après un premier
-   affichage » n'est pas une promesse : un reçu s'imprime le jour d'une
-   coupure, et une image qui n'est pas arrivée sort blanche sur la feuille
-   (la leçon de S10). Préchargé, il est là dès l'installation. */
-const FICHIERS_HORS_LIGNE = ["/logo-sandwidi.png"];
-
 /* Une révision par build : elle change à chaque compilation pour qu'une
    nouvelle version remplace l'ancienne dans le cache, et reste identique
    pour toutes les entrées d'un même build. C'est l'instant que lit aussi le
@@ -334,10 +324,11 @@ const construireAvecServiceWorker = () =>
     swSrc: "app/sw.ts",
     swDest: "public/sw.js",
     reloadOnOnline: false,
-    additionalPrecacheEntries: [...ECRANS_HORS_LIGNE, ...FICHIERS_HORS_LIGNE].map((url) => ({
-      url,
-      revision: REVISION,
-    })),
+    /* Aucun fichier à précharger en plus des écrans : le logo est un tracé
+       SVG écrit dans le code (`Monogramme`), donc présent avant la première
+       requête réseau. C'est ce qui permet à un reçu de s'imprimer entier un
+       jour de coupure — la leçon de S10. */
+    additionalPrecacheEntries: ECRANS_HORS_LIGNE.map((url) => ({ url, revision: REVISION })),
   });
 
 /* En développement, Serwist n'est même pas appelé.

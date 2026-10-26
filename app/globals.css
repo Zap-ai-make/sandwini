@@ -1431,11 +1431,6 @@
     font-family: var(--font-code);
   }
 
-  /* Une rangée laissée libre : sa hauteur est tenue, sinon elle s'écrase. */
-  .facture-lignes .facture-vide td {
-    height: 2rem;
-  }
-
   /* Les trois totaux, chacun dans sa pastille, alignés à droite. */
   .facture-total {
     display: flex;

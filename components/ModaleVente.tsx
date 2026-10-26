@@ -14,7 +14,6 @@ import {
   SAISIE_CLIENT_VIDE,
   chercherClients,
   formaterTelephone,
-  nipDejaPris,
   nomComplet,
   telephoneDejaPris,
   validerClient,
@@ -420,7 +419,7 @@ export function ModaleVente({
       /* Le rapprochement au dernier moment, sur la liste **lue** : on propose
          la fiche trouvée au lieu de refuser, et la vente attend ce choix
          plutôt que de fabriquer un doublon (D95/D96). */
-      const doublon = nipDejaPris(client.nip, lus) ?? telephoneDejaPris(client.telephone, lus);
+      const doublon = telephoneDejaPris(client.telephone, lus);
       if (doublon) {
         setRapproche(doublon);
         setRefus(null);

@@ -19,13 +19,11 @@ export type Client = {
    */
   nom: string;
   prenom: string;
-  /**
-   * Le numéro de la pièce d'identité, en chiffres seuls (S44).
-   *
-   * Vide est une valeur ordinaire, pas un manque à corriger : une vente au
-   * comptoir ne s'arrête pas parce que le client a oublié sa carte (D76).
-   */
-  nip: string;
+  /* **Le numéro de la pièce d'identité est parti** (26 octobre 2026) :
+     « supprime le numéro NIP pour la CNIB, finalement on en a pas besoin ».
+     Il était facultatif, et il ne servait qu'à rapprocher deux fiches — le
+     téléphone le fait, et c'est lui qu'on demande au comptoir. Les fiches
+     déjà saisies gardent le leur en base : rien ne le lit plus. */
   /** Tel que la personne l'a saisi — c'est ce qui s'affiche et s'imprime. */
   telephone: string;
   /** Forme internationale, celle sur laquelle on cherche. */
@@ -40,7 +38,6 @@ export type Client = {
 export type SaisieClient = {
   nom: string;
   prenom: string;
-  nip: string;
   telephone: string;
   telephone2: string;
   adresse: string;
@@ -50,7 +47,6 @@ export type SaisieClient = {
 export const SAISIE_CLIENT_VIDE: SaisieClient = {
   nom: "",
   prenom: "",
-  nip: "",
   telephone: "",
   telephone2: "",
   adresse: "",
@@ -61,15 +57,6 @@ export const LONGUEUR_NOM_MAX = 80;
 export const LONGUEUR_ADRESSE_MAX = 200;
 export const LONGUEUR_NOTE_MAX = 300;
 export const LONGUEUR_TELEPHONE_MAX = 32;
-
-/**
- * La longueur du numéro de pièce d'identité.
- *
- * Une constante, et une seule, parce que c'est la seule hypothèse du code sur
- * la forme du document : si la pièce devait porter une lettre en tête, c'est
- * ici et dans `firestore.rules` que ça se change — les deux ensemble.
- */
-export const LONGUEUR_NIP = 17;
 
 /**
  * L'indicatif ajouté aux numéros locaux.
@@ -158,17 +145,6 @@ export function nomPourRecherche(client: Pick<Client, "nom" | "prenom">): string
   return normaliserNom(nomComplet(client));
 }
 
-/**
- * Le numéro de pièce tel qu'on le range : chiffres seuls, borné.
- *
- * Un numéro se recopie d'une carte, souvent avec des espaces ou des tirets, et
- * parfois collé depuis ailleurs. Les refuser produirait une erreur pour une
- * saisie juste ; on les absorbe.
- */
-export function lireNip(brut: string): string {
-  return brut.replace(/\D/g, "").slice(0, LONGUEUR_NIP);
-}
-
 export function validerClient(saisie: SaisieClient): string | null {
   const nom = saisie.nom.trim();
   if (!nom) return "Le nom du client est obligatoire.";
@@ -176,16 +152,6 @@ export function validerClient(saisie: SaisieClient): string | null {
 
   if (saisie.prenom.trim().length > LONGUEUR_NOM_MAX) {
     return `Le prénom dépasse ${LONGUEUR_NOM_MAX} caractères.`;
-  }
-
-  /* Le NIP est facultatif — mais renseigné, il l'est en entier : un numéro à
-     seize chiffres est une saisie interrompue, pas un autre format.
-
-     On compte les chiffres **bruts**, pas ceux que `lireNip` a gardés. Un
-     numéro collé trop long serait sinon tronqué en silence, et c'est le genre
-     d'erreur qu'on découvre à la préfecture (D95, dans une autre matière). */
-  if (saisie.nip.trim() !== "" && saisie.nip.replace(/\D/g, "").length !== LONGUEUR_NIP) {
-    return `Le numéro de la pièce d’identité compte ${LONGUEUR_NIP} chiffres.`;
   }
 
   const telephone = saisie.telephone.trim();
@@ -250,18 +216,10 @@ function commenceUnMot(nomNormalise: string, cherche: string): boolean {
   return nomNormalise.split(" ").some((mot) => mot.startsWith(cherche));
 }
 
-/**
- * Le client qui porte déjà ce numéro de pièce, s'il y en a un.
- *
- * **Un NIP vide ne rapproche personne.** Sans cette garde, toutes les fiches
- * sans pièce d'identité se reconnaîtraient les unes dans les autres, et le
- * contrôle produirait exactement le doublon qu'il devait empêcher (D96).
- */
-export function nipDejaPris(nip: string, clients: Client[], sauf?: string): Client | undefined {
-  const cible = lireNip(nip);
-  if (cible.length !== LONGUEUR_NIP) return undefined;
-  return clients.find((client) => client.id !== sauf && lireNip(client.nip) === cible);
-}
+/* **`nipDejaPris` est parti avec le NIP** (26 octobre 2026). Il rapprochait
+   deux fiches par le numéro de pièce ; le rapprochement par téléphone, juste
+   en dessous, reste — et c'est le numéro qu'on demande au comptoir. Le
+   contrôle d'unicité du produit n'en est donc pas réduit à rien (D96). */
 
 /** Le client qui porte déjà ce numéro, s'il y en a un. */
 export function telephoneDejaPris(

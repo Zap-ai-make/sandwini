@@ -196,19 +196,11 @@ export function Recu({
             <td className="facture-nombre">{formaterNombre(vente.prixConvenu)}</td>
           </tr>
 
-          {/* **Les rangées libres font partie du document.** Sur le carnet,
-              elles disent qu'il n'y avait rien de plus à facturer, et laissent
-              la place d'une mention manuscrite. Les retirer ferait un tableau
-              qui se termine là où s'arrête le texte, et l'on pourrait y
-              ajouter une ligne après coup sans que cela se voie. */}
-          {[0, 1, 2].map((rang) => (
-            <tr key={rang} className="facture-vide" aria-hidden="true">
-              <td />
-              <td />
-              <td />
-              <td />
-            </tr>
-          ))}
+          {/* **Pas de rangée libre** (26 octobre 2026) : « le nombre de lignes
+              doit être celles qui sont remplies, pas ajouter des vides ». Sur
+              le carnet elles laissaient la place d'une mention manuscrite ; un
+              document imprimé n'a pas ce besoin, et trois cases vides sous une
+              seule moto font chercher ce qui manque. */}
         </tbody>
       </table>
 

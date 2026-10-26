@@ -884,8 +884,13 @@ service cloud.firestore {
              && (!donnees.keys().hasAny(['prenom'])
                  || (donnees.prenom is string && donnees.prenom.size() <= 80))
              // Le numéro de la pièce d'identité : dix-sept chiffres, ou rien.
-             // Vide est une valeur ordinaire — une vente ne s'arrête pas parce
-             // que le client a oublié sa carte (D76).
+             //
+             // **L'application ne l'écrit plus depuis le 26 octobre 2026** —
+             // « supprime le numéro NIP pour la CNIB, finalement on en a pas
+             // besoin ». La règle le garde quand même : des milliers de fiches
+             // le portent, et le retirer du `hasOnly` les rendrait toutes
+             // incorrigibles — la correction d'un nom ferait repartir le
+             // document entier, numéro de pièce compris, et serait refusée.
              && (!donnees.keys().hasAny(['nip'])
                  || (donnees.nip is string
                      && (donnees.nip == '' || donnees.nip.matches('^[0-9]{17}$'))))

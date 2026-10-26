@@ -10,7 +10,6 @@ import {
 import { db } from "@/lib/firebase/client";
 import {
   comparerClients,
-  lireNip,
   nomPourRecherche,
   normaliserTelephone,
   type Client,
@@ -41,7 +40,6 @@ function lireClient(instantane: QueryDocumentSnapshot<DocumentData>): Client {
        le nom entier est dans `nom`, et `nomComplet` rend la même chaîne
        qu'avant. Rien à migrer. */
     prenom: donnees.prenom ?? "",
-    nip: donnees.nip ?? "",
     telephone: donnees.telephone ?? "",
     telephoneNormalise: donnees.telephoneNormalise ?? "",
     telephone2: donnees.telephone2 ?? "",
@@ -80,7 +78,6 @@ function versDocument(saisie: SaisieClient) {
     /* Rangé en chiffres seuls : c'est la forme sur laquelle on rapproche deux
        fiches, et deux façons d'écrire le même numéro ne doivent pas produire
        deux personnes (même raison que `telephoneNormalise`). */
-    nip: lireNip(saisie.nip),
     /* La forme cherchée couvre le nom **et** le prénom : sans ça, séparer les
        deux champs ferait disparaître le prénom de la recherche. */
     nomNormalise: nomPourRecherche(saisie),

@@ -4,14 +4,11 @@ import { useState } from "react";
 import { useSession } from "@/lib/auth/session";
 import {
   LONGUEUR_ADRESSE_MAX,
-  LONGUEUR_NIP,
   LONGUEUR_NOM_MAX,
   LONGUEUR_NOTE_MAX,
   LONGUEUR_TELEPHONE_MAX,
   SAISIE_CLIENT_VIDE,
   formaterTelephone,
-  lireNip,
-  nipDejaPris,
   nomComplet,
   telephoneDejaPris,
   validerClient,
@@ -20,7 +17,6 @@ import {
 } from "@/lib/domain/client";
 import { creerClient, messageErreurClient, modifierClient } from "@/lib/repositories/clients";
 import { Champ } from "@/components/patrons/Champ";
-import { ChampCases } from "@/components/patrons/ChampCases";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 
 /**
@@ -64,7 +60,6 @@ export function FormulaireClient({
       ? {
           nom: existant.nom,
           prenom: existant.prenom,
-          nip: existant.nip,
           telephone: existant.telephone,
           telephone2: existant.telephone2,
           adresse: existant.adresse,
@@ -101,13 +96,13 @@ export function FormulaireClient({
       return;
     }
 
-    /* Deux clés de rapprochement, et la pièce d'identité passe devant : un
-       numéro de téléphone change de main, un numéro de pièce non. Les deux
-       proposent la fiche trouvée au lieu de refuser sèchement — un mur sans
-       panneau apprend surtout à ne plus lire l'écran (D95). */
-    const doublon =
-      nipDejaPris(saisie.nip, clients, existant?.id) ??
-      telephoneDejaPris(saisie.telephone, clients, existant?.id);
+    /* **Une seule clé de rapprochement depuis le 26 octobre 2026** : le
+       téléphone. Le numéro de pièce passait devant — un téléphone change de
+       main, un numéro de pièce non — mais le commanditaire a retiré le champ,
+       et un contrôle sur une donnée qu'on ne saisit plus ne rapproche rien.
+       Celui-ci propose la fiche trouvée au lieu de refuser sèchement : un mur
+       sans panneau apprend surtout à ne plus lire l'écran (D95). */
+    const doublon = telephoneDejaPris(saisie.telephone, clients, existant?.id);
     if (doublon) {
       setRapproche(doublon);
       setErreur(null);
@@ -228,15 +223,6 @@ export function ChampsClient({
           changer={(telephone) => changer({ telephone })}
           aide="Huit chiffres suffisent. L’indicatif est ajouté tout seul."
         />
-        <ChampCases
-          id={`${prefixe}-nip`}
-          libelle="Numéro de la pièce d’identité"
-          facultatif
-          valeur={saisie.nip}
-          longueur={LONGUEUR_NIP}
-          changer={(nip) => changer({ nip: lireNip(nip) })}
-        />
-
         {/* Trois champs qui ne servent qu'une fois sur dix. Repliés, ils ne
             pèsent plus sur le geste ordinaire ; dépliés, ils sont là. Un vrai
             bouton, pas un `<details>` : le formulaire est déjà dans une modale,

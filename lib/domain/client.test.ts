@@ -1,12 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  LONGUEUR_NIP,
   SAISIE_CLIENT_VIDE,
   chercherClients,
   comparerClients,
   formaterTelephone,
-  lireNip,
-  nipDejaPris,
   nomComplet,
   nomPourRecherche,
   normaliserNom,
@@ -17,7 +14,6 @@ import {
   type SaisieClient,
 } from "./client";
 
-const NIP = "12345678901234567";
 
 const saisie = (partie: Partial<SaisieClient> = {}): SaisieClient => ({
   ...SAISIE_CLIENT_VIDE,
@@ -31,7 +27,6 @@ const client = (partie: Partial<Client> = {}): Client => ({
   id: "1",
   nom: "Ouédraogo",
   prenom: "Salif",
-  nip: "",
   telephone: "70 12 34 56",
   telephoneNormalise: "+22670123456",
   telephone2: "",
@@ -41,9 +36,9 @@ const client = (partie: Partial<Client> = {}): Client => ({
   ...partie,
 });
 
-/** Une fiche d'avant S44 : tout le nom dans `nom`, ni prénom ni NIP. */
+/** Une fiche d'avant S44 : tout le nom dans `nom`, sans prénom. */
 const clientLegacy = (partie: Partial<Client> = {}): Client =>
-  client({ nom: "Ouédraogo Salif", prenom: "", nip: "", ...partie });
+  client({ nom: "Ouédraogo Salif", prenom: "", ...partie });
 
 describe("normaliserTelephone", () => {
   it("ramène les trois façons d’écrire le même numéro à une seule", () => {
@@ -112,21 +107,6 @@ describe("validerClient", () => {
   it("accepte une fiche sans prénom", () => {
     expect(validerClient(saisie({ prenom: "" }))).toBeNull();
   });
-
-  /* Le NIP est facultatif, et c'est un arbitrage : une vente au comptoir ne
-     s'arrête pas parce que le client a oublié sa carte (D76). */
-  it("accepte un NIP vide", () => {
-    expect(validerClient(saisie({ nip: "" }))).toBeNull();
-  });
-
-  it("accepte un NIP de dix-sept chiffres", () => {
-    expect(validerClient(saisie({ nip: NIP }))).toBeNull();
-  });
-
-  it("refuse un NIP renseigné qui n’a pas la bonne longueur", () => {
-    expect(validerClient(saisie({ nip: "1234567890123456" }))).toMatch(/17/);
-    expect(validerClient(saisie({ nip: "123456789012345678" }))).toMatch(/17/);
-  });
 });
 
 describe("nomComplet", () => {
@@ -153,43 +133,6 @@ describe("nomPourRecherche", () => {
 
   it("rend la même forme qu’avant pour une fiche sans prénom", () => {
     expect(nomPourRecherche({ nom: "Ouédraogo Salif", prenom: "" })).toBe("ouedraogo salif");
-  });
-});
-
-describe("lireNip", () => {
-  it("absorbe les espaces et les tirets d’un numéro recopié", () => {
-    expect(lireNip("1234 5678-9012 34567")).toBe(NIP);
-  });
-
-  it("ne garde que les chiffres", () => {
-    expect(lireNip("  ")).toBe("");
-    expect(lireNip("B1234")).toBe("1234");
-  });
-
-  it("s’arrête à la longueur du numéro plutôt que d’accepter n’importe quoi", () => {
-    expect(lireNip("1".repeat(25))).toHaveLength(LONGUEUR_NIP);
-  });
-});
-
-describe("nipDejaPris", () => {
-  const fichier = [client({ id: "1", nip: NIP }), client({ id: "2", nip: "" })];
-
-  it("reconnaît le même numéro écrit avec des espaces", () => {
-    expect(nipDejaPris("1234 5678 9012 34567", fichier)?.id).toBe("1");
-  });
-
-  /* Sans cette garde, toutes les fiches sans NIP se rapprocheraient les unes
-     des autres — et le rapprochement produirait ce qu'il devait empêcher. */
-  it("ne rapproche jamais sur un NIP vide", () => {
-    expect(nipDejaPris("", fichier)).toBeUndefined();
-  });
-
-  it("laisse passer un numéro neuf", () => {
-    expect(nipDejaPris("99999999999999999", fichier)).toBeUndefined();
-  });
-
-  it("ne se signale pas à soi-même lors d’une correction", () => {
-    expect(nipDejaPris(NIP, fichier, "1")).toBeUndefined();
   });
 });
 
