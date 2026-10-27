@@ -7,7 +7,7 @@ import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { completudePapiers, ecoulement, type Arrivage } from "@/lib/domain/arrivage";
 import { formaterDate, formaterNombre } from "@/lib/domain/format";
-import { LIBELLE_PAPIER, PAPIERS_MOTO, LIBELLE_STATUT, type PapierMoto, type Moto } from "@/lib/domain/moto";
+import { LIBELLE_PAPIER, LIBELLE_STATUT, type PapierMoto, type Moto } from "@/lib/domain/moto";
 import { marquerPapierRecu, messageErreurMoto } from "@/lib/repositories/motos";
 import type { Auteur } from "@/lib/repositories/referentiels";
 
@@ -56,9 +56,19 @@ export function InspecterLotModal({
   const papiers = completudePapiers(motosDuLot, arrivage.id);
   const vide = motosDuLot.length === 0;
 
-  /* **Un seul geste pour les deux papiers** (S53). La quittance se cochait
-     nulle part alors qu'elle arrive avec la moto, exactement comme le CMC :
-     c'était le « on comprend rien » du commanditaire. */
+  /**
+   * **La quittance a quitté l'arrivage** (27 octobre 2026) : « supprime la
+   * partie quittance dans arrivage ».
+   *
+   * Elle y avait été mise en S53 parce qu'elle arrive avec la moto, comme le
+   * CMC. À l'usage, ce n'est pas là qu'on la traite : un lot s'ouvre pour
+   * compter des motos et pointer les CMC, et deux colonnes de cases doublaient
+   * le geste pour un papier qu'on suit ailleurs. La fiche de la moto garde la
+   * sienne — le champ n'est pas touché, et rien de ce qui a été coché n'est
+   * perdu.
+   */
+  const PAPIERS_DU_LOT: PapierMoto[] = ["cmc"];
+
   function basculerPapier(moto: Moto, papier: PapierMoto, recu: boolean) {
     if (!auteur) return;
     setErreur(null);
@@ -73,11 +83,6 @@ export function InspecterLotModal({
     { nom: "Motos du lot", valeur: compte.total },
     { nom: "En stock", valeur: compte.restant },
     { nom: "Vendues", valeur: compte.vendues, couleur: "var(--color-solde)" },
-    {
-      nom: "Quittances manquantes",
-      valeur: papiers.quittancesManquantes,
-      couleur: "var(--color-alerte)",
-    },
     { nom: "CMC manquants", valeur: papiers.cmcManquants, couleur: "var(--color-alerte)" },
   ];
 
@@ -178,7 +183,7 @@ export function InspecterLotModal({
                     <th className="p-2 font-medium">N° de cadre</th>
                     <th className="p-2 font-medium">Marque</th>
                     <th className="p-2 font-medium">Statut</th>
-                    {PAPIERS_MOTO.map((papier) => (
+                    {PAPIERS_DU_LOT.map((papier) => (
                       <th key={papier} className="p-2 font-medium">
                         {LIBELLE_PAPIER[papier]}
                       </th>
@@ -204,7 +209,7 @@ export function InspecterLotModal({
                           {LIBELLE_STATUT[moto.statut]}
                         </span>
                       </td>
-                      {PAPIERS_MOTO.map((papier) => {
+                      {PAPIERS_DU_LOT.map((papier) => {
                         const enMain = estEnMain(moto, papier);
                         const nom = LIBELLE_PAPIER[papier];
                         return (

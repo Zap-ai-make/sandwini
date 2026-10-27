@@ -2343,4 +2343,57 @@
   article {
     break-inside: avoid;
   }
+
+  /* --------------------------------------------------------------------------
+     N'imprimer que le document, où qu'il soit dans l'écran.
+
+     « Le client a imprimé le reçu et c'est sorti 3 pages » (27 octobre 2026).
+     Le panneau du reçu portait pourtant `print:hidden` sur ses boutons : ce qui
+     sortait avec lui, c'était la **liste des ventes**, posée à côté de lui dans
+     la grille à deux colonnes, et le titre de l'écran au-dessus.
+
+     **Pourquoi une règle et non des classes.** Il aurait fallu poser
+     `print:hidden` sur chaque morceau de chaque écran qui héberge un reçu — ils
+     sont trois — et se souvenir de le faire sur le quatrième. Ici, l'élément
+     qui porte `a-imprimer` se déclare lui-même comme étant le document ; tout
+     ce qui n'est ni lui, ni l'un de ses parents, ni l'un de ses enfants
+     disparaît. Les parents restent pour que le document garde sa place dans le
+     flux — les effacer l'effacerait avec eux.
+
+     `display: none` et non `visibility: hidden` : une boîte invisible occupe
+     encore sa hauteur, et c'est exactement ce qui fabriquait les pages
+     blanches.
+
+     La règle ne s'arme que si un `a-imprimer` est présent (`body:has`). Les
+     écrans qui impriment autrement — les bordereaux, qui vivent déjà dans un
+     bloc `hidden print:block` — ne la rencontrent jamais.
+     -------------------------------------------------------------------------- */
+  body:has(.a-imprimer) *:not(:has(.a-imprimer)):not(.a-imprimer):not(.a-imprimer *) {
+    display: none !important;
+  }
+
+  /* **Les parents sont aplatis, pas seulement gardés.** Le panneau du reçu vit
+     dans une grille à deux colonnes dont la sienne fait 26 rem : sans cela, le
+     document sortirait imprimé sur un tiers de la feuille, encadré du cadre du
+     panneau. On leur retire donc tout ce qui est mise en page — largeur,
+     hauteur bornée, débordement masqué, cadre, ombre — pour qu'ils ne soient
+     plus que le chemin jusqu'au document. */
+  body:has(.a-imprimer) *:has(.a-imprimer) {
+    display: block !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    position: static !important;
+  }
+
+  /* Le document lui-même garde sa largeur de feuille et reste centré : c'est
+     `.facture` qui la porte, et elle n'est pas un parent. */
+  body:has(.a-imprimer) .a-imprimer {
+    margin: 0 !important;
+  }
 }

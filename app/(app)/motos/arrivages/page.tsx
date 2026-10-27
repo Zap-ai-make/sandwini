@@ -206,29 +206,25 @@ export default function PageArrivages() {
         rendu: (arrivage) => <BarreEcoulement compte={ecoulement(stock ?? [], arrivage.id)} />,
       },
       {
-        /* La clé reste « cmc » — elle sert d'identifiant de colonne, pas de
-           libellé — mais la colonne compte les DEUX papiers depuis S53. Un lot
-           dont les quittances manquaient s'affichait « Complet ». */
+        /* **La colonne ne compte plus que le CMC** (27 octobre 2026) :
+           « supprime la partie quittance dans arrivage ». Elle comptait les
+           deux papiers depuis S53 ; la quittance se suit désormais sur la fiche
+           de la moto, et un lot complet en CMC ne doit plus s'afficher
+           « manquants » pour une quittance qu'on ne pointe plus ici. */
         cle: "cmc",
-        titre: "Papiers",
+        titre: "CMC",
         rendu: (arrivage) => {
           const p = completudePapiers(stock ?? [], arrivage.id);
           if (p.total === 0) return <span className="text-encre-doux">—</span>;
-          const manquants = p.quittancesManquantes + p.cmcManquants;
           return (
             <div>
-              {manquants === 0 ? (
+              {p.cmcManquants === 0 ? (
                 <span className="pastille pastille-solde">Complet</span>
               ) : (
-                <span className="pastille pastille-retard">{manquants} manquants</span>
+                <span className="pastille pastille-retard">{p.cmcManquants} manquants</span>
               )}
-              {/* Le détail par papier : « 2 manquants » ne dit pas lequel aller
-                  chercher, et les deux ne se réclament pas au même endroit. */}
               <span className="mt-1 block text-legende text-encre-doux">
-                {p.quittancesManquantes > 0 && `${p.quittancesManquantes} quittance(s)`}
-                {p.quittancesManquantes > 0 && p.cmcManquants > 0 && " · "}
-                {p.cmcManquants > 0 && `${p.cmcManquants} CMC`}
-                {manquants === 0 && `${p.total} / ${p.total}`}
+                {p.total - p.cmcManquants} / {p.total}
               </span>
             </div>
           );

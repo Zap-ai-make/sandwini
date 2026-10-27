@@ -153,7 +153,14 @@ export function PanneauRecu({
             texte={textePartage(contenu, IDENTITE.raisonSociale, formaterMontant, formaterDate)}
             venteId={contenu.vente.id}
           />
-          <div className="mt-4 print:mt-0">
+          {/* **`a-imprimer` : ce qui sort, et rien d'autre** (27 octobre 2026).
+              « Le client a imprimé le reçu et c'est sorti 3 pages. » Le panneau
+              portait déjà `print:hidden` sur ses boutons, mais la liste des
+              ventes restait à côté de lui dans la grille, et s'imprimait avec.
+              La règle qui s'appuie sur cette classe vit dans `globals.css` : il
+              fallait un marqueur, parce qu'aucune structure ne dit où s'arrête
+              le document dans un écran qui en contient d'autres. */}
+          <div className="a-imprimer mt-4 print:mt-0">
             <Recu
               contenu={contenu}
               boutique={boutiques.find((b) => b.id === contenu.vente.boutiqueId) ?? null}

@@ -1,7 +1,7 @@
 "use client";
 
-import { Download } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { ChevronDown, Download, FileSpreadsheet, Printer } from "lucide-react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motosEnClasseur, nomFichierExport } from "@/lib/domain/export";
 import { TYPE_CLASSEUR } from "@/lib/domain/xlsx";
 import { formaterNombre } from "@/lib/domain/format";
@@ -49,6 +49,29 @@ export function ExportMotos({
   actions?: ReactNode;
 }) {
   const [echec, setEchec] = useState<string | null>(null);
+  /* Le menu des deux formats (27 octobre 2026) : « enlève Excel, et quand on
+     clique dessus, deux options : PDF et Excel ». Le bouton ne promet plus un
+     format dans son nom — il ouvre le choix. */
+  const [ouvert, setOuvert] = useState(false);
+  const boite = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ouvert) return;
+
+    function auClic(evenement: MouseEvent) {
+      if (!boite.current?.contains(evenement.target as Node)) setOuvert(false);
+    }
+    function auClavier(evenement: KeyboardEvent) {
+      if (evenement.key === "Escape") setOuvert(false);
+    }
+
+    document.addEventListener("mousedown", auClic);
+    document.addEventListener("keydown", auClavier);
+    return () => {
+      document.removeEventListener("mousedown", auClic);
+      document.removeEventListener("keydown", auClavier);
+    };
+  }, [ouvert]);
 
   function exporter() {
     setEchec(null);
@@ -97,15 +120,58 @@ export function ExportMotos({
         </button>
       )}
 
-      <button
-        type="button"
-        onClick={exporter}
-        disabled={motos.length === 0}
-        className="bouton bouton-principal"
-      >
-        <Download aria-hidden="true" className="size-4" />
-        Exporter (Excel)
-      </button>
+      <div ref={boite} className="relative">
+        <button
+          type="button"
+          aria-haspopup="menu"
+          aria-expanded={ouvert}
+          onClick={() => setOuvert((avant) => !avant)}
+          disabled={motos.length === 0}
+          className="bouton bouton-principal"
+        >
+          <Download aria-hidden="true" className="size-4" />
+          Exporter
+          <ChevronDown aria-hidden="true" className="size-4" />
+        </button>
+
+        {ouvert && (
+          <div
+            role="menu"
+            className="absolute left-0 z-20 mt-1 w-56 overflow-hidden rounded-carte border border-bord bg-papier shadow-panneau"
+          >
+            {/* **Le PDF passe par la boîte d'impression du navigateur** (D60) :
+                c'est elle qui propose « Enregistrer au format PDF », sans
+                réseau et sans un octet de bibliothèque. Elle emporte la liste
+                telle qu'elle est filtrée à l'écran — et non les seules motos
+                cochées, qu'aucune page imprimée ne saurait distinguer. */}
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOuvert(false);
+                window.print();
+              }}
+              className="flex w-full items-center gap-2 px-3 py-2.5 text-left text-encre hover:bg-survol"
+            >
+              <Printer aria-hidden="true" className="size-4 shrink-0" />
+              PDF (la liste affichée)
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                setOuvert(false);
+                exporter();
+              }}
+              className="flex w-full items-center gap-2 border-t border-bord px-3 py-2.5 text-left text-encre hover:bg-survol"
+            >
+              <FileSpreadsheet aria-hidden="true" className="size-4 shrink-0" />
+              Excel ({formaterNombre(motos.length)} cochée
+              {motos.length > 1 ? "s" : ""})
+            </button>
+          </div>
+        )}
+      </div>
 
       {actions}
 

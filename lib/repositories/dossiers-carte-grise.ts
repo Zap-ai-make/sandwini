@@ -15,6 +15,7 @@ import {
 import {
   champsDeLaLigne,
   champsDossierNeuf,
+  champsRetourMagasin,
   validerLigne,
   type DossierCarteGrise,
   type SaisieLigne,
@@ -246,6 +247,63 @@ export function corrigerLigne(
      résout jamais, et un écran qui l'attendrait bloquerait le geste au comptoir
      là où le hors-ligne devait le rendre possible. L'appelant avance sur
      l'écriture locale et rattache un `catch` pour le refus tardif. */
+  return suivreEcriture(lot.commit());
+}
+
+/**
+ * Marque d'un seul lot le retour de plusieurs dossiers partis chez un prestataire.
+ *
+ * **Le geste que le commanditaire faisait un par un** (27 octobre 2026) : « quand
+ * un prestataire ramène cent dossiers, il faut valider un par un, ça prend du
+ * temps ; je veux qu'on puisse valider en bloc, et décocher ceux qui ne sont
+ * pas de retour ». L'écran coche d'office tout ce qui est parti, on décoche les
+ * manquants, et ce qui reste rentre ensemble.
+ *
+ * **Un seul `writeBatch`, donc tout rentre ou rien.** Quatre-vingts dossiers
+ * dont la moitié passe et l'autre non laisseraient le comptoir incapable de dire
+ * lesquels sont déjà marqués. Hors ligne, Firestore garde le lot entier et le
+ * rejoue d'un bloc. Le plafond est celui d'`ouvrirLignes`, pour la même raison :
+ * chaque dossier coûte deux écritures — la ligne et son journal.
+ *
+ * **Chaque retour laisse sa trace**, dans le même lot, comme une correction : le
+ * statut dira où est le papier, le journal dira quand il est rentré et par la
+ * main de qui. Le journal reste tenu par l'application, non exigé par les règles
+ * (voir `corrigerLigne`).
+ */
+export function marquerRetoursMagasin(
+  dossiers: readonly DossierCarteGrise[],
+  auteur: Auteur,
+): Promise<void> {
+  if (dossiers.length === 0) return Promise.resolve();
+  if (dossiers.length > LIGNES_PAR_LOT_MAX) {
+    return Promise.reject(
+      new Error(
+        `Pas plus de ${LIGNES_PAR_LOT_MAX} retours à la fois : au-delà, l’enregistrement ne peut plus être garanti d’un seul tenant.`,
+      ),
+    );
+  }
+
+  const maintenant = new Date();
+  const lot = writeBatch(db());
+
+  for (const dossier of dossiers) {
+    const champs = champsRetourMagasin(dossier, maintenant);
+    const reference = doc(db(), COLLECTION, dossier.id);
+
+    lot.update(reference, { ...horodater(champs), ...traceModification(auteur) });
+
+    lot.set(doc(collection(reference, "historique")), {
+      boutiqueId: dossier.boutiqueId,
+      dossierId: dossier.id,
+      de: dossier.statut,
+      vers: champs.statut,
+      le: Timestamp.fromDate(new Date()),
+      ...traceCreation(auteur),
+    });
+  }
+
+  /* Comme `corrigerLigne`, la promesse ne s'attend pas (D76) : hors ligne elle
+     ne se résout jamais, et l'écran avance sur l'écriture locale. */
   return suivreEcriture(lot.commit());
 }
 

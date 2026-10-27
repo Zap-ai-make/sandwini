@@ -454,6 +454,12 @@ function Ventes() {
                 lignes={resultats}
                 cleDe={(ligne) => ligne.vente.id}
                 cleActive={venteOuverte}
+                /* **La ligne entière ouvre la fiche** (27 octobre 2026) : « fais
+                   que toute la ligne de la vente puisse ouvrir la fiche, pas le
+                   nom uniquement ». Le lien du nom reste — une `<tr>` ne se met
+                   pas au clavier, et lui seul sert le clavier et le lecteur
+                   d'écran. */
+                ouvrir={(ligne) => router.push(`/motos/ventes?vente=${ligne.vente.id}`)}
               />
             )}
           </div>

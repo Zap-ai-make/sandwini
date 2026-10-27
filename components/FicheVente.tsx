@@ -18,6 +18,7 @@ import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
 import { PapiersDeLaVente } from "@/components/PapiersDeLaVente";
 import type { Moto } from "@/lib/domain/moto";
+import { numeroLisible } from "@/lib/domain/numerotation";
 import { identifiantRecu, rangInscrit } from "@/lib/domain/recu";
 import {
   LIBELLE_MODE,
@@ -140,16 +141,19 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
 
   return (
     <PanneauLateral
-      nom={vente ? `Vente ${vente.numero}` : "Vente"}
-      fermerVers={base}
+      nom={vente ? `Vente n° ${numeroLisible(vente.numero)}` : "Vente"}
       identite={
         vente ? (
+          /* **Le rang du mois, et rien d'autre** (27 octobre 2026). La souche
+             portait `SDO-2610-0003` : le code de la boutique y était redit à
+             l'écran de cette boutique-là, et le mois à côté de la date qui le
+             dit déjà en toutes lettres. Reste ce qu'on dicte au téléphone.
+             Le numéro complet, lui, n'a pas bougé en base — c'est la clé qui
+             relie la vente à ses versements et à son dossier (D44). */
           <div className="souche">
             <p className="souche-numero">
-              <span className="souche-code">{vente.boutiqueId}</span>
-              {vente.numero.startsWith(`${vente.boutiqueId}-`)
-                ? vente.numero.slice(vente.boutiqueId.length)
-                : ` ${vente.numero}`}
+              <span className="souche-code">N° </span>
+              {numeroLisible(vente.numero)}
             </p>
             <p className="souche-legende">
               {vente.date ? `Vente du ${formaterDate(vente.date)}` : "Date inconnue"}
@@ -159,6 +163,7 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
           <p className="font-semibold text-encre">Vente</p>
         )
       }
+      fermerVers={base}
       actions={
         vente ? (
           <>

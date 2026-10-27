@@ -32,13 +32,13 @@ const prochainNumero = (page: Page) => page.locator('[data-test="prochain-numero
 test.describe("le numéro de la prochaine pièce", () => {
   test("un numéro appartient à une boutique, pas à l’entreprise", async ({ page }) => {
     await seConnecterEtEntrer(page);
-    const terrain = await preparerTerrain(page);
+    await preparerTerrain(page);
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
-    await expect(prochainNumero(page)).toHaveText(
-      new RegExp(`^${terrain.code}-\\d{4}-0001$`),
-      { timeout: 30_000 },
-    );
+    /* **Le reçu n'affiche plus que le rang du mois** (27 octobre 2026) : le code
+       de la boutique et le mois se lisent ailleurs sur la feuille. Le numéro
+       complet reste en base ; c'est son rendu qui s'allège. */
+    await expect(prochainNumero(page)).toHaveText(/^n°\s*0001$/, { timeout: 30_000 });
 
     /* **En vue entreprise, aucun numéro n'est promis.** C'est l'énoncé du
        titre : le compteur appartient à un tiroir, et l'entreprise n'en est pas
@@ -58,13 +58,10 @@ test.describe("le numéro de la prochaine pièce", () => {
     context,
   }) => {
     await seConnecterEtEntrer(page);
-    const terrain = await preparerTerrain(page);
+    await preparerTerrain(page);
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
-    await expect(prochainNumero(page)).toHaveText(
-      new RegExp(`^${terrain.code}-\\d{4}-0001$`),
-      { timeout: 30_000 },
-    );
+    await expect(prochainNumero(page)).toHaveText(/^n°\s*0001$/, { timeout: 30_000 });
     const enLigne = (await prochainNumero(page).textContent())!.trim();
 
     /* Le registre est mis en cache sans son paramètre : c'est la page que le

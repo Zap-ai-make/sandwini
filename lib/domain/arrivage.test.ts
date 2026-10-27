@@ -361,9 +361,10 @@ describe("filtrerArrivages", () => {
     motoLot({ arrivageId: "a1", statut: "en_stock", cmcRecu: false, quittanceRecue: true }),
     // les deux papiers en main, pas écoulé
     motoLot({ arrivageId: "a2", statut: "en_stock", cmcRecu: true, quittanceRecue: true }),
-    /* **Le lot que S53 fait apparaître dans ce filtre.** Son CMC est là, sa
-       quittance non : il était invisible tant que le filtre ne comptait qu'un
-       des deux papiers. */
+    /* **Le lot que S53 faisait apparaître dans ce filtre, et qui en sort le
+       27 octobre 2026.** Son CMC est là, sa quittance non. Le commanditaire a
+       retiré la quittance de l'arrivage : un lot complet en CMC ne doit plus
+       se déclarer incomplet pour un papier que cet écran ne pointe plus. */
     motoLot({ arrivageId: "quittance", statut: "en_stock", cmcRecu: true, quittanceRecue: false }),
     motoLot({ arrivageId: "ecoule", statut: "vendue", cmcRecu: true, quittanceRecue: true }),
     motoLot({ arrivageId: "annule", statut: "en_stock", cmcRecu: false, quittanceRecue: false }),
@@ -378,11 +379,8 @@ describe("filtrerArrivages", () => {
     ]);
   });
 
-  it("« cmc-incomplets » garde les lots dont l’un des deux papiers manque", () => {
-    expect(filtrerArrivages(arrivages, motos, "cmc-incomplets").map((a) => a.id)).toEqual([
-      "a1",
-      "quittance",
-    ]);
+  it("« cmc-incomplets » ne garde que les lots dont un CMC manque", () => {
+    expect(filtrerArrivages(arrivages, motos, "cmc-incomplets").map((a) => a.id)).toEqual(["a1"]);
   });
 
   it("« ecoules » ne garde que les lots tout vendus", () => {

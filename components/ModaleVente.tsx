@@ -49,6 +49,7 @@ import {
   type Vente,
 } from "@/lib/domain/vente";
 import type { VentePiece } from "@/lib/domain/vente-piece";
+import { numeroLisible } from "@/lib/domain/numerotation";
 import { prochainNumero } from "@/lib/numerotation/compteur";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -544,7 +545,7 @@ export function ModaleVente({
             {enregistrees.map((vente, rang) => (
               <span key={vente.id}>
                 {rang > 0 && " · "}
-                <span className="plaque-code">{vente.numero}</span>
+                <span className="plaque-code">n° {numeroLisible(vente.numero)}</span>
               </span>
             ))}
           </p>
@@ -597,101 +598,6 @@ export function ModaleVente({
 
       <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <div className="min-w-0">
-          <Groupe titre="Le client">
-            <ChampRecherche
-              id="recherche-client-vente"
-              libelle="Chercher un client"
-              aide="Rien ne s’affiche tant que vous n’avez pas tapé. Un nom, un prénom, ou un numéro."
-              placeholder="Un numéro, ou le début d’un nom"
-              valeur={rechercheClient}
-              changer={setRechercheClient}
-            />
-
-            {chercheClient &&
-              (clientsEnCours ? (
-                <p className="mt-3 text-corps text-encre-doux">Chargement du fichier clients…</p>
-              ) : resultatsClients.length === 0 ? (
-                <EtatSansResultat className="mt-3">
-                  Personne ne correspond. La fiche se crée juste en dessous.
-                </EtatSansResultat>
-              ) : (
-                <>
-                  <ul className="mt-3 space-y-2">
-                    {resultatsClients.map((client) => (
-                      <li key={client.id}>
-                        <Choix
-                          nom="client-vente"
-                          choisi={saisie.clientId === client.id}
-                          surChoix={() => changer({ clientId: client.id })}
-                        >
-                          <span className="min-w-0 flex-1">
-                            <span className="block font-medium text-encre">
-                              {nomComplet(client)}
-                            </span>
-                            <span className="block text-corps text-encre-doux">
-                              {formaterTelephone(client.telephone)}
-                              {client.adresse ? ` · ${client.adresse}` : ""}
-                            </span>
-                          </span>
-                        </Choix>
-                      </li>
-                    ))}
-                  </ul>
-                  <Tronquee
-                    montres={resultatsClients.length}
-                    total={clientsTrouves.length}
-                    mot="clients"
-                  />
-                </>
-              ))}
-          </Groupe>
-
-          {/* C'est **ce bloc-ci** qui change quand un client est retenu, et
-              jamais la liste au-dessus : replier un groupe de boutons radio au
-              moment du choix le détruirait sous les doigts de qui le parcourt
-              aux flèches.
-
-              Il vivait hors du `Groupe` parce qu'il portait un `<form>` et
-              qu'un formulaire ne se range pas dans le `fieldset` d'un autre.
-              Ce n'est plus le cas — `ChampsClient` n'est que des champs —, mais
-              la séparation reste : elle dit que ce bloc répond à la liste, au
-              lieu d'en faire partie. */}
-          <section className="mb-8">
-            {clientChoisi ? (
-              <ClientRetenu
-                client={clientChoisi}
-                surChangement={() => changer({ clientId: "" })}
-              />
-            ) : (
-              <div className="rounded-champ border border-bord bg-fond p-4">
-                <h3 className="font-semibold text-encre">Nouveau client</h3>
-                <p className="mt-1 text-corps text-encre-doux">
-                  Il sera rattaché à cette vente immédiatement, réseau ou pas.
-                </p>
-                <div className="mt-4 max-w-[40rem]">
-                  {/* Les champs seuls : pas de `<form>`, pas de bouton. Le
-                      client part avec la vente, et c'est le pied de la modale
-                      qui conclut les deux. */}
-                  <ChampsClient prefixe="nouveau-client" saisie={client} changer={changerClient} />
-
-                  {rapproche && (
-                    <FicheReconnue
-                      client={rapproche}
-                      surUtilisation={(trouve) => {
-                        changer({ clientId: trouve.id });
-                        setRapproche(null);
-                        /* La recherche se cale sur la fiche adoptée : si on
-                           revient changer d'avis, elle est encore là. */
-                        setRechercheClient(nomComplet(trouve));
-                      }}
-                      surAbandon={() => setRapproche(null)}
-                    />
-                  )}
-                </div>
-              </div>
-            )}
-          </section>
-
           <Groupe titre="La moto">
             {stock === null ? (
               <p className="text-corps text-encre-doux">Chargement du stock…</p>
@@ -822,6 +728,101 @@ export function ModaleVente({
               </p>
             )}
           </Groupe>
+
+          <Groupe titre="Le client">
+            <ChampRecherche
+              id="recherche-client-vente"
+              libelle="Chercher un client"
+              aide="Rien ne s’affiche tant que vous n’avez pas tapé. Un nom, un prénom, ou un numéro."
+              placeholder="Un numéro, ou le début d’un nom"
+              valeur={rechercheClient}
+              changer={setRechercheClient}
+            />
+
+            {chercheClient &&
+              (clientsEnCours ? (
+                <p className="mt-3 text-corps text-encre-doux">Chargement du fichier clients…</p>
+              ) : resultatsClients.length === 0 ? (
+                <EtatSansResultat className="mt-3">
+                  Personne ne correspond. La fiche se crée juste en dessous.
+                </EtatSansResultat>
+              ) : (
+                <>
+                  <ul className="mt-3 space-y-2">
+                    {resultatsClients.map((client) => (
+                      <li key={client.id}>
+                        <Choix
+                          nom="client-vente"
+                          choisi={saisie.clientId === client.id}
+                          surChoix={() => changer({ clientId: client.id })}
+                        >
+                          <span className="min-w-0 flex-1">
+                            <span className="block font-medium text-encre">
+                              {nomComplet(client)}
+                            </span>
+                            <span className="block text-corps text-encre-doux">
+                              {formaterTelephone(client.telephone)}
+                              {client.adresse ? ` · ${client.adresse}` : ""}
+                            </span>
+                          </span>
+                        </Choix>
+                      </li>
+                    ))}
+                  </ul>
+                  <Tronquee
+                    montres={resultatsClients.length}
+                    total={clientsTrouves.length}
+                    mot="clients"
+                  />
+                </>
+              ))}
+          </Groupe>
+
+          {/* C'est **ce bloc-ci** qui change quand un client est retenu, et
+              jamais la liste au-dessus : replier un groupe de boutons radio au
+              moment du choix le détruirait sous les doigts de qui le parcourt
+              aux flèches.
+
+              Il vivait hors du `Groupe` parce qu'il portait un `<form>` et
+              qu'un formulaire ne se range pas dans le `fieldset` d'un autre.
+              Ce n'est plus le cas — `ChampsClient` n'est que des champs —, mais
+              la séparation reste : elle dit que ce bloc répond à la liste, au
+              lieu d'en faire partie. */}
+          <section className="mb-8">
+            {clientChoisi ? (
+              <ClientRetenu
+                client={clientChoisi}
+                surChangement={() => changer({ clientId: "" })}
+              />
+            ) : (
+              <div className="rounded-champ border border-bord bg-fond p-4">
+                <h3 className="font-semibold text-encre">Nouveau client</h3>
+                <p className="mt-1 text-corps text-encre-doux">
+                  Il sera rattaché à cette vente immédiatement, réseau ou pas.
+                </p>
+                <div className="mt-4 max-w-[40rem]">
+                  {/* Les champs seuls : pas de `<form>`, pas de bouton. Le
+                      client part avec la vente, et c'est le pied de la modale
+                      qui conclut les deux. */}
+                  <ChampsClient prefixe="nouveau-client" saisie={client} changer={changerClient} />
+
+                  {rapproche && (
+                    <FicheReconnue
+                      client={rapproche}
+                      surUtilisation={(trouve) => {
+                        changer({ clientId: trouve.id });
+                        setRapproche(null);
+                        /* La recherche se cale sur la fiche adoptée : si on
+                           revient changer d'avis, elle est encore là. */
+                        setRechercheClient(nomComplet(trouve));
+                      }}
+                      surAbandon={() => setRapproche(null)}
+                    />
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
 
           <Groupe
             titre={
@@ -1178,7 +1179,9 @@ function Recapitulatif({
             suivants se tirent du même compteur, à l'enregistrement. */}
         {numero && (
           <span data-test="prochain-numero" className="plaque-code text-legende text-encre-doux">
-            {plusieurs ? `à partir de ${numero}` : numero}
+            {plusieurs
+              ? `à partir du n° ${numeroLisible(numero)}`
+              : `n° ${numeroLisible(numero)}`}
           </span>
         )}
       </div>

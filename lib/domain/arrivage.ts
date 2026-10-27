@@ -284,15 +284,14 @@ export type FiltreArrivage = "tous" | "cmc-incomplets" | "ecoules";
 /** Les lots actifs (jamais les annulés), restreints selon l'onglet choisi. */
 export function filtrerArrivages(arrivages: Arrivage[], motos: Moto[], filtre: FiltreArrivage): Arrivage[] {
   const actifs = arrivages.filter((a) => !a.annule);
-  /* Le filtre garde son nom d'URL — « cmc-incomplets » est dans les signets du
-     commanditaire — mais compte les DEUX papiers depuis S53 : un lot dont les
-     quittances manquent est tout aussi incomplet. Le libellé affiché, lui, dit
-     « Papiers incomplets ». */
+  /* **Le CMC seul, de nouveau** (27 octobre 2026) : « supprime la partie
+     quittance dans arrivage ». Le filtre comptait les deux papiers depuis S53 ;
+     la quittance se suit maintenant sur la fiche de la moto, et un lot dont
+     tous les CMC sont là ne doit plus se déclarer incomplet pour une quittance
+     que cet écran ne pointe plus. Le nom d'URL ne bouge pas : il est dans les
+     signets du commanditaire. */
   if (filtre === "cmc-incomplets") {
-    return actifs.filter((a) => {
-      const papiers = completudePapiers(motos, a.id);
-      return papiers.cmcManquants > 0 || papiers.quittancesManquantes > 0;
-    });
+    return actifs.filter((a) => completudePapiers(motos, a.id).cmcManquants > 0);
   }
   if (filtre === "ecoules") return actifs.filter((a) => estEcoule(motos, a.id));
   return actifs;

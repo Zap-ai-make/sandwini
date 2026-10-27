@@ -4,6 +4,7 @@ import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { montantEnLettres } from "@/lib/domain/lettres";
 import type { Boutique } from "@/lib/domain/boutique";
 import type { Moto } from "@/lib/domain/moto";
+import { numeroLisible } from "@/lib/domain/numerotation";
 import { LIBELLE_TYPE_RECU, type ContenuRecu } from "@/lib/domain/recu";
 import {
   LIBELLE_MODE,
@@ -88,7 +89,7 @@ export function Recu({
 
   return (
     <article
-      aria-label={`${LIBELLE_TYPE_RECU[contenu.type]} ${contenu.numero}`}
+      aria-label={`${LIBELLE_TYPE_RECU[contenu.type]} n° ${numeroLisible(contenu.numero)}`}
       className="facture mx-auto max-w-[170mm]"
     >
       <header className="facture-entete">
@@ -132,7 +133,12 @@ export function Recu({
               </>
             )}
           </h1>
-          <span className="facture-numero">N° {contenu.numero}</span>
+          {/* **Le rang du mois seul** (27 octobre 2026) : « trouve un bon
+              format de reçu, pas chargé, compréhensible ». C'est le format de
+              son carnet à souches — `N° 01579` — et les deux informations
+              retirées sont écrites ailleurs sur la même feuille : la boutique
+              en tête, le mois dans les cases de date juste à gauche. */}
+          <span className="facture-numero">N° {numeroLisible(contenu.numero)}</span>
         </div>
       </div>
 

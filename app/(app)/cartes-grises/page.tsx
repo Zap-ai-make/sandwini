@@ -1,11 +1,12 @@
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { PackageCheck, Plus, Search } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { GardeEspace } from "@/components/GardeSession";
 import { LigneModale } from "@/components/GestesDossierCarteGrise";
 import { Avis } from "@/components/patrons/Avis";
+import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { ErreurDeLecture, EtatChargement, EtatSansResultat } from "@/components/patrons/Etats";
 import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage } from "@/components/patrons/Page";
@@ -13,6 +14,7 @@ import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
 import { normaliserNom } from "@/lib/domain/client";
 import {
+  attendUnRetour,
   chercherDossiers,
   ENTETES_LIGNE,
   ORDRE_LIGNE,
@@ -24,7 +26,11 @@ import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import type { Prestataire } from "@/lib/domain/prestataire";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import { ecouterDossiersCarteGrise } from "@/lib/repositories/dossiers-carte-grise";
+import {
+  ecouterDossiersCarteGrise,
+  marquerRetoursMagasin,
+  messageErreurDossierCarteGrise,
+} from "@/lib/repositories/dossiers-carte-grise";
 import { ecouterPrestataires } from "@/lib/repositories/prestataires";
 
 /**
@@ -204,6 +210,9 @@ function Ecran() {
                   boutiqueId={boutiqueId}
                   prestataires={connus}
                   auteur={auteur}
+                  /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
+                     vivent les dossiers partis chez un prestataire. */
+                  permettreRetour
                 />
               ),
             },
@@ -249,6 +258,7 @@ function Liste({
   boutiqueId,
   prestataires,
   auteur,
+  permettreRetour = false,
 }: {
   dossiers: DossierCarteGrise[];
   chargement: boolean;
@@ -256,6 +266,8 @@ function Liste({
   boutiqueId: string | null;
   prestataires: Prestataire[];
   auteur: { uid: string; nom: string };
+  /** Le dépôt seul : ses dossiers chez un prestataire peuvent rentrer en bloc. */
+  permettreRetour?: boolean;
 }) {
   const [ouvert, setOuvert] = useState<DossierCarteGrise | null>(null);
 
@@ -307,13 +319,75 @@ function Liste({
     "immatriculation",
   ];
 
-  const colonnes: Colonne<DossierCarteGrise>[] = ORDRE_LIGNE.map((cle) => ({
+  const lignesColonnes: Colonne<DossierCarteGrise>[] = ORDRE_LIGNE.map((cle) => ({
     cle,
     titre: ENTETES_LIGNE[cle],
     principal: cle === "client",
     chiffre: CHIFFRES.includes(cle),
     rendu: rendus[cle],
   }));
+
+  /* **Les dossiers partis chez un prestataire, et ceux qu'on marque revenus.**
+     Un `Set` des identifiants *décochés* plutôt que cochés : on les coche tous
+     d'office — « souvent il peut ramener une partie, 80, qu'on puisse décocher
+     ceux qui ne sont pas de retour » — et on retient ce que l'utilisateur
+     retire, pas ce qu'il garde. Ainsi un dossier qui arrive après coup est coché
+     sans qu'on ait à y penser. */
+  const [decoches, setDecoches] = useState<ReadonlySet<string>>(new Set());
+  const [erreurRetour, setErreurRetour] = useState<string | null>(null);
+
+  const partis = useMemo(() => dossiers.filter(attendUnRetour), [dossiers]);
+  const aRentrer = useMemo(
+    () => partis.filter((dossier) => !decoches.has(dossier.id)),
+    [partis, decoches],
+  );
+  const montrerRetour = permettreRetour && partis.length > 0;
+
+  function basculer(id: string) {
+    setDecoches((avant) => {
+      const suivant = new Set(avant);
+      if (suivant.has(id)) suivant.delete(id);
+      else suivant.add(id);
+      return suivant;
+    });
+  }
+
+  function marquerRetours() {
+    if (aRentrer.length === 0) return;
+    setErreurRetour(null);
+    /* L'écriture n'est pas attendue (D76) : hors ligne elle part en file, les
+       lignes basculent dans le cache et quittent le dépôt tout de suite. Un
+       refus tardif remonte ici. */
+    marquerRetoursMagasin(aRentrer, auteur).catch((cause) =>
+      setErreurRetour(messageErreurDossierCarteGrise(cause)),
+    );
+    setDecoches(new Set());
+  }
+
+  const colonnes: Colonne<DossierCarteGrise>[] = montrerRetour
+    ? [
+        {
+          cle: "retour",
+          titre: "Revenu",
+          rendu: (dossier) =>
+            attendUnRetour(dossier) ? (
+              <input
+                type="checkbox"
+                checked={!decoches.has(dossier.id)}
+                onChange={() => basculer(dossier.id)}
+                /* La ligne entière ouvre la fiche : sans cette coupure, cocher
+                   le retour l'ouvrirait du même clic. */
+                onClick={(evenement) => evenement.stopPropagation()}
+                aria-label={`Marquer ${dossier.clientNom || "ce dossier"} revenu du prestataire`}
+                className="size-4 accent-encre"
+              />
+            ) : (
+              <span aria-hidden="true">—</span>
+            ),
+        },
+        ...lignesColonnes,
+      ]
+    : lignesColonnes;
 
   if (chargement) {
     return <EtatChargement className="mt-3">Chargement des dossiers…</EtatChargement>;
@@ -324,6 +398,46 @@ function Liste({
 
   return (
     <>
+      {montrerRetour && (
+        /* **Le retour d'un paquet, d'un seul geste** (27 octobre 2026). Les
+           cases sont cochées d'office ; on décoche ce qui n'est pas rentré, et
+           on valide le reste en bloc. */
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-carte border border-bord bg-fond p-3">
+          <PackageCheck aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
+          <p className="text-corps text-encre">
+            <strong className="font-semibold">{formaterNombre(partis.length)}</strong> chez un
+            prestataire,{" "}
+            <strong className="font-semibold">{formaterNombre(aRentrer.length)}</strong> coché
+            {aRentrer.length > 1 ? "s" : ""} comme revenu{aRentrer.length > 1 ? "s" : ""}.
+          </p>
+          <button
+            type="button"
+            onClick={() => setDecoches(new Set(partis.map((dossier) => dossier.id)))}
+            className="bouton bouton-discret"
+          >
+            Tout décocher
+          </button>
+          <button
+            type="button"
+            onClick={() => setDecoches(new Set())}
+            className="bouton bouton-discret"
+          >
+            Tout cocher
+          </button>
+          <button
+            type="button"
+            onClick={marquerRetours}
+            disabled={aRentrer.length === 0}
+            className="bouton bouton-principal"
+          >
+            <PackageCheck aria-hidden="true" className="size-4" />
+            Marquer {formaterNombre(aRentrer.length)} revenu
+            {aRentrer.length > 1 ? "s" : ""}
+          </button>
+          <EtatErreurSaisie message={erreurRetour} />
+        </div>
+      )}
+
       <Tableau
         legende="Les dossiers de carte grise, ceux qui n’ont pas encore été confiés d’abord, puis du plus ancien dépôt. Le nom du propriétaire ouvre la ligne."
         /* Ses noms gardent leur casse : les capitales de tableau feraient de

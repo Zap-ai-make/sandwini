@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  attendUnRetour,
   champsDeLaLigne,
   champsDossierNeuf,
+  champsRetourMagasin,
   chercherDossiers,
   dossierEnCours,
   ENTETES_LIGNE,
@@ -664,5 +666,48 @@ describe("chercher dans la liste", () => {
     /* Le pire des deux comportements serait de rendre la liste entière : on
        croirait avoir trouvé. */
     expect(chercherDossiers(liste, "zzzz", normaliser)).toEqual([]);
+  });
+});
+
+describe("retour d'un paquet en bloc", () => {
+  const dossier = (p: Partial<DossierCarteGrise> = {}): DossierCarteGrise =>
+    ({
+      id: "d1",
+      statut: "chez_prestataire",
+      deposeLe: new Date(2026, 0, 10),
+      revenuLe: null,
+      ...p,
+    }) as DossierCarteGrise;
+
+  describe("attendUnRetour", () => {
+    it("ne retient que les dossiers chez le prestataire", () => {
+      expect(attendUnRetour(dossier({ statut: "chez_prestataire" }))).toBe(true);
+      expect(attendUnRetour(dossier({ statut: "a_faire" }))).toBe(false);
+      expect(attendUnRetour(dossier({ statut: "revenu_magasin" }))).toBe(false);
+      expect(attendUnRetour(dossier({ statut: "remis" }))).toBe(false);
+    });
+  });
+
+  describe("champsRetourMagasin", () => {
+    const aujourdhui = new Date(2026, 9, 27);
+
+    it("passe le dossier « au magasin » et date le retour d'aujourd'hui", () => {
+      const champs = champsRetourMagasin(dossier(), aujourdhui);
+      expect(champs.statut).toBe("revenu_magasin");
+      expect(champs.revenuLe).toEqual(aujourdhui);
+    });
+
+    it("ne retouche pas une date de retour déjà inscrite", () => {
+      const hier = new Date(2026, 9, 26);
+      expect(champsRetourMagasin(dossier({ revenuLe: hier }), aujourdhui).revenuLe).toEqual(hier);
+    });
+
+    it("produit un statut que les règles acceptent avec cette date", () => {
+      /* `revenu_magasin` est crédible dès que `revenuLe` est posé : c'est la
+         même déduction que `statutDeLaLigne`. */
+      const champs = champsRetourMagasin(dossier(), aujourdhui);
+      expect(champs.revenuLe).not.toBeNull();
+      expect(champs.statut).toBe("revenu_magasin");
+    });
   });
 });

@@ -186,9 +186,15 @@ export function ChampsClient({
   saisie: SaisieClient;
   changer: (partie: Partial<SaisieClient>) => void;
 }) {
-  /* Replié par défaut : trois champs sur cinq ne servent qu'une fois sur dix,
-     et le geste du comptoir est « nom, prénom, téléphone, pièce ». */
-  const [details, setDetails] = useState(false);
+  /**
+   * **Plus rien n'est replié** (27 octobre 2026, demande du commanditaire) :
+   * « second numéro reste ouvert par défaut, ainsi que note ».
+   *
+   * Le repli datait du jour où la fiche portait cinq champs dont trois ne
+   * servaient qu'une fois sur dix. Il en reste quatre depuis que le numéro de
+   * pièce est parti, et le bouton coûtait désormais plus qu'il ne faisait
+   * gagner : un geste pour atteindre un champ qu'on remplit souvent.
+   */
 
   return (
     <>
@@ -214,65 +220,55 @@ export function ChampsClient({
             changer={(prenom) => changer({ prenom })}
           />
         </div>
-        <ChampClient
-          id={`${prefixe}-telephone`}
-          libelle="Téléphone"
-          type="tel"
-          valeur={saisie.telephone}
-          maximum={LONGUEUR_TELEPHONE_MAX}
-          changer={(telephone) => changer({ telephone })}
-          aide="Huit chiffres suffisent. L’indicatif est ajouté tout seul."
-        />
-        {/* Trois champs qui ne servent qu'une fois sur dix. Repliés, ils ne
-            pèsent plus sur le geste ordinaire ; dépliés, ils sont là. Un vrai
-            bouton, pas un `<details>` : le formulaire est déjà dans une modale,
-            et deux mécaniques de repli se contredisent à l'usage. */}
-        <div>
-          <button
-            type="button"
-            onClick={() => setDetails((ouvert) => !ouvert)}
-            aria-expanded={details}
-            aria-controls={`${prefixe}-details`}
-            className="bouton bouton-discret"
-          >
-            {details ? "Masquer les précisions" : "Préciser (second numéro, adresse, note)"}
-          </button>
+        {/* **Le téléphone et l'adresse côte à côte, comme le nom et le
+            prénom** (27 octobre 2026) : « divise le champ téléphone comme nom
+            et prénom et mets l'adresse pour le second champ ». Les deux
+            répondent à la même question — où joindre cette personne — et
+            l'adresse remontait du repli, où elle se faisait oublier. */}
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ChampClient
+            id={`${prefixe}-telephone`}
+            libelle="Téléphone"
+            type="tel"
+            valeur={saisie.telephone}
+            maximum={LONGUEUR_TELEPHONE_MAX}
+            changer={(telephone) => changer({ telephone })}
+            aide="Huit chiffres suffisent. L’indicatif est ajouté tout seul."
+          />
+          <ChampClient
+            id={`${prefixe}-adresse`}
+            libelle="Adresse"
+            facultatif
+            valeur={saisie.adresse}
+            maximum={LONGUEUR_ADRESSE_MAX}
+            changer={(adresse) => changer({ adresse })}
+          />
         </div>
 
-        {details && (
-          <div id={`${prefixe}-details`} className="space-y-4">
-            <ChampClient
-              id={`${prefixe}-telephone2`}
-              libelle="Second téléphone"
-              type="tel"
-              facultatif
-              valeur={saisie.telephone2}
-              maximum={LONGUEUR_TELEPHONE_MAX}
-              changer={(telephone2) => changer({ telephone2 })}
+        <div className="space-y-4">
+          <ChampClient
+            id={`${prefixe}-telephone2`}
+            libelle="Second téléphone"
+            type="tel"
+            facultatif
+            valeur={saisie.telephone2}
+            maximum={LONGUEUR_TELEPHONE_MAX}
+            changer={(telephone2) => changer({ telephone2 })}
+          />
+          <div>
+            <label htmlFor={`${prefixe}-note`} className="block text-sm font-medium text-encre">
+              Note <span className="font-normal text-encre-doux">(facultatif)</span>
+            </label>
+            <textarea
+              id={`${prefixe}-note`}
+              rows={2}
+              value={saisie.note}
+              maxLength={LONGUEUR_NOTE_MAX}
+              onChange={(evenement) => changer({ note: evenement.target.value })}
+              className="saisie mt-1.5"
             />
-            <ChampClient
-              id={`${prefixe}-adresse`}
-              libelle="Adresse"
-              facultatif
-              valeur={saisie.adresse}
-              maximum={LONGUEUR_ADRESSE_MAX}
-              changer={(adresse) => changer({ adresse })}
-            />
-            <div>
-              <label htmlFor={`${prefixe}-note`} className="block text-sm font-medium text-encre">
-                Note <span className="font-normal text-encre-doux">(facultatif)</span>
-              </label>
-              <textarea
-                id={`${prefixe}-note`}
-                rows={2}
-                value={saisie.note}
-                maxLength={LONGUEUR_NOTE_MAX}
-                onChange={(evenement) => changer({ note: evenement.target.value })}
-                className="saisie mt-1.5"
-              />
-            </div>
           </div>
-        )}
+        </div>
       </div>
     </>
   );

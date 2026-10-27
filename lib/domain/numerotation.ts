@@ -74,6 +74,40 @@ export function estNumeroValide(brut: string): boolean {
   return analyserNumero(brut) !== null;
 }
 
+/**
+ * Le numéro tel qu'il se lit sur le papier : le rang du mois, et rien d'autre.
+ *
+ * **« Trouve un bon format de reçu, pas chargé, compréhensible »** (27 octobre
+ * 2026). `SDO-2610-0003` porte trois informations dont le client n'a que faire :
+ * le code de la boutique — il sait chez qui il a acheté, c'est écrit en tête —
+ * et le mois — il est écrit juste à côté, en toutes lettres. Reste le rang,
+ * qui est ce qu'on dicte au téléphone et ce qu'on cherche dans un classeur.
+ * C'est exactement ce que porte son carnet à souches : `N° 01579`.
+ *
+ * **Le suffixe de collision, lui, reste.** Quand le serveur a renuméroté une
+ * pièce arrivée en second, deux reçus du même mois portent le même rang : les
+ * confondre à l'écran annulerait le travail de la réconciliation. `0003-B`
+ * s'affiche donc avec son suffixe.
+ *
+ * **Le numéro complet ne bouge pas en base.** C'est lui qui relie une vente à
+ * ses versements, à son dossier et à sa trace serveur (D44) ; ce qui change
+ * ici est ce qu'on en montre. Un numéro illisible — recopié de travers,
+ * importé d'ailleurs — est rendu tel quel : mieux vaut un numéro étrange que
+ * pas de numéro.
+ */
+export function numeroLisible(brut: string): string {
+  const numero = analyserNumero(brut);
+  if (!numero) return brut.trim();
+  const rang = String(numero.compteur).padStart(LONGUEUR_COMPTEUR, "0");
+  return numero.rang === 0 ? rang : `${rang}-${suffixeLu(brut)}`;
+}
+
+/** Les lettres de collision telles qu'elles sont écrites dans le numéro. */
+function suffixeLu(brut: string): string {
+  const trouve = MOTIF.exec(brut.trim());
+  return trouve?.[4] ?? "";
+}
+
 /** L’inverse de `suffixeDeRang`, sur les lettres seules (`B` → 1). `null` si `A`, réservé à l’original. */
 function rangDeSuffixe(lettres: string): number | null {
   let valeur = 0;

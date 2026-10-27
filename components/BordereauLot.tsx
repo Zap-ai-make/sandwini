@@ -36,16 +36,17 @@ export function BordereauLot({
         {arrivage.date ? ` — Arrivée ${formaterDate(arrivage.date)}` : ""}
       </p>
       {arrivage.description && <p style={{ marginTop: "0.25rem" }}>{arrivage.description}</p>}
+      {/* La quittance a quitté l'arrivage le 27 octobre 2026, à l'écran comme
+          sur ce bordereau : elle se suit sur la fiche de la moto. */}
       <p style={{ marginTop: "0.5rem", fontWeight: 600 }}>
-        Motos : {compte.total} · En stock : {compte.restant} · Vendues : {compte.vendues} ·
-        Quittances manquantes : {papiers.quittancesManquantes} · CMC manquants :{" "}
-        {papiers.cmcManquants}
+        Motos : {compte.total} · En stock : {compte.restant} · Vendues : {compte.vendues} · CMC
+        manquants : {papiers.cmcManquants}
       </p>
 
       <table style={{ marginTop: "0.75rem", width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" }}>
         <thead>
           <tr>
-            {["#", "N° de cadre", "Marque", "Statut", "Quittance", "CMC"].map((titre) => (
+            {["#", "N° de cadre", "Marque", "Statut", "CMC"].map((titre) => (
               <th
                 key={titre}
                 style={{ textAlign: "left", borderBottom: "2px solid #000", padding: "0.25rem 0.4rem" }}
@@ -68,9 +69,6 @@ export function BordereauLot({
               </td>
               <td style={{ borderBottom: filet, padding: "0.25rem 0.4rem" }}>
                 {LIBELLE_STATUT[moto.statut]}
-              </td>
-              <td style={{ borderBottom: filet, padding: "0.25rem 0.4rem" }}>
-                {moto.quittanceRecue ? "Reçue" : "Manquante"}
               </td>
               <td style={{ borderBottom: filet, padding: "0.25rem 0.4rem" }}>
                 {moto.cmcRecu ? "Reçu" : "Manquant"}

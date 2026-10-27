@@ -515,6 +515,44 @@ export function ligneEstVide(saisie: SaisieLigne): boolean {
   );
 }
 
+/* --- Marquer le retour d'un paquet d'un seul geste ------------------------- */
+
+/**
+ * Ce dossier est-il parti chez un prestataire, et attend-il son retour ?
+ *
+ * C'est le seul état qu'un retour en bloc concerne : ni « à faire » (pas encore
+ * parti), ni « au magasin » (déjà revenu), ni « remis » (fini). La liste des
+ * cases à cocher du retour groupé se dresse là-dessus.
+ */
+export function attendUnRetour(dossier: Pick<DossierCarteGrise, "statut">): boolean {
+  return dossier.statut === "chez_prestataire";
+}
+
+/**
+ * Les champs à écrire pour marquer qu'un dossier est revenu du prestataire.
+ *
+ * **Le geste que le commanditaire fait cent fois à la main, en un seul.** « Quand
+ * un prestataire ramène, il faut valider un par un, et ça prend du temps. »
+ * Marquer un retour, c'est inscrire la date du jour dans `revenuLe` : le statut
+ * s'en déduit, exactement comme quand on ouvre la ligne et qu'on remplit la
+ * case. On ne touche à rien d'autre — ni au dépôt, ni au prestataire, ni à
+ * l'avance —, parce qu'un retour ne corrige pas la ligne, il la fait avancer.
+ *
+ * **Une date déjà connue ne bouge pas.** Si le dossier porte déjà un `revenuLe`,
+ * on le garde : rejouer le geste ne doit pas dater d'aujourd'hui un retour
+ * d'hier. En pratique `attendUnRetour` l'a déjà écarté, mais la fonction reste
+ * juste seule.
+ */
+export function champsRetourMagasin(
+  dossier: Pick<DossierCarteGrise, "revenuLe">,
+  aujourdhui: Date,
+): { statut: StatutCarteGrise; revenuLe: Date } {
+  return {
+    statut: "revenu_magasin",
+    revenuLe: dossier.revenuLe ?? aujourdhui,
+  };
+}
+
 /* --- Chercher dans la liste ------------------------------------------------ */
 
 /**

@@ -3,6 +3,7 @@ import {
   analyserNumero,
   estNumeroValide,
   formaterNumero,
+  numeroLisible,
   periodeDe,
   prochainCompteur,
 } from "./numerotation";
@@ -80,5 +81,34 @@ describe("prochainCompteur", () => {
 
   it("laisse passer ce qu’il ne sait pas lire plutôt que de refuser de compter", () => {
     expect(prochainCompteur(["n’importe quoi", "PTG-2608-0005"], "PTG", "2608")).toBe(6);
+  });
+});
+
+describe("numeroLisible", () => {
+  /* « Trouve un bon format de reçu, pas chargé, compréhensible » (27 octobre
+     2026). Le code de la boutique est écrit en tête du reçu, le mois en toutes
+     lettres juste à côté : il reste le rang, qui est ce qu'on dicte. C'est le
+     format du carnet à souches du commanditaire — « N° 01579 ». */
+  it("ne garde que le rang du mois", () => {
+    expect(numeroLisible("SDO-2610-0003")).toBe("0003");
+    expect(numeroLisible("PTG-2608-0042")).toBe("0042");
+  });
+
+  it("garde les quatre chiffres, zéros compris", () => {
+    expect(numeroLisible("PTG-2608-0001")).toBe("0001");
+    expect(numeroLisible("PTG-2608-1234")).toBe("1234");
+  });
+
+  /* Deux pièces du même mois peuvent porter le même rang quand le serveur a
+     renuméroté celle arrivée en second : les confondre à l'écran annulerait
+     le travail de la réconciliation. */
+  it("garde le suffixe d’une collision", () => {
+    expect(numeroLisible("PTG-2608-0042-B")).toBe("0042-B");
+    expect(numeroLisible("PTG-2608-0042-C")).toBe("0042-C");
+  });
+
+  it("rend tel quel ce qui n’est pas un numéro", () => {
+    expect(numeroLisible("rien du tout")).toBe("rien du tout");
+    expect(numeroLisible("  PTG-26-42  ")).toBe("PTG-26-42");
   });
 });

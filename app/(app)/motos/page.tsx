@@ -2,7 +2,7 @@
 
 import { Bike, Plus, Search, Truck } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheMoto } from "@/components/FicheMoto";
 import {
@@ -92,6 +92,7 @@ function Stock() {
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const session = useSession();
   const catalogue = useCatalogue();
+  const router = useRouter();
   const [deplacement, setDeplacement] = useState(false);
   const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
   /* Les motos cochées pour l'export (S50). Un `Set` d'identifiants plutôt qu'un
@@ -206,6 +207,10 @@ function Stock() {
             type="checkbox"
             checked={cochees.has(moto.id)}
             onChange={() => basculer(moto.id)}
+            /* La ligne entière ouvre la fiche depuis le 27 octobre 2026 : sans
+               cette coupure, cocher une moto pour l'export l'ouvrirait du même
+               clic, et la liste se déroberait sous la main. */
+            onClick={(evenement) => evenement.stopPropagation()}
             aria-label={`Choisir la moto ${moto.numeroChassis} pour l’export`}
             className="size-4 accent-encre"
           />
@@ -456,6 +461,9 @@ function Stock() {
               colonnes={colonnes}
               lignes={resultats}
               cleDe={(moto) => moto.id}
+              /* Comme la liste des ventes (27 octobre 2026) : « de même que la
+                 page stock moto ». Le lien du châssis reste pour le clavier. */
+              ouvrir={(moto) => router.push(`/motos?moto=${moto.id}`)}
             />
           )}
         </div>
