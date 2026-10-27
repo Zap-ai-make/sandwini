@@ -13,6 +13,7 @@ import {
   Plus,
   Receipt,
   ReceiptText,
+  ShoppingCart,
   Truck,
   Store,
   Tags,
@@ -49,6 +50,15 @@ export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/parametres/cartes-grises": FolderSync,
   "/prestataires": HardHat,
   "/pieces": Wrench,
+  /* Le geste du comptoir, comme le bouton « Vendre » du catalogue (S65). */
+  "/pieces/vendre": ShoppingCart,
+  /* Le reçu, comme pour les ventes de motos (`/motos/ventes` → Receipt) : c'est
+     le même geste, consulter et réimprimer (S64). */
+  "/pieces/ventes": Receipt,
+  /* Un arrivage qui entre en stock : le camion de livraison (S66). */
+  "/pieces/reception": Truck,
+  /* Créer une référence : le même « + » que « Faire entrer une moto ». */
+  "/pieces/nouvelle": Plus,
   "/caisse": Coins,
   /* Sans ces deux lignes, les écrans de S55 retombaient sur `Activity` —
      déjà pris par `/parametres/referentiels`, dans la même colonne repliée.

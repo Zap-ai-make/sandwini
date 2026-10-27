@@ -156,6 +156,22 @@ describe("le second niveau de navigation", () => {
     expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
       "L’entreprise",
     ]);
+    /* L'espace pièces calque les motos : Vendre, Suivre, Enregistrer (S65).
+       Le gérant les voit tous — il vend, consulte et tient son catalogue. */
+    expect(groupesVisibles("pieces", "gerant").map((g) => g.titre)).toEqual([
+      "Vendre",
+      "Suivre",
+      "Enregistrer",
+    ]);
+  });
+
+  /* Sur « Toutes les boutiques », vendre n'a pas de sens (pas de boutiqueId) :
+     le groupe « Vendre » disparaît, comme celui des motos (S65). */
+  it("retire « Vendre » de l'espace pièces sur toutes les boutiques", () => {
+    expect(groupesVisibles("pieces", "responsable", "toutes").map((g) => g.titre)).toEqual([
+      "Suivre",
+      "Enregistrer",
+    ]);
   });
 
   /*

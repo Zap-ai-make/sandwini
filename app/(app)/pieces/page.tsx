@@ -121,7 +121,12 @@ function Catalogue() {
   const surUneBoutique = perimetre.type === "boutique";
 
   const role = session.statut === "connecte" ? session.utilisateur.role : null;
-  const tientLeCatalogue = role !== null && peut(role, "gerer_referentiels");
+  /* `gerer_pieces`, et non `gerer_referentiels` : le catalogue des pièces
+     appartient à la boutique (S20 réponse 4, renversée par `3c8b2fe`), et le
+     gérant le tient. Gardé par la capacité des marques de motos, le seul rôle
+     qui doit créer et corriger une référence ne voyait pas le bouton — alors
+     que le rail et la garde de route, eux, parlaient déjà `gerer_pieces`. */
+  const tientLeCatalogue = role !== null && peut(role, "gerer_pieces");
 
   if (catalogue.echec || journal.echec) {
     return (
@@ -193,6 +198,7 @@ function Catalogue() {
   ];
 
   const totalActives = (pieces ?? []).filter((piece) => piece.actif).length;
+  const totalArchivees = (pieces ?? []).filter((piece) => !piece.actif).length;
   const pieceOuverte = (pieces ?? []).find((piece) => piece.id === ouverte);
 
   return (
@@ -273,43 +279,71 @@ function Catalogue() {
       </div>
 
       <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label="Filtrer le catalogue">
-        {(surUneBoutique ? FILTRES_STOCK : FILTRES_STOCK.slice(0, 1)).map(({ cle, libelle }) => (
+        {/* Les filtres de stock ne s'appliquent qu'aux actives : une archivée
+            n'est pas « en stock » ni « épuisée », elle est hors catalogue. */}
+        {!filtres.archivees &&
+          (surUneBoutique ? FILTRES_STOCK : FILTRES_STOCK.slice(0, 1)).map(({ cle, libelle }) => (
+            <button
+              key={cle}
+              type="button"
+              onClick={() => setFiltres((actuels) => ({ ...actuels, stock: cle }))}
+              aria-pressed={filtres.stock === cle}
+              className={[
+                "inline-flex h-11 items-center rounded-plaque border px-3 text-sm font-medium",
+                filtres.stock === cle
+                  ? "border-2 border-encre bg-papier font-semibold text-encre"
+                  : "border-bord bg-papier text-encre hover:bg-fond",
+              ].join(" ")}
+            >
+              {libelle}
+            </button>
+          ))}
+        {/* Le tiroir des archivées, réservé à qui tient le catalogue : c'est là
+            qu'on retrouve une référence désactivée pour la réactiver (S63). */}
+        {tientLeCatalogue && (
           <button
-            key={cle}
             type="button"
-            onClick={() => setFiltres((actuels) => ({ ...actuels, stock: cle }))}
-            aria-pressed={filtres.stock === cle}
+            onClick={() => setFiltres((actuels) => ({ ...actuels, archivees: !actuels.archivees }))}
+            aria-pressed={filtres.archivees}
             className={[
               "inline-flex h-11 items-center rounded-plaque border px-3 text-sm font-medium",
-              filtres.stock === cle
+              filtres.archivees
                 ? "border-2 border-encre bg-papier font-semibold text-encre"
                 : "border-bord bg-papier text-encre hover:bg-fond",
             ].join(" ")}
           >
-            {libelle}
+            Archivées
           </button>
-        ))}
+        )}
         <p className="ml-auto self-center text-sm text-encre-doux">
           <strong className="font-semibold text-encre">{formaterNombre(lignes.length)}</strong> sur{" "}
-          {formaterNombre(totalActives)} référence{totalActives > 1 ? "s" : ""}
+          {formaterNombre(filtres.archivees ? totalArchivees : totalActives)}{" "}
+          {filtres.archivees ? "archivée" : "référence"}
+          {(filtres.archivees ? totalArchivees : totalActives) > 1 ? "s" : ""}
         </p>
       </div>
 
       {lignes.length === 0 && !chargement ? (
-        <EtatVide
-          titre={totalActives === 0 ? "Aucune référence au catalogue" : "Aucune pièce ne correspond"}
-          action={
-            totalActives === 0 && tientLeCatalogue ? (
-              <Link href="/pieces/nouvelle" className="bouton bouton-principal">
-                Créer la première référence
-              </Link>
-            ) : undefined
-          }
-        >
-          {totalActives === 0
-            ? "Le catalogue est commun à l’entreprise : une référence créée ici sert à toutes les boutiques."
-            : "Changez de filtre, ou cherchez autre chose."}
-        </EtatVide>
+        filtres.archivees ? (
+          <EtatVide titre="Aucune référence archivée">
+            Les références que vous archiverez se retrouveront ici, prêtes à être réactivées.
+          </EtatVide>
+        ) : (
+          <EtatVide
+            titre={totalActives === 0 ? "Aucune référence au catalogue" : "Aucune pièce ne correspond"}
+            action={
+              totalActives === 0 && tientLeCatalogue ? (
+                <Link href="/pieces/nouvelle" className="bouton bouton-principal">
+                  Créer la première référence
+                </Link>
+              ) : undefined
+            }
+          >
+            {totalActives === 0
+              ? "Le catalogue est commun à l’entreprise : une référence créée ici sert à toutes les boutiques."
+              : "Changez de filtre, ou cherchez autre chose."}
+          </EtatVide>
+        )
       ) : (
         <Tableau
           legende="Le catalogue des pièces et les quantités de la boutique"

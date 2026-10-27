@@ -35,6 +35,7 @@
  * a été renommée depuis. Même raisonnement que `coutMotoSnapshot` (D2).
  */
 
+import { formaterMontant } from "./format";
 import {
   etatStock,
   lireEntier,
@@ -43,7 +44,8 @@ import {
   type EtatStock,
   type Piece,
 } from "./piece";
-import type { MoyenPaiement } from "./vente";
+import { reduire } from "./referentiel";
+import { LIBELLE_MOYEN, type MoyenPaiement } from "./vente";
 
 /**
  * Au plus vingt lignes par vente.
@@ -87,6 +89,12 @@ export type VentePiece = {
   lignes: LigneVentePiece[];
   total: number;
   moyenPaiement: MoyenPaiement;
+  /**
+   * Qui a établi la vente, recopié de la trace d'audit pour le pied du reçu
+   * « Établi par » (S64). Vide quand la trace manque — un reçu n'annonce pas
+   * un opérateur inventé.
+   */
+  operateur: string;
 };
 
 /* --- Le panier ------------------------------------------------------------ */
@@ -411,4 +419,78 @@ export function piecesEnAlerte(
       if (a.quantite !== b.quantite) return a.quantite - b.quantite;
       return a.piece.reference.localeCompare(b.piece.reference, "fr", { numeric: true });
     });
+}
+
+/* --- L'historique des ventes et son reçu (S64) ---------------------------- */
+
+/**
+ * Tri d'affichage de la liste des ventes : la plus récente en haut.
+ *
+ * Une date absente passe en dernier plutôt qu'en tête : c'est une anomalie
+ * (une vente écrit sa date à la saisie), et la hisser au sommet ferait croire
+ * qu'elle vient d'arriver. À dates égales, le numéro départage, décroissant.
+ */
+export function comparerVentesPieces(a: VentePiece, b: VentePiece): number {
+  const ta = a.date ? a.date.getTime() : -Infinity;
+  const tb = b.date ? b.date.getTime() : -Infinity;
+  if (ta !== tb) return tb - ta;
+  return b.numero.localeCompare(a.numero, "fr", { numeric: true });
+}
+
+/**
+ * Une vente répond-elle à ce qu'on cherche ? Numéro, nom du client, ou
+ * référence/désignation d'une de ses pièces — comme au comptoir, où l'on tape
+ * ce qu'on a sous la main. Casse et accents ignorés ; une requête vide laisse
+ * tout passer.
+ *
+ * Le nom du client est passé résolu — la vente ne porte qu'un `clientId`, et
+ * c'est l'écran qui tient le fichier des clients.
+ */
+export function venteCorrespond(vente: VentePiece, nomClient: string, requete: string): boolean {
+  const cible = reduire(requete);
+  if (!cible) return true;
+  const foin = reduire(
+    [
+      vente.numero,
+      nomClient,
+      ...vente.lignes.map((ligne) => `${ligne.reference} ${ligne.designation}`),
+    ].join(" "),
+  );
+  return foin.includes(cible);
+}
+
+/** « Plaquette de frein avant », ou « Plaquette… +2 autres » au-delà d'une ligne. */
+export function resumeDesignations(vente: VentePiece): string {
+  const [premiere, ...reste] = vente.lignes;
+  if (!premiere) return "—";
+  return reste.length === 0
+    ? premiere.designation
+    : `${premiere.designation} +${reste.length} autre${reste.length > 1 ? "s" : ""}`;
+}
+
+/** Le nombre d'articles vendus, quantités comprises. */
+export function nombreArticles(vente: VentePiece): number {
+  return vente.lignes.reduce((somme, ligne) => somme + ligne.quantite, 0);
+}
+
+/**
+ * Le récapitulatif texte qu'on partage par WhatsApp ou SMS (§11), pour une
+ * vente de pièces. Court et sans mise en forme : il voyage en clair.
+ */
+export function textePartageVentePiece(
+  vente: VentePiece,
+  nomClient: string,
+  raisonSociale: string,
+): string {
+  const lignes = [
+    raisonSociale,
+    `Reçu ${vente.numero}`,
+    nomClient ? `Client : ${nomClient}` : null,
+    ...vente.lignes.map(
+      (ligne) => `  ${ligne.quantite} × ${ligne.designation} — ${formaterMontant(ligne.total)}`,
+    ),
+    `Total : ${formaterMontant(vente.total)} (${LIBELLE_MOYEN[vente.moyenPaiement]})`,
+    "Acquitté.",
+  ];
+  return lignes.filter((l) => l !== null).join("\n");
 }

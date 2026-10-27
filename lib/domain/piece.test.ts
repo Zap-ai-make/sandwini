@@ -11,6 +11,7 @@ import {
   normaliserReference,
   quantiteDe,
   referenceDejaPrise,
+  saisieDepuisPiece,
   stockParPiece,
   validerMouvement,
   validerPiece,
@@ -258,6 +259,51 @@ describe("filtrerPieces", () => {
         (p) => p.id,
       ),
     ).toEqual(["a"]);
+  });
+
+  /* Le miroir de « ne montre jamais une pièce désactivée » : sans ce mode, une
+     référence archivée serait perdue, donc impossible à réactiver (S63). */
+  it("ne montre QUE les archivées quand on les demande", () => {
+    expect(
+      filtrerPieces(catalogue, quantites, { ...FILTRES_PIECES_VIDES, archivees: true }).map(
+        (p) => p.id,
+      ),
+    ).toEqual(["p4"]);
+  });
+
+  it("cherche parmi les archivées sans retomber sur les actives", () => {
+    expect(
+      filtrerPieces(catalogue, quantites, {
+        ...FILTRES_PIECES_VIDES,
+        archivees: true,
+        recherche: "plaquette",
+      }),
+    ).toEqual([]);
+  });
+});
+
+describe("saisieDepuisPiece — rouvrir une référence pour la corriger (S63)", () => {
+  it("rend les champs du formulaire, les prix en texte", () => {
+    expect(saisieDepuisPiece(piece())).toEqual({
+      reference: "PLQ-0142",
+      designation: "Plaquette de frein avant",
+      categorie: "Freinage",
+      prixAchat: "2000",
+      prixVente: "3500",
+      seuilAlerte: "5",
+    });
+  });
+
+  /* Un prix nul est « non fixé », pas « zéro » (D101) : le champ revient vide,
+     et non « 0 », sinon rouvrir une pièce sans prix lui en inventerait un. */
+  it("laisse vide un prix non fixé plutôt que d’écrire zéro", () => {
+    const saisie = saisieDepuisPiece(piece({ prixAchat: null, prixVente: null }));
+    expect(saisie.prixAchat).toBe("");
+    expect(saisie.prixVente).toBe("");
+  });
+
+  it("fait un aller-retour fidèle avec validerPiece", () => {
+    expect(validerPiece(saisieDepuisPiece(piece()))).toBeNull();
   });
 });
 

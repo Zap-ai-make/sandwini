@@ -1,11 +1,13 @@
 "use client";
 
-import { ArrowDownLeft, ArrowUpRight } from "lucide-react";
+import { ArrowDownLeft, ArrowUpRight, Pencil } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Avis } from "@/components/patrons/Avis";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant, formaterNombre } from "@/lib/domain/format";
+import { peut } from "@/lib/domain/roles";
 import {
   LIBELLE_ETAT_STOCK,
   LONGUEUR_NOTE_MAX,
@@ -59,6 +61,12 @@ export function PanneauPiece({
   const quantite = quantiteDe(mouvements);
   const etat = etatStock(quantite, piece.seuilAlerte);
 
+  /* Qui tient le catalogue peut corriger la référence — fixer un prix manquant,
+     surtout, ce qui ferme le cul-de-sac du refus de vente « Fixer le prix »
+     (D90) : il mène ici, et d'ici à l'écran qui pose le prix (S63). */
+  const peutModifier =
+    session.statut === "connecte" && peut(session.utilisateur.role, "gerer_pieces");
+
   function soumettre(evenement: React.FormEvent) {
     evenement.preventDefault();
     if (session.statut !== "connecte" || !boutiqueId) return;
@@ -90,6 +98,15 @@ export function PanneauPiece({
           <p className="plaque-code text-encre">{piece.reference}</p>
           <h2 className="mt-1 font-semibold text-encre">{piece.designation}</h2>
           {piece.categorie && <p className="text-sm text-encre-doux">{piece.categorie}</p>}
+          {peutModifier && (
+            <Link
+              href={`/pieces/${piece.id}/modifier`}
+              className="mt-1.5 inline-flex items-center gap-1.5 text-sm text-encre underline decoration-bord underline-offset-4 hover:decoration-encre"
+            >
+              <Pencil aria-hidden="true" className="size-3.5" />
+              Modifier la référence
+            </Link>
+          )}
         </div>
         <div className="text-right">
           <p className="text-2xl font-semibold text-encre">{formaterNombre(quantite)}</p>

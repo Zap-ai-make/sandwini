@@ -1,22 +1,30 @@
 import { describe, expect, it } from "vitest";
+import { formaterMontant } from "./format";
 import type { Piece } from "./piece";
 import {
   ajouterAuPanier,
   changerLigne,
+  comparerVentesPieces,
   figerLignes,
   libelleEncaissement,
   LIGNES_MAX,
   margeDesVentesPieces,
   margeLigne,
   margeVentePiece,
+  nombreArticles,
   PANIER_VIDE,
   piecesEnAlerte,
   refusAjout,
+  resumeDesignations,
   retirerDuPanier,
+  textePartageVentePiece,
   totalLigne,
   totalPanier,
   validerPanier,
+  venteCorrespond,
+  type LigneVentePiece,
   type SaisiePanier,
+  type VentePiece,
 } from "./vente-piece";
 
 /**
@@ -402,5 +410,118 @@ describe("la marge d'une vente de pièces", () => {
     expect(margeDesVentesPieces([connue, inconnue])).toBe(4000);
     expect(margeDesVentesPieces([inconnue])).toBeNull();
     expect(margeDesVentesPieces([])).toBeNull();
+  });
+});
+
+/* --- S64 : l'historique des ventes de pièces et son reçu ------------------ */
+
+const ligne = (partie: Partial<LigneVentePiece> = {}): LigneVentePiece => ({
+  pieceId: "p1",
+  reference: "PLQ-0142",
+  designation: "Plaquette de frein avant",
+  quantite: 1,
+  prixUnitaire: 3500,
+  prixAchatUnitaire: 2000,
+  total: 3500,
+  ...partie,
+});
+
+const vente = (partie: Partial<VentePiece> = {}): VentePiece => ({
+  id: "v1",
+  numero: "PTG-2610-0042",
+  boutiqueId: "PTG",
+  date: new Date("2026-10-20T10:00:00Z"),
+  clientId: "",
+  operateur: "Awa",
+  lignes: [ligne()],
+  total: 3500,
+  moyenPaiement: "especes",
+  ...partie,
+});
+
+describe("comparerVentesPieces — la plus récente en haut (S64)", () => {
+  it("range par date décroissante", () => {
+    const liste = [
+      vente({ id: "a", date: new Date("2026-10-18") }),
+      vente({ id: "b", date: new Date("2026-10-21") }),
+      vente({ id: "c", date: new Date("2026-10-20") }),
+    ].sort(comparerVentesPieces);
+    expect(liste.map((v) => v.id)).toEqual(["b", "c", "a"]);
+  });
+
+  it("met une date absente en dernier, sans planter", () => {
+    const liste = [
+      vente({ id: "sansDate", date: null }),
+      vente({ id: "avecDate", date: new Date("2026-10-20") }),
+    ].sort(comparerVentesPieces);
+    expect(liste.map((v) => v.id)).toEqual(["avecDate", "sansDate"]);
+  });
+});
+
+describe("venteCorrespond — chercher une vente (S64)", () => {
+  const v = vente({
+    numero: "PTG-2610-0042",
+    lignes: [ligne({ designation: "Plaquette de frein avant", reference: "PLQ-0142" })],
+  });
+
+  it("trouve par numéro, même partiel", () => {
+    expect(venteCorrespond(v, "", "0042")).toBe(true);
+    expect(venteCorrespond(v, "", "ptg-2610")).toBe(true);
+  });
+
+  it("trouve par nom de client, sans casse ni accents", () => {
+    expect(venteCorrespond(v, "Aïcha Traoré", "aicha")).toBe(true);
+  });
+
+  it("trouve par désignation ou référence d'une pièce", () => {
+    expect(venteCorrespond(v, "", "plaquette")).toBe(true);
+    expect(venteCorrespond(v, "", "plq")).toBe(true);
+  });
+
+  it("une recherche vide laisse tout passer", () => {
+    expect(venteCorrespond(v, "", "   ")).toBe(true);
+  });
+
+  it("ne trouve pas ce qui n'y est pas", () => {
+    expect(venteCorrespond(v, "", "chaîne")).toBe(false);
+  });
+});
+
+describe("resumeDesignations et nombreArticles (S64)", () => {
+  it("nomme la seule pièce quand il n'y en a qu'une", () => {
+    expect(resumeDesignations(vente())).toBe("Plaquette de frein avant");
+  });
+
+  it("résume « première + N autres » au-delà d'une ligne", () => {
+    const v = vente({
+      lignes: [
+        ligne({ designation: "Plaquette de frein avant" }),
+        ligne({ pieceId: "p2", designation: "Bougie NGK" }),
+        ligne({ pieceId: "p3", designation: "Filtre à air" }),
+      ],
+    });
+    expect(resumeDesignations(v)).toBe("Plaquette de frein avant +2 autres");
+  });
+
+  it("compte les articles, quantités comprises", () => {
+    const v = vente({
+      lignes: [ligne({ quantite: 3 }), ligne({ pieceId: "p2", quantite: 2 })],
+    });
+    expect(nombreArticles(v)).toBe(5);
+  });
+});
+
+describe("textePartageVentePiece (S64)", () => {
+  it("porte le numéro, le total et l'enseigne", () => {
+    const texte = textePartageVentePiece(vente(), "", "ETS SANDWIDI ET FRÈRES");
+    expect(texte).toContain("PTG-2610-0042");
+    /* La valeur formatée porte le séparateur de milliers français (espace fine
+       insécable), qu'une « 3 500 » écrite au clavier ne contient pas. */
+    expect(texte).toContain(formaterMontant(3500));
+    expect(texte).toContain("ETS SANDWIDI ET FRÈRES");
+  });
+
+  it("nomme le client quand il y en a un", () => {
+    expect(textePartageVentePiece(vente(), "Aïcha Traoré", "ETS")).toContain("Aïcha Traoré");
   });
 });

@@ -7,6 +7,7 @@ import {
   Timestamp,
   updateDoc,
   where,
+  writeBatch,
   type DocumentData,
   type QueryDocumentSnapshot,
 } from "firebase/firestore";
@@ -21,6 +22,7 @@ import {
   type SaisiePiece,
   type TypeMouvement,
 } from "@/lib/domain/piece";
+import type { SaisieReception } from "@/lib/domain/reception";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
 import { traceCreation, traceModification, type Auteur } from "./referentiels";
@@ -229,6 +231,58 @@ export function enregistrerMouvement(
       }),
     ),
   };
+}
+
+/**
+ * Enregistre un arrivage de plusieurs pièces en **un seul lot** (S66).
+ *
+ * Par ligne : un mouvement `entree` qui porte la quantité et la note de
+ * l'arrivage. Et, si la ligne donne un prix d'achat **différent** de celui du
+ * catalogue, une mise à jour de ce prix sur la pièce — le coût vit là
+ * (`3c8b2fe`), pas sur le mouvement, dont les règles bornent les clés. Les
+ * ventes passées gardent leur coût par recopie (`prixAchatUnitaire`) ; seule la
+ * marge des ventes à venir suit le nouveau prix.
+ *
+ * Le lot est atomique : un arrivage entre en entier ou pas du tout, et hors
+ * ligne il voyage dans la file comme une écriture unique. Chaque ligne reste
+ * pourtant indépendante des autres — il n'y a pas d'invariant croisé comme
+ * entre une vente et sa recette ; le lot sert ici l'atomicité du geste, pas une
+ * cohérence que les règles ne pourraient pas tenir.
+ */
+export function enregistrerReception(
+  saisie: SaisieReception,
+  pieces: ReadonlyMap<string, Piece>,
+  boutiqueId: string,
+  auteur: Auteur,
+): { enregistre: Promise<void> } {
+  const lot = writeBatch(db());
+  const maintenant = Timestamp.fromDate(new Date());
+  const note = saisie.note.trim() || "Réception";
+
+  for (const ligne of saisie.lignes) {
+    lot.set(doc(collection(db(), "mouvementsPieces")), {
+      boutiqueId,
+      pieceId: ligne.pieceId,
+      type: "entree",
+      quantite: lireEntier(ligne.quantite) ?? 0,
+      note,
+      date: maintenant,
+      ...traceCreation(auteur),
+    });
+
+    /* Le prix d'achat ne se réécrit que s'il a changé : réécrire la pièce à
+       l'identique salirait son horodatage de modification pour rien. */
+    const prix = ligne.prixAchat.trim() ? lireEntier(ligne.prixAchat) : null;
+    const piece = pieces.get(ligne.pieceId);
+    if (prix !== null && piece && prix !== piece.prixAchat) {
+      lot.update(doc(db(), "pieces", ligne.pieceId), {
+        prixAchat: prix,
+        ...traceModification(auteur),
+      });
+    }
+  }
+
+  return { enregistre: suivreEcriture(lot.commit()) };
 }
 
 /* **Le sous-dossier privé d'une pièce a été retiré ici, et ce n'est pas un

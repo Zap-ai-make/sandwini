@@ -99,9 +99,12 @@ ce sont eux qui lui diront qu'il se trompe.
       rien à réapprovisionner.
 - [ ] **Une vente se passe réseau coupé** : le stock descend à l'écran
       immédiatement, l'encaissement apparaît au journal au retour du réseau.
-- [ ] Le reçu de vente de pièces (`PanneauRecu` étendu aux lignes), imprimable
-      hors ligne et en thème sombre système (D77).
-- [ ] Le rendu regardé en capture, clair et sombre, dans les deux rôles.
+- [x] Le reçu de vente de pièces, imprimable hors ligne et en thème sombre
+      système (D77) — **livré par S64** sous la forme d'un composant propre,
+      `RecuPiece`, plutôt qu'une extension de `PanneauRecu` (moto), pour ne pas
+      toucher au reçu des motos.
+- [x] Le rendu regardé en capture, clair et sombre — **vérifié en S64** sur les
+      émulateurs, vente de bout en bout, reçu imprimable, zéro erreur console.
 
 ---
 

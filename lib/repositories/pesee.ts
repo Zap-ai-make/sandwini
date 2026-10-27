@@ -12,6 +12,8 @@ import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterCatalogue, ecouterMouvements } from "@/lib/repositories/pieces";
 import { ecouterVentes } from "@/lib/repositories/ventes";
 import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
+import { ecouterRetoursPieces } from "@/lib/repositories/retours-pieces";
+import type { RetourPiece } from "@/lib/domain/retour";
 
 export {
   PESEE_VIDE,
@@ -97,17 +99,43 @@ export function usePeseeDesBoutiques(avecPieces: boolean): {
     "Les mouvements de pièces n’ont pas pu être lus.",
   );
 
+  /* Les retours retranchent la recette et la marge (S67). Lus sur le même
+     périmètre et sous la même garde `avecPieces` que les ventes de pièces. */
+  const souscrireRetours = useCallback(
+    (auChangement: (retours: RetourPiece[]) => void, enErreur: (cause: unknown) => void) =>
+      globalPieces ? ecouterRetoursPieces(null, auChangement, enErreur) : () => {},
+    [globalPieces],
+  );
+  const { valeur: retoursPieces } = useAbonnement(
+    souscrireRetours,
+    "Les retours de pièces n’ont pas pu être lus.",
+  );
+
   return useMemo(
     () => ({
       pesee: peserBoutiques(
-        { ventes, stock, ventesPieces, catalogue, mouvements },
+        { ventes, stock, ventesPieces, retoursPieces, catalogue, mouvements },
         new Date(),
       ),
       chargement:
         perimetreEnCours ||
         (global && (ventes === null || stock === null)) ||
-        (globalPieces && (ventesPieces === null || catalogue === null || mouvements === null)),
+        (globalPieces &&
+          (ventesPieces === null ||
+            retoursPieces === null ||
+            catalogue === null ||
+            mouvements === null)),
     }),
-    [ventes, stock, ventesPieces, catalogue, mouvements, perimetreEnCours, global, globalPieces],
+    [
+      ventes,
+      stock,
+      ventesPieces,
+      retoursPieces,
+      catalogue,
+      mouvements,
+      perimetreEnCours,
+      global,
+      globalPieces,
+    ],
   );
 }

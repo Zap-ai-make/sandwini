@@ -149,6 +149,7 @@ function VendrePieces() {
       recherche,
       stock: "tout",
       categorie: "",
+      archivees: false,
     })
       .sort(comparerPieces)
       .slice(0, 8);
@@ -237,10 +238,14 @@ function VendrePieces() {
           <p className="mt-1 text-corps text-encre-doux">
             Le stock est déjà à jour sur cet appareil. Si le réseau manque, la vente partira seule.
           </p>
-          {/* Pas de lien vers un reçu : il n'existe pas encore, et un bouton
-              qui mène nulle part apprend à ne plus croire l'écran. Le reçu de
-              vente de pièces est la seconde moitié de S21. */}
+          {/* Le reçu existe enfin (S64) : il s'ouvre dans l'historique, d'où il
+              s'imprime et se partage. Le reçu est consultable tout de suite,
+              même hors ligne — le numéro et la vente existent dès la saisie
+              (D76), avant même que l'écriture soit partie. */}
           <div className="mt-4 flex flex-wrap gap-2">
+            <Link href={`/pieces/ventes?vente=${enregistree.id}`} className="bouton bouton-principal">
+              Voir le reçu
+            </Link>
             <Link href="/pieces" className="bouton bouton-neutre">
               Retour au catalogue
             </Link>
@@ -345,7 +350,14 @@ function VendrePieces() {
                 )}
                 {REPARATION[refus.raison] && (
                   <Link
-                    href={`/pieces?piece=${refus.piece.id}`}
+                    /* « Fixer le prix » mène droit à l'écran qui le pose (S63) ;
+                       « Faire entrer un lot » et « Corriger le stock » passent
+                       par le panneau du catalogue, où vit le geste d'entrée. */
+                    href={
+                      refus.raison === "sans_prix"
+                        ? `/pieces/${refus.piece.id}/modifier`
+                        : `/pieces?piece=${refus.piece.id}`
+                    }
                     className="bouton bouton-neutre mt-3"
                   >
                     {REPARATION[refus.raison]}

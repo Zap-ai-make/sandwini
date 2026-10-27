@@ -1,6 +1,7 @@
 import { moisDe, memeMois } from "./chiffres";
 import type { Moto } from "./moto";
 import { etatStock, stockParPiece, type MouvementPiece, type Piece } from "./piece";
+import type { RetourPiece } from "./retour";
 import type { Vente } from "./vente";
 import { margeVentePiece, type VentePiece } from "./vente-piece";
 
@@ -113,6 +114,8 @@ export type SourcesPesee = {
   ventes: readonly Vente[] | null;
   stock: readonly Moto[] | null;
   ventesPieces: readonly VentePiece[] | null;
+  /** Les retours retranchés de la recette et de la marge (S67). */
+  retoursPieces: readonly RetourPiece[] | null;
   catalogue: readonly Piece[] | null;
   mouvements: readonly MouvementPiece[] | null;
 };
@@ -160,6 +163,20 @@ export function peserBoutiques(sources: SourcesPesee, maintenant: Date): Map<str
     ligne.ventesDuMois += 1;
     ligne.recetteDuMois += vente.total;
     ligne.margeDuMois = additionnerMarges(ligne.margeDuMois, margeVentePiece(vente));
+  }
+
+  /* **Les retours retranchent la recette et la marge** (S67, arbitrage 6), mais
+     pas le compte des ventes : la vente a bien eu lieu, elle a seulement été
+     défaite. Une marge de retour inconnue ne se soustrait pas — faute de coût,
+     on ne sait pas ce qu'on reprend ; la recette, elle, reste exacte. */
+  for (const retour of sources.retoursPieces ?? []) {
+    if (retour.date === null || !memeMois(moisDe(retour.date), mois)) continue;
+    const ligne = pour(retour.boutiqueId).pieces;
+    ligne.recetteDuMois -= retour.total;
+    const marge = margeVentePiece(retour);
+    if (marge !== null) {
+      ligne.margeDuMois = additionnerMarges(ligne.margeDuMois, -marge);
+    }
   }
 
   compterLesRayons(sources, pour);

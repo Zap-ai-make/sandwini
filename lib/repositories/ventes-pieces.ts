@@ -64,6 +64,10 @@ function lireVentePiece(instantane: QueryDocumentSnapshot<DocumentData>): VenteP
     lignes: Array.isArray(donnees.lignes) ? donnees.lignes.map(lireLigne) : [],
     total: typeof donnees.total === "number" ? donnees.total : 0,
     moyenPaiement: (donnees.moyenPaiement as VentePiece["moyenPaiement"]) ?? "especes",
+    /* Qui a établi la vente, pour le pied du reçu (S64). La trace d'audit la
+       porte déjà ; on la recopie dans le modèle plutôt que de relire le
+       document d'audit à l'impression. */
+    operateur: (donnees.createdByName as string) ?? "",
   };
 }
 
@@ -92,6 +96,32 @@ export function ecouterVentesPieces(
     (instantane) => {
       signalerSourceDonnees(instantane.metadata.fromCache);
       auChangement(instantane.docs.map(lireVentePiece));
+    },
+    enErreur,
+  );
+}
+
+/**
+ * Une vente de pièces précise, en direct (S67) — ce que l'écran de retour lit
+ * pour reprendre ses lignes au prix figé. `null` pour une vente qui n'existe
+ * pas (lien périmé, autre boutique), à distinguer de « pas encore arrivée »
+ * côté appelant.
+ */
+export function ecouterVentePiece(
+  venteId: string,
+  auChangement: (vente: VentePiece | null) => void,
+  enErreur: (cause: unknown) => void,
+): () => void {
+  return onSnapshot(
+    doc(db(), "ventesPieces", venteId),
+    { includeMetadataChanges: true },
+    (instantane) => {
+      signalerSourceDonnees(instantane.metadata.fromCache);
+      auChangement(
+        instantane.exists()
+          ? lireVentePiece(instantane as QueryDocumentSnapshot<DocumentData>)
+          : null,
+      );
     },
     enErreur,
   );

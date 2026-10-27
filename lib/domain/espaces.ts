@@ -472,16 +472,54 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
       ],
     },
   ],
+  /**
+   * L'espace pièces, structuré comme celui des motos : **Vendre**, puis
+   * **Suivre**, puis **Enregistrer** (S65). Avant ce lot, les trois gestes
+   * tenaient sous un seul titre « Suivre » — vendre, consulter et créer y
+   * étaient rangés ensemble, ce qui ne disait plus lequel on venait faire.
+   *
+   * Les trois groupes ne contiennent que des écrans qui existent : « Mouvements »
+   * et « Réception » sont annoncés par la feuille de route mais pas encore bâtis,
+   * et un titre sans écran dessous est un rangement qui ment (`espaces.test.ts`).
+   * Ils rejoindront « Suivre » et « Enregistrer » quand leur lot arrivera.
+   */
   pieces: [
+    {
+      /* « Vendre » passe devant : on vend toute la journée, on tient le
+         catalogue de temps en temps (même ordre que l'espace motos). Le geste
+         exige une boutique — un stock sort d'une étagère précise —, donc le
+         groupe disparaît sur « Toutes les boutiques », comme celui des motos. */
+      titre: "Vendre",
+      ecrans: [{ href: "/pieces/vendre", libelle: "Vendre une pièce", exigeBoutique: true }],
+    },
     {
       titre: "Suivre",
       ecrans: [
         { href: "/pieces", libelle: "Catalogue" },
-        /* Créer une référence appartenait au responsable (S20, réponse 4).
-           Le commanditaire l'a renversé pour les pièces : le gérant tient son
-           propre catalogue, prix d'achat compris, et le responsable regarde.
-           D'où `gerer_pieces` et non `gerer_referentiels`, qui garde les
-           marques et les modèles de motos. */
+        /* L'historique des ventes de pièces (S64). Rangé sous « Suivre » comme
+           les ventes de motos : on y vient consulter et réimprimer un reçu. */
+        { href: "/pieces/ventes", libelle: "Ventes" },
+      ],
+    },
+    {
+      /* Créer une référence appartenait au responsable (S20, réponse 4).
+         Le commanditaire l'a renversé pour les pièces : le gérant tient son
+         propre catalogue, prix d'achat compris, et le responsable regarde.
+         D'où `gerer_pieces` et non `gerer_referentiels`, qui garde les marques
+         et les modèles de motos. Vidé de ce droit, le groupe disparaît. */
+      titre: "Enregistrer",
+      ecrans: [
+        /* Faire entrer un arrivage de plusieurs références en une passe (S66).
+           Exige une boutique — un stock entre sur une étagère précise — et
+           `gerer_pieces`, car une ligne peut mettre à jour le coût d'une
+           référence. */
+        {
+          href: "/pieces/reception",
+          libelle: "Réception",
+          capacite: "gerer_pieces",
+          exigeBoutique: true,
+          quoi: "Faire entrer un arrivage de pièces, en une passe",
+        },
         {
           href: "/pieces/nouvelle",
           libelle: "Nouvelle référence",

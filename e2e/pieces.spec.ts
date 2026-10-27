@@ -184,8 +184,14 @@ test.describe("le stock bouge par mouvements", () => {
   });
 });
 
-test.describe("la frontière entre les deux rôles", () => {
-  test("le gérant tient le stock mais pas le catalogue", async ({ page, browser }) => {
+test.describe("ce que le gérant tient dans l'espace pièces", () => {
+  /* **Le renversement de S21** (`3c8b2fe`) : « pour les pièces c'est complètement
+     différent, le responsable ne fera que superviser… tout est fait par le
+     gérant ». Le gérant tient donc son catalogue — prix d'achat compris — et le
+     responsable regarde. Ce test disait l'inverse (le modèle de S20 réponse 4,
+     où une référence appartenait à la supervision) ; il a été retourné quand la
+     garde du bouton est passée de `gerer_referentiels` à `gerer_pieces` (S63). */
+  test("le gérant tient le stock et le catalogue", async ({ page, browser }) => {
     await seConnecterEtEntrer(page);
     const { reference, email } = await preparerComptoir(page, { avecGerant: true });
 
@@ -199,19 +205,24 @@ test.describe("la frontière entre les deux rôles", () => {
     await seConnecter(pageGerant, email!, MOT_DE_PASSE);
     await pageGerant.waitForURL("**/dashboard");
 
-    // Son espace existe, et il y voit le catalogue commun.
+    // Son espace existe, et il y voit le catalogue de sa boutique.
     await pageGerant.goto("/pieces", { waitUntil: "load" });
     await expect(pageGerant.locator("tbody tr").filter({ hasText: reference })).toHaveCount(1, {
       timeout: 30_000,
     });
 
-    /* Mais pas le bouton de création : une référence porte un prix, et les prix
-       appartiennent à la supervision. La garde le refuse aussi en direct. */
-    await expect(pageGerant.getByRole("link", { name: "Nouvelle référence" })).toHaveCount(0);
+    /* Et le bouton de création lui est ouvert : le catalogue des pièces est
+       celui de sa boutique, et c'est lui qui le tient (S21/S63). Ciblé dans le
+       contenu — sur mobile (Pixel 7), le rail est masqué, et seul le bouton de
+       l'en-tête porte ce libellé. */
+    await expect(
+      contenu(pageGerant).getByRole("link", { name: "Nouvelle référence" }),
+    ).toBeVisible();
     await pageGerant.goto("/pieces/nouvelle", { waitUntil: "load" });
-    await expect(contenu(pageGerant)).not.toContainText("Créer la référence");
+    await expect(contenu(pageGerant)).toContainText("Créer la référence");
 
-    // Le stock, lui, est le sien.
+    // Le stock, lui aussi, est le sien.
+    await pageGerant.goto("/pieces", { waitUntil: "load" });
     const panneau = await ouvrirLaPiece(pageGerant, reference);
     await panneau.getByLabel("Quantité").fill("7");
     await panneau.getByRole("button", { name: "Enregistrer le mouvement" }).click();

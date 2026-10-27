@@ -1585,8 +1585,8 @@ service cloud.firestore {
              && montantValide(donnees.montant)
              && donnees.montant > 0
              && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave']
-             && donnees.origine in ['vente_moto', 'versement', 'vente_piece', 'depense',
-                                    'avance_prestataire', 'autre']
+             && donnees.origine in ['vente_moto', 'versement', 'vente_piece', 'remboursement_piece',
+                                    'depense', 'avance_prestataire', 'autre']
              && donnees.origineRefId is string
              && texteBorne(donnees.libelle, 120)
              // L'argent des tranches est un engagement, pas une recette, tant
@@ -1797,7 +1797,7 @@ service cloud.firestore {
                                        'date'].concat(champsAudit()))
              && donnees.boutiqueId is string
              && donnees.pieceId is string
-             && donnees.type in ['entree', 'sortie_vente', 'sortie_autre',
+             && donnees.type in ['entree', 'sortie_vente', 'retour_vente', 'sortie_autre',
                                  'transfert_entree', 'transfert_sortie', 'ajustement_inventaire']
              && donnees.quantite is int
              && donnees.quantite > 0
@@ -1954,6 +1954,47 @@ service cloud.firestore {
       // Même principe qu'un versement et qu'une écriture de caisse : le stock
       // est descendu, la recette est au journal, et un document modifiable
       // rendrait les trois incohérents sans laisser de trace.
+      allow update, delete: if false;
+    }
+
+    // --- Le retour d'une vente de pièces (S67) -----------------------------
+    // Un retour est la contre-passation d'une vente : il la cite (`venteId`,
+    // `venteNumero`), reprend ses lignes au prix figé, et porte le total
+    // remboursé. Il réutilise `ligneVenteValide` et `sommeDesLignes` — une
+    // ligne reprise a la même forme qu'une ligne vendue. Ce qu'une règle ne
+    // peut pas tenir (la quantité reprise ≤ ce qui reste vendable, le lien vers
+    // l'entrée de stock et le décaissement) est tenu par le batch, et nommé
+    // dans `specs/S67-retour-echange-pieces.md`.
+    function retourPieceValide(donnees) {
+      return donnees.keys().hasOnly(['venteId', 'venteNumero', 'boutiqueId', 'date', 'lignes',
+                                     'total', 'moyenPaiement', 'motif'].concat(champsAudit()))
+             && donnees.keys().hasAll(['venteId', 'venteNumero', 'boutiqueId', 'date', 'lignes',
+                                       'total', 'moyenPaiement', 'motif'].concat(champsAudit()))
+             && donnees.venteId is string
+             && texteBorne(donnees.venteNumero, 40)
+             && donnees.boutiqueId is string
+             && dateAppareil(donnees.date)
+             && donnees.lignes is list
+             && donnees.lignes.size() > 0
+             && donnees.lignes.size() <= 20
+             // La première ligne intégralement, les vingt totaux par la somme —
+             // même budget d'expressions que la vente.
+             && ligneVenteValide(donnees.lignes[0])
+             && montantValide(donnees.total)
+             && donnees.total > 0
+             && donnees.total == sommeDesLignes(donnees.lignes)
+             && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave']
+             && texteBorne(donnees.motif, 120);
+    }
+
+    match /retoursPieces/{retourId} {
+      allow read: if peutVendrePour(resource.data.boutiqueId);
+
+      allow create: if retourPieceValide(request.resource.data)
+                    && traceCreation(request.resource.data)
+                    && peutVendrePour(request.resource.data.boutiqueId);
+
+      // Un retour est un fait comptable, immuable comme la vente qu'il défait.
       allow update, delete: if false;
     }
 

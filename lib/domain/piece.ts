@@ -4,11 +4,12 @@
  * **Trois arbitrages du commanditaire sont inscrits dans ces types**, et aucun
  * n'est réversible sans migration.
  *
- * *Le prix d'achat n'est pas ici.* Il vit dans `pieces/{id}/prive/cout`, lisible
- * et écrivable du seul responsable — le même cloisonnement que les motos (D2),
- * resserré par S39 : le gérant ne le saisit plus du tout. Un champ posé sur le
- * document public serait lisible par quiconque lit la pièce, Firestore ne
- * sachant pas masquer un champ.
+ * *Le prix d'achat est ici, à l'inverse d'une moto.* Il vivait dans
+ * `pieces/{id}/prive/cout`, cloisonné comme celui d'une moto (D2) — mais aucun
+ * écran ne l'a jamais écrit. Le commanditaire a tranché l'inverse pour les
+ * pièces (`3c8b2fe`) : « pour les pièces c'est complètement différent… tout est
+ * fait par le gérant ». Celui qui vend la bougie fixe son coût et voit sa
+ * marge ; `prixAchat` vit donc sur la pièce, lisible par qui lit la pièce.
  *
  * *La quantité ne se stocke pas, elle se compte.* `prompt.md` §5.7 décrit un
  * `stockPieces.quantite` entretenu par déclencheur ; D61 l'écarte, et le
@@ -38,6 +39,11 @@ import { reduire } from "./referentiel";
 export const MOUVEMENTS = {
   entree: { signe: 1, libelle: "Entrée" },
   sortie_vente: { signe: -1, libelle: "Vente" },
+  /* Une pièce qui revient d'une vente (S67). Signe +1, comme une entrée, mais
+     distincte : ce n'est ni un arrivage ni une correction de comptage, c'est
+     un fait — une vente défaite. Le ranger ailleurs mentirait sur l'histoire
+     du stock (D82). Produite par le seul flux de retour, jamais à la main. */
+  retour_vente: { signe: 1, libelle: "Retour" },
   sortie_autre: { signe: -1, libelle: "Sortie" },
   transfert_entree: { signe: 1, libelle: "Transfert reçu" },
   transfert_sortie: { signe: -1, libelle: "Transfert envoyé" },
@@ -223,6 +229,25 @@ export const PIECE_VIDE: SaisiePiece = {
   seuilAlerte: "0",
 };
 
+/**
+ * Rouvre une pièce enregistrée dans les champs texte d'un formulaire (S63).
+ *
+ * **Un prix nul revient vide, jamais « 0 »** (D101) : `null` veut dire « non
+ * fixé », et écrire zéro inventerait un prix à une pièce qui n'en a pas — la
+ * rendant vendable à zéro franc, ou effaçant « je ne sais pas encore ce qu'elle
+ * a coûté ». Le même aller-retour que `PIECE_VIDE`, en sens inverse.
+ */
+export function saisieDepuisPiece(piece: Piece): SaisiePiece {
+  return {
+    reference: piece.reference,
+    designation: piece.designation,
+    categorie: piece.categorie,
+    prixAchat: piece.prixAchat === null ? "" : String(piece.prixAchat),
+    prixVente: piece.prixVente === null ? "" : String(piece.prixVente),
+    seuilAlerte: String(piece.seuilAlerte),
+  };
+}
+
 export function validerPiece(saisie: SaisiePiece): string | null {
   const reference = normaliserReference(saisie.reference);
   if (!reference) return "La référence est obligatoire : c’est par elle qu’on cherche une pièce.";
@@ -302,9 +327,21 @@ export type FiltresPieces = {
   recherche: string;
   stock: FiltreStock;
   categorie: string;
+  /**
+   * Montrer les archivées **au lieu** des actives, et non en plus (S63). Une
+   * référence désactivée quitte le catalogue courant (S20) ; sans ce mode, elle
+   * serait introuvable, donc impossible à réactiver. Les deux mondes ne se
+   * mêlent pas : on range, ou on fouille le tiroir du bas.
+   */
+  archivees: boolean;
 };
 
-export const FILTRES_PIECES_VIDES: FiltresPieces = { recherche: "", stock: "tout", categorie: "" };
+export const FILTRES_PIECES_VIDES: FiltresPieces = {
+  recherche: "",
+  stock: "tout",
+  categorie: "",
+  archivees: false,
+};
 
 /**
  * Filtre le catalogue en mémoire.
@@ -325,7 +362,9 @@ export function filtrerPieces(
   const categorie = reduire(filtres.categorie);
 
   return pieces.filter((piece) => {
-    if (!piece.actif) return false;
+    /* Actives ou archivées, jamais les deux : `archivees` bascule le tiroir
+       plutôt que d'en ouvrir un second. */
+    if (piece.actif === filtres.archivees) return false;
 
     if (categorie && reduire(piece.categorie) !== categorie) return false;
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Moto } from "./moto";
+import type { RetourPiece } from "./retour";
 import { PESEE_VIDE, additionnerPesees, peserBoutiques, type SourcesPesee } from "./pesee";
 import type { MouvementPiece, Piece } from "./piece";
 import type { Vente } from "./vente";
@@ -50,9 +51,13 @@ const RIEN: SourcesPesee = {
   ventes: null,
   stock: null,
   ventesPieces: null,
+  retoursPieces: null,
   catalogue: null,
   mouvements: null,
 };
+
+const retourPiece = (partie: Partial<RetourPiece> = {}): RetourPiece =>
+  ({ id: "r1", boutiqueId: "BCA", date: CE_MOIS, total: 0, lignes: [], ...partie }) as RetourPiece;
 
 describe("peserBoutiques — les motos", () => {
   it("ne compte en stock que ce qui peut encore se vendre", () => {
@@ -148,6 +153,38 @@ describe("peserBoutiques — les pièces", () => {
       MAINTENANT,
     );
     expect(pesee.get("BCA")?.pieces.margeDuMois).toBeNull();
+  });
+
+  it("retranche un retour de la recette et de la marge, mais pas du compte des ventes (S67)", () => {
+    const pesee = peserBoutiques(
+      {
+        ...RIEN,
+        ventesPieces: [ventePiece({ id: "a", total: 10_000, lignes: [ligneVendue(10_000, 6_000)] })],
+        retoursPieces: [
+          retourPiece({ total: 4_000, lignes: [ligneVendue(2_000, 1_500, 2)] }),
+        ],
+      },
+      MAINTENANT,
+    );
+    const pieces = pesee.get("BCA")?.pieces;
+    // La vente a eu lieu : le compte reste à 1.
+    expect(pieces?.ventesDuMois).toBe(1);
+    // La recette nette : 10 000 − 4 000.
+    expect(pieces?.recetteDuMois).toBe(6_000);
+    // La marge nette : (10 000 − 6 000) − (2 000 − 1 500) × 2.
+    expect(pieces?.margeDuMois).toBe(3_000);
+  });
+
+  it("ignore un retour du mois dernier", () => {
+    const pesee = peserBoutiques(
+      {
+        ...RIEN,
+        ventesPieces: [ventePiece({ total: 10_000 })],
+        retoursPieces: [retourPiece({ total: 4_000, date: LE_MOIS_DERNIER })],
+      },
+      MAINTENANT,
+    );
+    expect(pesee.get("BCA")?.pieces.recetteDuMois).toBe(10_000);
   });
 
   it("une vente de pièces ne touche jamais les chiffres motos", () => {
