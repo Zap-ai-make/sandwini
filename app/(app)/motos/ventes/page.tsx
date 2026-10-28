@@ -25,6 +25,7 @@ import {
   normaliserNom,
   type Client,
 } from "@/lib/domain/client";
+import { nomDeBoutique } from "@/lib/domain/boutique";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
@@ -93,7 +94,8 @@ function Ventes() {
      est dans `app/sw.ts`, et l'oubli ne se verrait qu'en coupure. */
   const modaleOuverte = parametres.get("nouvelle") === "1";
   const router = useRouter();
-  const { perimetre, chargement: perimetreEnCours } = usePerimetre();
+  const { perimetre, boutiques, chargement: perimetreEnCours } = usePerimetre();
+  const toutesBoutiques = perimetre.type === "toutes";
   /* Avant tout retour anticipé : un hook appelé sous condition change l'ordre
      des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
   const surTitre = useSurTitre("Motos");
@@ -262,14 +264,21 @@ function Ventes() {
         rendu: (ligne) => <PastillePaiement statut={ligne.vente.statutPaiement} />,
       },
     ];
-    /* Pas de colonne « Boutique » : les trois premières lettres du numéro de
-       pièce la disent déjà, sur chaque ligne, et un second pavé jaune juste à
-       côté ne fait que diluer le signal (D70). C'est ce que montrent les
-       maquettes A6, A7 et A8 — aucune des trois n'a cette colonne, y compris
-       pour le responsable qui regarde toutes les boutiques. Le stock (A4) la
-       garde : une moto n'a pas de numéro de pièce, donc rien ne la porte. */
+    /* **La colonne « Boutique » revient sur « Toutes les boutiques »** (28
+       octobre 2026). Elle avait été écartée parce que le numéro de pièce
+       portait déjà le code de la boutique ; ce numéro a quitté la liste le 26,
+       et plus rien ne distinguait une vente d'une autre — « tout est
+       mélangé », dit le commanditaire. Sur une seule boutique, elle serait
+       constante : elle n'y paraît pas. */
+    if (toutesBoutiques) {
+      liste.splice(1, 0, {
+        cle: "boutique",
+        titre: "Boutique",
+        rendu: (ligne) => nomDeBoutique(boutiques, ligne.vente.boutiqueId),
+      });
+    }
     return liste;
-  }, [catalogue, venteOuverte]);
+  }, [catalogue, venteOuverte, toutesBoutiques, boutiques]);
 
   if (perimetre.type === "aucune")
     return (

@@ -1,12 +1,10 @@
 import type { Boutique } from "@/lib/domain/boutique";
-import { formaterTelephone } from "@/lib/domain/client";
-import { IDENTITE } from "@/lib/domain/entreprise";
 import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { montantEnLettres } from "@/lib/domain/lettres";
 import { numeroLisible } from "@/lib/domain/numerotation";
 import { LIBELLE_MOYEN } from "@/lib/domain/vente";
 import type { RetourPiece } from "@/lib/domain/retour";
-import { Monogramme } from "@/components/Monogramme";
+import { EntetePieces } from "@/components/EntetePieces";
 
 /**
  * Le reçu d'un retour de pièces (S67).
@@ -27,33 +25,12 @@ export function RecuRetour({
   retour: RetourPiece;
   boutique: Boutique | null;
 }) {
-  const adresse = boutique?.adresse || IDENTITE.siege;
-  const telephones = [
-    ...IDENTITE.telephones,
-    ...(boutique?.telephone && !IDENTITE.telephones.includes(boutique.telephone.replace(/\s/g, ""))
-      ? [boutique.telephone]
-      : []),
-  ].map((numero) => formaterTelephone(numero));
-
   return (
     <article
       aria-label={`Reçu de retour sur la facture n° ${numeroLisible(retour.venteNumero)}`}
       className="facture mx-auto max-w-[170mm]"
     >
-      <header className="facture-entete">
-        <Monogramme className="facture-logo" />
-        <div className="facture-identite">
-          <p className="facture-raison">{IDENTITE.raisonSociale}</p>
-          <p className="facture-enseigne">{IDENTITE.nomCommercial}</p>
-          <p>{IDENTITE.activite}</p>
-          <p>{adresse}</p>
-          <p>Tél : {telephones.join(" · ")}</p>
-          <p>Secrétariat : {formaterTelephone(IDENTITE.secretariat)}</p>
-          <p>
-            RCCM {IDENTITE.rccm} · IFU {IDENTITE.ifu}
-          </p>
-        </div>
-      </header>
+      <EntetePieces />
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
         <CasesDate date={retour.date} />

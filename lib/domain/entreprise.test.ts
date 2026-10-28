@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   IDENTITE,
   IDENTITE_A_CONFIRMER,
+  IDENTITE_PIECES,
   LIBELLE_IDENTITE,
   REGLAGES_DEFAUT,
   SEUIL_INACTIVITE_DEFAUT,
@@ -44,6 +45,29 @@ describe("l’identité de l’entreprise", () => {
   it("ne déclare à confirmer que des mentions qui existent", () => {
     for (const champ of IDENTITE_A_CONFIRMER) {
       expect(IDENTITE[champ], champ).toBeTruthy();
+    }
+  });
+});
+
+/* La boutique de pièces imprime sous le nom de Fatas (28 octobre 2026) : le
+   reçu ne doit rien emprunter à Sandwidi, ni le nom, ni les numéros. */
+describe("l’en-tête des reçus de pièces", () => {
+  it("porte le nom, l’activité, les villes et les deux numéros de Fatas", () => {
+    expect(IDENTITE_PIECES.enseigne).toBe("FATAS LE MANNEQUIN");
+    expect(IDENTITE_PIECES.activite).toMatch(/pièces détachées de qualité de toute marque de motos/);
+    expect(IDENTITE_PIECES.villes).toBe("Pouytenga / Ouagadougou");
+    expect(IDENTITE_PIECES.telephones).toEqual(["70074641", "74157727"]);
+  });
+
+  it("n’a que des numéros à huit chiffres", () => {
+    for (const numero of IDENTITE_PIECES.telephones) {
+      expect(numero, numero).toMatch(/^\d{8}$/);
+    }
+  });
+
+  it("ne reprend aucun numéro de Sandwidi", () => {
+    for (const numero of IDENTITE_PIECES.telephones) {
+      expect(IDENTITE.telephones, numero).not.toContain(numero);
     }
   });
 });

@@ -68,6 +68,23 @@ export const IDENTITE = {
 } as const;
 
 /**
+ * L'en-tête des reçus de pièces (28 octobre 2026).
+ *
+ * La boutique de pièces vend sous le nom de Fatas : le commanditaire a demandé
+ * que ses reçus — vente et retour — ne portent plus le logo ni le nom de
+ * Sandwidi, mais cette seule mention, dictée par lui. Les reçus de motos ne
+ * changent pas.
+ */
+export const IDENTITE_PIECES = {
+  enseigne: "FATAS LE MANNEQUIN",
+  activite: "Vend des pièces détachées de qualité de toute marque de motos",
+  villes: "Pouytenga / Ouagadougou",
+  /* Le second numéro a été dicté avec un 3 de trop à la fin ; corrigé par le
+     commanditaire lui-même. */
+  telephones: ["70074641", "74157727"] as readonly string[],
+} as const;
+
+/**
  * Les mentions encore provisoires, et le fait qu'elles le sont.
  *
  * **Ce tableau est vide, et c'est une bonne nouvelle** : l'IFU et le RCCM

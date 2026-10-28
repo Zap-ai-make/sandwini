@@ -7,6 +7,7 @@ import {
   normaliserBoutique,
   normaliserCode,
   normaliserMetiers,
+  nomDeBoutique,
   reunirMetiers,
   validerBoutique,
   type Boutique,
@@ -125,6 +126,22 @@ describe("comparerBoutiques", () => {
       boutique("Kaya", true),
     ].sort(comparerBoutiques);
     expect(liste.map((b) => b.nom)).toEqual(["Kaya", "Zorgho", "Bobo"]);
+  });
+});
+
+describe("nomDeBoutique", () => {
+  const boutiques: Boutique[] = [
+    { id: "SGG", code: "SGG", nom: "Saidou Ghana (gare routière)", metiers: ["motos"], adresse: "", telephone: "", actif: true },
+    { id: "PTG", code: "PTG", nom: "Pouytenga", metiers: ["pieces"], adresse: "", telephone: "", actif: false },
+  ];
+
+  it("rend le nom de la boutique, fermée comprise", () => {
+    expect(nomDeBoutique(boutiques, "SGG")).toBe("Saidou Ghana (gare routière)");
+    expect(nomDeBoutique(boutiques, "PTG")).toBe("Pouytenga");
+  });
+
+  it("rend l’identifiant quand la boutique n’est pas connue, plutôt qu’un vide", () => {
+    expect(nomDeBoutique(boutiques, "KDG")).toBe("KDG");
   });
 });
 

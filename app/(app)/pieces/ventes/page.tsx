@@ -14,6 +14,7 @@ import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
+import { nomDeBoutique } from "@/lib/domain/boutique";
 import { nomDuClient } from "@/lib/domain/client";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import {
@@ -62,7 +63,7 @@ export default function PageVentesPieces() {
  * cette même liste — aucune seconde lecture.
  */
 function VentesPieces() {
-  const { perimetre } = usePerimetre();
+  const { perimetre, boutiques } = usePerimetre();
   const router = useRouter();
   const parametres = useSearchParams();
   const surTitre = useSurTitre("Pièces");
@@ -142,6 +143,18 @@ function VentesPieces() {
       titre: "Date",
       rendu: (vente) => (vente.date ? formaterDate(vente.date) : "—"),
     },
+    /* Sur « Toutes les boutiques », la boutique de chaque vente (28 octobre
+       2026) : sans elle, les ventes des comptoirs se mélangent. Sur une seule
+       boutique, la colonne serait constante. */
+    ...(perimetre.type === "toutes"
+      ? [
+          {
+            cle: "boutique",
+            titre: "Boutique",
+            rendu: (vente: VentePiece) => nomDeBoutique(boutiques, vente.boutiqueId),
+          },
+        ]
+      : []),
     {
       cle: "client",
       titre: "Client",

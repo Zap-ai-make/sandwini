@@ -179,6 +179,15 @@ export function reunirMetiers(boutiques: readonly Boutique[]): Metier[] {
   );
 }
 
+/**
+ * Le nom d'une boutique, pour une ligne qui ne porte que son identifiant.
+ * Une boutique inconnue rend son identifiant : un vide ferait croire que la
+ * ligne n'appartient à aucune boutique.
+ */
+export function nomDeBoutique(boutiques: readonly Boutique[], id: string): string {
+  return boutiques.find((boutique) => boutique.id === id)?.nom ?? id;
+}
+
 /** Tri d'affichage : les boutiques actives d'abord, puis par nom. */
 export function comparerBoutiques(a: Boutique, b: Boutique): number {
   if (a.actif !== b.actif) return a.actif ? -1 : 1;

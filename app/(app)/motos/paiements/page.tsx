@@ -9,6 +9,7 @@ import { ErreurDeLecture, SansBoutique } from "@/components/patrons/Etats";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
+import { nomDeBoutique } from "@/lib/domain/boutique";
 import { nomDuClient } from "@/lib/domain/client";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
@@ -90,7 +91,8 @@ export default function PagePaiements() {
   const parametres = useSearchParams();
   const venteOuverte = parametres.get("vente");
   const recuOuvert = parametres.get("recu");
-  const { perimetre, chargement: perimetreEnCours } = usePerimetre();
+  const { perimetre, boutiques, chargement: perimetreEnCours } = usePerimetre();
+  const toutesBoutiques = perimetre.type === "toutes";
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
 
@@ -203,6 +205,18 @@ export default function PagePaiements() {
         principal: true,
         rendu: (ligne) => nomClient(ligne.vente.clientId),
       },
+      /* Sur « Toutes les boutiques », le nom de la boutique en clair (28
+         octobre 2026), comme sur les ventes : le code dans le numéro ne
+         suffisait pas à séparer les comptoirs. */
+      ...(toutesBoutiques
+        ? [
+            {
+              cle: "boutique",
+              titre: "Boutique",
+              rendu: (ligne: LignePaiement) => nomDeBoutique(boutiques, ligne.vente.boutiqueId),
+            },
+          ]
+        : []),
       { cle: "moto", titre: "Moto", rendu: (ligne) => nomMoto(ligne, moto, catalogue) },
       /* La colonne qui porte, à elle seule, ce que les deux bandeaux disaient.
          Un mot par ligne — « Crédit » ou « Tranches » — au lieu d'une phrase
@@ -281,7 +295,7 @@ export default function PagePaiements() {
           ),
       },
     ],
-    [nomClient, moto, catalogue, seuil],
+    [nomClient, moto, catalogue, seuil, toutesBoutiques, boutiques],
   );
 
   if (perimetre.type === "aucune")

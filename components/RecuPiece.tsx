@@ -1,12 +1,11 @@
 import type { Boutique } from "@/lib/domain/boutique";
 import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
-import { IDENTITE } from "@/lib/domain/entreprise";
 import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { montantEnLettres } from "@/lib/domain/lettres";
 import { numeroLisible } from "@/lib/domain/numerotation";
 import { LIBELLE_MOYEN } from "@/lib/domain/vente";
 import type { VentePiece } from "@/lib/domain/vente-piece";
-import { Monogramme } from "@/components/Monogramme";
+import { EntetePieces } from "@/components/EntetePieces";
 
 /**
  * Le reçu d'une vente de pièces (S64), étendu à plusieurs lignes.
@@ -24,12 +23,14 @@ import { Monogramme } from "@/components/Monogramme";
  * - **pas de « ce qui part »** (plaque, carte grise) : ce sont les papiers
  *   d'une moto, pas d'une bougie.
  *
+ * - **l'en-tête de Fatas** (28 octobre 2026), et non celui de Sandwidi : la
+ *   boutique de pièces vend sous ce nom (`EntetePieces`).
+ *
  * C'est un composant **à part** de `Recu`, et non une généralisation : le reçu
  * des motos est tenu par une autre partie du travail, et porte des notions —
  * versements, reste dû, papiers — qui n'ont pas de sens ici. Les mêmes classes
- * `facture-*` et les mêmes primitives (`IDENTITE`, `Monogramme`,
- * `montantEnLettres`) sont réutilisées : c'est la forme qui est commune, pas le
- * contenu.
+ * `facture-*` et `montantEnLettres` sont réutilisés : c'est la forme qui est
+ * commune, pas le contenu.
  *
  * Le composant ne lit rien et n'écoute rien : il reçoit tout. L'impression
  * s'appuie, comme ailleurs, sur le marqueur `a-imprimer` posé par son panneau.
@@ -50,33 +51,12 @@ export function RecuPiece({
    */
   nomLibre?: string;
 }) {
-  const adresse = boutique?.adresse || IDENTITE.siege;
-  const telephones = [
-    ...IDENTITE.telephones,
-    ...(boutique?.telephone && !IDENTITE.telephones.includes(boutique.telephone.replace(/\s/g, ""))
-      ? [boutique.telephone]
-      : []),
-  ].map((numero) => formaterTelephone(numero));
-
   return (
     <article
       aria-label={`Reçu de vente n° ${numeroLisible(vente.numero)}`}
       className="facture mx-auto max-w-[170mm]"
     >
-      <header className="facture-entete">
-        <Monogramme className="facture-logo" />
-        <div className="facture-identite">
-          <p className="facture-raison">{IDENTITE.raisonSociale}</p>
-          <p className="facture-enseigne">{IDENTITE.nomCommercial}</p>
-          <p>{IDENTITE.activite}</p>
-          <p>{adresse}</p>
-          <p>Tél : {telephones.join(" · ")}</p>
-          <p>Secrétariat : {formaterTelephone(IDENTITE.secretariat)}</p>
-          <p>
-            RCCM {IDENTITE.rccm} · IFU {IDENTITE.ifu}
-          </p>
-        </div>
-      </header>
+      <EntetePieces />
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-4">
         <CasesDate date={vente.date} />
