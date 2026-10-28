@@ -91,6 +91,14 @@ function VentesPieces() {
     () => new Map(clients.map((client) => [client.id, nomDuClient(client)])),
     [clients],
   );
+  /* Les ventes récentes portent le nom tapé au comptoir dans `clientId` ; les
+     anciennes y portent un identifiant de fiche. On résout donc « id connu →
+     nom de la fiche, sinon la chaîne EST le nom » — les deux générations
+     s'affichent et se cherchent sans migration. */
+  const nomDeVente = useCallback(
+    (vente: VentePiece) => nomParClient.get(vente.clientId) || vente.clientId,
+    [nomParClient],
+  );
 
   const maintenant = useMemo(() => new Date(), []);
 
@@ -104,10 +112,8 @@ function VentesPieces() {
 
   const resultats = useMemo(
     () =>
-      duPerimetre.filter((vente) =>
-        venteCorrespond(vente, nomParClient.get(vente.clientId) ?? "", recherche),
-      ),
-    [duPerimetre, nomParClient, recherche],
+      duPerimetre.filter((vente) => venteCorrespond(vente, nomDeVente(vente), recherche)),
+    [duPerimetre, nomDeVente, recherche],
   );
 
   const chargement = ventes === null;
@@ -141,7 +147,7 @@ function VentesPieces() {
       cle: "client",
       titre: "Client",
       rendu: (vente) =>
-        nomParClient.get(vente.clientId) || <span className="text-encre-doux">Comptoir</span>,
+        nomDeVente(vente) || <span className="text-encre-doux">Comptoir</span>,
     },
     {
       cle: "articles",

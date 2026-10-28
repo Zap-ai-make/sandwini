@@ -84,7 +84,19 @@ export type VentePiece = {
   numero: string;
   boutiqueId: string;
   date: Date | null;
-  /** Vide au comptoir anonyme, et c'est le cas courant. */
+  /**
+   * Le client, facultatif — vide au comptoir anonyme, et c'est le cas courant.
+   *
+   * **Ce champ porte désormais le nom tapé au comptoir**, pas un identifiant de
+   * fiche : le commanditaire a tranché « juste le nom, facultatif » (pas de
+   * compte ni de solde). La clé du document reste `clientId` parce que la règle
+   * `ventePieceValide` en fige l'ensemble des clés (`hasOnly`) : la renommer
+   * exigerait un déploiement des règles sur `sandwini` avant la moindre vente,
+   * et une vente refusée faute de ce déploiement est le défaut que
+   * [[regles-vertes-en-local-jamais-deployees]] a déjà coûté. Les ventes
+   * d'avant S21bis peuvent encore y porter un identifiant de fiche ; l'écran
+   * résout « id connu → nom, sinon la chaîne est le nom » (choix de l'assistant).
+   */
   clientId: string;
   lignes: LigneVentePiece[];
   total: number;
@@ -107,13 +119,24 @@ export type SaisieLigne = {
 
 export type SaisiePanier = {
   lignes: SaisieLigne[];
-  clientId: string;
+  /**
+   * Le nom du client, tapé au comptoir et facultatif (§9). Vide = « quelqu'un
+   * qui passe ». Il est recopié tel quel dans le document, sous la clé
+   * `clientId` que la règle fige (voir l'en-tête de `VentePiece.clientId`).
+   */
+  nomClient: string;
+  /**
+   * Toujours « espèces ». L'écran ne demande plus le moyen de paiement — une
+   * vente de pièces au comptoir est payée comptant, et le commanditaire a
+   * demandé de retirer ce choix. Le champ reste au modèle parce que
+   * l'encaissement et la règle l'exigent ; il ne varie simplement plus.
+   */
   moyenPaiement: MoyenPaiement;
 };
 
 export const PANIER_VIDE: SaisiePanier = {
   lignes: [],
-  clientId: "",
+  nomClient: "",
   moyenPaiement: "especes",
 };
 
@@ -443,8 +466,9 @@ export function comparerVentesPieces(a: VentePiece, b: VentePiece): number {
  * ce qu'on a sous la main. Casse et accents ignorés ; une requête vide laisse
  * tout passer.
  *
- * Le nom du client est passé résolu — la vente ne porte qu'un `clientId`, et
- * c'est l'écran qui tient le fichier des clients.
+ * Le nom du client est passé par l'écran : pour une vente récente, c'est le nom
+ * tapé au comptoir (porté par `clientId`) ; pour une vente ancienne, c'est le
+ * nom résolu depuis le fichier des clients. L'écran tranche entre les deux.
  */
 export function venteCorrespond(vente: VentePiece, nomClient: string, requete: string): boolean {
   const cible = reduire(requete);

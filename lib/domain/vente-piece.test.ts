@@ -67,7 +67,7 @@ describe("arbitrage 1 — le panier est multi-lignes, le client est facultatif",
     const bougie = piece({ id: "b" });
     const panier = ajouterAuPanier(PANIER_VIDE, bougie, 10);
 
-    expect(panier.clientId).toBe("");
+    expect(panier.nomClient).toBe("");
     expect(validerPanier(panier, carte(bougie), stocks(["b", 10]))).toBeNull();
   });
 

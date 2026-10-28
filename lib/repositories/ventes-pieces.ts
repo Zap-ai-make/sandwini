@@ -170,7 +170,10 @@ export function enregistrerVentePiece(
     numeroInitial: numero,
     boutiqueId,
     date: maintenant,
-    clientId: panier.clientId,
+    /* Le nom tapé au comptoir, recopié tel quel sous la clé `clientId` que la
+       règle fige (voir `VentePiece.clientId`). Trimé une fois ici pour qu'il
+       s'accorde avec le libellé de l'encaissement, qui trime aussi. */
+    clientId: panier.nomClient.trim(),
     lignes,
     total,
     moyenPaiement: panier.moyenPaiement,

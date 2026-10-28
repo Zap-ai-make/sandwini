@@ -38,10 +38,17 @@ export function RecuPiece({
   vente,
   boutique,
   client,
+  nomLibre = "",
 }: {
   vente: VentePiece;
   boutique: Boutique | null;
   client: Client | null;
+  /**
+   * Le nom tapé au comptoir, quand la vente ne renvoie à aucune fiche (le cas
+   * courant depuis que le client est un simple nom libre). Les autres traits —
+   * prénom, téléphone, localité — restent vides : un nom libre n'en porte pas.
+   */
+  nomLibre?: string;
 }) {
   const adresse = boutique?.adresse || IDENTITE.siege;
   const telephones = [
@@ -89,7 +96,7 @@ export function RecuPiece({
       <div className="mt-5 grid gap-x-8 gap-y-3 sm:grid-cols-2 print:grid-cols-2">
         <p className="facture-champ">
           <span>Nom :</span>
-          <span>{client?.nom || (client ? nomDuClient(client) : "Comptoir")}</span>
+          <span>{client?.nom || (client ? nomDuClient(client) : nomLibre.trim() || "Comptoir")}</span>
         </p>
         <p className="facture-champ">
           <span>Prénom :</span>

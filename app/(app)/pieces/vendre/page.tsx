@@ -5,8 +5,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { GardeEspace } from "@/components/GardeSession";
 import { Champ } from "@/components/patrons/Champ";
-import { nomComplet, nomDuClient } from "@/lib/domain/client";
-import { EtatErreurSaisie, EtatSansResultat, SansBoutique } from "@/components/patrons/Etats";
+import { EtatErreurSaisie, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import { formaterMontant } from "@/lib/domain/format";
@@ -17,7 +16,6 @@ import {
   type MouvementPiece,
   type Piece,
 } from "@/lib/domain/piece";
-import { LIBELLE_MOYEN, MOYENS_PAIEMENT, type MoyenPaiement } from "@/lib/domain/vente";
 import {
   ajouterAuPanier,
   changerLigne,
@@ -33,7 +31,6 @@ import {
 } from "@/lib/domain/vente-piece";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
-import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterCatalogue, ecouterMouvements } from "@/lib/repositories/pieces";
 import { ecouterVentes } from "@/lib/repositories/ventes";
 import {
@@ -121,7 +118,6 @@ function VendrePieces() {
   const journal = useAbonnement(souscrireMouvements, "Le stock n’a pas pu être lu.");
   const ventesMotos = useAbonnement(souscrireVentesMotos, "Les ventes n’ont pas pu être lues.");
   const ventesPieces = useAbonnement(souscrireVentesPieces, "Les ventes n’ont pas pu être lues.");
-  const { clients, lus: clientsLus } = useFichierClients();
 
   const [panier, setPanier] = useState(PANIER_VIDE);
   const [recherche, setRecherche] = useState("");
@@ -202,7 +198,7 @@ function VendrePieces() {
           ...ventesMotos.valeur.flatMap((vente) => [vente.numero, vente.numeroInitial]),
           ...ventesPieces.valeur.map((vente) => vente.numero),
         ],
-        nomClient: nomDuClient(clients.find((client) => client.id === panier.clientId), ""),
+        nomClient: panier.nomClient.trim(),
       },
       { uid: session.utilisateur.uid, nom: session.utilisateur.nom },
     );
@@ -227,7 +223,6 @@ function VendrePieces() {
       <TetePage
         retour={{ href: "/pieces", libelle: "Catalogue" }}
         titre="Vendre des pièces"
-        sousTitre={`Le stock de ${perimetre.nom} descend à la validation, et la recette entre au journal du jour.`}
       />
 
       {enregistree && (
@@ -253,22 +248,17 @@ function VendrePieces() {
         </div>
       )}
 
-      <div className="mt-6 max-w-[46rem]">
-        <fieldset className="cadre p-4">
+      <div className="mt-4 max-w-[46rem]">
+        <fieldset className="cadre p-3">
           <legend className="px-1 font-semibold text-encre">Les pièces</legend>
 
           <div className="mt-2">
-            <Champ
-              id="chercher-piece"
-              libelle="Chercher une pièce"
-              aide="Sa référence ou son nom. Les accents et la casse n’ont pas d’importance."
-            >
+            <Champ id="chercher-piece" libelle="Chercher une pièce">
               <input
                 id="chercher-piece"
                 type="search"
                 autoComplete="off"
                 value={recherche}
-                aria-describedby="chercher-piece-aide"
                 onChange={(evenement) => {
                   setRecherche(evenement.target.value);
                   /* Le refus portait sur la pièce qu'on vient de quitter. Le
@@ -367,14 +357,12 @@ function VendrePieces() {
             )}
           </div>
 
-          <div className="mt-5">
+          <div className="mt-4">
             <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
               Le panier
             </h2>
             {panier.lignes.length === 0 ? (
-              <EtatSansResultat className="mt-3">
-                Rien au panier. Cherchez une pièce ci-dessus pour commencer.
-              </EtatSansResultat>
+              <p className="mt-2 text-corps text-encre-doux">Rien au panier.</p>
             ) : (
               <ul className="mt-3 space-y-3">
                 {panier.lignes.map((ligne) => {
@@ -465,72 +453,38 @@ function VendrePieces() {
               </p>
             )}
           </div>
-        </fieldset>
 
-        <fieldset className="mt-6 cadre p-4">
-          <legend className="px-1 font-semibold text-encre">L’encaissement</legend>
-
-          <div className="mt-2 grid gap-4 sm:grid-cols-2">
-            <Champ id="moyen" libelle="Moyen de paiement">
-              <select
-                id="moyen"
-                value={panier.moyenPaiement}
+          {/* Un seul formulaire : le nom du client et le total vivent avec le
+              panier, pas dans un second cadre. Le nom se tape à la main, en
+              dernier et facultatif — au comptoir on prend l'argent avant de
+              demander un nom, et souvent on ne le demande pas (§9). Le
+              commanditaire ne veut « que le nom », sans fiche ni compte, et plus
+              de choix de moyen de paiement : une vente de pièces est payée
+              comptant. */}
+          <div className="mt-4 border-t border-bord pt-3">
+            <Champ id="client" libelle="Nom du client" facultatif>
+              <input
+                id="client"
+                type="text"
+                autoComplete="off"
+                value={panier.nomClient}
                 onChange={(evenement) =>
-                  setPanier((actuel) => ({
-                    ...actuel,
-                    moyenPaiement: evenement.target.value as MoyenPaiement,
-                  }))
+                  setPanier((actuel) => ({ ...actuel, nomClient: evenement.target.value }))
                 }
                 className="saisie"
-              >
-                {MOYENS_PAIEMENT.map((moyen) => (
-                  <option key={moyen} value={moyen}>
-                    {LIBELLE_MOYEN[moyen]}
-                  </option>
-                ))}
-              </select>
+              />
             </Champ>
 
-            {/* Le client vient en dernier et reste facultatif : au comptoir on
-                prend l'argent avant de demander un nom, et souvent on ne le
-                demande pas (§9). */}
-            <Champ
-              id="client"
-              libelle="Client"
-              facultatif
-              aide="Pour retrouver la vente plus tard, ou porter son nom au journal de caisse."
-            >
-              <select
-                id="client"
-                value={panier.clientId}
-                aria-describedby="client-aide"
-                disabled={clientsLus === null}
-                onChange={(evenement) =>
-                  setPanier((actuel) => ({ ...actuel, clientId: evenement.target.value }))
-                }
-                className="saisie disabled:opacity-60"
-              >
-                <option value="">
-                  {clientsLus === null ? "Lecture du fichier…" : "Personne au comptoir"}
-                </option>
-                {clients.map((client) => (
-                  <option key={client.id} value={client.id}>
-                    {nomComplet(client)}
-                  </option>
-                ))}
-              </select>
-            </Champ>
+            <p className="mt-3 flex items-baseline justify-between gap-4">
+              <span className="font-medium text-encre">Total à encaisser</span>
+              <span className="text-ecran font-bold tracking-tight text-encre">
+                {formaterMontant(total)}
+              </span>
+            </p>
           </div>
-
-          <p className="mt-5 flex items-baseline justify-between gap-4 border-t border-bord pt-3">
-            <span className="font-medium text-encre">Total à encaisser</span>
-            <span className="text-ecran font-bold tracking-tight text-encre">
-              {formaterMontant(total)}
-            </span>
-          </p>
         </fieldset>
 
-        <EtatErreurSaisie message={erreur} className="mt-3" />
+        <EtatErreurSaisie message={erreur} className="mt-2" />
 
         {/* Le bouton dit ce qui manque plutôt que de laisser cliquer dans le
             vide : sans le stock, cet écran ne sait pas si la vente est
@@ -539,7 +493,7 @@ function VendrePieces() {
           type="button"
           onClick={enregistrer}
           disabled={!pret || panier.lignes.length === 0}
-          className="mt-3 bouton bouton-principal"
+          className="mt-2 bouton bouton-principal"
         >
           {!pret ? "Lecture du stock…" : "Encaisser et enregistrer"}
         </button>

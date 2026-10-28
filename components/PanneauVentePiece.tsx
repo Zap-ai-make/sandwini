@@ -41,8 +41,11 @@ export function PanneauVentePiece({
   const { clients } = useFichierClients();
 
   const boutique = boutiques.find((b) => b.id === vente.boutiqueId) ?? null;
+  /* Vente récente : `clientId` porte le nom tapé au comptoir (pas de fiche).
+     Vente ancienne : un identifiant qu'on résout en fiche. « Fiche connue → son
+     nom, sinon la chaîne EST le nom » couvre les deux sans migration. */
   const client = clients.find((fiche) => fiche.id === vente.clientId) ?? null;
-  const nom = client ? nomDuClient(client) : "";
+  const nom = client ? nomDuClient(client) : vente.clientId;
 
   /* Les retours déjà faits sur cette vente : la vente n'est pas modifiée, elle
      les montre (S67). */
@@ -95,7 +98,12 @@ export function PanneauVentePiece({
           vit dans globals.css ; sans ce marqueur, la liste des ventes voisine
           sortirait avec le reçu). */}
       <div className="a-imprimer mt-4 print:mt-0">
-        <RecuPiece vente={vente} boutique={boutique} client={client} />
+        <RecuPiece
+          vente={vente}
+          boutique={boutique}
+          client={client}
+          nomLibre={client ? "" : vente.clientId}
+        />
       </div>
     </div>
   );
