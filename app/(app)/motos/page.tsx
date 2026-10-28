@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheMoto } from "@/components/FicheMoto";
+import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import {
   ErreurDeLecture,
   EtatVide,
@@ -270,11 +271,7 @@ function Stock() {
       liste.splice(2, 0, {
         cle: "boutique",
         titre: "Boutique",
-        rendu: (moto) => (
-          <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-1.5 py-0.5 text-legende leading-none text-encre-fixe">
-            {moto.boutiqueId}
-          </span>
-        ),
+        rendu: (moto) => <PlaqueBoutique boutiqueId={moto.boutiqueId} />,
       });
     }
     return liste;

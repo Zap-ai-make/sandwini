@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { GardeEspace } from "@/components/GardeSession";
 import { PanneauVentePiece } from "@/components/PanneauVentePiece";
+import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import {
   ErreurDeLecture,
   EtatVide,
@@ -14,7 +15,6 @@ import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { nomDeBoutique } from "@/lib/domain/boutique";
 import { nomDuClient } from "@/lib/domain/client";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import {
@@ -63,7 +63,7 @@ export default function PageVentesPieces() {
  * cette même liste — aucune seconde lecture.
  */
 function VentesPieces() {
-  const { perimetre, boutiques } = usePerimetre();
+  const { perimetre } = usePerimetre();
   const router = useRouter();
   const parametres = useSearchParams();
   const surTitre = useSurTitre("Pièces");
@@ -151,7 +151,7 @@ function VentesPieces() {
           {
             cle: "boutique",
             titre: "Boutique",
-            rendu: (vente: VentePiece) => nomDeBoutique(boutiques, vente.boutiqueId),
+            rendu: (vente: VentePiece) => <PlaqueBoutique boutiqueId={vente.boutiqueId} />,
           },
         ]
       : []),

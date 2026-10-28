@@ -7,6 +7,7 @@ import { Suspense, useCallback, useMemo, useState } from "react";
 import { CartesVentes } from "@/components/CartesVentes";
 import { FicheVente } from "@/components/FicheVente";
 import { PanneauRecu } from "@/components/PanneauRecu";
+import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { ModaleVente } from "@/components/ModaleVente";
 import { lireVentePreparee } from "@/lib/ia/gestes";
@@ -25,7 +26,6 @@ import {
   normaliserNom,
   type Client,
 } from "@/lib/domain/client";
-import { nomDeBoutique } from "@/lib/domain/boutique";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
@@ -94,7 +94,7 @@ function Ventes() {
      est dans `app/sw.ts`, et l'oubli ne se verrait qu'en coupure. */
   const modaleOuverte = parametres.get("nouvelle") === "1";
   const router = useRouter();
-  const { perimetre, boutiques, chargement: perimetreEnCours } = usePerimetre();
+  const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const toutesBoutiques = perimetre.type === "toutes";
   /* Avant tout retour anticipé : un hook appelé sous condition change l'ordre
      des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
@@ -274,11 +274,11 @@ function Ventes() {
       liste.splice(1, 0, {
         cle: "boutique",
         titre: "Boutique",
-        rendu: (ligne) => nomDeBoutique(boutiques, ligne.vente.boutiqueId),
+        rendu: (ligne) => <PlaqueBoutique boutiqueId={ligne.vente.boutiqueId} />,
       });
     }
     return liste;
-  }, [catalogue, venteOuverte, toutesBoutiques, boutiques]);
+  }, [catalogue, venteOuverte, toutesBoutiques]);
 
   if (perimetre.type === "aucune")
     return (

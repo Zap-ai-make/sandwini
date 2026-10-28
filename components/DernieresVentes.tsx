@@ -3,6 +3,7 @@
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo } from "react";
+import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import { ErreurDeLecture, EtatChargement, PastillePaiement } from "@/components/patrons/Etats";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { nomComplet } from "@/lib/domain/client";
@@ -110,11 +111,7 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
     {
       cle: "boutique",
       titre: "Boutique",
-      rendu: (ligne) => (
-        <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-1.5 py-0.5 text-legende leading-none text-encre-fixe">
-          {ligne.vente.boutiqueId}
-        </span>
-      ),
+      rendu: (ligne) => <PlaqueBoutique boutiqueId={ligne.vente.boutiqueId} />,
     },
     { cle: "client", titre: "Client", principal: true, rendu: (ligne) => ligne.client },
     { cle: "moto", titre: "Moto", rendu: (ligne) => ligne.moto },

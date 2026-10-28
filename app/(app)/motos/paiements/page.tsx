@@ -5,11 +5,11 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { FicheVente } from "@/components/FicheVente";
 import { PanneauRecu } from "@/components/PanneauRecu";
+import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import { ErreurDeLecture, SansBoutique } from "@/components/patrons/Etats";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
-import { nomDeBoutique } from "@/lib/domain/boutique";
 import { nomDuClient } from "@/lib/domain/client";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
@@ -91,7 +91,7 @@ export default function PagePaiements() {
   const parametres = useSearchParams();
   const venteOuverte = parametres.get("vente");
   const recuOuvert = parametres.get("recu");
-  const { perimetre, boutiques, chargement: perimetreEnCours } = usePerimetre();
+  const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const toutesBoutiques = perimetre.type === "toutes";
   const catalogue = useCatalogue();
   const { clients } = useFichierClients();
@@ -213,7 +213,7 @@ export default function PagePaiements() {
             {
               cle: "boutique",
               titre: "Boutique",
-              rendu: (ligne: LignePaiement) => nomDeBoutique(boutiques, ligne.vente.boutiqueId),
+              rendu: (ligne: LignePaiement) => <PlaqueBoutique boutiqueId={ligne.vente.boutiqueId} />,
             },
           ]
         : []),
@@ -295,7 +295,7 @@ export default function PagePaiements() {
           ),
       },
     ],
-    [nomClient, moto, catalogue, seuil, toutesBoutiques, boutiques],
+    [nomClient, moto, catalogue, seuil, toutesBoutiques],
   );
 
   if (perimetre.type === "aucune")

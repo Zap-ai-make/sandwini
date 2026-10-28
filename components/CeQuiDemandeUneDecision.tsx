@@ -2,6 +2,7 @@
 
 import { ArrowRight } from "lucide-react";
 import Link from "next/link";
+import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterMontant } from "@/lib/domain/format";
@@ -64,11 +65,7 @@ export function CeQuiDemandeUneDecision({ className }: { className?: string } = 
          dont la maquette la porte. */
       cle: "boutique",
       titre: "Boutique",
-      rendu: (ligne) => (
-        <span className="plaque-code rounded-plaque border border-plaque-bord bg-plaque px-1.5 py-0.5 text-legende leading-none text-encre-fixe">
-          {ligne.boutiqueId}
-        </span>
-      ),
+      rendu: (ligne) => <PlaqueBoutique boutiqueId={ligne.boutiqueId} />,
     },
     { cle: "client", titre: "Client", principal: true, rendu: (ligne) => ligne.client },
     {

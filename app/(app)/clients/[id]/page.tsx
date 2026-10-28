@@ -7,6 +7,7 @@ import { useCallback, useMemo, useState } from "react";
 import { FicheVente } from "@/components/FicheVente";
 import { FormulaireClient } from "@/components/FormulaireClient";
 import { PanneauRecu } from "@/components/PanneauRecu";
+import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import { ErreurDeLecture, EtatChargement, EtatVide, PastillePaiement } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
@@ -95,7 +96,7 @@ export default function PageClient() {
            serveur », et non « sans date » (D82). */
         rendu: (vente) => (vente.date ? formaterDateCourte(vente.date) : "à l’instant"),
       },
-      { cle: "boutique", titre: "Boutique", rendu: (vente) => <span className="plaque-code">{vente.boutiqueId}</span> },
+      { cle: "boutique", titre: "Boutique", rendu: (vente) => <PlaqueBoutique boutiqueId={vente.boutiqueId} /> },
       { cle: "mode", titre: "Mode", rendu: (vente) => LIBELLE_MODE[vente.modePaiement] },
       {
         cle: "reste",
