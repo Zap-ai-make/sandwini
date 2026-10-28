@@ -121,7 +121,15 @@ export function EtatErreurSaisie({
 }
 
 /**
- * Le vide : une invitation, pas un trou (`DESIGN.md` §10).
+ * Ce qu'on montre à la place d'une liste : un titre quand c'est une erreur, et
+ * le geste qui reste possible.
+ *
+ * **Plus de phrase, et plus de titre pour une liste vide** (28 octobre 2026).
+ * Le commanditaire a demandé qu'on ne voie plus de détails, « même les
+ * messages aucun résultat » : une liste vide ne dit plus rien, elle montre
+ * seulement son bouton s'il y en a un. Le titre ne subsiste que pour ce qui
+ * est une erreur — « Ce client n'existe pas », « Ce reçu est introuvable » —,
+ * parce qu'une page blanche y ferait croire à une panne.
  *
  * L’action est facultative parce qu’elle n’est pas toujours vraie — un gérant
  * qui n’a pas de boutique n’a rien à créer, et lui montrer un bouton qui le
@@ -129,23 +137,26 @@ export function EtatErreurSaisie({
  */
 export function EtatVide({
   titre,
-  children,
   action,
   icone,
   className,
 }: {
-  titre: string;
-  children?: ReactNode;
+  /** L'erreur, en toutes lettres. Absent pour une liste vide. */
+  titre?: string;
   action?: ReactNode;
   /** Le pictogramme du sujet — un stock, une file, un carnet. */
   icone?: ReactNode;
   className?: string;
 }) {
+  if (titre === undefined) {
+    return action ? (
+      <div className={`flex flex-wrap gap-2 ${className ?? ""}`}>{action}</div>
+    ) : null;
+  }
   return (
     <div className={`bloc-etat ${className ?? ""}`}>
       {icone ?? <Inbox aria-hidden="true" />}
       <h2 className="mt-3 text-bloc font-bold tracking-tight text-encre">{titre}</h2>
-      {children && <p className="mt-1 text-corps text-encre-doux">{children}</p>}
       {action && <div className="mt-5 flex flex-wrap justify-center gap-2">{action}</div>}
     </div>
   );
@@ -215,23 +226,6 @@ export function ErreurDeLecture({
       )}
     </div>
   );
-}
-
-/**
- * Le filtre qui ne trouve rien — à ne pas confondre avec le vide.
- *
- * « Aucune moto » et « aucune moto *qui corresponde* » demandent deux gestes
- * opposés : faire entrer une moto, ou élargir la recherche. Les mélanger envoie
- * le gérant créer une donnée qu’il possède déjà.
- */
-export function EtatSansResultat({
-  children,
-  className,
-}: {
-  children: ReactNode;
-  className?: string;
-}) {
-  return <p className={`encadre-vide text-encre-doux ${className ?? ""}`}>{children}</p>;
 }
 
 /**

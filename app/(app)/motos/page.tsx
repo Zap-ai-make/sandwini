@@ -1,13 +1,12 @@
 "use client";
 
-import { Bike, Plus, Search, Truck } from "lucide-react";
+import { Plus, Search, Truck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { FicheMoto } from "@/components/FicheMoto";
 import {
   ErreurDeLecture,
-  EtatSansResultat,
   EtatVide,
   SansBoutique,
 } from "@/components/patrons/Etats";
@@ -111,9 +110,6 @@ function Stock() {
   );
 
   const sansPerimetre = perimetre.type === "aucune";
-  /* Ce qui fait entrer une moto réclame un `boutiqueId` : sur « Toutes les
-     boutiques », le geste n'a nulle part où aboutir (S54). */
-  const dansUneBoutique = perimetre.type === "boutique";
   const {
     valeur: stock,
     erreur,
@@ -353,7 +349,7 @@ function Stock() {
           fonctionne normalement&nbsp;: ce geste n’a pas besoin de cette lecture.
         </ErreurDeLecture>
       ) : !chargement && total === 0 ? (
-        <StockVide perimetreEnCours={perimetreEnCours} dansUneBoutique={dansUneBoutique} />
+        <StockVide perimetreEnCours={perimetreEnCours} />
       ) : (
         /* `aria-busy` pendant la lecture : les lignes fantômes disent à l'œil
            que ça arrive, cet attribut le dit à qui ne les voit pas. */
@@ -452,9 +448,7 @@ function Stock() {
               chargement
             />
           ) : resultats.length === 0 ? (
-            <EtatSansResultat className="m-4">
-              Aucune moto ne correspond. Vérifiez le châssis saisi, ou élargissez les filtres.
-            </EtatSansResultat>
+            null
           ) : (
             <Tableau
               legende="Motos du stock, de la plus récemment entrée à la plus ancienne"
@@ -566,13 +560,7 @@ function Filtre({
   );
 }
 
-function StockVide({
-  perimetreEnCours,
-  dansUneBoutique,
-}: {
-  perimetreEnCours: boolean;
-  dansUneBoutique: boolean;
-}) {
+function StockVide({ perimetreEnCours }: { perimetreEnCours: boolean }) {
   if (perimetreEnCours) return null;
   /* Le cadre reste, et le vide s'y installe : c'est ce que montre `b4:92`. Un
      vide qui remplace aussi la boîte laisse la page nue, et l'écran a l'air
@@ -582,8 +570,7 @@ function StockVide({
   return (
     <div className="cadre">
     <EtatVide
-      icone={<Bike aria-hidden="true" />}
-      titre="Aucune moto en stock pour l’instant."
+      className="p-4"
       /* Même règle qu'en tête d'écran : le bouton existe toujours, et c'est
          l'écran de saisie qui demande la boutique quand elle manque (S54). Un
          écran vide dont le seul bouton a disparu est précisément ce qui a fait
@@ -594,11 +581,7 @@ function StockVide({
           Faire entrer une moto
         </Link>
       }
-    >
-      {dansUneBoutique
-        ? "La première entrée demande une marque, un modèle et une provenance. S’ils manquent, ils se déclarent dans les réglages."
-        : "Aucune des boutiques n’a de moto en stock. La saisie vous demandera laquelle reçoit la première."}
-    </EtatVide>
+    />
     </div>
   );
 }

@@ -84,7 +84,6 @@ export default function Supervision() {
            que le bandeau montre lui-même, deux centimètres plus haut, et
            poussait la tête d'écran à trois lignes. C'est l'accessoire qu'on
            retire avant de sortir (`DESIGN.md` §14). */
-        sousTitre="Choisissez une boutique pour y travailler, ou restez ici pour voir l’ensemble."
       />
 
       <InvitationBoutique />

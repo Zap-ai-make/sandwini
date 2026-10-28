@@ -201,11 +201,6 @@ export function LigneModale({
       onFermer={onFermer}
       taille="pleine"
       titre={correction ? "Modifier la ligne" : "Nouvelles lignes"}
-      description={
-        dossier
-          ? `${dossier.clientNom || "Sans nom"} — ${dossier.numeroChassis}`
-          : "Remplissez ce que vous avez, autant de lignes qu’il en faut. Rien ne descend dans la liste avant d’enregistrer."
-      }
       pied={
         <div className="flex flex-wrap items-center gap-2">
           <button

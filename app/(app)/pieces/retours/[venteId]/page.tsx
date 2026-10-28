@@ -131,7 +131,6 @@ function Retour() {
           <TetePage
             retour={{ href: `/pieces/ventes?vente=${fait.venteId}`, libelle: "Reçu de la vente" }}
             titre="Retour enregistré"
-            sousTitre={`${formaterMontant(fait.total)} remboursé${fait.total > 1 ? "s" : ""}. Le stock est déjà remonté sur cet appareil.`}
           />
           <div className="mt-4 flex flex-wrap gap-2">
             <button type="button" onClick={() => window.print()} className="bouton bouton-principal">
@@ -159,7 +158,7 @@ function Retour() {
     return (
       <div>
         <TetePage titre="Reprendre une vente" />
-        <EtatVide titre="Cette vente n’a pas pu être lue">{erreur}</EtatVide>
+        <EtatVide titre={`Cette vente n’a pas pu être lue : ${erreur}`} />
       </div>
     );
   }
@@ -168,9 +167,7 @@ function Retour() {
     return (
       <div>
         <TetePage retour={{ href: "/pieces/ventes", libelle: "Ventes" }} titre="Vente introuvable" />
-        <EtatVide titre="Cette vente n’existe pas ici">
-          Le lien est peut-être périmé, ou la vente appartient à une autre boutique.
-        </EtatVide>
+        <EtatVide titre="Cette vente n’existe pas ici" />
       </div>
     );
   }
@@ -182,11 +179,6 @@ function Retour() {
       <TetePage
         retour={{ href: vente ? `/pieces/ventes?vente=${vente.id}` : "/pieces/ventes", libelle: "Reçu de la vente" }}
         titre="Reprendre une vente"
-        sousTitre={
-          vente
-            ? `Facture ${vente.numero}. Cochez ce qui revient ; le remboursement se fait au prix vendu.`
-            : "Lecture de la vente…"
-        }
       />
 
       {chargement ? (
@@ -251,12 +243,12 @@ function Retour() {
                   ))}
                 </select>
               </Champ>
-              <Champ id="retour-motif" libelle="Motif" facultatif aide="Défaut, erreur de référence…">
+              <Champ id="retour-motif" libelle="Motif" facultatif>
                 <input
                   id="retour-motif"
                   maxLength={LONGUEUR_MOTIF_MAX}
+                  placeholder="Défaut, erreur de référence…"
                   value={saisie.motif}
-                  aria-describedby="retour-motif-aide"
                   onChange={(evenement) =>
                     setSaisie((actuel) => (actuel ? { ...actuel, motif: evenement.target.value } : actuel))
                   }

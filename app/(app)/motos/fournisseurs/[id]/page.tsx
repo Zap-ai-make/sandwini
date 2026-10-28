@@ -7,7 +7,6 @@ import { BarreEcoulement } from "@/components/BarreEcoulement";
 import {
   ErreurDeLecture,
   EtatChargement,
-  EtatVide,
   SansBoutique,
 } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
@@ -113,11 +112,6 @@ export default function PageFournisseur() {
         surTitre={surTitre}
         retour={{ href: "/motos/arrivages", libelle: "Arrivages" }}
         titre={fournisseur?.nom ?? "Fournisseur"}
-        sousTitre={
-          fournisseur
-            ? [fournisseur.telephone, fournisseur.localite].filter(Boolean).join(" · ") || undefined
-            : undefined
-        }
       />
 
       {erreur ? (
@@ -135,9 +129,7 @@ export default function PageFournisseur() {
            pas, on le dit (même principe que D82). */
         <EtatChargement>Lecture des lots de ce fournisseur…</EtatChargement>
       ) : lots.length === 0 ? (
-        <EtatVide titre="Aucun lot pris chez ce fournisseur.">
-          Les lots saisis à son nom apparaîtront ici, du plus récent au plus ancien.
-        </EtatVide>
+        null
       ) : (
         <>
           <div className="mb-5 cadre p-4 sm:p-5">

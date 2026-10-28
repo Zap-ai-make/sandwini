@@ -8,7 +8,6 @@ import { GardeEspace } from "@/components/GardeSession";
 import { PanneauVentePiece } from "@/components/PanneauVentePiece";
 import {
   ErreurDeLecture,
-  EtatSansResultat,
   EtatVide,
 } from "@/components/patrons/Etats";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
@@ -175,11 +174,6 @@ function VentesPieces() {
       <TetePage
         surTitre={surTitre}
         titre="Ventes"
-        sousTitre={
-          surUneBoutique
-            ? "Les ventes de pièces de cette boutique, de la plus récente à la plus ancienne."
-            : "Les ventes de pièces de toutes les boutiques réunies. Choisissez-en une pour n’en voir qu’une."
-        }
         actions={
           surUneBoutique ? (
             <Link href="/pieces/vendre" className="bouton bouton-principal">
@@ -212,7 +206,6 @@ function VentesPieces() {
           </ErreurDeLecture>
         ) : !chargement && total === 0 ? (
           <EtatVide
-            titre="Aucune vente de pièces"
             action={
               surUneBoutique ? (
                 <Link href="/pieces/vendre" className="bouton bouton-principal">
@@ -220,9 +213,7 @@ function VentesPieces() {
                 </Link>
               ) : undefined
             }
-          >
-            Les ventes faites au comptoir apparaîtront ici, avec leur reçu.
-          </EtatVide>
+          />
         ) : (
           <div className="cadre cadre-tableau">
             <div className="cadre-tete">
@@ -273,9 +264,7 @@ function VentesPieces() {
                 chargement
               />
             ) : resultats.length === 0 ? (
-              <EtatSansResultat className="m-4">
-                Aucune vente ne correspond. Essayez un autre terme, ou élargissez la période.
-              </EtatSansResultat>
+              null
             ) : (
               <Tableau
                 legende="Ventes de pièces, de la plus récente à la plus ancienne"

@@ -6,7 +6,7 @@ import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { useSession } from "@/lib/auth/session";
 import { joursEcoules, lireJour } from "@/lib/domain/dossier";
-import { formaterAnciennete, formaterMontant } from "@/lib/domain/format";
+import { formaterAnciennete } from "@/lib/domain/format";
 import {
   validerPaquet,
   type CarteAConfier,
@@ -182,12 +182,6 @@ export function ConfierPaquetModal({
     }
   }
 
-  const montant = Number(saisie.avance.replace(/\s/g, ""));
-  const part =
-    retenues.length > 0 && Number.isFinite(montant) && montant > 0
-      ? Math.floor(montant / retenues.length)
-      : null;
-
   return (
     <Modale
       ouvert
@@ -197,7 +191,6 @@ export function ConfierPaquetModal({
           ? `Confier des cartes grises à ${prestataireImpose.nom}`
           : "Confier des cartes grises"
       }
-      description="Un prestataire, une date, une avance. Elle se note sur les dossiers, pas dans la caisse."
     >
       {cartes.length === 0 ? (
         /* **Pas un formulaire vide.** Sans carte à confier, tous les champs
@@ -271,15 +264,7 @@ export function ConfierPaquetModal({
           </div>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <Champ
-              id="paq-avance"
-              libelle="Avance versée"
-              aide={
-                part !== null
-                  ? `Soit ${formaterMontant(part)} par carte, répartis sur les ${retenues.length} dossiers.`
-                  : "Le total pour le paquet entier, en francs entiers."
-              }
-            >
+            <Champ id="paq-avance" libelle="Avance versée">
               <input
                 id="paq-avance"
                 inputMode="numeric"

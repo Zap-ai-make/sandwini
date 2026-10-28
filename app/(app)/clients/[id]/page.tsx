@@ -129,9 +129,7 @@ export default function PageClient() {
     return (
       <div>
         <TetePage surTitre={surTitre} retour={{ href: "/clients", libelle: "Clients" }} titre="Client" />
-        <EtatVide titre="Ce client n’existe pas">
-          Il a peut-être été retiré du fichier, ou l’adresse est inexacte.
-        </EtatVide>
+        <EtatVide titre="Ce client n’existe pas" />
       </div>
     );
 
@@ -168,9 +166,7 @@ export default function PageClient() {
       {erreurVentes ? (
         <ErreurDeLecture titre="Les achats n’ont pas pu être lus">{erreurVentes}</ErreurDeLecture>
       ) : achats.length === 0 && ventes !== null ? (
-        <EtatVide titre="Aucun achat enregistré">
-          Ce client est au fichier, mais aucune vente ne lui est encore rattachée.
-        </EtatVide>
+        null
       ) : (
         <AvecPanneau
           panneau={

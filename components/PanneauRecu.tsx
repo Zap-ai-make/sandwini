@@ -271,9 +271,6 @@ function Introuvable({ base, libelleRevenir }: { base: string; libelleRevenir: s
           {libelleRevenir}
         </Link>
       }
-    >
-      Le lien ne correspond à aucun reçu de cette vente. Si le versement a été encaissé sur un
-      autre appareil, il apparaîtra ici dès que la synchronisation l’aura apporté.
-    </EtatVide>
+    />
   );
 }

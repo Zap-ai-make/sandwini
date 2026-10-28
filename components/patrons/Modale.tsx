@@ -76,7 +76,6 @@ export function Modale({
   ouvert,
   onFermer,
   titre,
-  description,
   taille = "moyenne",
   pied,
   children,
@@ -84,7 +83,6 @@ export function Modale({
   ouvert: boolean;
   onFermer: () => void;
   titre: string;
-  description?: ReactNode;
   taille?: TailleModale;
   /** Les actions, collées au bas du cadre : elles ne défilent pas avec le corps. */
   pied?: ReactNode;
@@ -245,10 +243,11 @@ export function Modale({
             className="absolute inset-x-0 top-2 mx-auto h-1 w-10 rounded-full bg-bord sm:hidden"
           />
           <div className="min-w-0 flex-1">
+            {/* Le titre seul : plus de sous-titre sous lui (28 octobre 2026,
+                « enlève tous les titres secondaires »). */}
             <h2 id={titreId} className="text-lg font-semibold text-encre">
               {titre}
             </h2>
-            {description && <p className="text-corps text-encre-doux">{description}</p>}
           </div>
           <button
             type="button"

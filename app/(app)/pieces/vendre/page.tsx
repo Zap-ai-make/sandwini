@@ -371,11 +371,6 @@ function VendrePieces() {
                   /* Calculé une fois : l'aide et son `aria-describedby` doivent
                      apparaître et disparaître ensemble, sinon l'input désigne
                      un paragraphe qui n'existe pas. */
-                  const ecartCatalogue =
-                    piece && piece.prixVente !== null &&
-                    String(piece.prixVente) !== ligne.prixUnitaire
-                      ? `Catalogue : ${formaterMontant(piece.prixVente)}`
-                      : undefined;
                   return (
                     <li key={ligne.pieceId} className="cadre p-3">
                       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -415,17 +410,10 @@ function VendrePieces() {
                             className="saisie"
                           />
                         </Champ>
-                        <Champ
-                          id={`p-${ligne.pieceId}`}
-                          libelle="Prix unitaire"
-                          aide={ecartCatalogue}
-                        >
+                        <Champ id={`p-${ligne.pieceId}`} libelle="Prix unitaire">
                           <input
                             id={`p-${ligne.pieceId}`}
                             inputMode="numeric"
-                            aria-describedby={
-                              ecartCatalogue ? `p-${ligne.pieceId}-aide` : undefined
-                            }
                             value={ligne.prixUnitaire}
                             onChange={(evenement) =>
                               setPanier((actuel) =>

@@ -64,7 +64,6 @@ export function FournisseurModal({
       ouvert={ouvert}
       onFermer={onFermer}
       titre="Nouveau fournisseur"
-      description="De qui vient ce lot. Le nom suffit ; le reste sert à le relancer."
       taille="etroite"
       pied={
         <div className="ml-auto flex flex-wrap gap-2">

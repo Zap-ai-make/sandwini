@@ -151,7 +151,7 @@ const filtre = (page: import("@playwright/test").Page, nom: string) =>
   contenu(page).getByRole("group", { name: "Filtrer les paiements" }).getByRole("button", { name: nom, exact: true });
 
 test.describe("la liste des paiements", () => {
-  test("une dette porte son mode, et ne compte pas dans ce que le magasin détient", async ({
+  test("une dette porte son mode et son reste dans sa ligne", async ({
     page,
   }) => {
     await seConnecterEtEntrer(page);
@@ -163,22 +163,15 @@ test.describe("la liste des paiements", () => {
 
     await page.goto("/motos/paiements", { waitUntil: "load" });
 
-    /* Le total des dettes est nommé pour ce qu'il est : de l'argent que les
-       clients doivent. */
-    await expect(contenu(page)).toContainText("750 000 FCFA dus par les clients", {
-      timeout: 30_000,
-    });
-    /* Et rien n'est détenu : cette vente est un crédit, la moto est partie.
-       Le second total ne doit même pas paraître. */
-    await expect(contenu(page)).not.toContainText("détenus pour eux");
-
+    /* Les totaux de tête ont disparu avec les autres détails (28 octobre
+       2026) : c'est la ligne qui dit le mode et ce qui reste dû. */
     const ligne = ligneDe(page, client);
-    await expect(ligne).toContainText("Crédit");
+    await expect(ligne).toContainText("Crédit", { timeout: 30_000 });
     await expect(ligne).toContainText("750 000");
     await expect(ligne).not.toContainText("Tranches");
   });
 
-  test("une tranche compte dans le détenu, jamais dans les dus", async ({ page }) => {
+  test("une tranche porte son mode et son reste dans sa ligne", async ({ page }) => {
     await seConnecterEtEntrer(page);
     const { client } = await vendre(page, {
       mode: "Tranches",
@@ -188,13 +181,8 @@ test.describe("la liste des paiements", () => {
 
     await page.goto("/motos/paiements", { waitUntil: "load" });
 
-    await expect(contenu(page)).toContainText("300 000 FCFA détenus pour eux", {
-      timeout: 30_000,
-    });
-    await expect(contenu(page)).not.toContainText("dus par les clients");
-
     const ligne = ligneDe(page, client);
-    await expect(ligne).toContainText("Tranches");
+    await expect(ligne).toContainText("Tranches", { timeout: 30_000 });
     await expect(ligne).toContainText("600 000");
   });
 
@@ -254,15 +242,9 @@ test.describe("la liste des paiements", () => {
 
     await filtre(page, "Partiellement payées").click();
     await expect(ligneDe(page, client)).toHaveCount(0);
-
-    /* Rien n'est dû sur une vente soldée : le total de tête ne doit pas la
-       compter, alors même que sa ligne est affichée. C'est le point exact que
-       l'élargissement pouvait fausser. */
-    await filtre(page, "Tout").click();
-    await expect(contenu(page)).not.toContainText("dus par les clients");
   });
 
-  test("une moto soldée s’annonce depuis la liste, avec le geste qui l’attend", async ({
+  test("une vente soldée ne propose plus d’encaisser, mais de la voir", async ({
     page,
   }) => {
     await seConnecterEtEntrer(page);
@@ -274,13 +256,14 @@ test.describe("la liste des paiements", () => {
     await encaisser(page, "300000");
     await expect(contenu(page)).toContainText("Tranches soldées", { timeout: 20_000 });
 
-    /* Sans cette ligne, une moto payée jusqu’au dernier franc dort au magasin
-       sans que personne le sache : c’est le seul endroit du produit où la
-       liste, et non la fiche, dit qu’un geste attend. */
+    /* « Remettre la moto » n'avait pas de sens dans la liste (commanditaire,
+       28 octobre 2026) : une vente soldée s'ouvre par « Voir », et la remise
+       se fait depuis sa fiche. */
     await page.goto("/motos/paiements", { waitUntil: "load" });
     const ligne = ligneDe(page, client);
     await expect(ligne).toContainText("Soldée", { timeout: 30_000 });
-    await expect(ligne.getByRole("link", { name: /^Remettre la moto de / })).toBeVisible();
+    await expect(ligne.getByRole("link", { name: /^Voir la vente / })).toBeVisible();
+    await expect(ligne.getByRole("link", { name: /^Encaisser/ })).toHaveCount(0);
   });
 });
 

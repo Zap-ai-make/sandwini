@@ -23,7 +23,10 @@ export const MODES_PAIEMENT = ["comptant", "credit", "tranches"] as const;
 export type ModePaiement = (typeof MODES_PAIEMENT)[number];
 
 export const LIBELLE_MODE: Record<ModePaiement, string> = {
-  comptant: "Comptant",
+  /* « Payé » et non plus « Comptant », à la demande du commanditaire (28
+     octobre 2026). Le mot se lit sur le reçu, la fiche et les listes ; la
+     valeur enregistrée, elle, reste `comptant` — aucune vente n'est migrée. */
+  comptant: "Payé",
   credit: "Crédit",
   tranches: "Tranches",
 };

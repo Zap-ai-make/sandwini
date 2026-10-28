@@ -6,7 +6,7 @@ import { BoutonScanPapier } from "@/components/BoutonScanPapier";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { completudePapiers, ecoulement, type Arrivage } from "@/lib/domain/arrivage";
-import { formaterDate, formaterNombre } from "@/lib/domain/format";
+import { formaterNombre } from "@/lib/domain/format";
 import { LIBELLE_PAPIER, LIBELLE_STATUT, type PapierMoto, type Moto } from "@/lib/domain/moto";
 import { marquerPapierRecu, messageErreurMoto } from "@/lib/repositories/motos";
 import type { Auteur } from "@/lib/repositories/referentiels";
@@ -27,7 +27,6 @@ import type { Auteur } from "@/lib/repositories/referentiels";
 export function InspecterLotModal({
   arrivage,
   motosDuLot,
-  nomFournisseur,
   nomMarque,
   nomModele,
   auteur,
@@ -40,7 +39,6 @@ export function InspecterLotModal({
 }: {
   arrivage: Arrivage;
   motosDuLot: Moto[];
-  nomFournisseur: string;
   nomMarque: (id: string) => string;
   nomModele: (id: string) => string;
   auteur: Auteur | null;
@@ -91,15 +89,6 @@ export function InspecterLotModal({
       ouvert
       onFermer={onFermer}
       titre={arrivage.nom}
-      description={
-        <>
-          Expéditeur : {nomFournisseur}
-          {arrivage.date ? ` — Arrivée ${formaterDate(arrivage.date)}` : ""}
-          {arrivage.annule && (
-            <span className="pastille pastille-retard ml-2">Annulé</span>
-          )}
-        </>
-      }
       taille="large"
       pied={
         <>

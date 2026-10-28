@@ -9,7 +9,7 @@ import {
   validerNom,
   type Referentiel,
 } from "@/lib/domain/referentiel";
-import { EtatChargement, EtatErreur, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import { EtatChargement, EtatErreur, EtatErreurSaisie } from "@/components/patrons/Etats";
 
 /**
  * Une liste de référentiel : un nom, un état, rien de plus.
@@ -96,9 +96,7 @@ export function ListeReferentiel({
       {entrees === null ? (
         erreur ? null : <EtatChargement className="mt-3">Chargement…</EtatChargement>
       ) : entrees.length === 0 && !erreur ? (
-        <EtatSansResultat className="mt-3">
-          Aucune entrée pour l’instant. Ajoutez celles que vous utilisez vraiment&nbsp;: {exemples}.
-        </EtatSansResultat>
+        null
       ) : (
         <ul className="mt-3 cadre cadre-liste">
           {entrees.map((entree) => (

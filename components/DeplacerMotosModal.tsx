@@ -104,7 +104,6 @@ export function DeplacerMotosModal({
       ouvert
       onFermer={onFermer}
       titre={`Déplacer ${motos.length} moto(s)`}
-      description="Elles quittent leur boutique et entrent dans le stock de celle que vous choisissez."
       pied={
         <div className="ml-auto flex flex-wrap gap-2">
           <button
@@ -157,12 +156,7 @@ export function DeplacerMotosModal({
              liste peut être vide maintenant qu'elle écarte les boutiques qui ne
              tiennent pas de motos : sans cette phrase, le sélecteur n'offrirait
              que « Choisir… » et on le croirait cassé. */
-          <Avis ton="transit" titre="Aucune boutique où les envoyer">
-            <p>
-              Seules les boutiques ouvertes qui vendent des motos reçoivent un stock de motos. Une
-              boutique de pièces détachées ou de cartes grises n’en tient pas.
-            </p>
-          </Avis>
+          <Avis ton="transit" titre="Aucune boutique où les envoyer" />
         )}
 
         <Champ
@@ -172,7 +166,6 @@ export function DeplacerMotosModal({
           /* L'exiger ferait taper « transfert » à chaque fois : la trace se
              remplirait de bruit, et on ne distinguerait plus les déplacements
              qui avaient une raison de ceux qui n'en avaient pas. */
-          aide="Il s’écrit sur chacune des traces."
         >
           <input
             id="motif-transfert"

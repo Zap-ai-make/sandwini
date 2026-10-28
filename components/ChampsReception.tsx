@@ -33,13 +33,11 @@ export function ChampsReception({
         id={`pa-recue-${ligne.pieceId}`}
         libelle="Prix d’achat"
         facultatif
-        aide="Modifié, il met à jour le coût au catalogue."
       >
         <input
           id={`pa-recue-${ligne.pieceId}`}
           inputMode="numeric"
           value={ligne.prixAchat}
-          aria-describedby={`pa-recue-${ligne.pieceId}-aide`}
           onChange={(evenement) => changer({ prixAchat: evenement.target.value })}
           className="saisie"
         />

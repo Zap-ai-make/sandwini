@@ -52,8 +52,9 @@ test.describe("recherche", () => {
       await expect(page.getByRole("listitem").filter({ hasText: nom })).toBeVisible();
     }
 
+    /* Plus de message « aucun résultat » (28 octobre 2026) : la ligne s'en va. */
     await page.getByLabel("Chercher un client").fill("99 99 99 99");
-    await expect(contenu(page)).toContainText("Personne ne correspond");
+    await expect(page.getByRole("listitem").filter({ hasText: nom })).toHaveCount(0);
   });
 
   test("un client se retrouve par le début de son nom, sans accents", async ({ page }) => {

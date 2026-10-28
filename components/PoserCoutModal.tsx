@@ -1,6 +1,5 @@
 "use client";
 
-import { Wallet } from "lucide-react";
 import { useState } from "react";
 import { FraisEntree } from "@/components/FraisEntree";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
@@ -117,14 +116,6 @@ export function PoserCoutModal({
       ouvert
       onFermer={onFermer}
       titre="Prix d’achat"
-      description={
-        <span className="flex flex-wrap items-center gap-2">
-          <Wallet aria-hidden="true" className="size-4" />
-          {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
-          {" — "}
-          <span className="plaque-code">{moto.numeroChassis}</span>
-        </span>
-      }
       pied={
         <div className="flex flex-wrap gap-2">
           <button

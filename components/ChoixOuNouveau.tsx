@@ -49,7 +49,6 @@ export function ChoixOuNouveau({
   invite,
   enAttente = false,
   facultatif = false,
-  aide,
   creer,
 }: {
   id: string;
@@ -94,7 +93,6 @@ export function ChoixOuNouveau({
    * d'un champ dont la validation refuse le vide serait un mensonge d'écran.
    */
   facultatif?: boolean;
-  aide?: string;
   /**
    * Écrit la nouvelle entrée et rend son identifiant **tout de suite**, sans
    * attendre le serveur : hors ligne la promesse ne se résout jamais, et la
@@ -109,7 +107,10 @@ export function ChoixOuNouveau({
   const [saisieOuverte, setSaisieOuverte] = useState(false);
   const [nom, setNom] = useState("");
   const [erreur, setErreur] = useState<string | null>(null);
-  const [note, setNote] = useState<string | null>(null);
+  /* Le seul message qui survive sous la liste : le refus du serveur. Les
+     confirmations (« ajouté », « existait déjà ») ont disparu avec les autres
+     détails le 28 octobre 2026 — la liste qui affiche le bon nom suffit. */
+  const [refus, setRefus] = useState<string | null>(null);
   const champ = useRef<HTMLInputElement>(null);
 
   /* Le champ prend la main dès qu’il s’ouvre : sans cela, le geste demande un
@@ -129,7 +130,7 @@ export function ChoixOuNouveau({
   function ouvrir() {
     setNom("");
     setErreur(null);
-    setNote(null);
+    setRefus(null);
     setSaisieOuverte(true);
   }
 
@@ -157,7 +158,6 @@ export function ChoixOuNouveau({
     const existante = trouverParNom(nom, toutes);
     if (existante) {
       changer(existante.id);
-      setNote(`« ${existante.nom} » existait déjà : c’est ${determinant === "cette" ? "elle" : "lui"} qui est retenu${determinant === "cette" ? "e" : ""}.`);
       fermer();
       return;
     }
@@ -170,10 +170,9 @@ export function ChoixOuNouveau({
       /* L’entrée reste sélectionnée : elle est dans le cache local, et la moto
          qui la cite partira avec. Ce qu’on annonce, c’est que le serveur l’a
          refusée — pas que le geste n’a rien fait. */
-      setNote(`« ${nom.trim()} » n’a pas été accepté${determinant === "cette" ? "e" : ""} par le serveur.`),
+      setRefus(`« ${nom.trim()} » n’a pas été accepté${determinant === "cette" ? "e" : ""} par le serveur.`),
     );
     changer(nouvelle);
-    setNote(`« ${nom.trim()} » ajouté${determinant === "cette" ? "e" : ""} à la liste.`);
     fermer();
   }
 
@@ -219,17 +218,17 @@ export function ChoixOuNouveau({
   }
 
   return (
-    <Champ id={id} libelle={libelle} facultatif={facultatif} aide={note ?? aide}>
+    <Champ id={id} libelle={libelle} facultatif={facultatif} erreur={refus}>
       <select
         id={id}
         value={valeur}
-        aria-describedby={note || aide ? `${id}-aide` : undefined}
+        aria-describedby={refus ? `${id}-erreur` : undefined}
         onChange={(evenement) => {
           if (evenement.target.value === NOUVELLE) {
             ouvrir();
             return;
           }
-          setNote(null);
+          setRefus(null);
           changer(evenement.target.value);
         }}
         className="saisie"

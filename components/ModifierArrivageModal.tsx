@@ -126,7 +126,6 @@ export function ModifierArrivageModal({
       ouvert
       onFermer={onFermer}
       titre="Modifier l’arrivage"
-      description="L’entête du lot, et l’identité de chacune de ses motos."
       taille={motosDuLot.length > 0 ? "pleine" : "moyenne"}
       pied={
         <div className="ml-auto flex flex-wrap gap-2">

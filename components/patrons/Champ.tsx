@@ -1,7 +1,13 @@
 import type { ReactNode } from "react";
 
 /**
- * Le champ : son intitulé, sa saisie, son aide, son erreur — dans cet ordre.
+ * Le champ : son intitulé, sa saisie, son erreur — dans cet ordre.
+ *
+ * **Plus d'aide sous le champ** (28 octobre 2026). Le commanditaire l'a
+ * demandé pour tout le produit : « on ne doit plus voir de détails ». Ce que
+ * l'intitulé ne dit pas, l'erreur le dira au moment où ça compte. Une consigne
+ * qu'on ne peut vraiment pas perdre va dans le `placeholder` de la saisie, qui
+ * s'efface dès qu'on tape.
  *
  * La saisie est passée en enfant plutôt que décrite en propriétés. Le produit
  * emploie l’`input` natif, le `select` natif et le champ date natif
@@ -23,14 +29,12 @@ export function Champ({
   id,
   libelle,
   facultatif = false,
-  aide,
   erreur,
   children,
 }: {
   id: string;
   libelle: string;
   facultatif?: boolean;
-  aide?: ReactNode;
   erreur?: string | null;
   children: ReactNode;
 }) {
@@ -41,11 +45,6 @@ export function Champ({
         {facultatif && <span className="font-normal text-encre-doux"> (facultatif)</span>}
       </label>
       <div className="mt-1.5">{children}</div>
-      {aide && (
-        <p id={`${id}-aide`} className="mt-1 text-corps text-encre-doux">
-          {aide}
-        </p>
-      )}
       {erreur && (
         <p id={`${id}-erreur`} className="mt-1 text-corps font-semibold text-alerte">
           {erreur}

@@ -5,19 +5,18 @@ import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo, useState } from "react";
 import { FicheVente } from "@/components/FicheVente";
 import { PanneauRecu } from "@/components/PanneauRecu";
-import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { ErreurDeLecture, SansBoutique } from "@/components/patrons/Etats";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import { AvecPanneau } from "@/components/patrons/PanneauLateral";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { nomDuClient } from "@/lib/domain/client";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { SEUIL_INACTIVITE_DEFAUT, type ReglagesEntreprise } from "@/lib/domain/entreprise";
-import { formaterDateCourte, formaterMontant, formaterNombre } from "@/lib/domain/format";
+import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
   PLAGE_VIDE,
   bornesPeriode,
-  libellePeriode,
   type Periode,
   type PlagePeriode,
 } from "@/lib/domain/periode";
@@ -26,15 +25,11 @@ import {
   LIBELLE_FILTRE_PAIEMENT,
   LIBELLE_MODE,
   LIBELLE_STATUT_PAIEMENT,
-  dettes,
   estInactive,
   filtrerPaiements,
   paiementsDeLaPeriode,
   paiementsEchelonnes,
   suivrePaiements,
-  totalDetenu,
-  totalDu,
-  tranchesEnCours,
   type FiltrePaiement,
   type LignePaiement,
   type StatutPaiement,
@@ -178,18 +173,6 @@ export default function PagePaiements() {
   const echelonnes = useMemo(() => paiementsEchelonnes(retenues), [retenues]);
   const lignesVues = useMemo(() => filtrerPaiements(echelonnes, filtre), [echelonnes, filtre]);
 
-  /* `dettes` et `tranchesEnCours` plutôt qu'un filtre sur le mode : depuis que
-     la liste porte aussi les soldées, le mode ne suffit plus à dire ce qui est
-     encore engagé. Une tranche soldée dont la moto est partie n'est plus de
-     l'argent détenu — la compter annoncerait une somme que le magasin a déjà
-     rendue en moto. Ces deux fonctions écartent ces cas d'elles-mêmes. */
-  const duParLesClients = useMemo(() => totalDu(dettes(lignesVues)), [lignesVues]);
-  const detenuPourEux = useMemo(() => totalDetenu(tranchesEnCours(lignesVues)), [lignesVues]);
-  const inactives = useMemo(
-    () => lignesVues.filter((ligne) => estInactive(ligne, seuil) && ligne.resteDu > 0),
-    [lignesVues, seuil],
-  );
-
   const nomClient = useCallback(
     (clientId: string) => nomDuClient(clients.find((client) => client.id === clientId)),
     [clients],
@@ -280,17 +263,18 @@ export default function PagePaiements() {
         cle: "action",
         titre: "Action",
         rendu: (ligne) =>
-          ligne.vente.modePaiement === "tranches" && ligne.resteDu === 0 ? (
-            /* Le geste du jour : la moto peut sortir. C'est la seule ligne de
-               l'écran qui appelle une action plutôt qu'un encaissement, et elle
-               se voit depuis la liste — sans quoi une moto soldée dort au
-               magasin sans que personne le sache. */
+          ligne.resteDu === 0 ? (
+            /* **Une vente soldée n'a plus rien à encaisser : on la regarde.**
+               Le bouton disait « Remettre la moto » sur les tranches soldées, et
+               « Encaisser » sur un crédit soldé — deux gestes qui n'avaient plus
+               de sens (commanditaire, 28 octobre 2026). Il ouvre la fiche, d'où
+               la remise se fait toujours. */
             <Link
               href={`/motos/paiements?vente=${ligne.vente.id}`}
-              aria-label={`Remettre la moto de ${ligne.vente.numero}`}
-              className="bouton bouton-principal h-9 px-3 text-legende"
+              aria-label={`Voir la vente ${ligne.vente.numero}`}
+              className="bouton bouton-neutre h-9 px-3 text-legende"
             >
-              Remettre la moto
+              Voir
             </Link>
           ) : (
             <Encaisser vente={ligne.vente.id} numero={ligne.vente.numero} />
@@ -309,7 +293,6 @@ export default function PagePaiements() {
     );
 
   const chargement = (ventes === null || versements === null) && !erreur && !erreurVersements;
-  const nomPeriode = libellePeriode(periode, maintenant, plage);
 
   return (
     <div className="ecran-plein">
@@ -355,28 +338,6 @@ export default function PagePaiements() {
         </ErreurDeLecture>
       )}
 
-      {/* **Deux totaux, jamais leur somme.** Les clients doivent de l'argent au
-          magasin ; le magasin en détient pour le compte des clients. Un seul
-          chiffre les mêlerait, et c'est précisément ce que la liste unique
-          rendait possible — d'où deux phrases, séparées par un point médian. */}
-      <p aria-live="polite" aria-atomic="true" className="mb-3 text-corps text-encre-doux">
-        {chargement ? (
-          "Lecture des paiements…"
-        ) : lignesVues.length === 0 ? (
-          ""
-        ) : (
-          <>
-            <strong className="font-semibold text-encre">
-              {compter(lignesVues.length, "vente", "ventes")}
-            </strong>
-            {duParLesClients > 0 && ` · ${formaterMontant(duParLesClients)} dus par les clients`}
-            {detenuPourEux > 0 && ` · ${formaterMontant(detenuPourEux)} détenus pour eux`}
-            {inactives.length > 0 &&
-              ` · ${inactives.length} sans versement depuis ${seuil} jours ou plus`}
-          </>
-        )}
-      </p>
-
       <AvecPanneau
         panneau={
           recuOuvert ? (
@@ -392,9 +353,7 @@ export default function PagePaiements() {
         }
       >
         {!chargement && lignesVues.length === 0 ? (
-          <EtatVide titre={titreDuVide(filtre, nomPeriode)}>
-            {phraseDuVide(filtre, nomPeriode)}
-          </EtatVide>
+          null
         ) : (
           <div className="cadre cadre-tableau">
             <Tableau
@@ -413,31 +372,6 @@ export default function PagePaiements() {
       {perimetreEnCours && <span className="sr-only">Chargement du périmètre…</span>}
     </div>
   );
-}
-
-/**
- * L'état vide, qui doit dire **laquelle** des trois absences on regarde.
- *
- * « Aucune vente échelonnée » est un registre neuf ; « aucun versement en août » n'en est
- * pas une, et « rien sous Soldées » n'est qu'un filtre trop
- * serré. Les confondre ferait croire à un registre à jour — la même faute que
- * D63 relève sur les compteurs à zéro, transposée à une phrase.
- */
-function titreDuVide(filtre: FiltrePaiement, nomPeriode: string | null): string {
-  if (nomPeriode) return `Aucun versement reçu — ${nomPeriode}.`;
-  if (filtre !== "tout") return `Rien sous « ${LIBELLE_FILTRE_PAIEMENT[filtre]} ».`;
-  return "Aucune vente à paiement échelonné.";
-}
-
-function phraseDuVide(filtre: FiltrePaiement, nomPeriode: string | null): string {
-  if (nomPeriode)
-    return "Aucune vente n’a reçu d’argent sur cette période. Ce qui reste à percevoir est visible sur « Tout ».";
-  if (filtre !== "tout")
-    return "Le filtre ne laisse rien passer. Les autres ventes échelonnées sont visibles sur « Tout ».";
-  /* Le comptant ne figure pas sur cet écran : il se solde à la saisie. Un
-     magasin qui ne vendrait qu'au comptant verra donc cette phrase, et elle
-     doit lui dire que ce n'est pas une anomalie. */
-  return "Aucun crédit ni aucune vente en tranches n’a encore été enregistré. Les ventes au comptant ne figurent pas ici : elles sont soldées dès la saisie.";
 }
 
 /* Jamais la couleur seule : le mot est écrit, la pastille ne fait que le
@@ -484,8 +418,4 @@ function nomMoto(
   return fiche
     ? `${catalogue.nomMarque(fiche.marqueId)} ${catalogue.nomModele(fiche.modeleId)}`
     : "Moto hors de ce périmètre";
-}
-
-function compter(nombre: number, singulier: string, pluriel: string): string {
-  return `${nombre} ${nombre > 1 ? pluriel : singulier}`;
 }

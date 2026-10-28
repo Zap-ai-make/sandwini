@@ -12,7 +12,6 @@ import { ModaleVente } from "@/components/ModaleVente";
 import { lireVentePreparee } from "@/lib/ia/gestes";
 import {
   ErreurDeLecture,
-  EtatSansResultat,
   EtatVide,
   PastillePaiement,
   SansBoutique,
@@ -443,10 +442,7 @@ function Ventes() {
                 chargement
               />
             ) : resultats.length === 0 ? (
-              <EtatSansResultat className="m-4">
-                Aucune vente ne correspond. Essayez le numéro de téléphone, le numéro du reçu, ou
-                élargissez les filtres.
-              </EtatSansResultat>
+              null
             ) : (
               <Tableau
                 legende="Ventes de la boutique, de la plus récente à la plus ancienne"
@@ -523,7 +519,6 @@ function AucuneVente({
   if (perimetreEnCours) return null;
   return (
     <EtatVide
-      titre="Aucune vente enregistrée pour l’instant."
       /* Même règle qu'en tête d'écran (S54) : sans boutique, le geste n'a pas
          de destination, et le vide dit alors quoi faire d'abord. */
       action={
@@ -534,10 +529,6 @@ function AucuneVente({
           </button>
         ) : undefined
       }
-    >
-      {dansUneBoutique
-        ? "Une vente demande une moto en stock et un client. Le client peut se créer au moment de la vente, sans quitter l’écran."
-        : "Aucune des boutiques n’a enregistré de vente. Choisissez-en une dans le bandeau pour y enregistrer la première."}
-    </EtatVide>
+    />
   );
 }

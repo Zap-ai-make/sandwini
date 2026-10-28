@@ -3,9 +3,8 @@
 import { Plus, Search } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 
-import { Avis } from "@/components/patrons/Avis";
 import { Champ } from "@/components/patrons/Champ";
-import { ErreurDeLecture, EtatErreurSaisie, EtatSansResultat } from "@/components/patrons/Etats";
+import { ErreurDeLecture, EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -123,7 +122,6 @@ export default function PageRetraitsCmc() {
       {surTitre}
       <TetePage
         titre="CMC"
-        sousTitre="Qui est venu chercher un CMC, et pour quelle moto."
         actions={
           boutiqueId !== null ? (
             <button
@@ -137,16 +135,6 @@ export default function PageRetraitsCmc() {
           ) : undefined
         }
       />
-
-      {boutiqueId === null && (
-        /* Une ligne appartient au comptoir qui a remis le papier : sans
-           boutique choisie, il n'y a personne à qui l'attribuer. La lecture,
-           elle, reste ouverte — le responsable voit tous les registres. */
-        <Avis ton="transit" titre="Choisissez une boutique pour inscrire un retrait">
-          Un retrait appartient au comptoir qui a remis le papier. Le registre, lui, montre déjà
-          tout ce que vous avez le droit de voir.
-        </Avis>
-      )}
 
       <div className="mt-6">
         <label htmlFor="recherche-cmc" className="block text-sm font-medium text-encre">
@@ -185,11 +173,7 @@ export default function PageRetraitsCmc() {
           Sans cette lecture, impossible de dire qui est venu chercher un papier.
         </ErreurDeLecture>
       ) : trouves.length === 0 && valeur !== null ? (
-        <EtatSansResultat className="mt-6">
-          {cherche
-            ? "Personne ne correspond à cette recherche."
-            : "Aucun retrait inscrit pour l’instant. Le premier s’inscrit avec le bouton ci-dessus."}
-        </EtatSansResultat>
+        null
       ) : (
         <Tableau
           legende="Les CMC retirés, du plus récent au plus ancien."
@@ -254,7 +238,6 @@ function RetraitModale({
       ouvert
       onFermer={onFermer}
       titre="Inscrire un retrait de CMC"
-      description="Qui emporte le papier, et pour quelle moto."
       taille="moyenne"
       pied={
         <div className="ml-auto flex flex-wrap gap-2">
@@ -297,7 +280,6 @@ function RetraitModale({
           facultatif
           /* On ne refuse pas un CMC à quelqu'un qui n'a pas de téléphone : le
              registre note ce qu'on sait, pas ce qu'on exige. */
-          aide="Pour rappeler la personne si le papier était le mauvais."
         >
           <input
             id="cmc-telephone"
@@ -313,7 +295,6 @@ function RetraitModale({
         <Champ
           id="cmc-moto"
           libelle="Numéro de la moto"
-          aide="Le numéro de cadre, tel qu’il est relevé sur la moto."
         >
           <input
             id="cmc-moto"

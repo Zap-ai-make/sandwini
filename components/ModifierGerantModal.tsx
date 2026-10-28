@@ -84,7 +84,6 @@ export function ModifierGerantModal({
       ouvert={ouvert}
       onFermer={onFermer}
       titre={`Modifier ${utilisateur.nom}`}
-      description="Ce que ce compte porte aujourd’hui. Laissez un champ tel quel pour ne pas y toucher."
       taille="etroite"
       pied={
         <div className="ml-auto flex flex-wrap gap-2">
@@ -128,7 +127,6 @@ export function ModifierGerantModal({
         <Champ
           id="modifier-nom"
           libelle="Nom"
-          aide="Les ventes déjà enregistrées gardent l’ancien nom : un journal ne se réécrit pas."
         >
           <input
             id="modifier-nom"
@@ -136,7 +134,6 @@ export function ModifierGerantModal({
             maxLength={200}
             autoFocus
             onChange={(evenement) => setNom(evenement.target.value)}
-            aria-describedby="modifier-nom-aide"
             className="saisie"
           />
         </Champ>
@@ -156,7 +153,6 @@ export function ModifierGerantModal({
           id="modifier-mot-de-passe"
           libelle="Nouveau mot de passe"
           facultatif
-          aide="Laissez vide pour garder le mot de passe actuel. Au moins 10 caractères, affiché en clair pour que vous puissiez le dicter."
         >
           <input
             id="modifier-mot-de-passe"
@@ -164,7 +160,6 @@ export function ModifierGerantModal({
             autoComplete="off"
             value={motDePasse}
             onChange={(evenement) => setMotDePasse(evenement.target.value)}
-            aria-describedby="modifier-mot-de-passe-aide"
             className="saisie font-code"
           />
         </Champ>

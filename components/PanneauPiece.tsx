@@ -121,8 +121,7 @@ export function PanneauPiece({
           plus » (D82). */}
       {etat === "anomalie" && (
         <Avis ton="alerte" titre="Il manque une entrée" className="mt-3" role="status">
-          Les sorties dépassent les entrées de {formaterNombre(-quantite)}. Un lot est arrivé sans
-          être saisi, ou une entrée a été corrigée après coup. Faites entrer ce qui manque.
+          Les sorties dépassent les entrées de {formaterNombre(-quantite)}.
         </Avis>
       )}
 

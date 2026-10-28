@@ -127,6 +127,15 @@ Un écran n'est pas terminé tant que tous ses états ne sont pas conçus, pas s
 
 L'état vide est une invitation à agir, pas un trou. L'erreur explique ce qui s'est passé et comment le corriger.
 
+**Arbitrage du commanditaire (28 octobre 2026) : pas de texte de détail.** « On ne doit plus voir de détails », dans tout le produit. Concrètement :
+
+- pas d'aide sous un champ, pas de sous-titre sous le titre d'une page ou d'une fenêtre ;
+- pas de phrase d'invitation (« Tapez un châssis… »), pas de compteur (« 13 lignes trouvées », « 3 ventes · … dus »), pas de message « aucun résultat » ;
+- une liste vide n'affiche que son bouton d'action s'il en a un, sinon rien ;
+- **seules les erreurs restent** — lecture impossible, refus, données incohérentes —, et elles se réduisent à leur titre et à leurs données.
+
+Une consigne qu'on ne peut vraiment pas perdre va dans le `placeholder` de la saisie, jamais en ligne sous le champ. L'état vide « invitation » ci-dessus ne vaut donc plus que par son bouton.
+
 ---
 
 ## 11. Accessibilité (non négociable)
@@ -145,7 +154,7 @@ Les mots existent pour rendre l'interface plus facile à comprendre, donc à uti
 - Écris du point de vue de l'utilisateur : on nomme ce que la personne contrôle et reconnaît, jamais la plomberie technique (« notifications », pas « config webhook »).
 - Voix active, sentence case, pas de remplissage. Un bouton dit exactement ce qui se passe : « Enregistrer les modifications », pas « Soumettre ».
 - Un mot d'action garde le même nom dans tout le flux : le bouton « Publier » produit un toast « Publié ».
-- Les erreurs ne s'excusent pas et ne sont jamais vagues. Les écrans vides invitent à l'action.
+- Les erreurs ne s'excusent pas et ne sont jamais vagues. Les écrans vides invitent à l'action par leur bouton, sans phrase (voir §10).
 - Être précis vaut toujours mieux qu'être malin. Chaque élément fait un seul job.
 
 ---

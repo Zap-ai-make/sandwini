@@ -6,13 +6,11 @@ import { BordereauPaquet } from "@/components/BordereauPaquet";
 import { ConfierDepuisPrestataire } from "@/components/ConfierDepuisPrestataire";
 import { GardeEspace } from "@/components/GardeSession";
 import { LienDeSuivi } from "@/components/LienDeSuivi";
-import { Avis } from "@/components/patrons/Avis";
 import { Champ } from "@/components/patrons/Champ";
 import {
   EtatChargement,
   EtatErreur,
   EtatErreurSaisie,
-  EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
@@ -113,7 +111,6 @@ function Prestataires() {
           bouton en tête, et l'écran redevient ce qu'il est — une liste. */}
       <TetePage
         titre="Prestataires"
-        sousTitre="Ceux à qui vous confiez les cartes grises. Depuis chaque fiche, vous pouvez leur remettre un paquet de dossiers en une fois."
         actions={
           administre ? (
             <button
@@ -128,16 +125,6 @@ function Prestataires() {
         }
       />
 
-      {/* **Un paquet appartient à une boutique**, et le responsable travaille
-          par défaut sur « toutes ». Le dire ici vaut mieux que de laisser
-          ouvrir une modale dont l'enregistrement serait refusé à la fin. */}
-      {boutiqueId === null && (
-        <Avis ton="transit" titre="Choisissez une boutique pour confier des cartes grises">
-          Un paquet part d’une boutique, et c’est sur ses dossiers que l’avance se note. La
-          liste des prestataires, elle, est la même partout.
-        </Avis>
-      )}
-
       {creation && administre && <Formulaire onFermer={() => setCreation(false)} />}
 
       <h2 className="mt-8 text-sm font-semibold tracking-wide text-encre-doux uppercase">
@@ -149,10 +136,7 @@ function Prestataires() {
       {valeur === null && !erreur ? (
         <EtatChargement className="mt-3">Chargement des prestataires…</EtatChargement>
       ) : (valeur ?? []).length === 0 && !erreur ? (
-        <EtatSansResultat className="mt-3">
-          Aucun prestataire pour l’instant. Tant qu’il n’y en a pas, un dossier ne peut pas être
-          marqué comme déposé.
-        </EtatSansResultat>
+        null
       ) : (
         <ul className="mt-3 cadre cadre-liste">
           {(valeur ?? []).map((prestataire) => (
@@ -208,7 +192,6 @@ function ApresAvoirConfie({
       ouvert
       onFermer={onFermer}
       titre={`${confie.cartes.length} carte(s) confiée(s) à ${confie.prestataireNom}`}
-      description="Le bordereau liste ce qu’il emporte. Imprimez-le pendant qu’il est là."
       pied={
         <div className="flex flex-wrap gap-2">
           <button

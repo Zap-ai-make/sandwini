@@ -9,7 +9,7 @@ import { BordereauLot } from "@/components/BordereauLot";
 import { CartesArrivages } from "@/components/CartesArrivages";
 import { InspecterLotModal } from "@/components/InspecterLotModal";
 import { ModifierArrivageModal } from "@/components/ModifierArrivageModal";
-import { ErreurDeLecture, EtatVide, SansBoutique } from "@/components/patrons/Etats";
+import { ErreurDeLecture, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import Link from "next/link";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -307,10 +307,7 @@ export default function PageArrivages() {
           {erreur}
         </ErreurDeLecture>
       ) : arrivages !== null && arrivages.length === 0 ? (
-        <EtatVide titre="Aucun arrivage pour l’instant.">
-          Un arrivage regroupe les motos reçues d’un même fournisseur, saisies en une fois.
-          {dansUneBoutique ? " Utilisez le bouton « Nouveau »." : ""}
-        </EtatVide>
+        null
       ) : (
         <>
           <CartesArrivages bilan={bilan} />
@@ -479,7 +476,6 @@ export default function PageArrivages() {
         ouvert={choixBoutique}
         onFermer={() => setChoixBoutique(false)}
         titre="Enregistrer un arrivage"
-        pourquoi="Un lot entre dans une boutique précise. Laquelle reçoit celui-ci ?"
         onChoisie={() => {
           setChoixBoutique(false);
           setModaleOuverte(true);
@@ -506,7 +502,6 @@ export default function PageArrivages() {
         <InspecterLotModal
           arrivage={arrivageInspecte}
           motosDuLot={motosDuLot}
-          nomFournisseur={nomFournisseur(arrivageInspecte.fournisseurId)}
           nomMarque={nomMarque}
           nomModele={nomModele}
           auteur={auteur}

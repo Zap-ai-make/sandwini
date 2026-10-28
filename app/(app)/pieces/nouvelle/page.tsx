@@ -138,7 +138,6 @@ function NouvellePiece() {
       <TetePage
         retour={{ href: "/pieces", libelle: "Catalogue" }}
         titre="Nouvelle référence"
-        sousTitre="Cette référence appartiendra à votre boutique, avec ses propres prix."
       />
 
       {creee && (

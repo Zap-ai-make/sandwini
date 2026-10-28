@@ -233,7 +233,6 @@ export function ChampsClient({
             valeur={saisie.telephone}
             maximum={LONGUEUR_TELEPHONE_MAX}
             changer={(telephone) => changer({ telephone })}
-            aide="Huit chiffres suffisent. L’indicatif est ajouté tout seul."
           />
           <ChampClient
             id={`${prefixe}-adresse`}
@@ -334,7 +333,6 @@ function ChampClient({
   changer,
   type = "text",
   facultatif = false,
-  aide,
 }: {
   id: string;
   libelle: string;
@@ -343,10 +341,9 @@ function ChampClient({
   changer: (valeur: string) => void;
   type?: string;
   facultatif?: boolean;
-  aide?: string;
 }) {
   return (
-    <Champ id={id} libelle={libelle} facultatif={facultatif} aide={aide}>
+    <Champ id={id} libelle={libelle} facultatif={facultatif}>
       <input
         id={id}
         type={type}

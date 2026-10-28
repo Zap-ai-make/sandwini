@@ -89,7 +89,6 @@ export function DeplacerMotoModal({
       ouvert={ouvert}
       onFermer={onFermer}
       titre="Déplacer cette moto"
-      description={`Elle quitte ${moto.boutiqueId} et entre dans le stock de la boutique choisie.`}
       taille="etroite"
       pied={
         <div className="ml-auto flex flex-wrap gap-2">
@@ -150,7 +149,6 @@ export function DeplacerMotoModal({
           id="transfert-motif"
           libelle="Motif"
           facultatif
-          aide="Pourquoi elle part. Laissez vide s’il n’y a rien à dire — mieux vaut une case vide qu’un « transfert » recopié partout."
         >
           <input
             id="transfert-motif"
@@ -159,7 +157,6 @@ export function DeplacerMotoModal({
             onChange={(evenement) =>
               setSaisie((actuel) => ({ ...actuel, motif: evenement.target.value }))
             }
-            aria-describedby="transfert-motif-aide"
             className="saisie"
           />
         </Champ>

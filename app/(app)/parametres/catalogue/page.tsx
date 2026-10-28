@@ -8,7 +8,6 @@ import {
   EtatChargement,
   EtatErreur,
   EtatErreurSaisie,
-  EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
 import { Onglets } from "@/components/patrons/Onglets";
@@ -186,9 +185,7 @@ function Modeles({
 
   if (marques.length === 0) {
     return (
-      <EtatSansResultat>
-        Ajoutez d’abord une marque, dans l’onglet voisin&nbsp;: un modèle n’existe pas tout seul.
-      </EtatSansResultat>
+      null
     );
   }
 
@@ -269,9 +266,7 @@ function Modeles({
       {deLaMarque === null ? (
         erreur ? null : <EtatChargement className="mt-3">Chargement…</EtatChargement>
       ) : deLaMarque.length === 0 && !erreur ? (
-        <EtatSansResultat className="mt-3">
-          Aucun modèle chez {marqueActive?.nom}. Ajoutez ceux que vous vendez réellement.
-        </EtatSansResultat>
+        null
       ) : (
         <ul className="mt-3 cadre cadre-liste">
           {deLaMarque.map((modele) => (

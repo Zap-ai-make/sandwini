@@ -5,7 +5,6 @@ import {
   ErreurDeLecture,
   EtatChargement,
   EtatErreurSaisie,
-  EtatVide,
   SansBoutique,
 } from "@/components/patrons/Etats";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
@@ -232,12 +231,7 @@ function Depenses({
             <EtatChargement>Lecture des dépenses…</EtatChargement>
           ) : sorties.length === 0 ? (
             /* D63 : une phrase, pas un tableau vide et trois zéros. */
-            <EtatVide
-              titre={`Aucune dépense ${intitule ? `sur ${intitule.toLowerCase()}` : "enregistrée"}`}
-            >
-              Rien n’est sorti du tiroir sur cet intervalle. Choisissez-en un autre, ou enregistrez
-              une dépense ci-dessus.
-            </EtatVide>
+            null
           ) : (
             <div className="grid gap-6">
               <div className="cadre p-4 sm:p-5">

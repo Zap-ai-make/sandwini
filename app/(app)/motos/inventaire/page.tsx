@@ -1,11 +1,10 @@
 "use client";
 
-import { TrendingUp } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import { BilanPeriode } from "@/components/BilanPeriode";
 import { InventaireStock } from "@/components/InventaireStock";
 import { CartesDuMois, Repartition } from "@/components/ChiffresDuMois";
-import { ErreurDeLecture, EtatChargement, EtatVide } from "@/components/patrons/Etats";
+import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import {
@@ -212,14 +211,7 @@ function Chiffres() {
       ) : chiffres.vide ? (
         /* Décision 6 : une phrase, pas quatre zéros alignés. Un mois sans rien
            est une information ; « 0 · 0 · 0 · 0 » n'en est pas une (D63). */
-        <EtatVide
-          icone={<TrendingUp aria-hidden="true" className="size-10" />}
-          titre={`Aucune vente en ${libelleMois(mois)}`}
-          className="mt-6"
-        >
-          Rien n’a été vendu ni encaissé ce mois-là. Choisissez un autre mois, ou enregistrez une
-          vente pour voir les chiffres apparaître.
-        </EtatVide>
+        null
       ) : (
         <div className="mt-6 grid gap-8">
           <CartesDuMois chiffres={chiffres} mois={mois} avecMarge={avecMarge} />

@@ -196,7 +196,6 @@ function CorpsArrivageModal({
       ouvert={ouvert}
       onFermer={onFermer}
       titre="Enregistrer un arrivage"
-      description="Un lot d’un même fournisseur. Une marque par groupe : ajoutez-en un pour une autre marque."
       taille="large"
       pied={
         <div className="ml-auto flex flex-wrap gap-2">
@@ -221,7 +220,6 @@ function CorpsArrivageModal({
             <Champ
               id="arr-nom"
               libelle="Nom de l’arrivage"
-              aide="Choisissez un arrivage passé pour reprendre son fournisseur et sa marque."
             >
               <input
                 id="arr-nom"

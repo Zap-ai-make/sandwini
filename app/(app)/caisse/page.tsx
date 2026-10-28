@@ -138,7 +138,6 @@ function BilanDesBoutiques() {
       <TetePage
         surTitre="Caisse · Toutes les boutiques"
         titre="Le bilan consolidé"
-        sousTitre={intitule ?? "Toutes périodes"}
       />
 
       <FiltrePeriode
@@ -319,7 +318,6 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
       <TetePage
         surTitre={`Caisse · ${nomBoutique}`}
         titre="Journal de caisse"
-        sousTitre={intitule ?? "Toutes périodes"}
       />
 
       {/* **Mensuel à l'ouverture, « Aujourd'hui » à un clic (S55).** Le
@@ -357,7 +355,6 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
           <JournalCaisse
             mouvements={deLaPeriode}
             chargement={chargement}
-            jourEstPasse={periode !== "aujourd-hui"}
             avecDate={periode !== "aujourd-hui"}
             nomDuPoste={nomDuPoste}
           />

@@ -14,22 +14,14 @@ import { usePerimetre } from "@/lib/perimetre/perimetre";
  * chacun d’eux, avec sa chaîne de classes ; une virgule de travers suffisait à
  * décaler un écran des autres sans que rien ne le signale.
  *
- * **Deux lignes, et elles ne disent pas la même chose.** Le sur-titre, au-dessus
- * du titre, dit *où je suis* — l’espace et la boutique, « Motos · Pouytenga ».
- * Le sous-titre, en dessous, dit *ce que fait cet écran*, quand le titre seul
- * ne suffit pas : « Le numéro de la pièce sera attribué à l’enregistrement,
- * même sans réseau ».
+ * **Le sur-titre et le titre, rien d'autre.** Le sur-titre, au-dessus du titre,
+ * dit *où je suis* — l’espace et la boutique, « Motos · Pouytenga » —, en onze
+ * pixels capitales interlettrées (`socle.css:476`) : c’est ce qui répond *où
+ * suis-je* **avant** qu’on lise le titre.
  *
- * **Le produit n’avait que le second, et y mettait les deux à tour de rôle** —
- * le périmètre sur les écrans de données, la phrase sur les écrans
- * d’administration, jamais les deux, alors que quatre maquettes portent les
- * deux. Les neuf maquettes posent le sur-titre au-dessus du titre, en onze
- * pixels capitales interlettrées (`socle.css:476`) : ce n’est pas une nuance
- * typographique, c’est ce qui répond *où suis-je* **avant** qu’on lise le
- * titre. Un sous-titre gris se lit après, ou pas du tout.
- *
- * Rien d’autre n’a le droit d’occuper ces deux lignes : pas de phrase
- * d’ambiance, pas de rappel de ce que le titre dit déjà.
+ * **Il y avait un sous-titre, il n'y en a plus** (28 octobre 2026). Le
+ * commanditaire a demandé d'« enlever tous les titres secondaires » : la phrase
+ * grise sous le titre ne se lisait pas, et elle chargeait chaque écran.
  *
  * `retour` n’est pas décoratif non plus. Les écrans de réglages sont des
  * enfants d’un hub ; sans lui, revenir demande la barre latérale, c’est-à-dire
@@ -39,14 +31,12 @@ export function TetePage({
   retour,
   surTitre,
   titre,
-  sousTitre,
   actions,
 }: {
   retour?: { href: string; libelle: string };
   /** Où je suis : l’espace et la boutique. Voir `useSurTitre`. */
   surTitre?: ReactNode;
   titre: string;
-  sousTitre?: ReactNode;
   actions?: ReactNode;
 }) {
   return (
@@ -68,7 +58,6 @@ export function TetePage({
             </p>
           )}
           <h1 className="text-ecran font-bold tracking-tight text-encre">{titre}</h1>
-          {sousTitre && <p className="mt-1 max-w-prose text-corps text-encre-doux">{sousTitre}</p>}
         </div>
         {/* `shrink-0` a été retiré : à 390 px il poussait la rangée d’actions
             hors du cadre et le lien passait sous le bandeau collant — le défaut

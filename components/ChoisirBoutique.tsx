@@ -31,15 +31,12 @@ export function ChoisirBoutique({
   ouvert,
   onFermer,
   titre,
-  pourquoi,
   onChoisie,
 }: {
   ouvert: boolean;
   onFermer: () => void;
   /** Ce qu'on s'apprête à faire : « Faire entrer une moto ». */
   titre: string;
-  /** Pourquoi la question se pose, en une phrase. */
-  pourquoi: string;
   /** Appelé après que le périmètre a changé, pour reprendre le geste. */
   onChoisie: (boutiqueId: string) => void;
 }) {
@@ -47,7 +44,7 @@ export function ChoisirBoutique({
   const ouvertes = boutiques.filter((boutique) => boutique.actif);
 
   return (
-    <Modale ouvert={ouvert} onFermer={onFermer} titre={titre} description={pourquoi} taille="etroite">
+    <Modale ouvert={ouvert} onFermer={onFermer} titre={titre} taille="etroite">
       {ouvertes.length === 0 ? (
         <p className="text-corps text-encre-doux">
           Aucune boutique ouverte. Déclarez-en une dans les réglages avant de continuer.

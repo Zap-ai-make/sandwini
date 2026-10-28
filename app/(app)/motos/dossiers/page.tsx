@@ -7,8 +7,7 @@ import { ConfierPaquetModal } from "@/components/ConfierPaquetModal";
 import { HistoriqueDesDeparts } from "@/components/HistoriqueDesDeparts";
 import { PaquetsEnCours } from "@/components/PaquetsEnCours";
 import { RelaisDocument } from "@/components/RelaisDocument";
-import { Avis } from "@/components/patrons/Avis";
-import { ErreurDeLecture, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { ErreurDeLecture } from "@/components/patrons/Etats";
 import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage, useSurTitre } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -25,7 +24,7 @@ import {
   type DossierEnAttente,
   type FiltreEtat,
 } from "@/lib/domain/dossier";
-import { compter, formaterDateCourte } from "@/lib/domain/format";
+import { compter } from "@/lib/domain/format";
 import {
   LIBELLE_DOCUMENT,
   TYPES_DOCUMENT,
@@ -402,7 +401,6 @@ export default function PageDossiers() {
   }, [parClient, documentOuvert, boutiqueId, confiables, choisies, basculer]);
 
   const chargement = perimetreEnCours || ventes === null || documents === null;
-  const enRetard = dossiers.filter((dossier) => dossier.enRetard);
   const filtreActif = Boolean(etat) || recherche.trim().length > 0;
   /* Rien à encadrer : un cadre vide, recherche et filtres compris, ferait
      croire à une file qu'on aurait mal interrogée (même règle qu'en A6). */
@@ -418,7 +416,6 @@ export default function PageDossiers() {
       <TetePage
         surTitre={surTitre}
         titre="Dossiers en cours"
-        sousTitre="Les cartes grises des ventes ouvertes. Un dossier s’en va quand la carte est revenue, la vente soldée et la moto remise."
       />
 
       {erreur && (
@@ -448,33 +445,6 @@ export default function PageDossiers() {
             libelle: "En cours",
             contenu: (
               <>
-      {/* Ce qui dépasse la date annoncée se dit avant la liste, et se nomme :
-          un compteur au-dessus d’un tableau se lit comme une décoration, un nom
-          de client se lit comme un appel à passer. Pas de `role="alert"` — cet
-          état est déjà là à l’ouverture, il n’interrompt rien (cf. `Avis`). */}
-      {enRetard.length > 0 && (
-        <Avis
-          ton="alerte"
-          titre={
-            enRetard.length === 1
-              ? "Un dossier dépasse la date annoncée"
-              : `${enRetard.length} dossiers dépassent la date annoncée`
-          }
-          className="mb-5"
-        >
-          {enRetard.slice(0, 3).map((dossier) => (
-            <p key={dossier.venteId}>
-              <span className="plaque-code">{dossier.numero}</span>
-              {" · "}
-              {nomDuClient(parClient.get(dossier.clientId))}
-              {" · "}
-              {retardDe(dossier)}
-            </p>
-          ))}
-          {enRetard.length > 3 && <p>et {enRetard.length - 3} autres.</p>}
-        </Avis>
-      )}
-
       <PaquetsEnCours
         paquets={paquets}
         documents={documents}
@@ -526,9 +496,7 @@ export default function PageDossiers() {
         />
       )}
 
-      {rienNAttend ? (
-        <FileVide />
-      ) : (
+      {rienNAttend ? null : (
         <div
           className={
             choisi
@@ -600,16 +568,7 @@ export default function PageDossiers() {
                 cleDe={(dossier) => dossier.venteId}
                 chargement
               />
-            ) : resultats.length === 0 ? (
-              fileVide ? (
-                <FileVide className="m-4" />
-              ) : (
-                <EtatSansResultat className="m-4">
-                  Aucun dossier ne correspond. Essayez le numéro de la pièce, le nom du client ou
-                  celui du prestataire, ou élargissez les filtres.
-                </EtatSansResultat>
-              )
-            ) : (
+            ) : resultats.length === 0 ? null : (
               <Tableau
                 legende="Dossiers en cours : pour chaque vente, où en est la carte grise"
                 colonnes={colonnes}
@@ -647,15 +606,6 @@ export default function PageDossiers() {
   );
 }
 
-/** La liste est vide, et c’est une bonne nouvelle : il n’y a rien à aller chercher. */
-function FileVide({ className }: { className?: string }) {
-  return (
-    <EtatVide titre="Aucun dossier en cours." className={className}>
-      Toutes les cartes grises des ventes ouvertes sont revenues au magasin, ou déclarées sans
-      objet.
-    </EtatVide>
-  );
-}
 
 /**
  * Ce qui désigne un document sans ambiguïté : la vente, puis le type.
@@ -782,13 +732,6 @@ function Detenteur({ dossier }: { dossier: DossierEnAttente }) {
       )}
     </span>
   );
-}
-
-/** Le retard d’un dossier, dit avec le document et la date qu’on a promise. */
-function retardDe(dossier: DossierEnAttente): string {
-  const document = dossier.enCours.find((candidat) => candidat.disponibleLe !== null);
-  if (!document?.disponibleLe) return "date annoncée dépassée";
-  return `${LIBELLE_DOCUMENT[document.type].toLowerCase()} annoncée pour le ${formaterDateCourte(document.disponibleLe)}`;
 }
 
 function Recherche({ valeur, changer }: { valeur: string; changer: (valeur: string) => void }) {

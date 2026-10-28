@@ -5,9 +5,8 @@ import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { GardeEspace } from "@/components/GardeSession";
 import { LigneModale } from "@/components/GestesDossierCarteGrise";
-import { Avis } from "@/components/patrons/Avis";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
-import { ErreurDeLecture, EtatChargement, EtatSansResultat } from "@/components/patrons/Etats";
+import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -122,7 +121,6 @@ function Ecran() {
     <div>
       <TetePage
         titre="Dossiers"
-        sousTitre="Les cartes grises et les plaques, de la demande à la remise."
         actions={
           boutiqueId !== null ? (
             <button
@@ -136,13 +134,6 @@ function Ecran() {
           ) : undefined
         }
       />
-
-      {boutiqueId === null && (
-        <Avis ton="transit" titre="Choisissez une boutique pour ajouter une ligne">
-          Une ligne appartient à une boutique — celle qui en répond. La liste, elle, montre déjà
-          tout ce que vous avez le droit de voir.
-        </Avis>
-      )}
 
       <div className="mt-6">
         <label htmlFor="recherche-dossier" className="block text-sm font-medium text-encre">
@@ -202,11 +193,6 @@ function Ecran() {
                 <Liste
                   dossiers={cours}
                   chargement={valeur === null}
-                  vide={
-                    cherche
-                      ? "Aucun dossier au dépôt ne correspond à cette recherche."
-                      : "Rien au dépôt. Tout ce qui est parti est revenu et a été repris."
-                  }
                   boutiqueId={boutiqueId}
                   prestataires={connus}
                   auteur={auteur}
@@ -223,11 +209,6 @@ function Ecran() {
                 <Liste
                   dossiers={termines}
                   chargement={valeur === null}
-                  vide={
-                    cherche
-                      ? "Aucun retrait ne correspond à cette recherche."
-                      : "Aucun papier repris pour l’instant."
-                  }
                   boutiqueId={boutiqueId}
                   prestataires={connus}
                   auteur={auteur}
@@ -254,7 +235,6 @@ function Ecran() {
 function Liste({
   dossiers,
   chargement,
-  vide,
   boutiqueId,
   prestataires,
   auteur,
@@ -262,7 +242,6 @@ function Liste({
 }: {
   dossiers: DossierCarteGrise[];
   chargement: boolean;
-  vide: string;
   boutiqueId: string | null;
   prestataires: Prestataire[];
   auteur: { uid: string; nom: string };
@@ -394,7 +373,7 @@ function Liste({
     return <EtatChargement className="mt-3">Chargement des dossiers…</EtatChargement>;
   }
   if (dossiers.length === 0) {
-    return <EtatSansResultat className="mt-3">{vide}</EtatSansResultat>;
+    return null;
   }
 
   return (

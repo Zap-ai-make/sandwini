@@ -133,7 +133,6 @@ function Ecran() {
       <TetePage
         retour={{ href: "/parametres", libelle: "Paramètres" }}
         titre="Reprendre les cartes grises"
-        sousTitre="Les dossiers existants entrent dans leur collection. Rien n’est supprimé, et rien n’est écrit deux fois."
       />
 
       <EtatErreur message={erreurLecture} className="mt-4" />
@@ -161,9 +160,7 @@ function Ecran() {
               ton="transit"
               titre={`${plan.sansChassis.length} dossier(s) laissés de côté : pas de numéro de châssis`}
             >
-              Les créer serait pire que les omettre : l’application refuserait ensuite toute
-              modification du dossier, qui exige un châssis. Corrigez le châssis de la moto, puis
-              revenez ici. Ventes concernées : {plan.sansChassis.join(", ")}.
+              Ventes concernées : {plan.sansChassis.join(", ")}.
             </Avis>
           )}
 
@@ -172,7 +169,7 @@ function Ecran() {
               ton="transit"
               titre={`${plan.introuvables.length} dossier(s) sans vente ni moto retrouvée`}
             >
-              Il n’y a rien à recopier dessus. Ventes concernées : {plan.introuvables.join(", ")}.
+              Ventes concernées : {plan.introuvables.join(", ")}.
             </Avis>
           )}
 
@@ -181,12 +178,6 @@ function Ecran() {
               Ventes concernées : {plan.statutInconnu.join(", ")}.
             </Avis>
           )}
-
-          <Avis ton="transit" titre="Deux choses que la reprise ne peut pas rendre">
-            La date de création des dossiers sera celle d’aujourd’hui — l’âge réel reste lisible
-            sur le dépôt. Et le nom de qui est venu chercher un papier déjà remis n’existe nulle
-            part : la question n’était pas posée avant. Rien n’est inventé.
-          </Avis>
 
           <EtatErreurSaisie message={erreur} className="mt-4" />
 

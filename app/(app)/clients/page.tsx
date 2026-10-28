@@ -4,7 +4,7 @@ import { MoreHorizontal, Phone, Plus, Search, ShoppingBag, UserPlus } from "luci
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { FormulaireClient } from "@/components/FormulaireClient";
-import { EtatChargement, EtatErreur, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { EtatChargement, EtatErreur, EtatVide } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { chercherClients, formaterTelephone, nomComplet, type Client } from "@/lib/domain/client";
@@ -80,7 +80,6 @@ export default function PageClients() {
     <div>
       <TetePage
         titre="Clients"
-        sousTitre="Commun à toutes les boutiques"
         actions={
           <>
             <button
@@ -150,7 +149,6 @@ export default function PageClients() {
         <EtatChargement className="mt-6">Chargement du fichier…</EtatChargement>
       ) : clients.length === 0 && !erreur ? (
         <EtatVide
-          titre="Aucun client pour l’instant."
           className="mt-6"
           action={
             <button type="button" onClick={() => setCreation(true)} className="bouton bouton-principal">
@@ -158,13 +156,9 @@ export default function PageClients() {
               Créer le premier
             </button>
           }
-        >
-          Ils se créent ici, ou au moment d’une vente — sans quitter l’écran de vente.
-        </EtatVide>
+        />
       ) : resultats.length === 0 ? (
-        <EtatSansResultat className="mt-6">
-          Personne ne correspond. Vérifiez le numéro, ou créez la fiche.
-        </EtatSansResultat>
+        null
       ) : (
         <>
           <p className="mt-6 text-sm text-encre-doux">

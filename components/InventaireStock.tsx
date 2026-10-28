@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useMemo } from "react";
 import { Chiffre } from "@/components/patrons/Chiffre";
-import { EtatVide } from "@/components/patrons/Etats";
 import { compter, formaterAnciennete } from "@/lib/domain/format";
 import {
   JOURS_DORMANTE,
@@ -79,10 +78,7 @@ export function InventaireStock({
       {detenues.length === 0 ? (
         /* D63 : une phrase, pas quatre tranches à zéro. Un stock vide est un
            fait, pas une répartition. */
-        <EtatVide titre="Aucune moto en stock">
-          Rien n’est au magasin dans ce périmètre. Les motos vendues et transférées n’y comptent
-          plus.
-        </EtatVide>
+        null
       ) : (
         <div className="cadre p-4 sm:p-5">
           <p className="font-code text-chiffre leading-tight tabular-nums text-encre">

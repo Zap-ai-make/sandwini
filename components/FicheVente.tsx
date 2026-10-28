@@ -623,14 +623,12 @@ function FormulaireVersement({
         <Champ
           id="montant-versement"
           libelle="Montant reçu"
-          aide={`Au plus ${formaterMontant(resteDu)}, le reste dû.`}
         >
           <input
             id="montant-versement"
             type="text"
             inputMode="numeric"
             autoComplete="off"
-            aria-describedby="montant-versement-aide"
             value={saisie.montant}
             onChange={(evenement) =>
               setSaisie((actuel) => ({ ...actuel, montant: evenement.target.value }))

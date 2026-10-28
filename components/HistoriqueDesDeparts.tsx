@@ -3,7 +3,6 @@
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 import { Avis } from "@/components/patrons/Avis";
-import { EtatVide } from "@/components/patrons/Etats";
 import { compter, formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import type { CartePartie, Depart } from "@/lib/domain/paquet";
 
@@ -45,10 +44,7 @@ export function HistoriqueDesDeparts({
 
   if (departs.length === 0) {
     return (
-      <EtatVide titre="Rien n’est encore parti.">
-        Les cartes grises confiées à un prestataire s’inscrivent ici, avec l’avance versée et la
-        date de leur retour.
-      </EtatVide>
+      null
     );
   }
 
@@ -61,10 +57,7 @@ export function HistoriqueDesDeparts({
           « jamais revenue », ce qui est faux et se recopierait dans un appel au
           prestataire. */}
       {sansRetours && (
-        <Avis ton="alerte" titre="Les dates de retour n’ont pas pu être lues" className="mb-3">
-          Le reste de l’historique est exact : qui a pris les cartes, combien a été avancé, et
-          quand elles sont parties.
-        </Avis>
+        <Avis ton="alerte" titre="Les dates de retour n’ont pas pu être lues" className="mb-3" />
       )}
 
       {/* Ce que la liste pèse, avant de la lire. Le total des avances est la

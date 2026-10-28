@@ -268,7 +268,9 @@ describe("les répartitions en barres", () => {
       vente({ date: le(10 + i), prixConvenu: 100_000 * (i + 1), modePaiement: mode }),
     );
     const parts = partsParMode(SEPTEMBRE, varies);
-    expect(parts.map((p) => p.libelle)).toEqual(["Tranches", "Crédit", "Comptant"]);
+    /* « Comptant » se lit « Payé » depuis le 28 octobre 2026 : seul le libellé a
+       changé, la valeur enregistrée reste `comptant`. */
+    expect(parts.map((p) => p.libelle)).toEqual(["Tranches", "Crédit", "Payé"]);
   });
 
   it("ne divise par rien quand le mois est vide", () => {

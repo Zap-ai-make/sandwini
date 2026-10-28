@@ -151,8 +151,9 @@ test.describe("recherche dans le stock", () => {
     await expect(page.locator("tbody tr").filter({ hasText: `AAA${marqueur}` })).toBeVisible();
     await expect(page.locator("tbody tr").filter({ hasText: `BBB${marqueur}` })).toHaveCount(0);
 
+    /* Plus de message « aucun résultat » (28 octobre 2026) : le tableau se vide. */
     await page.getByLabel("Chercher dans le stock").fill("CHASSIS-INTROUVABLE");
-    await expect(contenu(page)).toContainText("Aucune moto ne correspond");
+    await expect(page.locator("tbody tr")).toHaveCount(0);
   });
 });
 

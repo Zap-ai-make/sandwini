@@ -1,6 +1,6 @@
 "use client";
 
-import { CircleAlert, LoaderCircle, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
+import { LoaderCircle, Pencil, Plus, Trash2, UserCheck, UserX } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { GardeCapacite } from "@/components/GardeSession";
@@ -10,7 +10,6 @@ import {
   EtatChargement,
   EtatErreur,
   EtatErreurSaisie,
-  EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
 import { Modale } from "@/components/patrons/Modale";
@@ -110,9 +109,7 @@ function Utilisateurs() {
       {liste === null ? (
         <EtatChargement className="mt-3">Chargement des comptes…</EtatChargement>
       ) : liste.length === 0 && !erreurLecture ? (
-        <EtatSansResultat className="mt-3">
-          Aucun compte pour l’instant. Le formulaire ci-dessus crée le premier gérant.
-        </EtatSansResultat>
+        null
       ) : (
         <ul className="mt-3 cadre cadre-liste">
           {liste.map((utilisateur) => (
@@ -463,12 +460,6 @@ function FormulaireGerant({
       ouvert
       onFermer={onFermer}
       titre="Créer un gérant"
-      description={
-        <span className="flex gap-2">
-          <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-          <span>Cette action demande du réseau, contrairement au reste de l’application.</span>
-        </span>
-      }
       pied={
         <div className="flex flex-wrap gap-2">
           <button
@@ -518,7 +509,6 @@ function FormulaireGerant({
         <Champ
           id="mot-de-passe-gerant"
           libelle="Mot de passe provisoire"
-          aide="Au moins 10 caractères. Il est affiché en clair pour que vous puissiez le dicter."
         >
           <input
             id="mot-de-passe-gerant"
@@ -527,7 +517,6 @@ function FormulaireGerant({
             minLength={10}
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            aria-describedby="mot-de-passe-gerant-aide"
             className="saisie font-code"
           />
         </Champ>

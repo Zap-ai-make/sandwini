@@ -66,16 +66,8 @@ export function CartesDuMois({
             Reste à percevoir
           </p>
           <dl className="mt-2 grid gap-2">
-            <Deux
-              terme="Créances"
-              aide="crédits — la moto est partie"
-              valeur={formaterNombre(chiffres.creances)}
-            />
-            <Deux
-              terme="Dépôts"
-              aide="tranches — la moto est au magasin"
-              valeur={formaterNombre(chiffres.depots)}
-            />
+            <Deux terme="Créances" valeur={formaterNombre(chiffres.creances)} />
+            <Deux terme="Dépôts" valeur={formaterNombre(chiffres.depots)} />
           </dl>
         </div>
       </div>
@@ -105,12 +97,10 @@ function Carte({ nom, valeur, detail }: { nom: string; valeur: string; detail: s
   );
 }
 
-function Deux({ terme, aide, valeur }: { terme: string; aide: string; valeur: string }) {
+function Deux({ terme, valeur }: { terme: string; valeur: string }) {
   return (
     <div className="flex flex-wrap items-baseline justify-between gap-x-3">
-      <dt className="text-corps text-encre">
-        {terme} <span className="text-legende text-encre-doux">{aide}</span>
-      </dt>
+      <dt className="text-corps text-encre">{terme}</dt>
       <dd className="font-code text-bloc tabular-nums text-encre">{valeur}</dd>
     </div>
   );

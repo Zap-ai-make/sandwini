@@ -206,11 +206,6 @@ function Catalogue() {
       <TetePage
         surTitre={surTitre}
         titre="Pièces détachées"
-        sousTitre={
-          surUneBoutique
-            ? "Le catalogue est commun à l’entreprise ; les quantités sont celles de cette boutique."
-            : "Le catalogue est commun à l’entreprise, et les quantités sont celles de toutes les boutiques réunies. Choisissez-en une pour voir son étagère et y faire bouger le stock."
-        }
         actions={
           <>
             {/* **Vendre est le geste du comptoir**, et il passe donc devant : le
@@ -325,12 +320,9 @@ function Catalogue() {
 
       {lignes.length === 0 && !chargement ? (
         filtres.archivees ? (
-          <EtatVide titre="Aucune référence archivée">
-            Les références que vous archiverez se retrouveront ici, prêtes à être réactivées.
-          </EtatVide>
+          null
         ) : (
           <EtatVide
-            titre={totalActives === 0 ? "Aucune référence au catalogue" : "Aucune pièce ne correspond"}
             action={
               totalActives === 0 && tientLeCatalogue ? (
                 <Link href="/pieces/nouvelle" className="bouton bouton-principal">
@@ -338,11 +330,7 @@ function Catalogue() {
                 </Link>
               ) : undefined
             }
-          >
-            {totalActives === 0
-              ? "Le catalogue est commun à l’entreprise : une référence créée ici sert à toutes les boutiques."
-              : "Changez de filtre, ou cherchez autre chose."}
-          </EtatVide>
+          />
         )
       ) : (
         <Tableau

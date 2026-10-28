@@ -1,11 +1,11 @@
 "use client";
 
-import { Bike, Lock, Search, UserRound, X } from "lucide-react";
+import { Bike, Search, UserRound, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { ChampsClient, FicheReconnue } from "@/components/FormulaireClient";
 import { Champ } from "@/components/patrons/Champ";
-import { EtatErreur, EtatErreurSaisie, EtatSansResultat, EtatVide } from "@/components/patrons/Etats";
+import { EtatErreur, EtatErreurSaisie, EtatVide } from "@/components/patrons/Etats";
 import { Groupe } from "@/components/patrons/Formulaire";
 import { Modale } from "@/components/patrons/Modale";
 import { Segmente } from "@/components/patrons/Segmente";
@@ -302,8 +302,6 @@ export function ModaleVente({
   );
   const clientChoisi = clients.find((client) => client.id === saisie.clientId);
 
-  const estGerant = session.statut === "connecte" && session.utilisateur.role === "gerant";
-
   const numeroAVenir =
     boutiqueId && perimetre.type === "boutique"
       ? prochainNumero({ boutiqueId, code: perimetre.code }, numerosConnus)
@@ -564,11 +562,6 @@ export function ModaleVente({
       ouvert
       onFermer={fermer}
       titre="Nouvelle vente"
-      description={
-        saisie.motos.length > 1
-          ? `${saisie.motos.length} motos, donc ${saisie.motos.length} ventes : chacune aura son numéro, son reçu et son dossier.`
-          : "Le numéro de la pièce sera attribué à l’enregistrement, même sans réseau."
-      }
       taille="large"
       pied={
         <>
@@ -603,23 +596,18 @@ export function ModaleVente({
               <p className="text-corps text-encre-doux">Chargement du stock…</p>
             ) : vendables.length === 0 ? (
               <EtatVide
-                titre={`Aucune moto disponible dans ${perimetre.nom}.`}
                 action={
                   <Link href="/motos/nouvelle" className="bouton bouton-principal">
                     <Bike aria-hidden="true" className="size-4" />
                     Faire entrer une moto
                   </Link>
                 }
-              >
-                Les motos vendues et réservées ne réapparaissent pas ici. Faites-en entrer une pour
-                pouvoir vendre.
-              </EtatVide>
+              />
             ) : (
               <>
                 <ChampRecherche
                   id="recherche-moto-vente"
                   libelle="Chercher dans le stock"
-                  aide={`Châssis, marque ou modèle. Cochez-en plusieurs si le client en achète plusieurs. ${vendables.length} motos en stock à ${perimetre.nom}.`}
                   placeholder="Châssis, marque ou modèle"
                   valeur={rechercheMoto}
                   changer={setRechercheMoto}
@@ -633,20 +621,11 @@ export function ModaleVente({
                   </p>
                 )}
 
-                {!chercheMoto ? (
-                  /* L'état d'attente est une invitation, pas un trou
-                     (`DESIGN.md` §10) : il dit ce qu'on peut taper plutôt que
-                     de laisser une zone vide sous un champ. */
-                  <p className="mt-3 flex items-center gap-2 text-corps text-encre-doux">
-                    <Search aria-hidden="true" className="size-4 shrink-0" />
-                    Tapez un châssis, une marque ou un modèle pour voir les motos.
-                  </p>
-                ) : resultatsMotos.length === 0 ? (
-                  <EtatSansResultat className="mt-3">
-                    Aucune moto disponible ne correspond. Vérifiez le châssis, ou effacez la
-                    recherche.
-                  </EtatSansResultat>
-                ) : (
+                {/* Rien sous le champ tant qu'on n'a pas tapé, ni quand rien ne
+                    correspond : plus de phrase d'invitation ni de « aucun
+                    résultat » (28 octobre 2026, « on ne doit plus voir de
+                    détails »). */}
+                {chercheMoto && resultatsMotos.length > 0 && (
                   <>
                     <ul className="mt-3 space-y-2">
                       {resultatsMotos.map((moto) => (
@@ -688,44 +667,29 @@ export function ModaleVente({
                         </li>
                       ))}
                     </ul>
-                    <Tronquee
-                      montres={resultatsMotos.length}
-                      total={motosTrouvees.length}
-                      mot="motos"
-                    />
                   </>
                 )}
+
+                {/* **Les prix vivent dans le tableau des motos cochées**, sous
+                    la recherche (28 octobre 2026) : « quand la moto est
+                    choisie, les prix seront mis dans le tableau ». Le bloc « Le
+                    prix » et sa phrase d'attente ont disparu. */}
+                {saisie.motos.length > 0 && (
+                  <div className="mt-4">
+                    <LignesVendues
+                      lignes={saisie.motos}
+                      motos={motosRetenues.map((retenue) => retenue.moto)}
+                      parts={parts}
+                      total={total}
+                      catalogue={catalogue}
+                      rangFautif={refus?.rang ?? null}
+                      acompte={encaisse}
+                      changerPrix={changerPrix}
+                      retirer={retirerMoto}
+                    />
+                  </div>
+                )}
               </>
-            )}
-          </Groupe>
-
-          <Groupe titre={saisie.motos.length > 1 ? "Les prix" : "Le prix"}>
-            {saisie.motos.length === 0 ? (
-              <p className="text-corps text-encre-doux">
-                Cochez une moto ci-dessus — ou plusieurs — pour en fixer le prix.
-              </p>
-            ) : (
-              <LignesVendues
-                lignes={saisie.motos}
-                motos={motosRetenues.map((retenue) => retenue.moto)}
-                parts={parts}
-                total={total}
-                catalogue={catalogue}
-                rangFautif={refus?.rang ?? null}
-                acompte={encaisse}
-                changerPrix={changerPrix}
-                retirer={retirerMoto}
-              />
-            )}
-
-            {/* La frontière de D2, dite là où la question se pose — devant le
-                montant. Un gérant qui ne voit pas de marge doit savoir qu'elle
-                existe et qu'elle ne lui est pas cachée par accident. */}
-            {estGerant && (
-              <p className="mt-2 flex items-center gap-2 text-legende text-encre-doux">
-                <Lock aria-hidden="true" className="size-3.5 shrink-0" />
-                La marge de ces ventes est calculée pour le responsable seul.
-              </p>
             )}
           </Groupe>
 
@@ -733,7 +697,6 @@ export function ModaleVente({
             <ChampRecherche
               id="recherche-client-vente"
               libelle="Chercher un client"
-              aide="Rien ne s’affiche tant que vous n’avez pas tapé. Un nom, un prénom, ou un numéro."
               placeholder="Un numéro, ou le début d’un nom"
               valeur={rechercheClient}
               changer={setRechercheClient}
@@ -742,11 +705,8 @@ export function ModaleVente({
             {chercheClient &&
               (clientsEnCours ? (
                 <p className="mt-3 text-corps text-encre-doux">Chargement du fichier clients…</p>
-              ) : resultatsClients.length === 0 ? (
-                <EtatSansResultat className="mt-3">
-                  Personne ne correspond. La fiche se crée juste en dessous.
-                </EtatSansResultat>
               ) : (
+                resultatsClients.length > 0 && (
                 <>
                   <ul className="mt-3 space-y-2">
                     {resultatsClients.map((client) => (
@@ -769,12 +729,8 @@ export function ModaleVente({
                       </li>
                     ))}
                   </ul>
-                  <Tronquee
-                    montres={resultatsClients.length}
-                    total={clientsTrouves.length}
-                    mot="clients"
-                  />
                 </>
+                )
               ))}
           </Groupe>
 
@@ -797,9 +753,6 @@ export function ModaleVente({
             ) : (
               <div className="rounded-champ border border-bord bg-fond p-4">
                 <h3 className="font-semibold text-encre">Nouveau client</h3>
-                <p className="mt-1 text-corps text-encre-doux">
-                  Il sera rattaché à cette vente immédiatement, réseau ou pas.
-                </p>
                 <div className="mt-4 max-w-[40rem]">
                   {/* Les champs seuls : pas de `<form>`, pas de bouton. Le
                       client part avec la vente, et c'est le pied de la modale
@@ -865,19 +818,10 @@ export function ModaleVente({
             />
 
             <div className="mt-4 max-w-[16rem]">
-              <Champ
-                id="montant-encaisse"
-                libelle="Montant reçu"
-                aide={
-                  saisie.modePaiement === "comptant"
-                    ? "Au comptant, le prix convenu en entier."
-                    : "Laissez vide si le client ne verse rien aujourd’hui."
-                }
-              >
+              <Champ id="montant-encaisse" libelle="Montant reçu">
                 <input
                   id="montant-encaisse"
                   inputMode="numeric"
-                  aria-describedby="montant-encaisse-aide"
                   value={saisie.montantEncaisse}
                   onChange={(evenement) => {
                     setMontantTouche(true);
@@ -1365,24 +1309,9 @@ function Case({
   );
 }
 
-/**
- * Dit qu'une liste est tronquée. Une liste qui s'arrête sans le dire fait
- * conclure « il n'y en a pas d'autre », et on crée un doublon du client qu'on
- * n'a pas vu (`DESIGN.md` §10, l'état dense).
- */
-function Tronquee({ montres, total, mot }: { montres: number; total: number; mot: string }) {
-  if (total <= montres) return null;
-  return (
-    <p className="mt-2 text-corps text-encre-doux">
-      {montres} {mot} sur {total}. Affinez la recherche pour voir les autres.
-    </p>
-  );
-}
-
 function ChampRecherche({
   id,
   libelle,
-  aide,
   placeholder,
   valeur,
   changer,
@@ -1390,14 +1319,13 @@ function ChampRecherche({
 }: {
   id: string;
   libelle: string;
-  aide: string;
   placeholder: string;
   valeur: string;
   changer: (valeur: string) => void;
   monospace?: boolean;
 }) {
   return (
-    <Champ id={id} libelle={libelle} aide={aide}>
+    <Champ id={id} libelle={libelle}>
       <div className="relative">
         <Search
           aria-hidden="true"
@@ -1409,7 +1337,6 @@ function ChampRecherche({
           inputMode="search"
           autoComplete="off"
           placeholder={placeholder}
-          aria-describedby={`${id}-aide`}
           value={valeur}
           onChange={(evenement) => changer(evenement.target.value)}
           className={[

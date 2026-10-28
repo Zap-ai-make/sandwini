@@ -7,7 +7,6 @@ import {
   EtatChargement,
   EtatErreur,
   EtatErreurSaisie,
-  EtatSansResultat,
 } from "@/components/patrons/Etats";
 import { Champ } from "@/components/patrons/Champ";
 import { Modale } from "@/components/patrons/Modale";
@@ -66,7 +65,6 @@ function Boutiques() {
       <TetePage
         retour={{ href: "/parametres", libelle: "Paramètres" }}
         titre="Boutiques"
-        sousTitre={<>Ce que vend une boutique décide des espaces que son gérant voit.</>}
         actions={
           <button
             type="button"
@@ -92,10 +90,7 @@ function Boutiques() {
       {chargement ? (
         <EtatChargement className="mt-3">Chargement des boutiques…</EtatChargement>
       ) : boutiques.length === 0 && !erreur ? (
-        <EtatSansResultat className="mt-3">
-          Aucune boutique pour l’instant. « Ajouter une boutique » crée la première&nbsp;; tant
-          qu’elle n’existe pas, aucun gérant ne peut être rattaché.
-        </EtatSansResultat>
+        null
       ) : (
         <ul className="mt-3 cadre cadre-liste">
           {boutiques.map((boutique) => (
@@ -263,14 +258,12 @@ function ChampsBoutique({
       <Champ
         id={`${prefixe}-adresse`}
         libelle="Adresse"
-        aide="Elle s’imprime en tête des reçus de cette boutique."
       >
         <input
           id={`${prefixe}-adresse`}
           maxLength={LONGUEUR_ADRESSE_MAX}
           value={saisie.adresse}
           onChange={(e) => changer({ adresse: e.target.value })}
-          aria-describedby={`${prefixe}-adresse-aide`}
           className="saisie"
         />
       </Champ>

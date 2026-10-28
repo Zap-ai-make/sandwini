@@ -132,7 +132,7 @@ test.describe("enregistrer une vente", () => {
        convenu en entier », et une recherche par sous-chaîne résolvait les deux
        champs à la fois. */
     await expect(page.getByLabel("Prix convenu", { exact: true })).toHaveValue("1200000");
-    await choisirSegment(page, "Mode de paiement", "Comptant");
+    await choisirSegment(page, "Mode de paiement", "Payé");
     await page.getByLabel(/Montant reçu/).fill("1200000");
 
     // Le récapitulatif dit ce qui sera écrit, avant qu'on valide.
@@ -235,7 +235,7 @@ test.describe("enregistrer une vente", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Comptant");
+    await choisirSegment(page, "Mode de paiement", "Payé");
     await page.getByLabel(/Montant reçu/).fill("600000");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
@@ -436,7 +436,7 @@ test.describe("enregistrer une vente", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Comptant");
+    await choisirSegment(page, "Mode de paiement", "Payé");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
     await expect(contenu(page).getByRole("status")).toContainText("Vente enregistrée", {
       timeout: 20_000,
@@ -455,10 +455,10 @@ test.describe("enregistrer une vente", () => {
     await expect(ecran).toContainText("1 200 000 FCFA");
 
     /* Le mois dernier ne contient rien : toute la suite écrit aujourd'hui. Les
-       cartes disparaissent avec le bilan vide (D63), et le tableau le dit. */
+       cartes disparaissent avec le bilan vide (D63), et le tableau avec elles. */
     await periodes.getByRole("button", { name: "Mois dernier" }).click();
     await expect(ecran).not.toContainText("Chiffre d’affaires");
-    await expect(ecran).toContainText("Aucune vente ne correspond");
+    await expect(ecran.locator("tbody tr")).toHaveCount(0);
 
     /* Et l'on revient : « Tout » ne borne rien, donc la vente est de retour. */
     await periodes.getByRole("button", { name: "Tout" }).click();
@@ -617,7 +617,7 @@ test.describe("la marge est réservée au responsable", () => {
       timeout: 30_000,
     });
     await choisirMotoEtClient(pageGerant, chassis, client);
-    await choisirSegment(pageGerant, "Mode de paiement", "Comptant");
+    await choisirSegment(pageGerant, "Mode de paiement", "Payé");
     await pageGerant.getByLabel(/Montant reçu/).fill("1200000");
     await pageGerant.getByRole("button", { name: "Enregistrer la vente" }).click();
     await expect(contenu(pageGerant).getByRole("status")).toContainText("Vente enregistrée", {

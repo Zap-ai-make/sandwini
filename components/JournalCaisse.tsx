@@ -1,7 +1,6 @@
 "use client";
 
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { EtatVide } from "@/components/patrons/Etats";
 import { LIBELLE_ORIGINE, montantSigne, type Mouvement } from "@/lib/domain/caisse";
 import {
   compter,
@@ -32,7 +31,6 @@ import { LIBELLE_MOYEN } from "@/lib/domain/vente";
 export function JournalCaisse({
   mouvements,
   chargement,
-  jourEstPasse,
   avecDate,
   nomDuPoste,
 }: {
@@ -59,8 +57,6 @@ export function JournalCaisse({
    * serait du bruit : d'où le drapeau plutôt qu'une date systématique.
    */
   avecDate: boolean;
-  /** Une période passée sans mouvement n’est pas la même chose qu’une journée qui commence. */
-  jourEstPasse: boolean;
 }) {
   const colonnes: Colonne<Mouvement>[] = [
     {
@@ -143,11 +139,7 @@ export function JournalCaisse({
 
   if (!chargement && mouvements.length === 0) {
     return (
-      <EtatVide titre={jourEstPasse ? "Rien sur cette période" : "Rien encore aujourd’hui"}>
-        {jourEstPasse
-          ? "Aucun mouvement n’a été enregistré sur cet intervalle — la boutique était fermée, ou tout s’est fait ailleurs."
-          : "Les ventes, les versements et les sorties d’espèces apparaîtront ici au fur et à mesure."}
-      </EtatVide>
+      null
     );
   }
 

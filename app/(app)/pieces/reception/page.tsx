@@ -119,7 +119,6 @@ function Reception() {
       <TetePage
         retour={{ href: "/pieces", libelle: "Catalogue" }}
         titre="Faire entrer un arrivage"
-        sousTitre={`Le stock de ${perimetre.nom} monte à la validation. Chaque ligne crée une entrée, et un prix d’achat modifié met à jour le catalogue.`}
       />
 
       {faite !== null && (
@@ -144,14 +143,12 @@ function Reception() {
             <Champ
               id="chercher-piece-reception"
               libelle="Chercher une pièce"
-              aide="Sa référence ou son nom. Les accents et la casse n’ont pas d’importance."
             >
               <input
                 id="chercher-piece-reception"
                 type="search"
                 autoComplete="off"
                 value={recherche}
-                aria-describedby="chercher-piece-reception-aide"
                 onChange={(evenement) => setRecherche(evenement.target.value)}
                 className="saisie"
               />
@@ -239,13 +236,11 @@ function Reception() {
             id="note-reception"
             libelle="Note"
             facultatif
-            aide="Portée sur chaque entrée : un numéro de bon de livraison, une date d’arrivage."
           >
             <input
               id="note-reception"
               maxLength={120}
               value={saisie.note}
-              aria-describedby="note-reception-aide"
               placeholder="Arrivage, bon de livraison…"
               onChange={(evenement) =>
                 setSaisie((actuel) => ({ ...actuel, note: evenement.target.value }))

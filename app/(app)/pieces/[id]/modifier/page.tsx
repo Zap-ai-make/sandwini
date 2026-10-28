@@ -183,10 +183,7 @@ function ModifierPiece() {
     return (
       <div>
         <TetePage retour={{ href: "/pieces", libelle: "Catalogue" }} titre="Référence introuvable" />
-        <EtatVide titre="Cette référence n’existe pas ici">
-          Elle a peut-être été archivée, ou appartient à une autre boutique. Revenez au catalogue
-          pour la retrouver.
-        </EtatVide>
+        <EtatVide titre="Cette référence n’existe pas ici" />
       </div>
     );
   }
@@ -198,11 +195,6 @@ function ModifierPiece() {
       <TetePage
         retour={{ href: "/pieces", libelle: "Catalogue" }}
         titre="Modifier une référence"
-        sousTitre={
-          piece && !piece.actif
-            ? "Cette référence est archivée : elle ne paraît plus au catalogue. Réactivez-la pour la vendre de nouveau."
-            : "Corrigez ses informations, ou archivez-la si elle ne se vend plus."
-        }
       />
 
       {enregistree && (

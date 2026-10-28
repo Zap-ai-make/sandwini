@@ -264,7 +264,7 @@ test.describe("la file des dossiers en attente", () => {
 
     /* Rien n'est encore parti : personne ne détient quoi que ce soit. */
     await contenu(page).getByRole("button", { name: "Chez un prestataire", exact: true }).click();
-    await expect(contenu(page)).toContainText("Aucun dossier ne correspond");
+    await expect(contenu(page).locator("tbody tr").filter({ hasText: numero })).toHaveCount(0);
     await contenu(page).getByRole("button", { name: "Ouverts", exact: true }).click();
 
     /* Le relais s'ouvre sous la file et montre le chemin qui reste : deux
