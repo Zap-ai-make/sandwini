@@ -523,9 +523,27 @@ export function ligneEstVide(saisie: SaisieLigne): boolean {
  * C'est le seul état qu'un retour en bloc concerne : ni « à faire » (pas encore
  * parti), ni « au magasin » (déjà revenu), ni « remis » (fini). La liste des
  * cases à cocher du retour groupé se dresse là-dessus.
+ *
+ * **Il se lit sur les cases, et non sur le champ `statut`** — même déduction
+ * que `statutDeLaLigne`, pour la même raison (voir le commentaire de ce fichier
+ * sur « l'état EST le remplissage »). Un dossier repris du classeur porte un
+ * prestataire dans `TRANSITE` mais un `statut` resté « a_faire », faute d'avoir
+ * jamais été redéduit ; se fier au champ écrit l'écartait à tort du retour
+ * groupé (défaut relevé le 28 octobre 2026). On le déduit donc de ce qu'on voit
+ * sur la ligne, comme partout ailleurs.
  */
-export function attendUnRetour(dossier: Pick<DossierCarteGrise, "statut">): boolean {
-  return dossier.statut === "chez_prestataire";
+export function attendUnRetour(
+  dossier: Pick<
+    DossierCarteGrise,
+    "deposeLe" | "prestataireNom" | "immatriculation" | "revenuLe" | "remisLe"
+  >,
+): boolean {
+  /* Déjà remis, ou déjà revenu au magasin : il n'attend plus rien. L'ordre
+     suit celui de `statutDeLaLigne`, lu à l'envers. */
+  if (dossier.remisLe !== null) return false;
+  if (dossier.immatriculation.trim() !== "" || dossier.revenuLe !== null) return false;
+  /* Dehors dès qu'une case le dit : une date de dépôt, ou un nom de prestataire. */
+  return dossier.deposeLe !== null || dossier.prestataireNom.trim() !== "";
 }
 
 /**

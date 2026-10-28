@@ -675,16 +675,40 @@ describe("retour d'un paquet en bloc", () => {
       id: "d1",
       statut: "chez_prestataire",
       deposeLe: new Date(2026, 0, 10),
+      prestataireNom: "",
+      immatriculation: "",
       revenuLe: null,
+      remisLe: null,
       ...p,
     }) as DossierCarteGrise;
 
   describe("attendUnRetour", () => {
-    it("ne retient que les dossiers chez le prestataire", () => {
-      expect(attendUnRetour(dossier({ statut: "chez_prestataire" }))).toBe(true);
-      expect(attendUnRetour(dossier({ statut: "a_faire" }))).toBe(false);
-      expect(attendUnRetour(dossier({ statut: "revenu_magasin" }))).toBe(false);
-      expect(attendUnRetour(dossier({ statut: "remis" }))).toBe(false);
+    it("retient un dossier parti chez un prestataire, par ses cases", () => {
+      /* Il est « dehors » dès qu'une case le dit : une date de dépôt, ou un
+         nom dans TRANSITE. */
+      expect(attendUnRetour(dossier({ deposeLe: new Date(2026, 0, 10) }))).toBe(true);
+      expect(attendUnRetour(dossier({ deposeLe: null, prestataireNom: "bohary" }))).toBe(true);
+    });
+
+    it("se fie aux cases, pas au statut écrit — un dossier confié sans date reste à rentrer", () => {
+      /* **Le défaut du 28 octobre 2026.** Les dossiers repris du classeur
+         portent un prestataire dans TRANSITE mais un statut figé à « a_faire »,
+         parce que leur `statut` n'a jamais été redéduit. Se fier au champ
+         `statut` les écartait du retour groupé ; se fier aux cases les y
+         ramène, comme tout le reste de ce fichier. */
+      expect(
+        attendUnRetour(dossier({ statut: "a_faire", deposeLe: null, prestataireNom: "bohary" })),
+      ).toBe(true);
+    });
+
+    it("écarte ce qui n'est pas dehors ou n'est plus dehors", () => {
+      /* Rien de parti : pas de retour à attendre. */
+      expect(attendUnRetour(dossier({ deposeLe: null, prestataireNom: "" }))).toBe(false);
+      /* Déjà revenu — une plaque ou une date de retour le prouve. */
+      expect(attendUnRetour(dossier({ immatriculation: "11 AA 1234" }))).toBe(false);
+      expect(attendUnRetour(dossier({ revenuLe: new Date(2026, 9, 1) }))).toBe(false);
+      /* Déjà remis au client. */
+      expect(attendUnRetour(dossier({ remisLe: new Date(2026, 9, 2) }))).toBe(false);
     });
   });
 
