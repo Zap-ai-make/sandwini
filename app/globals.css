@@ -997,6 +997,13 @@
      au soleil sur un écran de comptoir, et il ne dit rien à qui ne voit pas les
      nuances : le filet à gauche le double (`DESIGN.md` §5). Le lien de la
      première cellule porte en plus `aria-current`, qui, lui, s'entend. */
+  /* La ligne réglée — pour les cartes grises, le papier reçu. Placée avant le
+     survol et la ligne ouverte : à spécificité égale, la dernière règle gagne,
+     et la ligne qu'on montre du doigt ou qu'on regarde doit rester lisible. */
+  .tableau tbody tr.ligne-reglee td {
+    background: var(--color-solde-surface);
+  }
+
   .tableau tbody tr.ligne-active td {
     background: var(--color-survol);
   }
@@ -1070,8 +1077,15 @@
        ouverte suit le même chemin — replié, il n'y a plus de première cellule
        où accrocher le filet. */
     .tableau tbody tr:hover td,
+    .tableau tbody tr.ligne-reglee td,
     .tableau tbody tr.ligne-active td {
       background: transparent;
+    }
+
+    /* Le vert couvre la carte entière : posé sur les cellules, il laisserait
+       des bandes claires entre elles. */
+    .tableau tbody tr.ligne-reglee {
+      background: var(--color-solde-surface);
     }
 
     .tableau tbody tr.ligne-active {
@@ -1935,7 +1949,15 @@
 
      Les deux règles qui suivent rejouent le marquage de la ligne ouverte, après
      celle du retard : quand une ligne est les deux à la fois, c'est celle qu'on
-     regarde qui l'emporte — le retard, lui, est encore écrit dans sa colonne. */
+     regarde qui l'emporte — le retard, lui, est encore écrit dans sa colonne.
+
+     La ligne réglée passe la première, et donc perd contre les deux autres :
+     un retard est une alerte, un papier reçu n'en est pas une. Son filet double
+     le fond vert, que le thème à fort contraste efface (DESIGN.md §5). */
+  .tableau tbody tr.ligne-reglee td:first-child {
+    box-shadow: inset 3px 0 0 var(--color-solde);
+  }
+
   .tableau tbody tr.ligne-retard td:first-child {
     box-shadow: inset 3px 0 0 var(--color-alerte);
   }
@@ -1948,8 +1970,13 @@
      n'y a plus de première colonne où l'accrocher. Le seuil suit celui du
      repli, sinon la ligne perdrait son marquage entre 768 et 1024. */
   @media (max-width: 767px) {
+    .tableau tbody tr.ligne-reglee td:first-child,
     .tableau tbody tr.ligne-retard td:first-child {
       box-shadow: none;
+    }
+
+    .tableau tbody tr.ligne-reglee {
+      box-shadow: inset 3px 0 0 var(--color-solde);
     }
 
     .tableau tbody tr.ligne-retard {

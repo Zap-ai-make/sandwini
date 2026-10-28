@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  aMarquerRecu,
   attendUnRetour,
   champsDeLaLigne,
   champsDossierNeuf,
@@ -677,6 +678,7 @@ describe("retour d'un paquet en bloc", () => {
       deposeLe: new Date(2026, 0, 10),
       prestataireNom: "",
       immatriculation: "",
+      recu: false,
       revenuLe: null,
       remisLe: null,
       ...p,
@@ -712,6 +714,32 @@ describe("retour d'un paquet en bloc", () => {
     });
   });
 
+  describe("aMarquerRecu", () => {
+    it("propose les dossiers encore chez le prestataire", () => {
+      expect(aMarquerRecu(dossier({ deposeLe: null, prestataireNom: "bohary" }))).toBe(true);
+    });
+
+    it("propose aussi un dossier revenu dont la case Reçu n'est pas cochée", () => {
+      /* **Les treize lignes « bohary » du 28 octobre 2026.** Marquées revenues
+         avant que le geste ne coche « Reçu », elles étaient rentrées sans que
+         rien ne le montre. Les reproposer évite de les rouvrir une à une. */
+      expect(aMarquerRecu(dossier({ revenuLe: new Date(2026, 9, 27), recu: false }))).toBe(true);
+      expect(aMarquerRecu(dossier({ immatriculation: "11 AA 1234", recu: false }))).toBe(true);
+    });
+
+    it("écarte ce qui est déjà reçu, jamais parti, ou remis", () => {
+      expect(aMarquerRecu(dossier({ revenuLe: new Date(2026, 9, 27), recu: true }))).toBe(false);
+      expect(aMarquerRecu(dossier({ deposeLe: null, prestataireNom: "" }))).toBe(false);
+      expect(aMarquerRecu(dossier({ remisLe: new Date(2026, 9, 2), recu: false }))).toBe(false);
+    });
+
+    it("garde un dossier dehors même si sa case Reçu est déjà cochée", () => {
+      /* Cochée à la main avant son retour : le dossier n'en est pas moins
+         dehors, et il faut pouvoir dire qu'il est rentré. */
+      expect(aMarquerRecu(dossier({ recu: true }))).toBe(true);
+    });
+  });
+
   describe("champsRetourMagasin", () => {
     const aujourdhui = new Date(2026, 9, 27);
 
@@ -719,6 +747,12 @@ describe("retour d'un paquet en bloc", () => {
       const champs = champsRetourMagasin(dossier(), aujourdhui);
       expect(champs.statut).toBe("revenu_magasin");
       expect(champs.revenuLe).toEqual(aujourdhui);
+    });
+
+    it("coche la case Reçu", () => {
+      /* Demande du 28 octobre 2026 : « même si on marque comme reçu, la case
+         Reçu ne se coche pas ». */
+      expect(champsRetourMagasin(dossier({ recu: false }), aujourdhui).recu).toBe(true);
     });
 
     it("ne retouche pas une date de retour déjà inscrite", () => {

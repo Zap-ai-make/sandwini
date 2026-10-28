@@ -14,7 +14,7 @@ import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
 import { normaliserNom } from "@/lib/domain/client";
 import {
-  attendUnRetour,
+  aMarquerRecu,
   chercherDossiers,
   ENTETES_LIGNE,
   ORDRE_LIGNE,
@@ -327,16 +327,17 @@ function Liste({
     rendu: rendus[cle],
   }));
 
-  /* **Les dossiers partis chez un prestataire, et ceux qu'on marque revenus.**
-     Un `Set` des identifiants *décochés* plutôt que cochés : on les coche tous
-     d'office — « souvent il peut ramener une partie, 80, qu'on puisse décocher
-     ceux qui ne sont pas de retour » — et on retient ce que l'utilisateur
-     retire, pas ce qu'il garde. Ainsi un dossier qui arrive après coup est coché
-     sans qu'on ait à y penser. */
+  /* **Les dossiers à marquer reçus, et ceux qu'on coche.** Ce sont ceux partis
+     chez un prestataire, plus ceux rentrés sans que la case Reçu le dise
+     (`aMarquerRecu`). Un `Set` des identifiants *décochés* plutôt que cochés :
+     on les coche tous d'office — « souvent il peut ramener une partie, 80,
+     qu'on puisse décocher ceux qui ne sont pas de retour » — et on retient ce
+     que l'utilisateur retire, pas ce qu'il garde. Ainsi un dossier qui arrive
+     après coup est coché sans qu'on ait à y penser. */
   const [decoches, setDecoches] = useState<ReadonlySet<string>>(new Set());
   const [erreurRetour, setErreurRetour] = useState<string | null>(null);
 
-  const partis = useMemo(() => dossiers.filter(attendUnRetour), [dossiers]);
+  const partis = useMemo(() => dossiers.filter(aMarquerRecu), [dossiers]);
   const aRentrer = useMemo(
     () => partis.filter((dossier) => !decoches.has(dossier.id)),
     [partis, decoches],
@@ -368,9 +369,9 @@ function Liste({
     ? [
         {
           cle: "retour",
-          titre: "Revenu",
+          titre: "Marquer",
           rendu: (dossier) =>
-            attendUnRetour(dossier) ? (
+            aMarquerRecu(dossier) ? (
               <input
                 type="checkbox"
                 checked={!decoches.has(dossier.id)}
@@ -378,7 +379,7 @@ function Liste({
                 /* La ligne entière ouvre la fiche : sans cette coupure, cocher
                    le retour l'ouvrirait du même clic. */
                 onClick={(evenement) => evenement.stopPropagation()}
-                aria-label={`Marquer ${dossier.clientNom || "ce dossier"} revenu du prestataire`}
+                aria-label={`Marquer ${dossier.clientNom || "ce dossier"} reçu`}
                 className="size-4 accent-encre"
               />
             ) : (
@@ -405,10 +406,10 @@ function Liste({
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-carte border border-bord bg-fond p-3">
           <PackageCheck aria-hidden="true" className="size-5 shrink-0 text-encre-doux" />
           <p className="text-corps text-encre">
-            <strong className="font-semibold">{formaterNombre(partis.length)}</strong> chez un
-            prestataire,{" "}
+            <strong className="font-semibold">{formaterNombre(partis.length)}</strong> à marquer
+            reçu{partis.length > 1 ? "s" : ""},{" "}
             <strong className="font-semibold">{formaterNombre(aRentrer.length)}</strong> coché
-            {aRentrer.length > 1 ? "s" : ""} comme revenu{aRentrer.length > 1 ? "s" : ""}.
+            {aRentrer.length > 1 ? "s" : ""}.
           </p>
           <button
             type="button"
@@ -431,7 +432,7 @@ function Liste({
             className="bouton bouton-principal"
           >
             <PackageCheck aria-hidden="true" className="size-4" />
-            Marquer {formaterNombre(aRentrer.length)} revenu
+            Marquer {formaterNombre(aRentrer.length)} reçu
             {aRentrer.length > 1 ? "s" : ""}
           </button>
           <EtatErreurSaisie message={erreurRetour} />
@@ -439,13 +440,17 @@ function Liste({
       )}
 
       <Tableau
-        legende="Les dossiers de carte grise, ceux qui n’ont pas encore été confiés d’abord, puis du plus ancien dépôt. Le nom du propriétaire ouvre la ligne."
+        legende="Les dossiers de carte grise, ceux qui n’ont pas encore été confiés d’abord, puis du plus ancien dépôt. Les lignes reçues sont sur fond vert. Le nom du propriétaire ouvre la ligne."
         /* Ses noms gardent leur casse : les capitales de tableau feraient de
            `Reci` et `Depot` d'autres mots à l'œil de celui qui les relit. */
         entetesLitterales
         /* « Si on clique sur la ligne, ça doit ouvrir la fiche » — demande du
            commanditaire, 24 octobre 2026. */
         ouvrir={setOuvert}
+        /* « Un fond vert clair pour tous les reçus, ça s'identifie
+           immédiatement » — 28 octobre 2026. C'est la case Reçu qui décide,
+           dans les deux onglets. */
+        reglee={(dossier) => dossier.recu}
         colonnes={colonnes}
         lignes={dossiers}
         cleDe={(dossier) => dossier.id}

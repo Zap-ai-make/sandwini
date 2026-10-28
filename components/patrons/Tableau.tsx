@@ -146,6 +146,7 @@ export function Tableau<T>({
   chargement,
   cleActive,
   enRetard,
+  reglee,
   entetesLitterales = false,
   ouvrir,
 }: {
@@ -177,6 +178,15 @@ export function Tableau<T>({
    * balayer la liste, pas à la comprendre.
    */
   enRetard?: (ligne: T) => boolean;
+  /**
+   * La ligne dont on n'a plus à s'occuper : fond vert clair et filet vert.
+   *
+   * Posé pour les cartes grises (28 octobre 2026) : « mettre un fond vert clair
+   * pour tous les reçus, ça s'identifie immédiatement ». Comme pour le retard,
+   * la couleur ne porte jamais seule l'information (`DESIGN.md` §5) : la
+   * colonne de l'appelant la dit en mots ou en signe — ici le `√` de « Reçu ».
+   */
+  reglee?: (ligne: T) => boolean;
   /**
    * Les entêtes gardent leur casse au lieu de passer en capitales.
    *
@@ -242,6 +252,7 @@ export function Tableau<T>({
                 className={
                   [
                     ouvrir === undefined ? "" : "ligne-ouvrable",
+                    reglee?.(ligne) ? "ligne-reglee" : "",
                     enRetard?.(ligne) ? "ligne-retard" : "",
                     cleDe(ligne) === cleActive ? "ligne-active" : "",
                     arrivees.has(cleDe(ligne)) ? "ligne-arrivee" : "",

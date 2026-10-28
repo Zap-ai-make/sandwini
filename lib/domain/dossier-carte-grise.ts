@@ -547,6 +547,29 @@ export function attendUnRetour(
 }
 
 /**
+ * Ce dossier a-t-il sa place dans la barre « Marquer reçus » ?
+ *
+ * **Ceux qui sont dehors, et ceux qui sont rentrés sans que la case Reçu le
+ * dise.** Les seconds existent : treize lignes ont été marquées revenues le 27
+ * octobre 2026, avant que le geste ne coche « Reçu ». Elles restaient dans le
+ * Dépôt sans rien qui les distingue d'une ligne jamais partie — le défaut même
+ * qui a fait croire le geste disparu. Les reproposer les rattrape d'un clic, au
+ * lieu de les rouvrir une à une.
+ *
+ * Un dossier remis n'y figure jamais : il est fini, et il vit dans Retrait.
+ */
+export function aMarquerRecu(
+  dossier: Pick<
+    DossierCarteGrise,
+    "deposeLe" | "prestataireNom" | "immatriculation" | "recu" | "revenuLe" | "remisLe"
+  >,
+): boolean {
+  if (attendUnRetour(dossier)) return true;
+  if (dossier.remisLe !== null || dossier.recu) return false;
+  return dossier.revenuLe !== null || dossier.immatriculation.trim() !== "";
+}
+
+/**
  * Les champs à écrire pour marquer qu'un dossier est revenu du prestataire.
  *
  * **Le geste que le commanditaire fait cent fois à la main, en un seul.** « Quand
@@ -560,14 +583,20 @@ export function attendUnRetour(
  * on le garde : rejouer le geste ne doit pas dater d'aujourd'hui un retour
  * d'hier. En pratique `attendUnRetour` l'a déjà écarté, mais la fonction reste
  * juste seule.
+ *
+ * **Et la case Reçu se coche** (demande du 28 octobre 2026) : « même si on
+ * marque comme reçu, la case Reçu ne se coche pas ». Pour lui, marquer le
+ * retour et cocher `Reçu` sont un seul et même geste ; c'est aussi cette case
+ * qui met la ligne en vert.
  */
 export function champsRetourMagasin(
   dossier: Pick<DossierCarteGrise, "revenuLe">,
   aujourdhui: Date,
-): { statut: StatutCarteGrise; revenuLe: Date } {
+): { statut: StatutCarteGrise; revenuLe: Date; recu: true } {
   return {
     statut: "revenu_magasin",
     revenuLe: dossier.revenuLe ?? aujourdhui,
+    recu: true,
   };
 }
 

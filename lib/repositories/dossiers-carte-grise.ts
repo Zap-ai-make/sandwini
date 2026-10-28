@@ -257,7 +257,9 @@ export function corrigerLigne(
  * un prestataire ramène cent dossiers, il faut valider un par un, ça prend du
  * temps ; je veux qu'on puisse valider en bloc, et décocher ceux qui ne sont
  * pas de retour ». L'écran coche d'office tout ce qui est parti, on décoche les
- * manquants, et ce qui reste rentre ensemble.
+ * manquants, et ce qui reste rentre ensemble — case « Reçu » cochée
+ * (`champsRetourMagasin`). Un dossier déjà rentré qui repasse ici garde sa date
+ * de retour ; seule sa case change.
  *
  * **Un seul `writeBatch`, donc tout rentre ou rien.** Quatre-vingts dossiers
  * dont la moitié passe et l'autre non laisseraient le comptoir incapable de dire
