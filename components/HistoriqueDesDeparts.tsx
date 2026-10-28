@@ -48,9 +48,6 @@ export function HistoriqueDesDeparts({
     );
   }
 
-  const cartes = departs.reduce((total, depart) => total + depart.cartes.length, 0);
-  const avances = departs.reduce((total, depart) => total + depart.avance, 0);
-
   return (
     <div>
       {/* **Le dire plutôt que d'afficher des blancs.** Une colonne vide se lit
@@ -60,17 +57,6 @@ export function HistoriqueDesDeparts({
         <Avis ton="alerte" titre="Les dates de retour n’ont pas pu être lues" className="mb-3" />
       )}
 
-      {/* Ce que la liste pèse, avant de la lire. Le total des avances est la
-          seule question qu'on pose à un historique sans l'ouvrir. */}
-      <p className="mb-2 text-corps text-encre-doux">
-        <strong className="font-semibold text-encre">
-          {compter(departs.length, "départ", "départs")}
-        </strong>
-        {" · "}
-        {compter(cartes, "carte grise", "cartes grises")}
-        {" · "}
-        {formaterMontant(avances)} d’avances versées
-      </p>
 
       <ul className="cadre cadre-liste">
         {departs.map((depart) => (

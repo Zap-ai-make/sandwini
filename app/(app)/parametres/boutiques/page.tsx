@@ -250,9 +250,6 @@ function ChampsBoutique({
             );
           })}
         </div>
-        <p className="mt-1 text-sm text-encre-doux">
-          Le gérant de cette boutique ne verra que le ou les espaces cochés ici.
-        </p>
       </fieldset>
 
       <Champ

@@ -78,10 +78,6 @@ export function LienDeSuivi({ prestataire }: { prestataire: Prestataire }) {
 
       {lien === null ? (
         <>
-          <p className="mt-1 text-sm text-encre-doux">
-            Une page de consultation où {prestataire.nom} voit ses cartes grises en cours, celles
-            rendues, et le total des avances reçues. Sans compte ni mot de passe.
-          </p>
           <button
             type="button"
             onClick={emettre}

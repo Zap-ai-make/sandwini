@@ -127,9 +127,6 @@ function Reception() {
             Arrivage enregistré — {formaterNombre(faite)} unité{faite > 1 ? "s" : ""} entrée
             {faite > 1 ? "s" : ""}.
           </p>
-          <p className="mt-1 text-corps text-encre-doux">
-            Le stock est déjà à jour sur cet appareil. Si le réseau manque, l’arrivage partira seul.
-          </p>
           <Link href="/pieces" className="mt-4 inline-flex bouton bouton-neutre">
             Voir le catalogue
           </Link>
@@ -187,9 +184,7 @@ function Reception() {
                 L’arrivage
               </h2>
               {saisie.lignes.length === 0 ? (
-                <p className="mt-3 text-corps text-encre-doux">
-                  Rien encore. Cherchez une pièce ci-dessus pour commencer l’arrivage.
-                </p>
+                null
               ) : (
                 <ul className="mt-3 space-y-3">
                   {saisie.lignes.map((ligne) => {

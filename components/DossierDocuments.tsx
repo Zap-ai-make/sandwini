@@ -44,11 +44,7 @@ export function DossierDocuments({
     return <p className="px-4 py-3 text-sm text-encre-doux">Chargement du dossier…</p>;
   }
   if (documents.length === 0) {
-    return (
-      <p className="px-4 py-3 text-sm text-encre-doux">
-        Aucun document n’est encore parvenu au serveur pour cette vente.
-      </p>
-    );
+    return null;
   }
   return (
     /* Nommée : le panneau d'une vente porte plusieurs listes, et « Carte grise »

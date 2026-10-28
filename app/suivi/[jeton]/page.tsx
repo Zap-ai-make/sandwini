@@ -116,25 +116,10 @@ export default async function PageSuivi({ params }: { params: Promise<{ jeton: s
         <h1 className="text-2xl font-semibold tracking-tight text-encre sm:text-3xl">
           {prestataire.nom}
         </h1>
-        <p className="mt-2 max-w-prose text-encre-doux">
-          Les cartes grises que la boutique vous a confiées. Cette page se met à jour toute seule,
-          à chaque fois que vous l’ouvrez.
-        </p>
 
       <section className="mt-8">
         <Titre compte={enCours.length}>Chez vous en ce moment</Titre>
-        {enCours.length === 0 ? (
-          /* **Deux phrases, et il faut les deux.** « Tout a été rendu » sur un
-             prestataire à qui l'on n'a jamais rien confié contredit le bloc du
-             dessous, qui dit « rien encore ». Vu sur une capture, pas sur un
-             test : les deux cas rendent zéro ligne, et aucune assertion de
-             longueur ne les distingue. */
-          <p className="encadre-vide mt-3 text-center text-encre-doux">
-            {historique.length === 0
-              ? "La boutique ne vous a encore confié aucune carte grise."
-              : "Aucune carte grise chez vous. Tout a été rendu."}
-          </p>
-        ) : (
+        {enCours.length === 0 ? null : (
           <ul className="mt-3 space-y-3">
             {enCours.map((ligne) => (
               <Carte key={`${ligne.numeroVente}-${ligne.chassis}`} ligne={ligne} dehors />
@@ -146,7 +131,7 @@ export default async function PageSuivi({ params }: { params: Promise<{ jeton: s
       <section className="mt-10">
         <Titre compte={historique.length}>Déjà rendues</Titre>
         {historique.length === 0 ? (
-          <p className="mt-3 text-encre-doux">Rien encore.</p>
+          null
         ) : (
           <ul className="mt-3 space-y-3">
             {historique.map((ligne) => (
@@ -167,16 +152,8 @@ export default async function PageSuivi({ params }: { params: Promise<{ jeton: s
           <p className="mt-2 font-mono text-3xl font-medium tabular-nums text-encre">
             {formaterMontant(argent.avances)}
           </p>
-          <p className="mt-3 max-w-prose text-sm text-encre-doux">
-            Total des avances versées par la boutique pour les cartes ci-dessus. Pour toute
-            question sur un règlement, adressez-vous à la boutique.
-          </p>
         </section>
 
-        <p className="mt-10 border-t border-bord pt-5 text-sm text-encre-doux">
-          Page de consultation. Vous ne pouvez rien modifier depuis ici — et personne d’autre que
-          vous ne devrait avoir ce lien.
-        </p>
       </main>
     </div>
   );

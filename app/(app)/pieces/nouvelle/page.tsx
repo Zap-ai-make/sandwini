@@ -143,10 +143,6 @@ function NouvellePiece() {
       {creee && (
         <div role="status" className="mb-6 cadre p-4 max-w-[40rem]">
           <p className="font-medium text-encre">Référence créée — {creee}</p>
-          <p className="mt-1 text-sm text-encre-doux">
-            Elle n’a encore aucun stock : une quantité est la somme des mouvements. Faites entrer un
-            lot depuis le catalogue.
-          </p>
           <Link href="/pieces" className="mt-4 inline-flex bouton bouton-neutre">
             Retour au catalogue
           </Link>

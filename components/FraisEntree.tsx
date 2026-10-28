@@ -25,10 +25,7 @@ export function FraisEntree({
       <span className="block text-sm font-medium text-encre">Frais d’entrée</span>
 
       {types.length === 0 ? (
-        <p className="mt-1.5 text-sm text-encre-doux">
-          Aucun type de frais déclaré. Le prix d’achat suffit ; les types se déclarent dans les
-          réglages.
-        </p>
+        null
       ) : (
         <>
           {lignes.map((ligne, index) => (

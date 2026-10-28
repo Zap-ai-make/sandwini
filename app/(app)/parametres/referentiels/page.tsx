@@ -74,10 +74,6 @@ function Referentiels() {
   return (
     <div>
       <TetePage retour={{ href: "/motos", libelle: "Motos" }} titre="Provenances et frais" />
-      <p className="mt-2 max-w-prose text-encre-doux">
-        D’où viennent les motos, et quels frais s’ajoutent à leur prix d’achat. Ces deux listes
-        valent pour toutes les boutiques de motos, et alimentent le formulaire d’entrée en stock.
-      </p>
 
       <Onglets
         libelle="Ce que vous réglez"

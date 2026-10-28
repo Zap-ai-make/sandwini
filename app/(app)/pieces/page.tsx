@@ -198,7 +198,6 @@ function Catalogue() {
   ];
 
   const totalActives = (pieces ?? []).filter((piece) => piece.actif).length;
-  const totalArchivees = (pieces ?? []).filter((piece) => !piece.actif).length;
   const pieceOuverte = (pieces ?? []).find((piece) => piece.id === ouverte);
 
   return (
@@ -310,12 +309,6 @@ function Catalogue() {
             Archivées
           </button>
         )}
-        <p className="ml-auto self-center text-sm text-encre-doux">
-          <strong className="font-semibold text-encre">{formaterNombre(lignes.length)}</strong> sur{" "}
-          {formaterNombre(filtres.archivees ? totalArchivees : totalActives)}{" "}
-          {filtres.archivees ? "archivée" : "référence"}
-          {(filtres.archivees ? totalArchivees : totalActives) > 1 ? "s" : ""}
-        </p>
       </div>
 
       {lignes.length === 0 && !chargement ? (

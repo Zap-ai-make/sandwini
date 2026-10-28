@@ -586,9 +586,7 @@ export function Assistant() {
             {montreHistorique && (
               <div className="max-h-64 overflow-y-auto border-b border-bord bg-fond/60 p-2">
                 {discussions.length === 0 ? (
-                  <p className="p-2 text-sm text-encre-doux">
-                    Aucune discussion gardée. Elles restent sur cet appareil.
-                  </p>
+                  null
                 ) : (
                   <ul>
                     {discussions.map((ancienne) => (
@@ -630,9 +628,6 @@ export function Assistant() {
                   <p className="text-xl font-semibold text-encre">
                     Bonjour {session.utilisateur.nom.split(" ")[0]}.
                   </p>
-                  <p className="mt-1 text-encre-doux">
-                    Posez votre question sur vos motos, vos pièces, vos clients ou votre caisse.
-                  </p>
 
                   <div className="mt-5 flex flex-col items-start gap-2">
                     {SUGGESTIONS.map((suggestion) => (
@@ -647,10 +642,6 @@ export function Assistant() {
                     ))}
                   </div>
 
-                  <p className="mt-6 text-sm text-encre-doux">
-                    Il consulte vos données avec vos propres droits : il ne voit rien que vous ne
-                    puissiez voir. Il n’enregistre rien tout seul.
-                  </p>
                 </div>
               )}
 
@@ -706,13 +697,6 @@ export function Assistant() {
                   </div>
                 ) : ecriture === "faite" ? (
                   <div className="mt-3 flex items-center gap-3">
-                    <p className="flex-1 text-sm text-encre-doux">
-                      La ligne apparaît dans{" "}
-                      {proposition.quoi === "depense"
-                        ? "le journal de caisse"
-                        : "le stock de la pièce"}
-                      .
-                    </p>
                     <button
                       type="button"
                       onClick={() => setProposition(null)}
@@ -759,9 +743,6 @@ export function Assistant() {
               <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-bord bg-fond px-5 py-3">
                 {avis.quoi === "propose" ? (
                   <>
-                    <p className="flex-1 text-sm text-encre-doux">
-                      Le détail est dans {avis.libelle}.
-                    </p>
                     <button
                       type="button"
                       onClick={() => {
@@ -834,9 +815,6 @@ export function Assistant() {
                     }
                     surErreur={(message) => setAvis({ quoi: "souci", texte: message })}
                   />
-                  <p className="mt-2 text-center text-xs text-encre-doux">
-                    L’assistant peut se tromper. Vérifiez ce qui engage de l’argent.
-                  </p>
                 </>
               )}
             </div>

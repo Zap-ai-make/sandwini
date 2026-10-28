@@ -35,7 +35,6 @@ import {
   groupeDepuisDepart,
   lireMontant,
   lireMontantEncaisse,
-  motoRemiseA,
   repartirEncaisse,
   totalGroupe,
   validerVenteGroupee,
@@ -547,11 +546,6 @@ export function ModaleVente({
               </span>
             ))}
           </p>
-          <p className="mt-1 max-w-prose text-corps text-encre-doux">
-            {seule
-              ? "Le dossier de carte grise est ouvert. Si le réseau manque, la vente partira seule dès son retour."
-              : "Chaque moto a son reçu et son dossier de carte grise. Si le réseau manque, les ventes partiront ensemble dès son retour."}
-          </p>
         </div>
       </Modale>
     );
@@ -683,7 +677,6 @@ export function ModaleVente({
                       total={total}
                       catalogue={catalogue}
                       rangFautif={refus?.rang ?? null}
-                      acompte={encaisse}
                       changerPrix={changerPrix}
                       retirer={retirerMoto}
                     />
@@ -903,7 +896,6 @@ function LignesVendues({
   total,
   catalogue,
   rangFautif,
-  acompte,
   changerPrix,
   retirer,
 }: {
@@ -914,7 +906,6 @@ function LignesVendues({
   total: number;
   catalogue: Catalogue;
   rangFautif: number | null;
-  acompte: number;
   changerPrix: (rang: number, valeur: string) => void;
   retirer: (rang: number) => void;
 }) {
@@ -1037,14 +1028,6 @@ function LignesVendues({
         </p>
       )}
 
-      {detaille && acompte > 0 && acompte < total && (
-        /* La règle, dite là où on en voit l'effet. Sans elle, les deux colonnes
-           paraîtraient arbitraires — or elles sont prévisibles, et c'est ce qui
-           permet de les contredire en changeant les prix ou l'ordre. */
-        <p className="mt-1 text-right text-legende text-encre-doux">
-          L’acompte solde les premières lignes avant d’entamer les suivantes.
-        </p>
-      )}
     </>
   );
 }
@@ -1101,7 +1084,6 @@ function Recapitulatif({
   total: number;
   encaisse: number;
 }) {
-  const remise = motoRemiseA(saisie.modePaiement);
   const inclusions = [
     saisie.carteGrise ? LIBELLE_INCLUSION.carteGrise : null,
     saisie.casque ? LIBELLE_INCLUSION.casque : null,
@@ -1166,27 +1148,7 @@ function Recapitulatif({
         />
       </dl>
 
-      {/* La conséquence du mode, dite une fois et à l'endroit où l'on relit.
-          C'est la confusion la plus coûteuse du produit — crédit, la moto part ;
-          tranches, elle reste — et elle se paie au comptoir, pas ici. */}
-      <p className="mt-4 border-t border-bord pt-3 text-corps text-encre-doux">
-        {remise
-          ? plusieurs
-            ? "Le client repart avec les motos. Elles passeront au statut « vendue »."
-            : "Le client repart avec la moto. Elle passera au statut « vendue »."
-          : plusieurs
-            ? "Les motos restent au magasin, réservées, jusqu’au dernier versement. L’argent reçu est un engagement, pas une recette."
-            : "La moto reste au magasin, réservée, jusqu’au dernier versement. L’argent reçu est un engagement, pas une recette."}
-      </p>
 
-      {plusieurs && (
-        /* Ce que l'option A veut dire, dit là où on valide : le commanditaire
-           l'a choisie pour cela, et c'est ce qui se vérifiera à la caisse. */
-        <p className="mt-2 text-corps text-encre-doux">
-          {saisie.motos.length} ventes distinctes seront enregistrées : un reçu, un dossier de
-          carte grise et un crédit par moto.
-        </p>
-      )}
     </section>
   );
 }

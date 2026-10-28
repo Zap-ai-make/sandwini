@@ -274,21 +274,12 @@ export default function PageArrivages() {
         }
       />
 
-      {!dansUneBoutique && (
-        <p className="mb-4 text-corps text-encre-doux">
-          Vous voyez les arrivages de toutes les boutiques. « Nouveau » vous demandera dans laquelle
-          enregistrer celui-ci.
-        </p>
-      )}
 
       {dernierLot && (
         <div role="status" className="mb-4 cadre p-4">
           <p className="font-medium text-encre">
             Arrivage enregistré — {dernierLot.nombre}{" "}
             {dernierLot.nombre > 1 ? "motos entrées" : "moto entrée"} en stock.
-          </p>
-          <p className="mt-1 text-sm text-encre-doux">
-            Elles sont déjà dans le stock de cet appareil. Si le réseau manque, le lot partira seul.
           </p>
         </div>
       )}
@@ -321,10 +312,6 @@ export default function PageArrivages() {
             <label htmlFor="rech-moto" className="block font-medium text-encre">
               Retrouver un lot ou une moto
             </label>
-            <p className="text-corps text-encre-doux">
-              Le nom d’un arrivage, celui d’un fournisseur, ou un numéro de cadre — complet ou par
-              ses derniers caractères.
-            </p>
             <input
               id="rech-moto"
               value={recherche}
@@ -336,7 +323,7 @@ export default function PageArrivages() {
             {recherche.trim() && (
               <div className="mt-3">
                 {lotsTrouves.length === 0 && resultats.length === 0 ? (
-                  <p className="text-corps text-encre-doux">Aucun lot ni aucune moto ne correspond.</p>
+                  null
                 ) : (
                   <div className="grid gap-4">
                     {lotsTrouves.length > 0 && (

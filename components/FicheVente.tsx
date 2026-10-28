@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CircleAlert, Info, KeyRound, Lock, Minus, Printer, ReceiptText } from "lucide-react";
+import { Check, CircleAlert, Info, KeyRound, Minus, Printer, ReceiptText } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { DossierDocuments } from "@/components/DossierDocuments";
@@ -549,15 +549,7 @@ function Marge({ id }: { id: string }) {
 }
 
 function MargeMasquee() {
-  return (
-    <p className="flex gap-2 text-corps text-encre-doux">
-      <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-      <span>
-        Le coût de la moto et la marge de cette vente sont réservés au responsable. Ils ne sont pas
-        masqués à l’écran&nbsp;: ils ne quittent jamais le serveur pour votre compte.
-      </span>
-    </p>
-  );
+  return null;
 }
 
 /**

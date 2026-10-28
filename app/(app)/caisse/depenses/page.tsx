@@ -19,11 +19,10 @@ import {
   mouvementsDeLaPeriode,
   type Mouvement,
 } from "@/lib/domain/caisse";
-import { compter, formaterDateCourte, formaterMontant, formaterNombre } from "@/lib/domain/format";
+import { formaterDateCourte, formaterMontant, formaterNombre } from "@/lib/domain/format";
 import {
   PLAGE_VIDE,
   bornesPeriode,
-  libellePeriode,
   plageInversee,
   type Periode,
   type PlagePeriode,
@@ -91,7 +90,6 @@ function Depenses({
     () => bornesPeriode(periode, maintenant, plage),
     [periode, maintenant, plage],
   );
-  const intitule = libellePeriode(periode, maintenant, plage);
   const inversee = plageInversee(periode, plage);
 
   const { lus: postesLus, nomDuPoste, erreur: erreurPostes } = usePostesDepense();
@@ -240,9 +238,6 @@ function Depenses({
                 </p>
                 <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
                   {formaterMontant(total)}
-                </p>
-                <p className="text-legende text-encre-doux">
-                  {compter(sorties.length, "sortie")} · {intitule ?? "toutes périodes"}
                 </p>
 
                 {/* Où l'argent est parti : c'est à cela que servent les postes,
@@ -410,10 +405,6 @@ function SaisieDepense({
   return (
     <form onSubmit={soumettre} className="cadre p-4 sm:p-5">
       <h2 className="text-bloc font-bold tracking-tight text-encre">Enregistrer une dépense</h2>
-      <p className="mt-1 max-w-prose text-corps text-encre-doux">
-        L’argent qui quitte le tiroir pour autre chose qu’un client&nbsp;: carburant, course,
-        loyer. Le poste le range&nbsp;; sans lui, on saurait que l’argent est parti sans savoir où.
-      </p>
 
       <div className="mt-4 grid gap-4 sm:grid-cols-2">
         {boutiqueId === null && (

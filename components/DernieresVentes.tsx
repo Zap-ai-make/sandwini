@@ -153,13 +153,7 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
         </ErreurDeLecture>
       ) : chargement ? (
         <EtatChargement>Lecture des ventes…</EtatChargement>
-      ) : lignes.length === 0 ? (
-        /* Une phrase, et non « 0 ». Sur une installation neuve c'est même
-           l'information la plus utile de l'écran : il reste à vendre. */
-        <p className="text-encre-doux">
-          Aucune vente enregistrée pour l’instant. La première apparaîtra ici.
-        </p>
-      ) : (
+      ) : lignes.length === 0 ? null : (
         /* `lg:max-h-none` lève la borne de hauteur que `.cadre-tableau` pose
            sur bureau. Elle est juste pour un écran de liste, où le tableau est
            toute la page : il défile, pas elle. Ici le tableau est un bloc parmi

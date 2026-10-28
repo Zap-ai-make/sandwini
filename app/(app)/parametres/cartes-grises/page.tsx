@@ -147,13 +147,6 @@ function Ecran() {
             <Compte libelle="Écritures au total" valeur={plan.ecritures} />
           </dl>
 
-          {plan.ecritures > plan.aMigrer.length && (
-            <p className="mt-3 text-corps text-encre-doux">
-              Il y a plus d’écritures que de dossiers parce qu’un dossier déjà parti chez un
-              prestataire doit être amené jusqu’à l’état où il se trouve vraiment, étape par
-              étape.
-            </p>
-          )}
 
           {plan.sansChassis.length > 0 && (
             <Avis

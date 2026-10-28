@@ -34,12 +34,9 @@ import { LIBELLE_MOYEN } from "@/lib/domain/vente";
  */
 export function ResumeCaisse({
   mouvements,
-  intitule,
   agrege = false,
 }: {
   mouvements: readonly Mouvement[];
-  /** « octobre 2026 », « 13/10/26 » — ce que la période affichée recouvre. */
-  intitule: string;
   /**
    * Vrai en vue entreprise : plusieurs tiroirs, et les phrases se mettent au
    * pluriel. Le calcul, lui, ne change pas — c'est la même somme d'espèces
@@ -68,12 +65,6 @@ export function ResumeCaisse({
         </p>
         <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
           <Chiffre valeur={formaterMontant(resume.especesAttendues)} />
-        </p>
-        <p className="text-legende text-encre-doux">
-          Entré en espèces sur {intitule.toLowerCase()}, moins ce qui en est sorti.{" "}
-          {agrege
-            ? "Ce n’est pas le contenu des tiroirs : personne ne les a comptés."
-            : "Ce n’est pas le contenu du tiroir : personne ne l’a compté."}
         </p>
 
         <dl className="mt-4 grid gap-2 border-t border-bord pt-4">
@@ -106,10 +97,6 @@ export function ResumeCaisse({
                 />
               ))}
             </dl>
-            <p className="mt-2 text-legende text-encre-doux">
-              Cet argent est sur un compte mobile. Il compte dans la recette, jamais dans le
-              meuble.
-            </p>
           </>
         )}
 

@@ -256,10 +256,7 @@ export function PanneauPiece({
           </div>
         </form>
       ) : (
-        <p className="mt-4 border-t border-bord pt-4 text-sm text-encre-doux">
-          Un mouvement appartient à une boutique. Choisissez-en une dans le bandeau pour faire entrer
-          ou sortir du stock.
-        </p>
+        null
       )}
 
       <div className="mt-5 border-t border-bord pt-4">
@@ -267,10 +264,7 @@ export function PanneauPiece({
           Les derniers mouvements
         </h3>
         {mouvements.length === 0 ? (
-          <p className="mt-2 text-sm text-encre-doux">
-            Aucun mouvement ici. La quantité d’une pièce est la somme de ses mouvements&nbsp;: sans
-            entrée, elle vaut zéro.
-          </p>
+          null
         ) : (
           <ul className="mt-2 cadre cadre-liste">
             {mouvements.slice(0, 8).map((mouvement) => (

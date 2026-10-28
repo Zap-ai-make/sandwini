@@ -289,9 +289,6 @@ function Stock() {
     );
 
   const total = (stock ?? []).length;
-  /* Compté sur ce que l'écran montre, pas sur le stock entier : « 12 motos sur
-     128 · 96 en stock » ferait croire que 96 des 12 lignes sont disponibles. */
-  const enStock = resultats.filter((moto) => moto.statut === "en_stock").length;
   const chargement = stock === null && !erreur;
 
   return (
@@ -388,24 +385,6 @@ function Stock() {
               />
             </div>
 
-            {/* Le comptage se lit avant le tableau : c'est lui qui dit si les
-                filtres ont mangé la moto qu'on cherchait. Annoncé poliment, il
-                sert deux fois — il dit d'abord que le stock arrive, puis ce que
-                les filtres ont laissé, à qui ne voit pas le tableau changer.
-                `aria-live` sans `role` : la coquille n'a qu'un seul `status`,
-                et c'est le bandeau réseau. */}
-            <p aria-live="polite" aria-atomic="true" className="ml-auto text-corps text-encre-doux">
-              {chargement ? (
-                "Chargement du stock…"
-              ) : (
-                <>
-                  <strong className="font-semibold text-encre">
-                    {resultats.length === 1 ? "1 moto" : `${resultats.length} motos`}
-                  </strong>
-                  {resultats.length !== total && ` sur ${total}`} · {enStock} en stock
-                </>
-              )}
-            </p>
 
             {/* L'export, sous les filtres : on coche ce que les filtres ont
                 laissé, donc la barre appartient à la même tête d'écran. Elle

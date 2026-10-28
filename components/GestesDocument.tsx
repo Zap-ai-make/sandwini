@@ -275,15 +275,6 @@ function FormulaireDepot({
             </Champ>
           </div>
 
-          {/* **Le contraire de ce qui était écrit ici jusqu'au 21 octobre 2026.**
-              Le dépôt n'écrit plus en caisse : l'avance se note sur le dossier,
-              et on la retrouve dans l'historique des départs. Le dire est le
-              minimum — qui lisait le journal de caisse pour suivre cet argent
-              doit savoir qu'il n'y est plus. */}
-          <p className="mt-2 text-sm text-encre-doux">
-            L’avance se note sur le dossier. Elle n’apparaît pas dans le journal de caisse : on la
-            retrouve dans l’historique des départs.
-          </p>
 
           <EtatErreur message={probleme} className="mt-3" />
 

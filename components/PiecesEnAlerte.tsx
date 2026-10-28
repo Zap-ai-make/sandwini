@@ -44,7 +44,6 @@ const MAX_LIGNES = 6;
 export function PiecesEnAlerte({ className }: { className?: string }) {
   const { perimetre } = usePerimetre();
   const boutiqueId = perimetre.boutiqueId;
-  const surUneBoutique = perimetre.type === "boutique";
   const sansPerimetre = perimetre.type === "aucune";
 
   const souscrireCatalogue = useCallback(
@@ -90,16 +89,10 @@ export function PiecesEnAlerte({ className }: { className?: string }) {
   if (alertes.length === 0) return null;
 
   const montrees = alertes.slice(0, MAX_LIGNES);
-  const reste = alertes.length - montrees.length;
 
   return (
     <section className={className} aria-labelledby="titre-alertes-pieces">
       <TitreSection id="titre-alertes-pieces">Pièces à réapprovisionner</TitreSection>
-      <p className="mt-1 text-corps text-encre-doux">
-        {surUneBoutique
-          ? `Sur l’étagère de ${perimetre.nom}.`
-          : "Toutes boutiques réunies : une pièce peut manquer ici et non ailleurs."}
-      </p>
 
       <ul className="mt-3 cadre cadre-liste">
         {montrees.map(({ piece, quantite, etat }) => (
@@ -133,11 +126,6 @@ export function PiecesEnAlerte({ className }: { className?: string }) {
         <Link href="/pieces?stock=bas" className="bouton bouton-neutre">
           Voir le catalogue
         </Link>
-        {reste > 0 && (
-          <p className="text-corps text-encre-doux">
-            {reste === 1 ? "1 autre référence" : `${reste} autres références`} dans le même cas.
-          </p>
-        )}
       </div>
     </section>
   );

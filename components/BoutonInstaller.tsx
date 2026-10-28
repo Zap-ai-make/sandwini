@@ -60,12 +60,7 @@ export function BoutonInstaller() {
   );
 
   if (posee) {
-    return (
-      <p className="text-sm text-encre-doux">
-        L’application est installée sur cet appareil. Elle s’ouvre sans navigateur et fonctionne
-        sans réseau.
-      </p>
-    );
+    return null;
   }
 
   if (invite) {
@@ -79,10 +74,6 @@ export function BoutonInstaller() {
           <Download aria-hidden="true" className="size-4" />
           Installer l’application
         </button>
-        <p className="mt-2 text-sm text-encre-doux">
-          Elle s’ouvrira comme une application, sans barre d’adresse, et continuera de fonctionner
-          quand le réseau tombe.
-        </p>
       </div>
     );
   }
@@ -105,10 +96,5 @@ export function BoutonInstaller() {
   /* Ni invite ni iOS : navigateur qui ne sait pas installer, ou conditions pas
      encore réunies. Dire le geste vaut mieux que de ne rien dire — mais sans
      promettre un bouton qui n'apparaîtra peut-être jamais. */
-  return (
-    <p className="text-sm text-encre-doux">
-      Pour poser l’application sur l’écran d’accueil, ouvrez le menu de votre navigateur et
-      choisissez « Installer » ou « Ajouter à l’écran d’accueil ».
-    </p>
-  );
+  return null;
 }

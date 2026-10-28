@@ -220,11 +220,6 @@ function ApresAvoirConfie({
         </div>
       }
     >
-      <p className="text-corps text-encre-doux">
-        Dans la boîte d’impression, choisissez « Enregistrer au format PDF » pour obtenir le
-        fichier. Le paquet, lui, est déjà enregistré : fermer cette fenêtre ne le perd pas — seul
-        le bordereau ne se retrouvera plus.
-      </p>
 
       <ul className="mt-4 cadre cadre-liste">
         {confie.cartes.map((carte) => (

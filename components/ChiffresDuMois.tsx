@@ -3,7 +3,7 @@
 import { Chiffre } from "@/components/patrons/Chiffre";
 import { TitreSection } from "@/components/patrons/Page";
 import { compter, formaterMontant, formaterNombre } from "@/lib/domain/format";
-import { libelleMois, type ChiffresDuMois as Chiffres, type Mois, type Part } from "@/lib/domain/chiffres";
+import { type ChiffresDuMois as Chiffres, type Part } from "@/lib/domain/chiffres";
 
 /**
  * Les quatre chiffres du mois, et les deux répartitions (S24, `c3:89-172`).
@@ -14,18 +14,12 @@ import { libelleMois, type ChiffresDuMois as Chiffres, type Mois, type Part } fr
  */
 export function CartesDuMois({
   chiffres,
-  mois,
   avecMarge,
 }: {
   chiffres: Chiffres;
-  mois: Mois;
   /** Un gérant n’a pas la marge : elle n’est pas masquée, elle est absente (D2). */
   avecMarge: boolean;
 }) {
-  const avant = libelleMois({
-    annee: mois.mois === 0 ? mois.annee - 1 : mois.annee,
-    mois: mois.mois === 0 ? 11 : mois.mois - 1,
-  });
 
   return (
     <section aria-labelledby="titre-mois">
@@ -35,12 +29,10 @@ export function CartesDuMois({
         <Carte
           nom="Motos vendues"
           valeur={formaterNombre(chiffres.motosVendues)}
-          detail={`${formaterNombre(chiffres.motosVenduesAvant)} en ${avant.replace(/ \d{4}$/, "")}`}
         />
         <Carte
           nom="Encaissé"
           valeur={formaterNombre(chiffres.encaisse)}
-          detail="FCFA · tous moyens confondus"
         />
         {avecMarge && (
           <Carte
@@ -48,13 +40,6 @@ export function CartesDuMois({
             /* « — » et non « 0 » quand rien n'est connu : zéro affirmerait une
                marge nulle, le tiret dit qu'on ne sait pas. */
             valeur={chiffres.marge === null ? "—" : formaterNombre(chiffres.marge)}
-            detail={
-              chiffres.marge === null
-                ? "Pas encore calculée pour ce mois"
-                : chiffres.margePartiellementEncaissee
-                  ? "FCFA · acquise à la vente, pas encore encaissée en totalité"
-                  : "FCFA · hors frais de dossier"
-            }
           />
         )}
         {/* Une carte, deux lignes. Les additionner produirait un nombre qui ne
@@ -72,18 +57,11 @@ export function CartesDuMois({
         </div>
       </div>
 
-      {/* Écrit une fois, sous les cartes : deux dates différentes se lisent
-          au-dessus, et sans cette phrase on croit à une incohérence. */}
-      <p className="mt-3 max-w-prose text-corps text-encre-doux">
-        « Motos vendues » compte les ventes du mois&nbsp;; « encaissé » compte l’argent entré ce
-        mois-là, quelle que soit la date de la vente. Une vente du mois dernier payée ce mois-ci
-        apparaît donc dans les deux, à deux endroits différents.
-      </p>
     </section>
   );
 }
 
-function Carte({ nom, valeur, detail }: { nom: string; valeur: string; detail: string }) {
+function Carte({ nom, valeur }: { nom: string; valeur: string }) {
   return (
     <div className="cadre p-4 sm:p-5">
       <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">{nom}</p>
@@ -92,7 +70,6 @@ function Carte({ nom, valeur, detail }: { nom: string; valeur: string; detail: s
       <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
         <Chiffre valeur={valeur} />
       </p>
-      <p className="text-legende text-encre-doux">{detail}</p>
     </div>
   );
 }
@@ -127,7 +104,6 @@ export function Repartition({
   id,
   parts,
   unite,
-  seule,
   children,
 }: {
   titre: string;
@@ -136,7 +112,6 @@ export function Repartition({
   /** Ce que compte la seconde valeur, **au singulier** : « moto », « vente ». */
   unite: string;
   /** Ce qu'on dit à la place des barres quand il n'y a qu'une part. */
-  seule: string;
   children?: React.ReactNode;
 }) {
   if (parts.length === 0) return null;
@@ -154,7 +129,6 @@ export function Repartition({
             {formaterMontant(part.montant)}{" "}
             <span className="text-encre-doux">· {compter(part.compte, unite)}</span>
           </p>
-          <p className="mt-1 text-legende text-encre-doux">{seule}</p>
           {children}
         </div>
       </section>
@@ -167,10 +141,6 @@ export function Repartition({
         {titre}
       </h2>
       <div className="cadre p-4 sm:p-5">
-        {/* L'unité se dit une fois en tête plutôt que sur chaque ligne : la
-            colonne des montants fait sept caractères et demi de large, et y
-            répéter « FCFA » la ferait passer à la ligne sur un téléphone. */}
-        <p className="mb-3 text-legende text-encre-doux">Montants en FCFA.</p>
         <ul className="grid gap-3">
           {parts.map((part) => (
             <li

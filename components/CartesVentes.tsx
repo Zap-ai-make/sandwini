@@ -24,7 +24,7 @@ import type { BilanVentes } from "@/lib/domain/vente";
  * l'écran. Un montant qu'on croit total alors qu'il porte sur un mois est une
  * erreur qu'on ne rattrape pas — elle ne se voit pas.
  */
-export function CartesVentes({ bilan, periode }: { bilan: BilanVentes; periode?: string | null }) {
+export function CartesVentes({ bilan }: { bilan: BilanVentes }) {
   if (bilan.ventes === 0) return null;
 
   const cartes = [
@@ -54,7 +54,6 @@ export function CartesVentes({ bilan, periode }: { bilan: BilanVentes; periode?:
           </p>
           {/* En minuscules, sans graisse : c'est une précision sur le titre, pas
               un second titre. */}
-          {periode && <p className="text-legende text-encre-doux">{periode}</p>}
           {/* Les montants sont plus longs qu'un compteur : ils descendent d'un
               cran pour ne pas se casser en deux dans une carte de quart de
               largeur. Les chiffres restent tabulaires — ces quatre cartes se

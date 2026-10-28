@@ -61,7 +61,7 @@ test.describe("le journal de caisse", () => {
     await expect(ligne).toContainText("400 000", { timeout: 30_000 });
     await expect(ligne).toContainText("Espèces");
     await expect(ligne).toContainText("Vente");
-    await expect(contenu(page)).toContainText("1 mouvement");
+    await expect(contenu(page).locator("tbody tr")).toHaveCount(1);
 
     /* **Ce que le journal ne montre pas, et c'est voulu.** Le nom du client ne
        figure nulle part dans un encaissement, et `origineRefId` est un
@@ -182,7 +182,7 @@ test.describe("la dépense", () => {
     await expect(auJournal).toBeVisible({ timeout: 30_000 });
     await expect(auJournal).toContainText("Sortie");
     await expect(auJournal).toContainText(/[−-]\s*15\s000/);
-    await expect(contenu(pageGerant)).toContainText("2 mouvements");
+    await expect(contenu(pageGerant).locator("tbody tr")).toHaveCount(2);
 
     /**
      * **Le responsable saisit lui aussi, et c'est l'inverse de ce que ce test

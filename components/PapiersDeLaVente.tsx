@@ -285,9 +285,6 @@ function ChampPlaque({ moto }: { moto: Moto | null }) {
           Enregistrer la plaque
         </button>
       </div>
-      <p className="mt-1 text-legende text-encre-doux">
-        Elle se range sur la moto, et se relit dans l’inventaire.
-      </p>
 
       <EtatErreurSaisie message={erreur} />
     </div>

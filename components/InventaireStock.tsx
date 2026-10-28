@@ -84,10 +84,6 @@ export function InventaireStock({
           <p className="font-code text-chiffre leading-tight tabular-nums text-encre">
             <Chiffre valeur={compter(detenues.length, "moto")} />
           </p>
-          <p className="text-legende text-encre-doux">
-            Au magasin aujourd’hui, les réservées comprises — elles occupent la place et l’argent
-            tant qu’elles ne sont pas soldées.
-          </p>
 
           <h3 className="mt-5 mb-3 border-t border-bord pt-4 text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
             Depuis combien de temps

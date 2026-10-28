@@ -2,30 +2,23 @@
 
 import { Wallet } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import Link from "next/link";
 import { JournalCaisse } from "@/components/JournalCaisse";
 import { ResumeCaisse } from "@/components/ResumeCaisse";
 import { ErreurDeLecture, EtatChargement, SansBoutique } from "@/components/patrons/Etats";
 import { TetePage } from "@/components/patrons/Page";
-import { useSession } from "@/lib/auth/session";
 import { FiltrePeriode } from "@/components/patrons/FiltrePeriode";
 import {
   PLAGE_VIDE,
   bornesPeriode,
-  libellePeriode,
   type Periode,
   type PlagePeriode,
 } from "@/lib/domain/periode";
 import {
   bilanParBoutique,
   mouvementsDeLaPeriode,
-  totalDuBilan,
   type Mouvement,
 } from "@/lib/domain/caisse";
-import {
-  compter,
-  formaterMontant,
-} from "@/lib/domain/format";
+import { formaterMontant } from "@/lib/domain/format";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterMouvements } from "@/lib/repositories/caisse";
@@ -106,7 +99,6 @@ function BilanDesBoutiques() {
     () => bornesPeriode(periode, maintenant, plage),
     [periode, maintenant, plage],
   );
-  const intitule = libellePeriode(periode, maintenant, plage);
 
   /* `null` : les mouvements de toutes les boutiques du périmètre. C'est la même
      écoute que la caisse d'une boutique, sans son filtre. */
@@ -130,7 +122,6 @@ function BilanDesBoutiques() {
     () => bilanParBoutique(deLaPeriode, boutiques),
     [deLaPeriode, boutiques],
   );
-  const total = useMemo(() => totalDuBilan(lignes), [lignes]);
   const chargement = mouvements === null && !erreur;
 
   return (
@@ -167,10 +158,6 @@ function BilanDesBoutiques() {
           <h2 className="mt-3 text-bloc font-bold tracking-tight text-encre">
             Aucun mouvement sur cette période
           </h2>
-          <p className="mt-1 max-w-prose text-corps text-encre-doux">
-            Aucune boutique n’a encaissé ni sorti d’argent. Choisissez un autre intervalle, ou une
-            boutique dans le bandeau pour ouvrir son journal.
-          </p>
         </div>
       ) : (
         <div className="mt-6 min-w-0 max-w-4xl">
@@ -181,7 +168,7 @@ function BilanDesBoutiques() {
               son total disaient deux fois la même chose, en deux mises en page
               différentes. Le commanditaire a tranché : « l'espace du gérant est
               très joli, celui du superviseur doit être pareil ». */}
-          <ResumeCaisse mouvements={deLaPeriode} intitule={intitule ?? "toutes périodes"} agrege />
+          <ResumeCaisse mouvements={deLaPeriode} agrege />
 
           {/* **Le détail par boutique ne paraît qu'à plusieurs.** Avec une seule
               qui a bougé, chaque ligne redirait le bloc du dessus : c'est
@@ -227,27 +214,10 @@ function BilanDesBoutiques() {
                     </div>
                   ))}
                 </dl>
-                <p className="mt-4 border-t border-bord pt-3 text-legende text-encre-doux">
-                  {compter(lignes.length, "boutique")} ont bougé sur cette période.
-                </p>
               </div>
             </section>
           )}
 
-          {/* **Le détail des dépenses a quitté la caisse (S55).** « Dans la
-              caisse c'est juste le montant total qui doit figurer » : la ligne
-              « Sorti des tiroirs » le dit, et « Où l'argent est parti » se lit
-              dans l'écran des dépenses, qui porte aussi la saisie et
-              l'historique. */}
-          {total.sorties > 0 && (
-            <p className="mt-6 text-corps text-encre-doux">
-              {formaterMontant(total.sorties)} sont sortis des tiroirs sur cette période.{" "}
-              <Link href="/caisse/depenses" className="lien">
-                Voir où l’argent est parti
-              </Link>
-              .
-            </p>
-          )}
         </div>
       )}
     </div>
@@ -255,31 +225,6 @@ function BilanDesBoutiques() {
 }
 
 function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: string }) {
-  const session = useSession();
-  const utilisateur = session.statut === "connecte" ? session.utilisateur : null;
-  /**
-   * **Le responsable peut sortir des espèces depuis S55, et c'était un trou.**
-   *
-   * L'écran réservait le geste au gérant de la boutique. Les règles Firestore,
-   * elles, l'autorisent depuis toujours : `encaissements` crée sous
-   * `peutVendrePour`, qui vaut responsable **ou** gérant de la boutique. Un
-   * responsable travaillant dans une de ses boutiques prenait donc un billet
-   * pour du carburant sans qu'aucun écran ne le lui laisse écrire — et le
-   * mouvement devenait un trou que rien n'expliquait.
-   *
-   * Le commanditaire a tranché la question en une phrase : « ce qui compte est
-   * de rendre tout traçable ». Un geste permis par les règles mais refusé par
-   * l'écran ne protège rien ; il empêche seulement la trace.
-   *
-   * La boutique reste la borne. On sort l'argent d'un tiroir précis, celui du
-   * périmètre affiché — jamais de trois à la fois, ce que la vue consolidée
-   * refuse déjà par construction.
-   */
-  const peutSortirDesEspeces =
-    utilisateur !== null &&
-    (utilisateur.role === "responsable" ||
-      (utilisateur.role === "gerant" && utilisateur.boutiqueId === boutiqueId));
-
   const [periode, setPeriode] = useState<Periode>("ce-mois");
   const [plage, setPlage] = useState<PlagePeriode>(PLAGE_VIDE);
   const maintenant = useMemo(() => new Date(), []);
@@ -287,7 +232,6 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
     () => bornesPeriode(periode, maintenant, plage),
     [periode, maintenant, plage],
   );
-  const intitule = libellePeriode(periode, maintenant, plage);
 
   /* Pour la colonne « Objet » seulement : une dépense dont le détail est resté
      vide porte son poste à la place (S55). */
@@ -349,7 +293,7 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
               lecture — un total qui s'affiche à moitié est pire qu'un total
               qui attend. */}
           {!chargement && (
-            <ResumeCaisse mouvements={deLaPeriode} intitule={intitule ?? "toutes périodes"} />
+            <ResumeCaisse mouvements={deLaPeriode} />
           )}
 
           <JournalCaisse
@@ -358,20 +302,6 @@ function Caisse({ boutiqueId, nomBoutique }: { boutiqueId: string; nomBoutique: 
             avecDate={periode !== "aujourd-hui"}
             nomDuPoste={nomDuPoste}
           />
-          {peutSortirDesEspeces && (
-            /* **La saisie a quitté cet écran (S55).** Elle vit dans
-               « Dépenses », avec son historique et ses postes — « dans la
-               caisse c'est juste le montant total qui doit figurer ». Le
-               renvoi reste, parce qu'un geste déplacé sans panneau est un
-               geste perdu. */
-            <p className="mt-6 text-corps text-encre-doux">
-              Une dépense à enregistrer&nbsp;?{" "}
-              <Link href="/caisse/depenses" className="lien">
-                Ouvrir les dépenses
-              </Link>
-              .
-            </p>
-          )}
         </div>
       )}
     </div>

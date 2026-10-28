@@ -175,9 +175,7 @@ export default function PageFournisseur() {
                 {chargementStock ? (
                   <p className="mt-3 text-corps text-encre-doux">Chargement des motos…</p>
                 ) : lot.motos.length === 0 ? (
-                  <p className="mt-3 text-corps text-encre-doux">
-                    Ce lot ne porte aucune moto.
-                  </p>
+                  null
                 ) : (
                   <ul className="mt-3 grid gap-1">
                     {lot.motos.map((moto) => (

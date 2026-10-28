@@ -133,10 +133,7 @@ export function JourneeDuGerant() {
       {chargement ? (
         <EtatChargement>Lecture de la journée…</EtatChargement>
       ) : ecritures.length === 0 ? (
-        <p className="text-encre-doux">
-          Rien d’enregistré aujourd’hui. La première vente ou la première entrée en stock
-          apparaîtra ici.
-        </p>
+        null
       ) : (
         <div className="cadre">
           <ul className="cadre-liste">
@@ -153,10 +150,6 @@ export function JourneeDuGerant() {
               </li>
             ))}
           </ul>
-          <p className="border-t border-bord px-4 py-2 text-legende text-encre-doux">
-            {ecritures.length === 1 ? "Une écriture" : `${ecritures.length} écritures`} depuis ce
-            matin. Le bandeau, en haut, dit ce qui reste à envoyer.
-          </p>
         </div>
       )}
     </section>

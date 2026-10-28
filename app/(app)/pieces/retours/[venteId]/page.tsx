@@ -143,9 +143,6 @@ function Retour() {
               Vendre maintenant
             </Link>
           </div>
-          <p className="mt-2 max-w-prose text-sm text-encre-doux">
-            Pour un PDF, choisissez « Enregistrer au format PDF » dans la boîte d’impression.
-          </p>
         </div>
         <div className="a-imprimer mt-4 print:mt-0">
           <RecuRetour retour={fait} boutique={boutique} />

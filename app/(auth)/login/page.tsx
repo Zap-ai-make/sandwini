@@ -131,9 +131,6 @@ export default function Connexion() {
       <main className="flex flex-col justify-center px-6 py-10 md:px-14">
         <div className="w-full max-w-[380px]">
           <h1 className="text-ecran font-semibold tracking-tight text-encre">Connexion</h1>
-          <p className="mt-1 text-corps text-encre-doux">
-            Entrez avec le compte que le responsable vous a créé.
-          </p>
 
           {!configurationPresente ? (
             <Avis ton="alerte" titre="Firebase n’est pas configuré sur cet appareil" className="mt-6">

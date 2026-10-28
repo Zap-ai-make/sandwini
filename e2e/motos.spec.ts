@@ -238,11 +238,11 @@ test.describe("le coût est réservé au responsable", () => {
     await page.goto("/motos", { waitUntil: "load" });
     await page.getByLabel("Chercher dans le stock").fill(chassis);
     await page.getByRole("link", { name: chassis }).click();
-    await expect(contenu(page)).toContainText("Aucun prix d’achat n’est enregistré", {
-      timeout: 60_000,
-    });
-
-    await page.getByRole("button", { name: "Renseigner le prix d’achat" }).click();
+    /* La phrase « Aucun prix d'achat n'est enregistré » a disparu avec les
+       autres détails (28 octobre 2026) : c'est le bouton qui dit qu'il manque. */
+    const renseigner = page.getByRole("button", { name: "Renseigner le prix d’achat" });
+    await expect(renseigner).toBeVisible({ timeout: 60_000 });
+    await renseigner.click();
     /* Une modale : le formulaire de coût est passé au patron `Modale`, qui lui
        donne le piège de focus, Échap et un pied d'actions qui ne défile pas. Le
        cadre se vise par son rôle `dialog` — il n'y en a jamais deux ouverts

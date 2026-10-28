@@ -149,10 +149,6 @@ function Actions({ texte, titre }: { texte: string; titre: string }) {
         </button>
       </div>
 
-      <p className="mt-2 max-w-prose text-sm text-encre-doux">
-        Pour un PDF, choisissez « Enregistrer au format PDF » dans la boîte d’impression : elle
-        fonctionne sans réseau.
-      </p>
 
       {message && (
         <p role="status" className="mt-2 flex items-center gap-2 text-sm text-encre">

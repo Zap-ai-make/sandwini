@@ -195,16 +195,6 @@ export default function PageClient() {
         </AvecPanneau>
       )}
 
-      {/* **Dit, et non caché.** Un gérant ne lit que les ventes de sa boutique
-          (D7) : sans cette phrase, une fiche incomplète se lirait comme une
-          fiche vide, et quelqu'un en conclurait qu'un client n'a rien acheté
-          alors qu'il a acheté ailleurs. */}
-      {boutiqueId !== null && (
-        <p className="mt-3 text-legende text-encre-doux">
-          Seuls les achats faits dans cette boutique sont affichés. Le fichier client, lui, est
-          commun à toutes les boutiques.
-        </p>
-      )}
 
       <Modale
         ouvert={correction}

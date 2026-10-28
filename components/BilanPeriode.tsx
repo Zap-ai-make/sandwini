@@ -8,7 +8,6 @@ import { chiffresDeLaPeriode } from "@/lib/domain/periode-chiffres";
 import {
   PLAGE_VIDE,
   bornesPeriode,
-  libellePeriode,
   plageInversee,
   type Periode,
   type PlagePeriode,
@@ -55,7 +54,6 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
   const partCredit = dehors === 0 ? 0 : (chiffres.creditDehors / dehors) * 100;
   const partTranches = dehors === 0 ? 0 : (chiffres.resteSurTranches / dehors) * 100;
 
-  const intitule = libellePeriode(periode, maintenant, plage);
   const inversee = plageInversee(periode, plage);
 
   return (
@@ -73,24 +71,16 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
         className="mb-4"
       />
 
-      {inversee ? null : chiffres.vide ? (
-        /* Une phrase, pas cinq zéros alignés : D63. Cinq zéros se lisent comme
-           un résultat, alors qu'il n'y a simplement rien dans l'intervalle. */
-        <p className="cadre p-4 text-corps text-encre-doux sm:p-5">
-          Aucune vente {intitule ? `pour ${intitule.toLowerCase()}` : "enregistrée"}.
-        </p>
-      ) : (
+      {inversee ? null : chiffres.vide ? null : (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
             <Carte
               nom="Motos vendues"
               valeur={formaterNombre(chiffres.motosVendues)}
-              detail={intitule ?? "Toutes périodes"}
             />
             <Carte
               nom="Montant"
               valeur={formaterMontant(chiffres.montant)}
-              detail="Ce qui a été convenu, pas ce qui est rentré"
             />
           </div>
 
@@ -136,7 +126,6 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
             <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
               <Chiffre valeur={formaterMontant(chiffres.resteAPercevoir)} />
             </p>
-            <p className="text-legende text-encre-doux">Tout ce que les clients doivent encore</p>
 
             <div
               aria-hidden="true"
@@ -151,13 +140,11 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
                 ton="bg-goutte"
                 nom="Crédit dehors"
                 valeur={formaterMontant(chiffres.creditDehors)}
-                detail="La moto est partie, le client doit"
               />
               <Terme
                 ton="bg-or"
                 nom="Reste sur tranches"
                 valeur={formaterMontant(chiffres.resteSurTranches)}
-                detail="La moto est au magasin, il manque encore ceci"
               />
             </dl>
           </div>
@@ -169,7 +156,6 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
             <Carte
               nom="Encaissé sur tranches"
               valeur={formaterMontant(chiffres.encaisseSurTranches)}
-              detail="L’argent des clients, gardé contre une moto qui n’est pas partie"
             />
           </div>
         </>
@@ -178,14 +164,13 @@ export function BilanPeriode({ ventes }: { ventes: Vente[] }) {
   );
 }
 
-function Carte({ nom, valeur, detail }: { nom: string; valeur: string; detail: string }) {
+function Carte({ nom, valeur }: { nom: string; valeur: string }) {
   return (
     <div className="cadre p-4 sm:p-5">
       <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">{nom}</p>
       <p className="mt-1 font-code text-chiffre leading-tight tabular-nums text-encre">
         <Chiffre valeur={valeur} />
       </p>
-      <p className="text-legende text-encre-doux">{detail}</p>
     </div>
   );
 }
@@ -202,12 +187,10 @@ function Terme({
   ton,
   nom,
   valeur,
-  detail,
 }: {
   ton: string;
   nom: string;
   valeur: string;
-  detail: string;
 }) {
   return (
     <div>
@@ -218,7 +201,6 @@ function Terme({
       <dd className="mt-1 font-code text-bloc leading-tight tabular-nums text-encre">
         <Chiffre valeur={valeur} />
       </dd>
-      <dd className="text-legende text-encre-doux">{detail}</dd>
     </div>
   );
 }

@@ -230,9 +230,6 @@ function VendrePieces() {
           <p className="font-medium text-encre">
             Vente enregistrée — <span className="plaque-code">{enregistree.numero}</span>
           </p>
-          <p className="mt-1 text-corps text-encre-doux">
-            Le stock est déjà à jour sur cet appareil. Si le réseau manque, la vente partira seule.
-          </p>
           {/* Le reçu existe enfin (S64) : il s'ouvre dans l'historique, d'où il
               s'imprime et se partage. Le reçu est consultable tout de suite,
               même hors ligne — le numéro et la vente existent dès la saisie
@@ -362,7 +359,7 @@ function VendrePieces() {
               Le panier
             </h2>
             {panier.lignes.length === 0 ? (
-              <p className="mt-2 text-corps text-encre-doux">Rien au panier.</p>
+              null
             ) : (
               <ul className="mt-3 space-y-3">
                 {panier.lignes.map((ligne) => {

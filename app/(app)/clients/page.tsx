@@ -161,10 +161,6 @@ export default function PageClients() {
         null
       ) : (
         <>
-          <p className="mt-6 text-sm text-encre-doux">
-            {resultats.length === 1 ? "1 client" : `${resultats.length} clients`}
-            {resultats.length !== clients.length && ` sur ${clients.length}`}
-          </p>
           <ul className="mt-2 cadre cadre-liste">
             {resultats.map((client) => (
               <LigneClient

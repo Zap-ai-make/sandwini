@@ -336,9 +336,6 @@ function CorpsArrivageModal({
               )}
             </div>
 
-            <p className="mt-3 text-corps text-encre-doux">
-              Une ligne par moto : son numéro de châssis, et sa couleur si vous l’avez.
-            </p>
             <div className="mt-2">
               <SaisieLotMotos
                 lignes={groupe.lignes}

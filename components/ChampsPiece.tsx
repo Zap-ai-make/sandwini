@@ -47,9 +47,6 @@ export function ChampsPiece({
             onChange={(evenement) => changer({ reference: evenement.target.value })}
             className="plaque-code saisie mt-1.5"
           />
-          <p className="mt-1 text-sm text-encre-doux">
-            Celle du fournisseur ou la vôtre. C’est par elle qu’on cherche au comptoir.
-          </p>
         </div>
 
         <div className="mt-4">
@@ -63,9 +60,6 @@ export function ChampsPiece({
             onChange={(evenement) => changer({ designation: evenement.target.value })}
             className="saisie mt-1.5"
           />
-          <p className="mt-1 text-sm text-encre-doux">
-            Ce qu’on dit en la demandant : « plaquette de frein avant ».
-          </p>
         </div>
 
         <div className="mt-4">
@@ -88,9 +82,6 @@ export function ChampsPiece({
               <option key={categorie} value={categorie} />
             ))}
           </datalist>
-          <p className="mt-1 text-sm text-encre-doux">
-            Écrivez ce que vous voulez. Les catégories déjà employées vous sont proposées.
-          </p>
         </div>
       </fieldset>
 
@@ -108,10 +99,6 @@ export function ChampsPiece({
             onChange={(evenement) => changer({ prixAchat: evenement.target.value })}
             className="saisie mt-1.5"
           />
-          <p className="mt-1 text-sm text-encre-doux">
-            Ce que la pièce vous a coûté. Il sert à calculer votre marge, et il ne sort pas de votre
-            boutique. Laissé vide, la marge restera inconnue.
-          </p>
         </div>
 
         <div className="mt-4">
@@ -125,9 +112,6 @@ export function ChampsPiece({
             onChange={(evenement) => changer({ prixVente: evenement.target.value })}
             className="saisie mt-1.5"
           />
-          <p className="mt-1 text-sm text-encre-doux">
-            Laissé vide, la référence existe au catalogue et ne se vend pas encore.
-          </p>
         </div>
 
         <div className="mt-4">
@@ -141,10 +125,6 @@ export function ChampsPiece({
             onChange={(evenement) => changer({ seuilAlerte: evenement.target.value })}
             className="saisie mt-1.5"
           />
-          <p className="mt-1 text-sm text-encre-doux">
-            En dessous de cette quantité, la pièce apparaît en « stock bas ». Zéro veut dire « ne
-            m’alerte pas ».
-          </p>
         </div>
 
         {/* **Le prix d’achat est ici, à l’inverse de celui d’une moto.** Il

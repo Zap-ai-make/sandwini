@@ -50,10 +50,6 @@ function Identite() {
   return (
     <section className="cadre p-4">
       <h2 className="font-semibold text-encre">Ce qui s’imprime en tête de chaque reçu</h2>
-      <p className="mt-1 max-w-prose text-corps text-encre-doux">
-        Ces informations font partie du logiciel. Elles ne se saisissent pas, et elles ne peuvent
-        pas être effacées&nbsp;: un reçu sans mentions légales n’est pas conforme.
-      </p>
 
       {/* Le filet du haut et celui du bas ont sauté : les faits ne tiennent
           plus toute la largeur depuis que le monogramme est à leur gauche, et
@@ -103,10 +99,6 @@ function CetAppareil() {
         <BoutonInstaller />
       </div>
 
-      <p className="mt-3 max-w-prose text-corps text-encre-doux">
-        Ce bloc est propre à l’appareil du comptoir&nbsp;: ce qui est en attente ici n’est pas en
-        attente ailleurs.
-      </p>
     </section>
   );
 }
@@ -140,9 +132,6 @@ function Cadre({ children }: { children: React.ReactNode }) {
       {/* Aucun retour : `/parametres` mène ici, donc le lien boucherait sur
           l'écran qu'on regarde. */}
       <TetePage titre="Identité de l’entreprise" />
-      <p className="mt-2 mb-6 max-w-prose text-encre-doux">
-        L’en-tête de chaque reçu remis à un client.
-      </p>
       {children}
     </div>
   );

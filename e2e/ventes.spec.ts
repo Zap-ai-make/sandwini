@@ -138,7 +138,7 @@ test.describe("enregistrer une vente", () => {
     // Le récapitulatif dit ce qui sera écrit, avant qu'on valide.
     const recap = page.getByRole("region", { name: "Récapitulatif de la vente" });
     await expect(recap).toContainText("1 200 000 FCFA");
-    await expect(recap).toContainText("Le client repart avec la moto");
+    await expect(recap).toContainText("Payé");
     await expect(recap.locator(".plaque-code")).toHaveText(NUMERO);
 
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();

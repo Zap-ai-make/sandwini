@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft, Lock, LoaderCircle, Truck, Wallet } from "lucide-react";
+import { ArrowLeft, LoaderCircle, Truck, Wallet } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useState } from "react";
 import { DeplacerMotoModal } from "@/components/DeplacerMotoModal";
@@ -313,10 +313,6 @@ function Cout({ moto, catalogue }: { moto: Moto; catalogue: Catalogue }) {
            plus (S39). La phrase dit ce que l'absence empêche — la marge —
            parce que c'est la seule conséquence visible. */
         <div className="mt-2 cadre p-4 sm:p-5">
-          <p className="text-corps text-encre-doux">
-            Aucun prix d’achat n’est enregistré : la marge de cette moto restera muette tant qu’il
-            manquera.
-          </p>
           <button
             type="button"
             onClick={() => setOuvert(true)}
@@ -382,13 +378,6 @@ function CoutMasque() {
       <h2 className="text-sm font-semibold tracking-wide text-encre-doux uppercase">
         Coût d’entrée
       </h2>
-      <p className="mt-2 flex gap-3 rounded-plaque border border-dashed border-bord p-4 text-sm text-encre-doux">
-        <Lock aria-hidden="true" className="mt-0.5 size-4 shrink-0" />
-        <span>
-          Le prix d’achat et les frais sont réservés au responsable. Vous les avez saisis à l’entrée
-          de la moto&nbsp;; ils ne se relisent pas ici.
-        </span>
-      </p>
     </section>
   );
 }

@@ -101,11 +101,6 @@ function Catalogue() {
   return (
     <div>
       <TetePage retour={{ href: "/motos", libelle: "Motos" }} titre="Marques et modèles" />
-      <p className="mt-2 max-w-prose text-encre-doux">
-        Ce que vend l’entreprise, dans toutes ses boutiques de motos. Une moto entrée en stock
-        choisira sa marque puis son modèle dans ces listes — jamais en texte libre, sinon le même
-        modèle finit écrit de trois façons.
-      </p>
 
       <Onglets
         libelle="Ce que vous réglez"

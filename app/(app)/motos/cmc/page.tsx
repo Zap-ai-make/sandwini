@@ -115,7 +115,6 @@ export default function PageRetraitsCmc() {
 
   if (session.statut !== "connecte") return null;
   const auteur: Auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
-  const cherche = recherche.trim() !== "";
 
   return (
     <div>
@@ -156,11 +155,6 @@ export default function PageRetraitsCmc() {
             className="saisie pr-3 pl-9 placeholder:text-encre-doux sm:max-w-96"
           />
         </div>
-        <p aria-live="polite" className="mt-1.5 text-legende text-encre-doux">
-          {cherche
-            ? `${trouves.length} ligne(s) trouvée(s).`
-            : "La recherche regarde le nom, le prénom, le téléphone et le numéro de la moto."}
-        </p>
       </div>
 
       {erreur !== null ? (

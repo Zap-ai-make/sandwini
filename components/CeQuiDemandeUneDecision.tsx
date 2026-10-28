@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Check } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
@@ -116,14 +116,7 @@ export function CeQuiDemandeUneDecision({ className }: { className?: string } = 
         </ErreurDeLecture>
       ) : chargement ? (
         <EtatChargement>Lecture des dossiers et des tranches…</EtatChargement>
-      ) : lignes.length === 0 ? (
-        /* Pas un compteur à zéro : une phrase vraie. « Rien n'attend » est une
-           information utile au responsable ; « 0 » ne l'est pas (D63). */
-        <p className="flex items-center gap-3 text-encre-doux">
-          <Check aria-hidden="true" className="size-4 shrink-0 text-solde" />
-          Rien n’attend de décision&nbsp;: aucun document en retard, aucune tranche inactive.
-        </p>
-      ) : (
+      ) : lignes.length === 0 ? null : (
         <>
           {/* Même raison qu'aux dernières ventes : un tableau encastré dans un
               tableau de bord ne se borne pas à la fenêtre, sinon il ouvre une
@@ -137,19 +130,6 @@ export function CeQuiDemandeUneDecision({ className }: { className?: string } = 
               enRetard={() => true}
             />
           </div>
-          {lignes.length > MAX_LIGNES && (
-            <p className="mt-2 text-corps text-encre-doux">
-              {lignes.length - MAX_LIGNES} autres attendent aussi. Les dossiers se traitent dans{" "}
-              <Link href="/motos/dossiers" className="underline">
-                Dossiers en cours
-              </Link>
-              , les tranches dans{" "}
-              <Link href="/motos/paiements" className="underline">
-                Paiements
-              </Link>
-              .
-            </p>
-          )}
         </>
       )}
     </section>
@@ -188,10 +168,7 @@ export function AFaireAujourdhui({ className }: { className?: string } = {}) {
       ) : chargement ? (
         <EtatChargement>Lecture des dossiers et des tranches…</EtatChargement>
       ) : lignes.length === 0 ? (
-        <p className="flex items-center gap-3 text-encre-doux">
-          <Check aria-hidden="true" className="size-4 shrink-0 text-solde" />
-          Rien n’attend&nbsp;: aucun document en retard, aucune tranche inactive.
-        </p>
+        null
       ) : (
         <ul className="cadre cadre-liste">
           {lignes.map((ligne) => (

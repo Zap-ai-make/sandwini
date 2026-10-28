@@ -42,7 +42,6 @@ import {
   PLAGE_VIDE,
   bornesPeriode,
   dansLaPeriode,
-  libellePeriode,
   type Periode,
   type PlagePeriode,
 } from "@/lib/domain/periode";
@@ -284,17 +283,13 @@ function Ventes() {
      qu'aucune boutique n'est choisie (S54). */
   const dansUneBoutique = perimetre.type === "boutique";
 
-  /* Deux totaux, et la distinction compte. `total` est le registre entier :
-     c'est lui qui décide si la boutique n'a jamais rien vendu — une période
-     vide n'est pas un registre vide, et proposer « enregistrez la première
-     vente » à qui consulte le mois dernier serait faux. `retenues` est le
-     dénominateur du comptage, donc la période choisie. */
+  /* `total` est le registre entier : c'est lui qui décide si la boutique n'a
+     jamais rien vendu — une période vide n'est pas un registre vide, et
+     proposer « enregistrez la première vente » à qui consulte le mois dernier
+     serait faux. */
   const total = cherchables.length;
-  const retenues = duPerimetre.length;
-  const enCours = resultats.filter((ligne) => ligne.vente.resteDu > 0).length;
   const chargement = ventes === null && !erreur;
   const bilan = bilanVentes(duPerimetre.map((ligne) => ligne.vente));
-  const nomPeriode = libellePeriode(periode, maintenant, plage);
 
   /* Ouvrir et fermer la modale ne perd pas la fiche ouverte derrière : les
      deux paramètres d'écran cohabitent, et fermer l'une ne referme pas
@@ -348,7 +343,7 @@ function Ventes() {
         className="mb-4"
       />
 
-      <CartesVentes bilan={bilan} periode={nomPeriode} />
+      <CartesVentes bilan={bilan} />
 
       {modaleOuverte && (
         /* L’assistant ouvre cette modale déjà remplie en passant par l’adresse
@@ -416,21 +411,6 @@ function Ventes() {
                 ))}
               </div>
 
-              {/* Le comptage se lit avant le tableau : c'est lui qui dit si la
-                  recherche a mangé la vente qu'on cherchait. `aria-live` sans
-                  `role` : la coquille n'a qu'un seul `status`, le bandeau. */}
-              <p aria-live="polite" aria-atomic="true" className="ml-auto text-corps text-encre-doux">
-                {chargement ? (
-                  "Chargement des ventes…"
-                ) : (
-                  <>
-                    <strong className="font-semibold text-encre">
-                      {resultats.length === 1 ? "1 vente" : `${resultats.length} ventes`}
-                    </strong>
-                    {resultats.length !== retenues && ` sur ${retenues}`} · {enCours} en cours
-                  </>
-                )}
-              </p>
             </div>
 
             {chargement ? (

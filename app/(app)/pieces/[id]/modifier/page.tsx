@@ -200,9 +200,6 @@ function ModifierPiece() {
       {enregistree && (
         <div role="status" className="mb-6 cadre p-4 max-w-[40rem]">
           <p className="font-medium text-encre">Modifications enregistrées.</p>
-          <p className="mt-1 text-sm text-encre-doux">
-            Elles sont déjà à jour sur cet appareil. Si le réseau manque, elles partiront seules.
-          </p>
           <Link href="/pieces" className="mt-4 inline-flex bouton bouton-neutre">
             Retour au catalogue
           </Link>
@@ -263,9 +260,6 @@ function ModifierPiece() {
               </>
             ) : (
               <>
-                <p className="mt-2 text-sm text-encre-doux">
-                  Elle reparaîtra au catalogue et redeviendra vendable.
-                </p>
                 <button
                   type="button"
                   onClick={basculerActivation}

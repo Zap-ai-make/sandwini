@@ -139,9 +139,6 @@ export default function PageNouvelleMoto() {
     return (
       <Cadre>
         <h2 className="text-bloc font-semibold text-encre">Dans quelle boutique entre-t-elle ?</h2>
-        <p className="mt-1 max-w-prose text-corps text-encre-doux">
-          Une moto entre dans une boutique précise : celle qui la détient et qui la vendra.
-        </p>
         <ul className="mt-4 grid max-w-md gap-2">
           {boutiquesOuvertes.length === 0 ? (
             <li className="text-corps text-encre-doux">
@@ -180,9 +177,6 @@ export default function PageNouvelleMoto() {
             Moto enregistrée dans {perimetre.nom}
             {" — "}
             <span className="plaque-code">{enregistree.chassis}</span>
-          </p>
-          <p className="mt-1 text-sm text-encre-doux">
-            Elle est déjà dans le stock de cet appareil. Si le réseau manque, elle partira seule.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link
@@ -268,9 +262,6 @@ export default function PageNouvelleMoto() {
               onChange={(evenement) => changer({ numeroChassis: evenement.target.value })}
               className="plaque-code saisie mt-1.5"
             />
-            <p className="mt-1 text-sm text-encre-doux">
-              Relevé sur le cadre. Les espaces et la casse n’ont pas d’importance.
-            </p>
           </div>
 
           <div className="mt-4">
@@ -357,19 +348,12 @@ export default function PageNouvelleMoto() {
               onChange={(evenement) => changer({ prixVenteConseille: evenement.target.value })}
               className="saisie mt-1.5"
             />
-            <p className="mt-1 text-sm text-encre-doux">
-              Un repère pour le comptoir, pas un prix imposé : la vente se négocie.
-            </p>
           </div>
         </fieldset>
 
         {voitLesCouts && (
           <fieldset className="mt-6 cadre p-4">
             <legend className="px-1 font-semibold text-encre">Ce qu’elle a coûté</legend>
-            <p className="mt-1 text-sm text-encre-doux">
-              Réservé au responsable. Vous pouvez le laisser vide et le poser plus tard depuis
-              la fiche de la moto, section « Coût d’entrée ».
-            </p>
 
             <div className="mt-4">
               <label htmlFor="prix-achat" className="block text-sm font-medium text-encre">

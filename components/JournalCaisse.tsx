@@ -3,7 +3,6 @@
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { LIBELLE_ORIGINE, montantSigne, type Mouvement } from "@/lib/domain/caisse";
 import {
-  compter,
   formaterDateCourte,
   formaterHeure,
   formaterNombre,
@@ -151,20 +150,6 @@ export function JournalCaisse({
       <div className="cadre-tete">
         <h2 className="text-bloc font-bold tracking-tight text-encre">Les mouvements</h2>
 
-        {/* Le comptage se lit avant le tableau. Il sert deux fois : il dit
-            d'abord que la période arrive, puis combien elle a compté — et
-            « 6 mouvements » se rapproche du carnet qu'on tenait avant, où l'on
-            comptait les lignes du doigt. `aria-live` sans `role` : la coquille
-            n'a qu'un seul `status`, et c'est le bandeau réseau. */}
-        <p aria-live="polite" aria-atomic="true" className="ml-auto text-corps text-encre-doux">
-          {chargement ? (
-            "Lecture des mouvements…"
-          ) : (
-            <strong className="font-semibold text-encre">
-              {compter(mouvements.length, "mouvement")}
-            </strong>
-          )}
-        </p>
       </div>
 
       <Tableau

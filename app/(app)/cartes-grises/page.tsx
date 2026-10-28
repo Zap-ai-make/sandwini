@@ -110,7 +110,6 @@ function Ecran() {
   const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
 
   const { cours, termines } = rangerDossiers(trouves);
-  const cherche = recherche.trim() !== "";
 
   /* Une ligne appartient à la boutique des cartes grises : sans boutique
      choisie, il n'y a pas de propriétaire à lui donner. */
@@ -157,13 +156,6 @@ function Ecran() {
             className="saisie pr-3 pl-9 placeholder:text-encre-doux sm:max-w-96"
           />
         </div>
-        {/* Le compte explique un écran vide : sans lui, on croit que la liste
-            n'a rien, alors que c'est la recherche qui a tout mangé. */}
-        <p aria-live="polite" className="mt-1.5 text-legende text-encre-doux">
-          {cherche
-            ? `${cours.length + termines.length} ligne(s) trouvée(s) — ${cours.length} au dépôt, ${termines.length} au retrait.`
-            : "Tape n’importe quoi qui figure sur la ligne : la recherche regarde toutes les colonnes."}
-        </p>
       </div>
 
       {/* **La liste entière manque, et l'écran n'a plus rien à montrer.** Un

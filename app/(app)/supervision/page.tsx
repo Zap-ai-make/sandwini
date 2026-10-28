@@ -41,7 +41,6 @@ import {
 export default function Supervision() {
   const { perimetre, boutiques, chargement, erreur, choisir } = usePerimetre();
   const actives = boutiques.filter((boutique) => boutique.actif);
-  const fermees = boutiques.length - actives.length;
   const toutesLesMetiers = reunirMetiers(actives);
 
   /* Le même calcul que le tableau du dessous, réparti par boutique (D73). Les
@@ -157,13 +156,6 @@ export default function Supervision() {
         </nav>
       ) : null}
 
-      {fermees > 0 && (
-        <p className="mt-3 text-sm text-encre-doux">
-          {fermees === 1
-            ? "Une boutique fermée n’apparaît pas ici ; elle reste lisible dans les réglages."
-            : `${fermees} boutiques fermées n’apparaissent pas ici ; elles restent lisibles dans les réglages.`}
-        </p>
-      )}
 
       {/* « Ce qui demande une décision » a quitté cet écran (S54), à la
           demande du commanditaire, pour épurer le contenu. Il reste sur

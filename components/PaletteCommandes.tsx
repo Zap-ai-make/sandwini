@@ -185,10 +185,7 @@ export function PaletteCommandes() {
         </div>
 
         {resultats.length === 0 ? (
-          <p className="px-4 py-6 text-encre-doux">
-            Aucun écran ne porte ce nom. La palette ne cherche pas encore dans les motos, les
-            ventes ni les clients.
-          </p>
+          null
         ) : (
           <ul className="max-h-[46vh] overflow-y-auto py-1">
             {resultats.map(({ href, libelle, espace }, rang) => (

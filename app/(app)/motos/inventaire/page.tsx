@@ -17,7 +17,6 @@ import {
   partsParMode,
   type Mois,
 } from "@/lib/domain/chiffres";
-import { formaterMontant } from "@/lib/domain/format";
 import { peut } from "@/lib/domain/roles";
 import type { Moto } from "@/lib/domain/moto";
 import type { Vente, Versement } from "@/lib/domain/vente";
@@ -137,13 +136,6 @@ function Chiffres() {
   );
   const parMode = useMemo(() => partsParMode(mois, ventes ?? []), [mois, ventes]);
 
-  /* Le total se tire des parts affichées plutôt que d'un champ voisin : deux
-     sources pour un seul nombre finissent toujours par diverger d'un arrondi,
-     et c'est la phrase du chapeau qui aurait tort. */
-  const totalDesVentes = useMemo(
-    () => parBoutique.reduce((somme, part) => somme + part.montant, 0),
-    [parBoutique],
-  );
 
   const ou = perimetre.type === "boutique" ? perimetre.nom : "Toutes les boutiques";
   /* Un gérant n'a pas de supervision où revenir : le renvoyer là-bas le
@@ -214,7 +206,7 @@ function Chiffres() {
         null
       ) : (
         <div className="mt-6 grid gap-8">
-          <CartesDuMois chiffres={chiffres} mois={mois} avecMarge={avecMarge} />
+          <CartesDuMois chiffres={chiffres} avecMarge={avecMarge} />
 
           {/* **Le chapeau, et pourquoi il manquait (S55).** Les deux sections
               affichent le même total, à quelques pixels l'une de l'autre, sans
@@ -223,18 +215,12 @@ function Chiffres() {
               pas — c'est un seul mois, coupé deux fois. La phrase le pose avant
               que la question se forme. */}
           <div className="grid gap-8">
-            <p className="max-w-prose text-corps text-encre-doux">
-              Les deux découpages ci-dessous portent sur le <strong className="font-semibold text-encre">même
-              total</strong> — {formaterMontant(totalDesVentes)} vendus en {libelleMois(mois)}. Le premier dit
-              où, le second comment : ils ne s’additionnent pas.
-            </p>
 
             <Repartition
               id="titre-par-boutique"
               titre="Par boutique"
               parts={parBoutique}
               unite="moto"
-              seule="Seule boutique à avoir vendu ce mois-ci."
             />
 
             <Repartition
@@ -242,13 +228,7 @@ function Chiffres() {
               titre="Par mode de paiement"
               parts={parMode}
               unite="vente"
-              seule="Seul mode de paiement employé ce mois-ci."
             >
-              <p className="mt-4 max-w-prose text-corps text-encre-doux">
-                «&nbsp;Crédit&nbsp;» et «&nbsp;tranches&nbsp;» ne se totalisent pas ensemble&nbsp;:
-                dans un cas le client doit de l’argent au magasin, dans l’autre le magasin détient
-                de l’argent et retient la moto.
-              </p>
             </Repartition>
           </div>
         </div>

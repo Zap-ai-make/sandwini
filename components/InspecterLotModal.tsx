@@ -161,9 +161,7 @@ export function InspecterLotModal({
           <EtatErreurSaisie message={erreur} />
 
           {vide ? (
-            <p className="cadre p-6 text-center text-encre-doux">
-              Ce lot ne porte aucune moto. Vous pouvez le supprimer.
-            </p>
+            null
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full border-collapse text-sm">

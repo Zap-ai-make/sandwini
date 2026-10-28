@@ -19,10 +19,6 @@ export default function HorsLigne() {
       <h1 className="text-2xl font-semibold tracking-tight text-encre">
         Cet écran n’a pas encore été ouvert sur cet appareil
       </h1>
-      <p className="mt-3 text-encre-doux">
-        Il n’est donc pas en mémoire, et le réseau est coupé. Les écrans déjà utilisés restent
-        accessibles, et vos saisies en attente partiront dès le retour du réseau — rien n’est perdu.
-      </p>
       <Link
         href="/dashboard"
         className="bouton bouton-principal mt-6 self-start"

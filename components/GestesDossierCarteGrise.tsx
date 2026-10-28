@@ -228,11 +228,6 @@ export function LigneModale({
             Annuler
           </button>
 
-          {correction && !fini && (
-            <p className="ml-auto text-legende text-encre-doux">
-              « Terminer » date le retrait d’aujourd’hui et range la ligne dans Retrait.
-            </p>
-          )}
         </div>
       }
     >

@@ -161,14 +161,6 @@ export function DeplacerMotoModal({
           />
         </Champ>
 
-        {/* La conséquence s'annonce avant le geste, pas après. */}
-        {choisie && (
-          <p className="rounded-plaque border border-bord bg-fond p-3 text-corps text-encre-doux">
-            Elle sortira du stock de <span className="plaque-code">{moto.boutiqueId}</span> et
-            entrera dans celui de <span className="plaque-code">{choisie.code}</span> — {choisie.nom}
-            . Les deux boutiques garderont la trace du déplacement.
-          </p>
-        )}
 
         <p className="flex gap-2 text-corps text-encre-doux">
           <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />

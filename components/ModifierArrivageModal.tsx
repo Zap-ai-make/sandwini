@@ -190,19 +190,11 @@ export function ModifierArrivageModal({
           </h3>
 
           {stock === null ? (
-            <p className="mt-2 text-corps text-encre-doux">
-              Les motos du lot n’ont pas fini d’arriver. L’entête se corrige déjà.
-            </p>
+            null
           ) : motosDuLot.length === 0 ? (
-            <p className="mt-2 text-corps text-encre-doux">
-              Ce lot ne porte aucune moto : il n’y a rien à corriger ici.
-            </p>
+            null
           ) : (
             <>
-              <p className="mt-1 max-w-prose text-corps text-encre-doux">
-                Ce qui décrit la moto se reprend ici. Ce qui lui est arrivé — vendue, papiers
-                reçus, scans — se corrige sur sa fiche.
-              </p>
               <GrilleMotos
                 lignes={lignes}
                 marques={marques}
