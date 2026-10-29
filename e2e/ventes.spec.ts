@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   attendreLaFileVide,
-  choisirSegment,
+  choisirDansLaListe,
   bandeauEtat,
   contenu,
   creerClientDepuisLeFichier,
@@ -132,7 +132,7 @@ test.describe("enregistrer une vente", () => {
        convenu en entier », et une recherche par sous-chaîne résolvait les deux
        champs à la fois. */
     await expect(page.getByLabel("Prix convenu", { exact: true })).toHaveValue("1200000");
-    await choisirSegment(page, "Mode de paiement", "Payé");
+    await choisirDansLaListe(page, "Mode de paiement", "Payé");
     await page.getByLabel(/Montant reçu/).fill("1200000");
 
     // Le récapitulatif dit ce qui sera écrit, avant qu'on valide.
@@ -193,7 +193,7 @@ test.describe("enregistrer une vente", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Crédit");
+    await choisirDansLaListe(page, "Mode de paiement", "Crédit");
     await page.getByLabel(/Montant reçu/).fill("400000");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
@@ -235,7 +235,7 @@ test.describe("enregistrer une vente", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Payé");
+    await choisirDansLaListe(page, "Mode de paiement", "Payé");
     await page.getByLabel(/Montant reçu/).fill("600000");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
@@ -250,7 +250,7 @@ test.describe("enregistrer une vente", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Crédit");
+    await choisirDansLaListe(page, "Mode de paiement", "Crédit");
     await page.getByLabel(/Montant reçu/).fill("1500000");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
@@ -334,9 +334,9 @@ test.describe("enregistrer une vente", () => {
 
     /* Le cœur du défaut signalé : choisir un mode, puis un moyen, ne doit rien
        effacer de ce qui est déjà tapé — ni laisser le groupe sans réponse. */
-    await choisirSegment(page, "Mode de paiement", "Tranches");
+    await choisirDansLaListe(page, "Mode de paiement", "Tranches");
     await expect(modale.getByLabel("Nom", { exact: true })).toHaveValue(nom);
-    await expect(page.getByRole("radio", { name: "Tranches" })).toBeChecked();
+    await expect(page.getByLabel("Mode de paiement", { exact: true })).toHaveValue("tranches");
     /* **Visible, et pas seulement présent.** Le défaut que cette ligne garde ne
        retirait rien du DOM : le radio `sr-only`, absolu sous une étiquette non
        positionnée, prenait le cadre de la modale pour bloc conteneur et
@@ -347,10 +347,10 @@ test.describe("enregistrer une vente", () => {
     await expect(modale.getByLabel("Nom", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Enregistrer la vente" })).toBeVisible();
 
-    await choisirSegment(page, "Moyen de paiement", "Orange Money");
+    await choisirDansLaListe(page, "Moyen de paiement", "Orange Money");
     await expect(modale.getByLabel("Nom", { exact: true })).toHaveValue(nom);
     await expect(modale.getByLabel("Téléphone", { exact: true })).toHaveValue(telephone);
-    await expect(page.getByRole("radio", { name: "Orange Money" })).toBeChecked();
+    await expect(page.getByLabel("Moyen de paiement", { exact: true })).toHaveValue("orange_money");
     await expect(modale.getByLabel("Nom", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Enregistrer la vente" })).toBeVisible();
 
@@ -381,7 +381,7 @@ test.describe("enregistrer une vente", () => {
     await expect(casque).toBeChecked();
     await casque.uncheck();
 
-    await choisirSegment(page, "Mode de paiement", "Crédit");
+    await choisirDansLaListe(page, "Mode de paiement", "Crédit");
     await page.getByLabel(/Montant reçu/).fill("0");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
     await expect(contenu(page).getByRole("status")).toContainText("Vente enregistrée", {
@@ -402,7 +402,7 @@ test.describe("enregistrer une vente", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Crédit");
+    await choisirDansLaListe(page, "Mode de paiement", "Crédit");
     await page.getByLabel(/Montant reçu/).fill("500000");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
     await expect(contenu(page).getByRole("status")).toContainText("Vente enregistrée", {
@@ -436,7 +436,7 @@ test.describe("enregistrer une vente", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Payé");
+    await choisirDansLaListe(page, "Mode de paiement", "Payé");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
     await expect(contenu(page).getByRole("status")).toContainText("Vente enregistrée", {
       timeout: 20_000,
@@ -504,7 +504,7 @@ test.describe("crédit et tranches ne font pas la même chose", () => {
 
     await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
     await choisirMotoEtClient(page, chassis, client);
-    await choisirSegment(page, "Mode de paiement", "Tranches");
+    await choisirDansLaListe(page, "Mode de paiement", "Tranches");
     await page.getByLabel(/Montant reçu/).fill("300000");
 
     const recap = page.getByRole("region", { name: "Récapitulatif de la vente" });
@@ -617,7 +617,7 @@ test.describe("la marge est réservée au responsable", () => {
       timeout: 30_000,
     });
     await choisirMotoEtClient(pageGerant, chassis, client);
-    await choisirSegment(pageGerant, "Mode de paiement", "Payé");
+    await choisirDansLaListe(pageGerant, "Mode de paiement", "Payé");
     await pageGerant.getByLabel(/Montant reçu/).fill("1200000");
     await pageGerant.getByRole("button", { name: "Enregistrer la vente" }).click();
     await expect(contenu(pageGerant).getByRole("status")).toContainText("Vente enregistrée", {
@@ -704,7 +704,7 @@ test.describe("hors ligne", () => {
       new RegExp(`^${terrain.code}-\\d{4}-\\d{4}$`),
     );
 
-    await choisirSegment(page, "Mode de paiement", "Tranches");
+    await choisirDansLaListe(page, "Mode de paiement", "Tranches");
     await page.getByLabel(/Montant reçu/).fill("250000");
     await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 

@@ -132,7 +132,7 @@ export function DeplacerMotosModal({
         </div>
       }
     >
-      <div className="colonne-formulaire space-y-4">
+      <div className="colonne-formulaire rangee-champs">
         <Champ id="vers-boutique" libelle="Boutique de destination">
           <select
             id="vers-boutique"

@@ -24,22 +24,30 @@ import type { ReactNode } from "react";
  * `facultatif` marque le facultatif, pas l’obligatoire. Sur un formulaire dont
  * presque tout est requis, l’astérisque partout ne dit plus rien ; c’est
  * l’exception qui mérite le mot.
+ *
+ * **Dix-huit rem au plus** (29 octobre 2026). Le commanditaire trouvait les
+ * champs trop longs : un nom ou un montant n'a pas besoin de la largeur de
+ * l'écran. La borne est sur le champ, et non sur sa saisie, pour que des champs
+ * posés dans une `.rangee-champs` se rangent côte à côte d'eux-mêmes. `large`
+ * la lève — une barre de recherche garde sa longueur.
  */
 export function Champ({
   id,
   libelle,
   facultatif = false,
   erreur,
+  large = false,
   children,
 }: {
   id: string;
   libelle: string;
   facultatif?: boolean;
   erreur?: string | null;
+  large?: boolean;
   children: ReactNode;
 }) {
   return (
-    <div>
+    <div className={large ? "champ w-full" : "champ w-full max-w-72"}>
       <label htmlFor={id} className="block font-medium text-encre">
         {libelle}
         {facultatif && <span className="font-normal text-encre-doux"> (facultatif)</span>}

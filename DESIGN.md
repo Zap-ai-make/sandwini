@@ -94,6 +94,14 @@ La typo porte la personnalité de la page — ce n'est pas un véhicule neutre p
 - Hiérarchie claire : on sait où regarder en premier, deuxième, troisième.
 - Résilient au contenu réel : la mise en page tient avec du contenu court, moyen, et très long. Formats de dates/nombres/devises adaptés à la locale.
 
+**Arbitrage du commanditaire (29 octobre 2026) : des champs courts, côte à côte.** « Mets-les côte à côte et diminue les champs, sauf les barres de recherche. » Concrètement :
+- un champ mesure **18 rem au plus** (`Champ`, et `.saisie` pour les saisies posées sans lui) ; la barre de recherche (`type="search"`, `Champ large`) et la zone de texte gardent leur longueur ;
+- des champs qui se suivent vont dans une **`.rangee-champs`** : ils se rangent côte à côte et s'enroulent quand la place manque ; un avis, un groupe de cases ou un bouton y garde sa ligne entière ;
+- un choix parmi une liste fermée de valeurs (mode, moyen de paiement) est une **liste déroulante**, pas une rangée de boutons ;
+- des cases à cocher indépendantes se posent côte à côte, à la largeur de leur mot.
+
+Cela remplace « un champ par ligne » de `CAHIER-UI.md` §8.3.
+
 ---
 
 ## 7. Composants : réutiliser plutôt que réécrire

@@ -86,7 +86,7 @@ export function FournisseurModal({
             soumettre();
           }
         }}
-        className="space-y-4"
+        className="rangee-champs"
       >
         <Champ id="f-nom" libelle="Nom">
           <input

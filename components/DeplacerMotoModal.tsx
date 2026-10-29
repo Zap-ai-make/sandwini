@@ -116,7 +116,7 @@ export function DeplacerMotoModal({
         </div>
       }
     >
-      <div className="space-y-4">
+      <div className="rangee-champs">
         {/* La moto visée, en toutes lettres : un châssis se confond avec le
             suivant à deux caractères près. */}
         <div className="rounded-plaque border border-bord bg-fond p-3">

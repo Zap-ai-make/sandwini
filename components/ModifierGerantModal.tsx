@@ -117,7 +117,7 @@ export function ModifierGerantModal({
             void soumettre();
           }
         }}
-        className="space-y-4"
+        className="rangee-champs"
       >
         <p className="flex gap-2 text-corps text-encre-doux">
           <CircleAlert aria-hidden="true" className="mt-0.5 size-4 shrink-0" />

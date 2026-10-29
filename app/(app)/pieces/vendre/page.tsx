@@ -250,7 +250,7 @@ function VendrePieces() {
           <legend className="px-1 font-semibold text-encre">Les pièces</legend>
 
           <div className="mt-2">
-            <Champ id="chercher-piece" libelle="Chercher une pièce">
+            <Champ id="chercher-piece" libelle="Chercher une pièce" large>
               <input
                 id="chercher-piece"
                 type="search"

@@ -209,7 +209,7 @@ function ChampsBoutique({
   prefixe: string;
 }) {
   return (
-    <div className="colonne-formulaire mt-4 max-w-[40rem] space-y-4">
+    <div className="colonne-formulaire rangee-champs mt-4 max-w-[40rem]">
       <Champ id={`${prefixe}-nom`} libelle="Nom de la boutique">
         <input
           id={`${prefixe}-nom`}

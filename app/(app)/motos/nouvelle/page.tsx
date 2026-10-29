@@ -211,7 +211,7 @@ export default function PageNouvelleMoto() {
               le comportement de la marque ; ce qui reste vrai — un modèle
               appartient à une marque (S40) — est dit par l'invite, avant le
               geste, et non par un champ éteint. */}
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <div className="mt-4 rangee-champs">
             <ChoixOuNouveau
               id="marque"
               libelle="Marque"
@@ -247,40 +247,38 @@ export default function PageNouvelleMoto() {
               enAttente={!saisie.marqueId}
               creer={(nom, auteur) => creerModele(saisie.marqueId, nom, auteur)}
             />
-          </div>
 
-          <div className="mt-4">
-            <label htmlFor="chassis" className="block text-sm font-medium text-encre">
-              Numéro de châssis
-            </label>
-            <input
-              id="chassis"
-              value={saisie.numeroChassis}
-              maxLength={LONGUEUR_CHASSIS_MAX + 8}
-              autoCapitalize="characters"
-              autoComplete="off"
-              onChange={(evenement) => changer({ numeroChassis: evenement.target.value })}
-              className="plaque-code saisie mt-1.5"
-            />
-          </div>
+            <div className="champ w-full max-w-72">
+              <label htmlFor="chassis" className="block text-sm font-medium text-encre">
+                Numéro de châssis
+              </label>
+              <input
+                id="chassis"
+                value={saisie.numeroChassis}
+                maxLength={LONGUEUR_CHASSIS_MAX + 8}
+                autoCapitalize="characters"
+                autoComplete="off"
+                onChange={(evenement) => changer({ numeroChassis: evenement.target.value })}
+                className="plaque-code saisie mt-1.5"
+              />
+            </div>
 
-          <div className="mt-4">
-            <label htmlFor="moteur" className="block text-sm font-medium text-encre">
-              Numéro de moteur <span className="font-normal text-encre-doux">(facultatif)</span>
-            </label>
-            <input
-              id="moteur"
-              value={saisie.numeroMoteur}
-              maxLength={LONGUEUR_CHASSIS_MAX + 8}
-              autoCapitalize="characters"
-              autoComplete="off"
-              onChange={(evenement) => changer({ numeroMoteur: evenement.target.value })}
-              className="plaque-code saisie mt-1.5"
-            />
-          </div>
+            <div className="champ w-full max-w-72">
+              <label htmlFor="moteur" className="block text-sm font-medium text-encre">
+                Numéro de moteur <span className="font-normal text-encre-doux">(facultatif)</span>
+              </label>
+              <input
+                id="moteur"
+                value={saisie.numeroMoteur}
+                maxLength={LONGUEUR_CHASSIS_MAX + 8}
+                autoCapitalize="characters"
+                autoComplete="off"
+                onChange={(evenement) => changer({ numeroMoteur: evenement.target.value })}
+                className="plaque-code saisie mt-1.5"
+              />
+            </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
-            <div>
+            <div className="champ w-full max-w-72">
               <label htmlFor="couleur" className="block text-sm font-medium text-encre">
                 Couleur <span className="font-normal text-encre-doux">(facultatif)</span>
               </label>
@@ -292,7 +290,7 @@ export default function PageNouvelleMoto() {
                 className="saisie mt-1.5"
               />
             </div>
-            <div>
+            <div className="champ w-full max-w-72">
               <label htmlFor="annee" className="block text-sm font-medium text-encre">
                 Année <span className="font-normal text-encre-doux">(facultatif)</span>
               </label>
@@ -305,13 +303,11 @@ export default function PageNouvelleMoto() {
                 className="saisie mt-1.5"
               />
             </div>
-          </div>
 
-          {/* La provenance n'est pas un montant : c'est d'où vient la moto, et
-              le gérant le sait mieux que personne. Elle vivait dans le bloc des
-              coûts alors qu'elle est stockée sur le document public — S39 la
-              remet là où elle appartient. */}
-          <div className="mt-4">
+            {/* La provenance n'est pas un montant : c'est d'où vient la moto, et
+                le gérant le sait mieux que personne. Elle vivait dans le bloc des
+                coûts alors qu'elle est stockée sur le document public — S39 la
+                remet là où elle appartient. */}
             <ChoixOuNouveau
               id="provenance"
               libelle="Provenance"

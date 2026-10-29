@@ -244,18 +244,16 @@ function Champs({
   prefixe: string;
 }) {
   return (
-    <div className="colonne-formulaire max-w-[40rem] space-y-4">
-      <div className="mt-4">
-        <Champ id={`${prefixe}-nom`} libelle="Nom">
-          <input
-            id={`${prefixe}-nom`}
-            value={saisie.nom}
-            maxLength={LONGUEUR_NOM_MAX}
-            onChange={(evenement) => changer({ nom: evenement.target.value })}
-            className="saisie"
-          />
-        </Champ>
-      </div>
+    <div className="colonne-formulaire rangee-champs mt-4 max-w-[40rem]">
+      <Champ id={`${prefixe}-nom`} libelle="Nom">
+        <input
+          id={`${prefixe}-nom`}
+          value={saisie.nom}
+          maxLength={LONGUEUR_NOM_MAX}
+          onChange={(evenement) => changer({ nom: evenement.target.value })}
+          className="saisie"
+        />
+      </Champ>
 
       <Champ id={`${prefixe}-telephone`} libelle="Téléphone">
         <input

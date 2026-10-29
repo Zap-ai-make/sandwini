@@ -216,7 +216,7 @@ function CorpsArrivageModal({
       <div className="space-y-6">
         <fieldset className="cadre p-4">
           <legend className="px-1 font-semibold text-encre">L’arrivage</legend>
-          <div className="mt-2 colonne-formulaire">
+          <div className="mt-2 colonne-formulaire rangee-champs">
             <Champ
               id="arr-nom"
               libelle="Nom de l’arrivage"
@@ -244,27 +244,25 @@ function CorpsArrivageModal({
               auteur={auteur}
             />
 
-            <div className="grid gap-3 sm:grid-cols-2">
-              <Champ id="arr-date" libelle="Date d’arrivée" facultatif>
-                <input
-                  id="arr-date"
-                  type="date"
-                  value={saisie.date}
-                  onChange={(evenement) => changer({ date: evenement.target.value })}
-                  className="saisie"
-                />
-              </Champ>
-              <Champ id="arr-desc" libelle="Description" facultatif>
-                <input
-                  id="arr-desc"
-                  value={saisie.description}
-                  maxLength={LONGUEUR_DESCRIPTION_MAX}
-                  placeholder="Ex. dédouanement du 12 mars"
-                  onChange={(evenement) => changer({ description: evenement.target.value })}
-                  className="saisie"
-                />
-              </Champ>
-            </div>
+            <Champ id="arr-date" libelle="Date d’arrivée" facultatif>
+              <input
+                id="arr-date"
+                type="date"
+                value={saisie.date}
+                onChange={(evenement) => changer({ date: evenement.target.value })}
+                className="saisie"
+              />
+            </Champ>
+            <Champ id="arr-desc" libelle="Description" facultatif>
+              <input
+                id="arr-desc"
+                value={saisie.description}
+                maxLength={LONGUEUR_DESCRIPTION_MAX}
+                placeholder="Ex. dédouanement du 12 mars"
+                onChange={(evenement) => changer({ description: evenement.target.value })}
+                className="saisie"
+              />
+            </Champ>
           </div>
         </fieldset>
 
@@ -285,7 +283,7 @@ function CorpsArrivageModal({
               )}
             </legend>
 
-            <div className="mt-2 grid gap-3 sm:grid-cols-2">
+            <div className="mt-2 rangee-champs">
               <ChoixOuNouveau
                 id={`arr-marque-${index}`}
                 libelle="Marque"

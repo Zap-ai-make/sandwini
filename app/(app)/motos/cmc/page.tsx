@@ -244,29 +244,27 @@ function RetraitModale({
         </div>
       }
     >
-      <div className="colonne-formulaire space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Champ id="cmc-nom" libelle="Nom">
-            <input
-              id="cmc-nom"
-              value={saisie.nom}
-              maxLength={LONGUEUR_NOM_MAX}
-              autoComplete="off"
-              onChange={(evenement) => changer({ nom: evenement.target.value })}
-              className="saisie"
-            />
-          </Champ>
-          <Champ id="cmc-prenom" libelle="Prénom" facultatif>
-            <input
-              id="cmc-prenom"
-              value={saisie.prenom}
-              maxLength={LONGUEUR_NOM_MAX}
-              autoComplete="off"
-              onChange={(evenement) => changer({ prenom: evenement.target.value })}
-              className="saisie"
-            />
-          </Champ>
-        </div>
+      <div className="colonne-formulaire rangee-champs">
+        <Champ id="cmc-nom" libelle="Nom">
+          <input
+            id="cmc-nom"
+            value={saisie.nom}
+            maxLength={LONGUEUR_NOM_MAX}
+            autoComplete="off"
+            onChange={(evenement) => changer({ nom: evenement.target.value })}
+            className="saisie"
+          />
+        </Champ>
+        <Champ id="cmc-prenom" libelle="Prénom" facultatif>
+          <input
+            id="cmc-prenom"
+            value={saisie.prenom}
+            maxLength={LONGUEUR_NOM_MAX}
+            autoComplete="off"
+            onChange={(evenement) => changer({ prenom: evenement.target.value })}
+            className="saisie"
+          />
+        </Champ>
 
         <Champ
           id="cmc-telephone"

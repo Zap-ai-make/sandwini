@@ -611,7 +611,7 @@ function FormulaireVersement({
         </p>
       )}
 
-      <div className="space-y-3">
+      <div className="rangee-champs">
         <Champ
           id="montant-versement"
           libelle="Montant reçu"

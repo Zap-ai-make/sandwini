@@ -375,23 +375,15 @@ export async function ouvrirLaVente(
 }
 
 /**
- * Choisit une option dans un groupe segmenté (`components/patrons/Segmente`).
+ * Choisit une option dans une liste déroulante de la modale de vente.
  *
- * **On clique l'étiquette, pas le bouton radio.** Le radio y est `sr-only` —
- * un carré d'un pixel que Playwright refuse de cliquer, parce que le point
- * qu'il vise tombe sur le cadre qui le recouvre. C'est déjà la convention du
- * dépôt pour les deux radios de `PanneauPiece` (`pieces.spec.ts`), et c'est
- * aussi le geste réel : personne ne vise un pixel, on touche le segment.
- *
- * Le groupe est nommé parce que la modale de vente en porte deux — le mode et
- * le moyen de paiement — et que « Espèces » ne doit pas se chercher dans le
- * mauvais.
+ * Le mode et le moyen de paiement étaient des groupes segmentés ; ce sont des
+ * `<select>` depuis le 29 octobre 2026, à la demande du commanditaire. On les
+ * vise par leur intitulé, et l'option par le mot affiché — « Payé », « Orange
+ * Money » —, comme le ferait la personne au comptoir.
  */
-export async function choisirSegment(page: Page, groupe: string, option: string) {
-  await page
-    .getByRole("radiogroup", { name: groupe })
-    .getByText(option, { exact: true })
-    .click();
+export async function choisirDansLaListe(page: Page, liste: string, option: string) {
+  await page.getByLabel(liste, { exact: true }).selectOption({ label: option });
 }
 
 export async function vendre(
@@ -421,7 +413,7 @@ export async function vendre(
   await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
   await ouvrirLaVente(page, { chassis, client });
   await page.getByLabel("Prix convenu", { exact: true }).fill(options.prix);
-  await choisirSegment(page, "Mode de paiement", options.mode);
+  await choisirDansLaListe(page, "Mode de paiement", options.mode);
   await page.getByLabel(/Montant reçu/).fill(options.encaisse);
   await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
@@ -507,7 +499,7 @@ export async function vendreDansLeTerrain(
   await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
   await ouvrirLaVente(page, { chassis, client });
   await page.getByLabel("Prix convenu", { exact: true }).fill("1200000");
-  await choisirSegment(page, "Mode de paiement", options.mode ?? "Crédit");
+  await choisirDansLaListe(page, "Mode de paiement", options.mode ?? "Crédit");
   await page.getByLabel(/Montant reçu/).fill("400000");
   await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 

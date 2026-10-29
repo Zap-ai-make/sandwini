@@ -143,7 +143,7 @@ export function ModifierArrivageModal({
             s'élargit pour la grille : un champ « Nom » étiré sur 78rem ne se
             lit pas. La borne est posée ici, sur la mise en page, et non sur le
             champ — c'est ce que dit `globals.css` au sujet de la colonne. */}
-        <div className="colonne-formulaire max-w-2xl space-y-4">
+        <div className="colonne-formulaire rangee-champs max-w-2xl">
           <Champ id="mod-nom" libelle="Nom de l’arrivage">
             <input
               id="mod-nom"
@@ -162,26 +162,24 @@ export function ModifierArrivageModal({
             auteur={auteur}
           />
 
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Champ id="mod-date" libelle="Date d’arrivée" facultatif>
-              <input
-                id="mod-date"
-                type="date"
-                value={saisie.date}
-                onChange={(evenement) => changer({ date: evenement.target.value })}
-                className="saisie"
-              />
-            </Champ>
-            <Champ id="mod-desc" libelle="Description" facultatif>
-              <input
-                id="mod-desc"
-                value={saisie.description}
-                maxLength={LONGUEUR_DESCRIPTION_MAX}
-                onChange={(evenement) => changer({ description: evenement.target.value })}
-                className="saisie"
-              />
-            </Champ>
-          </div>
+          <Champ id="mod-date" libelle="Date d’arrivée" facultatif>
+            <input
+              id="mod-date"
+              type="date"
+              value={saisie.date}
+              onChange={(evenement) => changer({ date: evenement.target.value })}
+              className="saisie"
+            />
+          </Champ>
+          <Champ id="mod-desc" libelle="Description" facultatif>
+            <input
+              id="mod-desc"
+              value={saisie.description}
+              maxLength={LONGUEUR_DESCRIPTION_MAX}
+              onChange={(evenement) => changer({ description: evenement.target.value })}
+              className="saisie"
+            />
+          </Champ>
         </div>
 
         <section aria-labelledby="titre-motos-lot">

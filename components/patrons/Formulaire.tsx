@@ -4,10 +4,12 @@ import type { ReactNode } from "react";
  * L’écran de formulaire : une colonne, un aparté, une barre d’action.
  *
  * `CAHIER-UI.md` §8.3 le décrit en trois exigences, et les trois sont ici :
- * **une colonne** pour la saisie — jamais deux champs côte à côte s’ils se
- * lisent en séquence ; **la conséquence annoncée avant la validation** — c’est
- * le rôle de l’aparté ; **le bouton visible** — un formulaire long ne cache pas
- * sa validation à deux mille pixels de défilement (§7).
+ * **une colonne** pour la saisie ; **la conséquence annoncée avant la
+ * validation** — c’est le rôle de l’aparté ; **le bouton visible** — un
+ * formulaire long ne cache pas sa validation à deux mille pixels de défilement
+ * (§7). Dans la colonne, les champs se rangent désormais côte à côte
+ * (`.rangee-champs`, arbitrage du 29 octobre 2026, `DESIGN.md` §6) : la
+ * colonne de 40 rem en tient deux de 18 rem.
  *
  * **La place à droite ne sert pas à étirer les champs.** C’est tout le point :
  * en retirant `max-w-3xl`, S28 a rendu la zone de travail à sa largeur, et les

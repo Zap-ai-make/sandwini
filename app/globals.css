@@ -1607,19 +1607,14 @@
   .saisie {
     height: 2.375rem;
     width: 100%;
-    /* Aucune borne ici, et c'est le sujet de cette dette. `.saisie` en portait
-       une de 32 rem, qui protégeait cinq écrans sans colonne — l'entrée en
-       stock, le fichier clients, la fiche client, les référentiels, la
-       connexion. Elle les protégeait en contraignant les vingt autres, y
-       compris ceux dont la mise en page tenait déjà sa largeur : la borne
-       vivait sur le contrôle alors que la question appartient à l'écran, et un
-       champ ne sait pas de quelle place il dispose.
-
-       Les cinq tiennent désormais leur colonne, et la borne est levée. La
-       largeur se pose là où on la voit : `.colonne-formulaire` sur la mise en
-       page, `sm:max-w-80` sur une recherche. Un champ qui s'étire à nouveau
-       est un écran à qui l'on a oublié sa colonne, et cela se voit sur une
-       capture — pas une règle globale à rétablir. */
+    /* **La borne revient, à 18 rem, par arbitrage du commanditaire** (29
+       octobre 2026) : « diminue les champs trop longs, sauf les barres de
+       recherche ». Elle avait été levée parce qu'elle vivait sur le contrôle
+       plutôt que sur l'écran ; c'est désormais `Champ` qui la porte, et elle
+       n'est répétée ici que pour les saisies posées sans lui. La recherche et
+       la zone de texte en sont exemptées plus bas : l'une se lit sur sa
+       longueur, l'autre s'écrit sur plusieurs lignes. */
+    max-width: 18rem;
     padding-inline: 0.75rem;
     border: 1px solid var(--color-bord-fort);
     border-radius: var(--radius-champ);
@@ -1632,6 +1627,36 @@
   textarea.saisie {
     height: auto;
     padding-block: 0.5rem;
+    max-width: none;
+  }
+
+  .saisie[type="search"] {
+    max-width: none;
+  }
+
+  /* --------------------------------------------------------------------------
+     Une rangée de champs (29 octobre 2026).
+
+     « Mets-les côte à côte, et diminue les champs » : le commanditaire ne veut
+     plus de champs empilés un par ligne quand la place est là. Les champs
+     (`Champ`, borné à 18 rem) s'y suivent et s'enroulent ; tout le reste — un
+     avis, un groupe de cases, un bouton — garde sa ligne entière, sans quoi
+     il se tasserait entre deux champs. 18 rem et non 20 : deux champs et leur
+     gouttière tiennent alors dans la colonne de 40 rem d'un formulaire.
+     -------------------------------------------------------------------------- */
+  .rangee-champs {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .rangee-champs > * {
+    flex-basis: 100%;
+  }
+
+  .rangee-champs > .champ {
+    flex-basis: auto;
   }
 
   .saisie[aria-invalid="true"] {

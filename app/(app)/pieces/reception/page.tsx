@@ -140,6 +140,7 @@ function Reception() {
             <Champ
               id="chercher-piece-reception"
               libelle="Chercher une pièce"
+              large
             >
               <input
                 id="chercher-piece-reception"

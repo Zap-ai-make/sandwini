@@ -178,7 +178,9 @@ export function ChoixOuNouveau({
 
   if (saisieOuverte) {
     return (
-      <Champ id={`${id}-nouveau`} libelle={`${nouveau} ${singulier}`} erreur={erreur}>
+      /* Large : le champ et ses deux boutons tiennent sur une ligne. La
+         saisie, elle, reste bornée par `.saisie`. */
+      <Champ id={`${id}-nouveau`} libelle={`${nouveau} ${singulier}`} erreur={erreur} large>
         <div className="flex flex-wrap gap-2">
           <input
             ref={champ}

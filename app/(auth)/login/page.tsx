@@ -186,7 +186,10 @@ export default function Connexion() {
                 </Avis>
               )}
 
-              <Champ id="email" libelle="Adresse e-mail">
+              {/* À la largeur de la carte, et non à celle des autres champs :
+                  la carte est déjà étroite, et une saisie plus courte que le
+                  bouton en dessous aurait l'air coupée. */}
+              <Champ id="email" libelle="Adresse e-mail" large>
                 <input
                   id="email"
                   name="email"
@@ -196,11 +199,11 @@ export default function Connexion() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="saisie"
+                  className="saisie max-w-none"
                 />
               </Champ>
 
-              <Champ id="mot-de-passe" libelle="Mot de passe">
+              <Champ id="mot-de-passe" libelle="Mot de passe" large>
                 <input
                   id="mot-de-passe"
                   name="mot-de-passe"
@@ -209,7 +212,7 @@ export default function Connexion() {
                   required
                   value={motDePasse}
                   onChange={(e) => setMotDePasse(e.target.value)}
-                  className="saisie"
+                  className="saisie max-w-none"
                 />
               </Champ>
 

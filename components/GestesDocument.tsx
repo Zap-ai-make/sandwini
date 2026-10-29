@@ -217,7 +217,7 @@ function FormulaireDepot({
         </p>
       ) : (
         <>
-          <div className="mt-3">
+          <div className="mt-3 rangee-champs">
             <Champ id={`prestataire-${type}`} libelle="Prestataire">
               <select
                 id={`prestataire-${type}`}
@@ -239,9 +239,7 @@ function FormulaireDepot({
                 ))}
               </select>
             </Champ>
-          </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Champ id={`depose-${type}`} libelle="Date du dépôt">
               <input
                 id={`depose-${type}`}
@@ -261,9 +259,7 @@ function FormulaireDepot({
                 className="saisie"
               />
             </Champ>
-          </div>
 
-          <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <Champ id={`avance-${type}`} libelle="Avance versée">
               <input
                 id={`avance-${type}`}
@@ -274,7 +270,6 @@ function FormulaireDepot({
               />
             </Champ>
           </div>
-
 
           <EtatErreur message={probleme} className="mt-3" />
 

@@ -241,7 +241,7 @@ export function ConfierPaquetModal({
             toutDecocher={() => setCoches(new Set())}
           />
 
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rangee-champs">
             <Champ id="paq-depose" libelle="Date du dépôt">
               <input
                 id="paq-depose"
@@ -261,9 +261,7 @@ export function ConfierPaquetModal({
                 className="saisie"
               />
             </Champ>
-          </div>
 
-          <div className="grid gap-4 sm:grid-cols-2">
             <Champ id="paq-avance" libelle="Avance versée">
               <input
                 id="paq-avance"

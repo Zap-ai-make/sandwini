@@ -198,75 +198,65 @@ export function ChampsClient({
 
   return (
     <>
-      <div className="space-y-4">
-        {/* Le nom et le prénom côte à côte : ce sont deux moitiés d'une même
-            information, et les empiler ferait lire deux questions là où il n'y
-            en a qu'une. C'est la seule paire de l'écran — partout ailleurs,
-            un champ par ligne (`CAHIER-UI.md` §8.3). */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ChampClient
-            id={`${prefixe}-nom`}
-            libelle="Nom"
-            valeur={saisie.nom}
-            maximum={LONGUEUR_NOM_MAX}
-            changer={(nom) => changer({ nom })}
+      {/* **Une rangée, et non plus des paires** (29 octobre 2026). Le nom et
+          le prénom, puis le téléphone et l'adresse, étaient déjà côte à côte ;
+          le commanditaire veut tous les champs ainsi, et plus courts. Ils se
+          suivent dans l'ordre où on les demande au client, et s'enroulent
+          quand la place manque. La note garde sa ligne : elle s'écrit sur
+          plusieurs lignes. */}
+      <div className="rangee-champs">
+        <ChampClient
+          id={`${prefixe}-nom`}
+          libelle="Nom"
+          valeur={saisie.nom}
+          maximum={LONGUEUR_NOM_MAX}
+          changer={(nom) => changer({ nom })}
+        />
+        <ChampClient
+          id={`${prefixe}-prenom`}
+          libelle="Prénom"
+          facultatif
+          valeur={saisie.prenom}
+          maximum={LONGUEUR_NOM_MAX}
+          changer={(prenom) => changer({ prenom })}
+        />
+        <ChampClient
+          id={`${prefixe}-telephone`}
+          libelle="Téléphone"
+          type="tel"
+          valeur={saisie.telephone}
+          maximum={LONGUEUR_TELEPHONE_MAX}
+          changer={(telephone) => changer({ telephone })}
+        />
+        <ChampClient
+          id={`${prefixe}-adresse`}
+          libelle="Adresse"
+          facultatif
+          valeur={saisie.adresse}
+          maximum={LONGUEUR_ADRESSE_MAX}
+          changer={(adresse) => changer({ adresse })}
+        />
+        <ChampClient
+          id={`${prefixe}-telephone2`}
+          libelle="Second téléphone"
+          type="tel"
+          facultatif
+          valeur={saisie.telephone2}
+          maximum={LONGUEUR_TELEPHONE_MAX}
+          changer={(telephone2) => changer({ telephone2 })}
+        />
+        <div>
+          <label htmlFor={`${prefixe}-note`} className="block text-sm font-medium text-encre">
+            Note <span className="font-normal text-encre-doux">(facultatif)</span>
+          </label>
+          <textarea
+            id={`${prefixe}-note`}
+            rows={2}
+            value={saisie.note}
+            maxLength={LONGUEUR_NOTE_MAX}
+            onChange={(evenement) => changer({ note: evenement.target.value })}
+            className="saisie mt-1.5"
           />
-          <ChampClient
-            id={`${prefixe}-prenom`}
-            libelle="Prénom"
-            facultatif
-            valeur={saisie.prenom}
-            maximum={LONGUEUR_NOM_MAX}
-            changer={(prenom) => changer({ prenom })}
-          />
-        </div>
-        {/* **Le téléphone et l'adresse côte à côte, comme le nom et le
-            prénom** (27 octobre 2026) : « divise le champ téléphone comme nom
-            et prénom et mets l'adresse pour le second champ ». Les deux
-            répondent à la même question — où joindre cette personne — et
-            l'adresse remontait du repli, où elle se faisait oublier. */}
-        <div className="grid gap-4 sm:grid-cols-2">
-          <ChampClient
-            id={`${prefixe}-telephone`}
-            libelle="Téléphone"
-            type="tel"
-            valeur={saisie.telephone}
-            maximum={LONGUEUR_TELEPHONE_MAX}
-            changer={(telephone) => changer({ telephone })}
-          />
-          <ChampClient
-            id={`${prefixe}-adresse`}
-            libelle="Adresse"
-            facultatif
-            valeur={saisie.adresse}
-            maximum={LONGUEUR_ADRESSE_MAX}
-            changer={(adresse) => changer({ adresse })}
-          />
-        </div>
-
-        <div className="space-y-4">
-          <ChampClient
-            id={`${prefixe}-telephone2`}
-            libelle="Second téléphone"
-            type="tel"
-            facultatif
-            valeur={saisie.telephone2}
-            maximum={LONGUEUR_TELEPHONE_MAX}
-            changer={(telephone2) => changer({ telephone2 })}
-          />
-          <div>
-            <label htmlFor={`${prefixe}-note`} className="block text-sm font-medium text-encre">
-              Note <span className="font-normal text-encre-doux">(facultatif)</span>
-            </label>
-            <textarea
-              id={`${prefixe}-note`}
-              rows={2}
-              value={saisie.note}
-              maxLength={LONGUEUR_NOTE_MAX}
-              onChange={(evenement) => changer({ note: evenement.target.value })}
-              className="saisie mt-1.5"
-            />
-          </div>
         </div>
       </div>
     </>

@@ -483,7 +483,7 @@ function FormulaireGerant({
     >
     <form id={FORMULAIRE_GERANT} onSubmit={soumettre} noValidate>
 
-      <div className="colonne-formulaire mt-4 max-w-[40rem] space-y-4">
+      <div className="colonne-formulaire rangee-champs mt-4 max-w-[40rem]">
         <Champ id="nom" libelle="Nom">
           <input
             id="nom"
@@ -521,36 +521,33 @@ function FormulaireGerant({
           />
         </Champ>
 
-        <div>
-          <Champ id="boutique-gerant" libelle="Boutique">
-            <select
-              id="boutique-gerant"
-              value={boutiqueId}
-              onChange={(e) => setBoutiqueId(e.target.value)}
-              className="saisie"
-            >
-              <option value="">Aucune pour l’instant</option>
-              {boutiques.map((boutique) => (
-                <option key={boutique.id} value={boutique.id}>
-                  {boutique.code} · {boutique.nom}
-                </option>
-              ))}
-            </select>
-          </Champ>
-          <p className="mt-1 text-corps text-encre-doux">
-            {boutiques.length === 0 ? (
-              <>
-                Aucune boutique ouverte —{" "}
-                <Link href="/parametres/boutiques" className="underline hover:text-encre">
-                  déclarez-en une
-                </Link>{" "}
-                d’abord. Le compte peut aussi être créé maintenant et rattaché plus tard.
-              </>
-            ) : (
-              "Le gérant ne verra que le stock, les ventes et la caisse de cette boutique."
-            )}
+        <Champ id="boutique-gerant" libelle="Boutique">
+          <select
+            id="boutique-gerant"
+            value={boutiqueId}
+            onChange={(e) => setBoutiqueId(e.target.value)}
+            className="saisie"
+          >
+            <option value="">Aucune pour l’instant</option>
+            {boutiques.map((boutique) => (
+              <option key={boutique.id} value={boutique.id}>
+                {boutique.code} · {boutique.nom}
+              </option>
+            ))}
+          </select>
+        </Champ>
+        {/* La raison qui bloque reste ; la phrase d'explication qui
+            l'accompagnait quand une boutique existe est partie avec les
+            autres textes de détail (28 octobre 2026). */}
+        {boutiques.length === 0 && (
+          <p className="text-corps text-encre-doux">
+            Aucune boutique ouverte —{" "}
+            <Link href="/parametres/boutiques" className="underline hover:text-encre">
+              déclarez-en une
+            </Link>{" "}
+            d’abord. Le compte peut aussi être créé maintenant et rattaché plus tard.
           </p>
-        </div>
+        )}
       </div>
 
       <EtatErreurSaisie message={erreur} className="mt-3" />

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 import {
   chassisUnique,
-  choisirSegment,
+  choisirDansLaListe,
   contenu,
   creerClientDepuisLeFichier,
   nomUnique,
@@ -72,7 +72,7 @@ test("captures de la refonte S44", async ({ page }) => {
       await page.getByRole("radio", { name: new RegExp(chassis) }).check();
       await page.getByLabel("Chercher un client").fill(client);
       await page.getByRole("radio", { name: new RegExp(client) }).check();
-      await choisirSegment(page, "Mode de paiement", "Tranches");
+      await choisirDansLaListe(page, "Mode de paiement", "Tranches");
       await page.getByLabel(/Montant reçu/).fill("300000");
       /* **Jamais `fullPage` sur une modale.** Le calque est en position fixe :
          `fullPage` étire la page entière, photographie la feuille à
@@ -111,7 +111,7 @@ test("captures de la refonte S44", async ({ page }) => {
   await page.getByRole("radio", { name: new RegExp(chassis) }).check();
   await page.getByLabel("Chercher un client").fill(client);
   await page.getByRole("radio", { name: new RegExp(client) }).check();
-  await choisirSegment(page, "Mode de paiement", "Crédit");
+  await choisirDansLaListe(page, "Mode de paiement", "Crédit");
   await page.getByLabel(/Montant reçu/).fill("500000");
   await page.getByRole("button", { name: "Enregistrer la vente" }).click();
   await expect(contenu(page).getByRole("status")).toContainText("Vente enregistrée", {

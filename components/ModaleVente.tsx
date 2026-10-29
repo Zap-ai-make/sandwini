@@ -8,7 +8,6 @@ import { Champ } from "@/components/patrons/Champ";
 import { EtatErreur, EtatErreurSaisie, EtatVide } from "@/components/patrons/Etats";
 import { Groupe } from "@/components/patrons/Formulaire";
 import { Modale } from "@/components/patrons/Modale";
-import { Segmente } from "@/components/patrons/Segmente";
 import { useSession } from "@/lib/auth/session";
 import {
   SAISIE_CLIENT_VIDE,
@@ -778,8 +777,11 @@ export function ModaleVente({
             {/* Deux cases fixes, cochées : c'est le cas ordinaire, et le
                 décocher est le geste rare. Ce sont de vraies cases à cocher —
                 les deux sont indépendantes, contrairement au mode de paiement
-                juste en dessous, qui est un choix exclusif. */}
-            <div className="space-y-2">
+                juste en dessous, qui est un choix exclusif. **Côte à côte**,
+                à la largeur de leur mot (29 octobre 2026) : deux bandes
+                pleine largeur pour un mot chacune, c'était de la place prise
+                au formulaire. */}
+            <div className="flex flex-wrap gap-3">
               <Case
                 id="inclus-carte-grise"
                 libelle={LIBELLE_INCLUSION.carteGrise}
@@ -796,21 +798,34 @@ export function ModaleVente({
           </Groupe>
 
           <Groupe titre="Le paiement">
-            <Segmente
-              libelle="Mode de paiement"
-              valeur={saisie.modePaiement}
-              /* Le montant reçu n'est pas posé ici : c'est `changer` qui tient
-                 la règle, parce qu'elle doit valoir aussi quand le prix bouge
-                 — et parce que le comptant étant le mode par défaut, ce
-                 rappel-ci ne se déclenche pas au cas le plus courant. */
-              changer={(mode: ModePaiement) => changer({ modePaiement: mode })}
-              options={MODES_PAIEMENT.map((mode) => ({
-                valeur: mode,
-                libelle: LIBELLE_MODE[mode],
-              }))}
-            />
+            {/* **Une ligne : le mode, la somme, le moyen** (29 octobre 2026).
+                Le mode et le moyen étaient des rangées de boutons pleine
+                largeur, empilées autour du montant ; le commanditaire les veut
+                en listes déroulantes, alignées avec lui. La rangée s'enroule
+                quand la place manque. */}
+            <div className="rangee-champs">
+              <Champ id="mode-paiement" libelle="Mode de paiement">
+                <select
+                  id="mode-paiement"
+                  value={saisie.modePaiement}
+                  /* Le montant reçu n'est pas posé ici : c'est `changer` qui
+                     tient la règle, parce qu'elle doit valoir aussi quand le
+                     prix bouge — et parce que le comptant étant le mode par
+                     défaut, ce rappel-ci ne se déclenche pas au cas le plus
+                     courant. */
+                  onChange={(evenement) =>
+                    changer({ modePaiement: evenement.target.value as ModePaiement })
+                  }
+                  className="saisie"
+                >
+                  {MODES_PAIEMENT.map((mode) => (
+                    <option key={mode} value={mode}>
+                      {LIBELLE_MODE[mode]}
+                    </option>
+                  ))}
+                </select>
+              </Champ>
 
-            <div className="mt-4 max-w-[16rem]">
               <Champ id="montant-encaisse" libelle="Montant reçu">
                 <input
                   id="montant-encaisse"
@@ -823,21 +838,25 @@ export function ModaleVente({
                   className="plaque-code saisie"
                 />
               </Champ>
-            </div>
 
-            <Segmente
-              className="mt-4"
-              libelle="Moyen de paiement"
-              valeur={saisie.moyenPaiement}
-              changer={(moyen: MoyenPaiement) => changer({ moyenPaiement: moyen })}
-              options={MOYENS_PAIEMENT.map((moyen) => ({
-                valeur: moyen,
-                libelle: LIBELLE_MOYEN[moyen],
-              }))}
-            />
+              <Champ id="moyen-paiement" libelle="Moyen de paiement">
+                <select
+                  id="moyen-paiement"
+                  value={saisie.moyenPaiement}
+                  onChange={(evenement) =>
+                    changer({ moyenPaiement: evenement.target.value as MoyenPaiement })
+                  }
+                  className="saisie"
+                >
+                  {MOYENS_PAIEMENT.map((moyen) => (
+                    <option key={moyen} value={moyen}>
+                      {LIBELLE_MOYEN[moyen]}
+                    </option>
+                  ))}
+                </select>
+              </Champ>
 
-            {saisie.moyenPaiement !== "especes" && (
-              <div className="mt-4">
+              {saisie.moyenPaiement !== "especes" && (
                 <Champ id="reference-paiement" libelle="Référence du transfert" facultatif>
                   <input
                     id="reference-paiement"
@@ -847,8 +866,8 @@ export function ModaleVente({
                     className="plaque-code saisie"
                   />
                 </Champ>
-              </div>
-            )}
+              )}
+            </div>
           </Groupe>
         </div>
 
@@ -1238,7 +1257,7 @@ function Choix({
   );
 }
 
-/** Une case à cocher : indépendante, contrairement au segmenté du mode. */
+/** Une case à cocher : indépendante, contrairement au mode de paiement. */
 function Case({
   id,
   libelle,
@@ -1254,7 +1273,7 @@ function Case({
     <label
       htmlFor={id}
       className={[
-        "flex cursor-pointer items-center gap-3 rounded-champ border px-4 py-3",
+        "inline-flex h-[2.375rem] cursor-pointer items-center gap-2.5 rounded-champ border px-3",
         "has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-encre",
         coche ? "border-encre bg-papier" : "border-bord bg-papier hover:bg-survol",
       ].join(" ")}
@@ -1287,7 +1306,7 @@ function ChampRecherche({
   monospace?: boolean;
 }) {
   return (
-    <Champ id={id} libelle={libelle}>
+    <Champ id={id} libelle={libelle} large>
       <div className="relative">
         <Search
           aria-hidden="true"
