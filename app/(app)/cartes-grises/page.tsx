@@ -3,6 +3,7 @@
 import { PackageCheck, Plus, Search } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
+import { DepotsCartesGrises } from "@/components/DepotsCartesGrises";
 import { GardeEspace } from "@/components/GardeSession";
 import { LigneModale } from "@/components/GestesDossierCarteGrise";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
@@ -12,6 +13,7 @@ import { TetePage } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
 import { normaliserNom } from "@/lib/domain/client";
+import { cleDepot, depotsDeCartesGrises } from "@/lib/domain/depots-carte-grise";
 import {
   aMarquerRecu,
   chercherDossiers,
@@ -70,6 +72,7 @@ function Ecran() {
   const [panneau, setPanneau] = useState<Panneau>("cours");
   const [creation, setCreation] = useState(false);
   const [recherche, setRecherche] = useState("");
+  const [depotChoisi, setDepotChoisi] = useState<string | null>(null);
 
   /**
    * **Toute l'entreprise dès que le périmètre porte le métier.** C'est ce que
@@ -101,9 +104,20 @@ function Ecran() {
   /* **La recherche porte sur les deux onglets à la fois.** C'est la demande, et
      c'est la bonne : celui qui cherche un nom ne sait pas si le papier est
      encore dehors ou déjà rendu — c'est même souvent la question qu'il pose. */
+  const depots = useMemo(() => depotsDeCartesGrises(valeur ?? []), [valeur]);
+  const depot = depots.find((candidat) => candidat.cle === depotChoisi) ?? null;
+
+  /* Un dépôt choisi borne le classeur à ses dossiers, avant la recherche : on
+     cherche alors un nom dans ce paquet-là. Un dépôt disparu — son dernier
+     dossier modifié — ne filtre plus rien. */
   const trouves = useMemo(
-    () => chercherDossiers(valeur ?? [], recherche, normaliserNom),
-    [valeur, recherche],
+    () =>
+      chercherDossiers(
+        depot ? (valeur ?? []).filter((dossier) => cleDepot(dossier) === depot.cle) : (valeur ?? []),
+        recherche,
+        normaliserNom,
+      ),
+    [valeur, recherche, depot],
   );
 
   if (session.statut !== "connecte") return null;
@@ -133,6 +147,10 @@ function Ecran() {
           ) : undefined
         }
       />
+
+      {erreur === null && (
+        <DepotsCartesGrises depots={depots} choisi={depot?.cle ?? null} choisir={setDepotChoisi} />
+      )}
 
       <div className="mt-6">
         <label htmlFor="recherche-dossier" className="block text-sm font-medium text-encre">
@@ -172,43 +190,63 @@ function Ecran() {
           prestataires, elle, reste consultable.
         </ErreurDeLecture>
       ) : (
-        <Onglets
-          className="mt-6"
-          libelle="Les dossiers"
-          valeur={panneau}
-          changer={setPanneau}
-          onglets={[
-            {
-              valeur: "cours",
-              libelle: `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}`,
-              contenu: (
-                <Liste
-                  dossiers={cours}
-                  chargement={valeur === null}
-                  boutiqueId={boutiqueId}
-                  prestataires={connus}
-                  auteur={auteur}
-                  /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
-                     vivent les dossiers partis chez un prestataire. */
-                  permettreRetour
-                />
-              ),
-            },
-            {
-              valeur: "historique",
-              libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
-              contenu: (
-                <Liste
-                  dossiers={termines}
-                  chargement={valeur === null}
-                  boutiqueId={boutiqueId}
-                  prestataires={connus}
-                  auteur={auteur}
-                />
-              ),
-            },
-          ]}
-        />
+        <>
+          {depot && (
+            <div className="mt-6 flex flex-wrap items-center gap-3 rounded-carte border border-bord bg-fond p-3">
+              <p className="text-corps text-encre">
+                Dépôt de{" "}
+                <strong className="font-semibold">
+                  {depot.prestataireNom || "prestataire non noté"}
+                </strong>
+                {depot.deposeLe ? ` du ${formaterDateCourte(depot.deposeLe)}` : ""}
+              </p>
+              <button
+                type="button"
+                onClick={() => setDepotChoisi(null)}
+                className="bouton bouton-discret"
+              >
+                Tout afficher
+              </button>
+            </div>
+          )}
+          <Onglets
+            className="mt-6"
+            libelle="Les dossiers"
+            valeur={panneau}
+            changer={setPanneau}
+            onglets={[
+              {
+                valeur: "cours",
+                libelle: `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}`,
+                contenu: (
+                  <Liste
+                    dossiers={cours}
+                    chargement={valeur === null}
+                    boutiqueId={boutiqueId}
+                    prestataires={connus}
+                    auteur={auteur}
+                    /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
+                       vivent les dossiers partis chez un prestataire. */
+                    permettreRetour
+                  />
+                ),
+              },
+              {
+                valeur: "historique",
+                libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
+                contenu: (
+                  <Liste
+                    dossiers={termines}
+                    chargement={valeur === null}
+                    boutiqueId={boutiqueId}
+                    prestataires={connus}
+                    auteur={auteur}
+                  />
+                ),
+              },
+            ]}
+          />
+        </>
       )}
 
       {creation && boutiqueId !== null && (
