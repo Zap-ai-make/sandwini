@@ -3351,3 +3351,21 @@ un numéro de téléphone**. Le refus se lirait comme un défaut de droits — l
 blocage vécu sur `sandwini` le matin même. La règle accepte donc les deux champs
 du jeton **et interdit au client d'y toucher** : on ouvre la serrure sans ouvrir
 la porte, comme `typesACreer`.
+
+## D109 — Le gérant annule et corrige les ventes de sa boutique
+
+*S25, 31 octobre 2026. Revient sur Q4 du 11 septembre 2026 et sur D10.*
+
+Le 11 septembre, le commanditaire avait réservé l'annulation au responsable :
+« un gérant qui peut défaire une vente peut défaire une recette ». Le 31
+octobre, devant la question posée de nouveau — et le rappel de sa réponse
+d'alors —, il a confirmé : **le gérant aussi**, pour les ventes de sa boutique.
+
+Ce qui tient la recette malgré tout, ce sont les trois principes de D10, qui ne
+bougent pas : rien ne s'efface, un versement ne se retouche pas, et chaque
+annulation porte son **motif obligatoire**, son auteur et sa date, lisibles par
+le responsable. Une correction est une annulation suivie d'une nouvelle vente,
+sous un nouveau numéro : il n'existe pas de vente réécrite.
+
+*Conséquence :* les règles accordent l'annulation à `peutVendrePour(boutiqueId)`
+et non à `estResponsable()`. La spec est `specs/S25-annuler-et-corriger-une-vente.md`.
