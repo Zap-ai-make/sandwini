@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
 import { CartesVentes } from "@/components/CartesVentes";
+import { CorrigerVente } from "@/components/CorrigerVente";
 import { FicheVente } from "@/components/FicheVente";
 import { PanneauRecu } from "@/components/PanneauRecu";
 import { PlaqueBoutique } from "@/components/PlaqueBoutique";
@@ -34,6 +35,7 @@ import {
   STATUTS_PAIEMENT,
   bilanVentes,
   chercherVentes,
+  estAnnulee,
   comparerVentes,
   type StatutPaiement,
   type Vente,
@@ -93,6 +95,9 @@ function Ventes() {
      paramètre `nouvelle` est donc ignoré par le cache de précharge — la ligne
      est dans `app/sw.ts`, et l'oubli ne se verrait qu'en coupure. */
   const modaleOuverte = parametres.get("nouvelle") === "1";
+  /* La correction d'une vente (S25) s'ouvre de la même façon, depuis sa fiche
+     — et depuis n'importe quel écran qui la montre. */
+  const corriger = parametres.get("corriger");
   const router = useRouter();
   const { perimetre, chargement: perimetreEnCours } = usePerimetre();
   const toutesBoutiques = perimetre.type === "toutes";
@@ -172,7 +177,13 @@ function Ventes() {
 
   const resultats = useMemo(() => {
     const trouves = chercherVentes(duPerimetre, recherche, normaliserNom);
-    return statut ? trouves.filter((ligne) => ligne.vente.statutPaiement === statut) : trouves;
+    /* Un statut de paiement ne dit rien d'une vente annulée : elle ne paraît
+       que sous « Toutes ». */
+    return statut
+      ? trouves.filter(
+          (ligne) => !estAnnulee(ligne.vente) && ligne.vente.statutPaiement === statut,
+        )
+      : trouves;
   }, [duPerimetre, recherche, statut]);
 
   const colonnes = useMemo<Colonne<Cherchable>[]>(() => {
@@ -271,7 +282,14 @@ function Ventes() {
       {
         cle: "paiement",
         titre: "Paiement",
-        rendu: (ligne) => <PastillePaiement statut={ligne.vente.statutPaiement} />,
+        /* Une vente annulée reste dans la liste, pour être retrouvée (S25) ;
+           sa pastille le dit à la place du paiement, qui ne compte plus. */
+        rendu: (ligne) =>
+          estAnnulee(ligne.vente) ? (
+            <span className="pastille pastille-retard">Annulée</span>
+          ) : (
+            <PastillePaiement statut={ligne.vente.statutPaiement} />
+          ),
       },
     ];
     /* **La colonne « Boutique » revient sur « Toutes les boutiques »** (28
@@ -363,6 +381,17 @@ function Ventes() {
       />
 
       <CartesVentes bilan={bilan} />
+
+      {corriger && (
+        <CorrigerVente
+          id={corriger}
+          onFermer={() =>
+            router.replace(venteOuverte ? `/motos/ventes?vente=${venteOuverte}` : "/motos/ventes", {
+              scroll: false,
+            })
+          }
+        />
+      )}
 
       {modaleOuverte && (
         /* L’assistant ouvre cette modale déjà remplie en passant par l’adresse

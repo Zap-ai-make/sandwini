@@ -19,7 +19,7 @@ import {
 } from "@/lib/domain/chiffres";
 import { peut } from "@/lib/domain/roles";
 import type { Moto } from "@/lib/domain/moto";
-import type { Vente, Versement } from "@/lib/domain/vente";
+import { ventesActives, type Vente, type Versement } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -114,7 +114,7 @@ function Chiffres() {
      et il n'y a aucune raison de demander celles qu'on ne montre pas. */
   const ventesDuMois = useMemo(
     () =>
-      (ventes ?? []).filter(
+      ventesActives(ventes ?? []).filter(
         (vente) => vente.date !== null && cleMois(moisDe(vente.date)) === cleMois(mois),
       ),
     [ventes, mois],

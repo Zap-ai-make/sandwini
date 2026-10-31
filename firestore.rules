@@ -958,7 +958,8 @@ service cloud.firestore {
                                      'motoRemise', 'dateRemiseMoto', 'tokenSuivi',
                                      'lienSuiviEnvoyeAt', 'statutDossier',
                                      'dateClotureDossier',
-                                     'emporte', 'carteGriseChemin'].concat(champsAudit()))
+                                     'emporte', 'carteGriseChemin',
+                                     'remplaceId'].concat(champsAudit()))
              && donnees.keys().hasAll(['numero', 'numeroInitial', 'boutiqueId', 'motoId', 'clientId',
                                        'date', 'prixConvenu', 'modePaiement', 'carteGrise', 'casque',
                                        'totalPaye', 'resteDu', 'statutPaiement', 'dernierVersementAt',
@@ -1010,7 +1011,11 @@ service cloud.firestore {
              && donnees.tokenSuivi.matches('^[A-Za-z0-9_-]+$')
              && donnees.lienSuiviEnvoyeAt == null
              && donnees.statutDossier == 'ouvert'
-             && donnees.dateClotureDossier == null;
+             && donnees.dateClotureDossier == null
+             // La vente qui en corrige une autre la cite (S25). Facultatif :
+             // une vente ordinaire ne remplace rien.
+             && (!donnees.keys().hasAny(['remplaceId'])
+                 || (donnees.remplaceId is string && donnees.remplaceId.size() > 0));
     }
 
     function peutVendrePour(boutiqueId) {
@@ -1110,6 +1115,44 @@ service cloud.firestore {
              && dateAppareil(donnees.dateRemiseMoto);
     }
 
+    // **L'annulation d'une vente (S25), et ce qu'elle ferme.**
+    //
+    // Les quatre champs se posent ensemble et une seule fois : une vente
+    // annulée ne se ré-annule pas, ne se désannule pas — si l'annulation était
+    // elle-même une erreur, on ressaisit la vente. `remplaceeParId` s'y ajoute
+    // quand c'est une correction. Rien d'autre ne bouge dans la même écriture :
+    // le prix, les totaux et le client restent ce qu'ils étaient, et c'est ce
+    // qui fait d'une annulation une trace plutôt qu'une réécriture.
+    //
+    // L'auteur inscrit est l'appelant : sans cette égalité, un gérant pourrait
+    // signer l'annulation au nom du responsable. Le motif est obligatoire —
+    // c'est lui qui rend une annulation lisible des mois plus tard.
+    //
+    // Le gérant de la boutique annule comme le responsable (D109) : la garde
+    // est `peutVendrePour`, posée sur la règle elle-même.
+    function venteAnnulee(donnees) {
+      return donnees.get('annulee', false) == true;
+    }
+
+    function annulationValide(donnees, ancien) {
+      return !venteAnnulee(ancien)
+             && request.resource.data.diff(resource.data).affectedKeys()
+                  .hasAll(['annulee', 'annuleeLe', 'annuleePar', 'motifAnnulation'])
+             && seulsChangent(['annulee', 'annuleeLe', 'annuleePar', 'motifAnnulation',
+                               'remplaceeParId'])
+             && donnees.annulee == true
+             && dateAppareil(donnees.annuleeLe)
+             && donnees.annuleePar.keys().hasOnly(['uid', 'nom'])
+             && donnees.annuleePar.keys().hasAll(['uid', 'nom'])
+             && donnees.annuleePar.uid == request.auth.uid
+             && texteBorne(donnees.annuleePar.nom, 200)
+             && donnees.motifAnnulation is string
+             && donnees.motifAnnulation.size() > 0
+             && donnees.motifAnnulation.size() <= 200
+             && (!donnees.keys().hasAny(['remplaceeParId'])
+                 || (donnees.remplaceeParId is string && donnees.remplaceeParId.size() > 0));
+    }
+
     match /ventesMotos/{venteId} {
       allow read: if peutVendrePour(resource.data.boutiqueId);
 
@@ -1117,11 +1160,15 @@ service cloud.firestore {
                     && traceCreation(request.resource.data)
                     && peutVendrePour(request.resource.data.boutiqueId);
 
+      // Une vente annulée n'accepte plus aucun des trois gestes : ni
+      // versement, ni remise, ni papier emporté (S25).
       allow update: if peutVendrePour(resource.data.boutiqueId)
                     && traceModification(request.resource.data, resource.data)
-                    && (encaissementValideSurVente(request.resource.data, resource.data)
-                        || remiseMotoValide(request.resource.data, resource.data)
-                        || papiersEmportesValide(request.resource.data));
+                    && (annulationValide(request.resource.data, resource.data)
+                        || (!venteAnnulee(resource.data)
+                            && (encaissementValideSurVente(request.resource.data, resource.data)
+                                || remiseMotoValide(request.resource.data, resource.data)
+                                || papiersEmportesValide(request.resource.data))));
 
       // Une vente ne se supprime pas : elle s'annule, et l'annulation laisse
       // une trace. S25.
@@ -1393,7 +1440,7 @@ service cloud.firestore {
               'numeroChassis', 'recu', 'credit', 'statut', 'prestataireId',
               'prestataireNom', 'deposeLe', 'avance', 'disponibleLe',
               'immatriculation', 'revenuLe', 'remisLe', 'remisANom',
-              'remisATelephone'];
+              'remisATelephone', 'venteAnnulee'];
     }
 
     function dossierCarteGriseValide(donnees) {
@@ -1420,6 +1467,9 @@ service cloud.firestore {
              // entier positif : le FCFA ne se divise pas, et un montant negatif
              // ne veut rien dire sur une dette.
              && donnees.get('recu', false) is bool
+             // La vente de ce dossier a été annulée alors que la carte était
+             // déjà partie (S25) : le dossier reste, marqué, jusqu'au retour.
+             && donnees.get('venteAnnulee', false) is bool
              && (donnees.get('credit', null) == null
                  || (donnees.credit is int && donnees.credit >= 0
                      && donnees.credit <= 1000000000))
@@ -1586,7 +1636,9 @@ service cloud.firestore {
              && donnees.montant > 0
              && donnees.moyenPaiement in ['especes', 'orange_money', 'moov_money', 'wave']
              && donnees.origine in ['vente_moto', 'versement', 'vente_piece', 'remboursement_piece',
-                                    'depense', 'avance_prestataire', 'autre']
+                                    'depense', 'avance_prestataire', 'annulation_vente', 'autre']
+             // L'argent d'une vente annulée ressort (S25) : jamais il n'entre.
+             && (donnees.origine != 'annulation_vente' || donnees.sens == 'sortie')
              && donnees.origineRefId is string
              && texteBorne(donnees.libelle, 120)
              // L'argent des tranches est un engagement, pas une recette, tant

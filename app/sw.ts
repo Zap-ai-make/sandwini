@@ -45,6 +45,8 @@ const serwist = new Serwist({
       /^moto$/,
       /^vente$/,
       /^nouvelle$/,
+      /* La correction d'une vente (S25) s'ouvre par `?corriger=`. */
+      /^corriger$/,
       /^recu$/,
     ],
   },

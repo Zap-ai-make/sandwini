@@ -9,7 +9,7 @@ import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { nomComplet } from "@/lib/domain/client";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
-import { comparerVentes, LIBELLE_MODE, type Vente } from "@/lib/domain/vente";
+import { comparerVentes, LIBELLE_MODE, ventesActives, type Vente } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -80,7 +80,8 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
     const nomDuClient = new Map(clients.map((client) => [client.id, nomComplet(client)]));
     const parMoto = new Map((stock ?? []).map((moto) => [moto.id, moto]));
 
-    return [...(ventes ?? [])]
+    /* Une vente annulée n'est pas une vente du jour (S25). */
+    return ventesActives(ventes ?? [])
       .sort(comparerVentes)
       .slice(0, MAX_LIGNES)
       .map((vente) => {

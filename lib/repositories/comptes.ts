@@ -19,6 +19,7 @@ import {
   type DocumentDossier,
   type Vente,
   type Versement,
+  ventesActives,
 } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -139,7 +140,13 @@ export function useCeQuiAttend(): {
     const pret = Boolean(ventes && documents && versements);
 
     const ouverts = ventes && documents
-      ? dossiersEnAttente(ventes, documents, motos ?? [], FILTRES_DOSSIERS_VIDES, maintenant)
+      ? dossiersEnAttente(
+          ventesActives(ventes),
+          documents,
+          motos ?? [],
+          FILTRES_DOSSIERS_VIDES,
+          maintenant,
+        )
       : [];
 
     const enRetard: Attente[] = ouverts

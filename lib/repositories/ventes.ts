@@ -27,6 +27,7 @@ import {
   motoRemiseA,
   numeroRecuVersement,
   statutMotoApresVente,
+  type AnnulationVente,
   type DocumentDossier,
   type MargeVente,
   type ModePaiement,
@@ -39,7 +40,13 @@ import {
   type Vente,
   type Versement,
 } from "@/lib/domain/vente";
-import { champsDossierNeuf } from "@/lib/domain/dossier-carte-grise";
+import {
+  dossierApresAnnulation,
+  motifDeCorrection,
+  remboursementsDAnnulation,
+} from "@/lib/domain/annulation-vente";
+import { champsDossierNeuf, type DossierCarteGrise } from "@/lib/domain/dossier-carte-grise";
+import { numeroLisible } from "@/lib/domain/numerotation";
 import { validerFichierPapier, type PapierMoto } from "@/lib/domain/moto";
 import { reserverNumero, type Numeroteur } from "@/lib/numerotation/compteur";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
@@ -117,6 +124,26 @@ function lireVente(instantane: DocumentSnapshot<DocumentData>): Vente {
     /* La trace d'audit sert ici de contenu : le reçu doit nommer l'opérateur
        (§10), et `createdBy` n'est qu'un identifiant de compte. */
     operateur: donnees.createdByName ?? "",
+    annulation: lireAnnulation(donnees),
+    remplaceId: typeof donnees.remplaceId === "string" ? donnees.remplaceId : null,
+  };
+}
+
+/**
+ * L'annulation d'une vente (S25), telle que la règle l'a acceptée : les quatre
+ * champs ensemble. Une vente d'avant S25 n'en porte aucun, et tient.
+ */
+function lireAnnulation(donnees: DocumentData): AnnulationVente | null {
+  if (donnees.annulee !== true) return null;
+  const par = donnees.annuleePar ?? {};
+  return {
+    le: versDate(donnees.annuleeLe),
+    par: {
+      uid: typeof par.uid === "string" ? par.uid : "",
+      nom: typeof par.nom === "string" ? par.nom : "",
+    },
+    motif: typeof donnees.motifAnnulation === "string" ? donnees.motifAnnulation : "",
+    remplaceeParId: typeof donnees.remplaceeParId === "string" ? donnees.remplaceeParId : null,
   };
 }
 
@@ -445,6 +472,8 @@ function ecrireVenteDansLot(
   numero: string,
   maintenant: Timestamp,
   auteur: Auteur,
+  /** La vente que celle-ci corrige (S25). */
+  remplaceId: string | null = null,
 ): string {
   const { saisie, dossier } = aEcrire;
   const reference = doc(collection(db(), "ventesMotos"));
@@ -484,6 +513,9 @@ function ecrireVenteDansLot(
        que l'écran sache dire pourquoi. Trouvé par le témoin e2e, pas déduit. */
     emporte: PAPIERS_EMPORTES_VIDES,
     carteGriseChemin: null,
+    /* Le champ n'existe que sur une correction : une vente ordinaire ne
+       remplace rien, et la règle refuse une chaîne vide. */
+    ...(remplaceId ? { remplaceId } : {}),
     ...traceCreation(auteur),
   });
 
@@ -638,6 +670,136 @@ export function enregistrerVentes(
 }
 
 /**
+ * Ce qu'une annulation doit connaître de la vente : elle-même, ses versements
+ * — pour rendre l'argent —, et son dossier de carte grise s'il a pu être lu.
+ *
+ * `dossier` à `null` quand il n'a pas pu être lu ou n'existe pas : l'annulation
+ * part quand même, sans y toucher. Mettre à jour un dossier absent ferait
+ * échouer le lot entier.
+ */
+export type VenteAAnnuler = {
+  vente: Vente;
+  versements: readonly Versement[];
+  dossier: DossierCarteGrise | null;
+};
+
+/**
+ * Écrit l'annulation d'une vente dans un lot déjà ouvert (S25).
+ *
+ * **Rien ne s'efface** (D10) : la vente reçoit ses quatre champs d'annulation
+ * et ne bouge plus ; chaque versement ressort par un encaissement de sens
+ * inverse, par le même moyen ; la moto revient en stock ; le dossier est écarté
+ * s'il n'est jamais parti, marqué sinon.
+ *
+ * `garderMoto` sert la correction qui garde la même moto : la nouvelle vente
+ * lui donne son statut, et un lot ne réécrit pas deux fois le même document.
+ */
+function ecrireAnnulationDansLot(
+  lot: WriteBatch,
+  { vente, versements, dossier }: VenteAAnnuler,
+  motif: string,
+  maintenant: Timestamp,
+  auteur: Auteur,
+  options: { remplaceeParId?: string; garderMoto?: boolean } = {},
+): void {
+  lot.update(doc(db(), "ventesMotos", vente.id), {
+    annulee: true,
+    annuleeLe: maintenant,
+    annuleePar: { uid: auteur.uid, nom: auteur.nom },
+    motifAnnulation: motif.trim(),
+    ...(options.remplaceeParId ? { remplaceeParId: options.remplaceeParId } : {}),
+    ...traceModification(auteur),
+  });
+
+  for (const remboursement of remboursementsDAnnulation(vente, versements)) {
+    lot.set(doc(collection(db(), "encaissements")), {
+      boutiqueId: vente.boutiqueId,
+      date: maintenant,
+      sens: "sortie",
+      montant: remboursement.montant,
+      moyenPaiement: remboursement.moyenPaiement,
+      origine: "annulation_vente",
+      origineRefId: vente.id,
+      libelle: `Remboursement vente ${numeroLisible(vente.numero)}`,
+      categorieTranches: remboursement.categorieTranches,
+      ...traceCreation(auteur),
+    });
+  }
+
+  if (!options.garderMoto) {
+    lot.update(doc(db(), "motos", vente.motoId), {
+      statut: "en_stock",
+      ...traceModification(auteur),
+    });
+  }
+
+  if (dossier) {
+    lot.update(doc(db(), "dossiersCarteGrise", dossier.id), {
+      ...dossierApresAnnulation(dossier),
+      ...traceModification(auteur),
+    });
+  }
+}
+
+/**
+ * Annule une vente (S25) : un seul lot, hors ligne compris (D76).
+ *
+ * La promesse n'est pas à attendre pour fermer la confirmation : hors ligne,
+ * elle ne se résout qu'au retour du réseau, et l'écran voit déjà la vente
+ * annulée dans son cache.
+ */
+export function annulerVente(
+  aAnnuler: VenteAAnnuler,
+  motif: string,
+  auteur: Auteur,
+): Promise<void> {
+  const lot = writeBatch(db());
+  ecrireAnnulationDansLot(lot, aAnnuler, motif, Timestamp.fromDate(new Date()), auteur);
+  return suivreEcriture(lot.commit());
+}
+
+/**
+ * Corrige une vente (S25) : l'annulation de l'ancienne et la nouvelle vente,
+ * dans un seul lot.
+ *
+ * **Un nouveau numéro** (arbitrage du 31 octobre 2026), tiré du compteur de la
+ * boutique de la vente. L'ancienne cite la nouvelle (`remplaceeParId`), la
+ * nouvelle cite l'ancienne (`remplaceId`), et le motif nomme la nouvelle : on
+ * remonte de l'une à l'autre dans les deux sens.
+ *
+ * Le lot garantit qu'on n'a jamais l'une sans l'autre : une ancienne annulée
+ * sans remplaçante laisserait le client sans vente, une remplaçante sans
+ * annulation vendrait la même moto deux fois.
+ */
+export function corrigerVente(
+  ancienne: VenteAAnnuler,
+  nouvelle: VenteAEcrire,
+  contexte: ContexteVentes,
+  auteur: Auteur,
+): { vente: { id: string; numero: string }; enregistre: Promise<void> } {
+  const boutiqueId = contexte.boutique.boutiqueId;
+  const maintenant = Timestamp.fromDate(new Date());
+  const lot = writeBatch(db());
+
+  const numero = reserverNumero(contexte.boutique, contexte.numerosConnus);
+  const id = ecrireVenteDansLot(
+    lot,
+    nouvelle,
+    boutiqueId,
+    numero,
+    maintenant,
+    auteur,
+    ancienne.vente.id,
+  );
+  ecrireAnnulationDansLot(lot, ancienne, motifDeCorrection(numero), maintenant, auteur, {
+    remplaceeParId: id,
+    garderMoto: nouvelle.saisie.motoId === ancienne.vente.motoId,
+  });
+
+  return { vente: { id, numero }, enregistre: suivreEcriture(lot.commit()) };
+}
+
+/**
  * Enregistre un versement ultérieur : le reçu, l'encaissement, les agrégats.
  *
  * Trois documents dans un seul lot, comme la vente elle-même. Le lot est ce qui
@@ -764,6 +926,21 @@ export function messageErreurVente(cause: unknown): string {
   if (code.includes("not-found")) return "Cette moto n’existe plus dans le stock.";
   if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
   return "L’enregistrement de la vente n’a pas abouti.";
+}
+
+/**
+ * Les refus d'une annulation ou d'une correction (S25).
+ *
+ * Le plus probable est une vente que l'appareil voyait encore active alors
+ * qu'un autre l'avait déjà annulée : la règle refuse une seconde annulation.
+ */
+export function messageErreurAnnulation(cause: unknown): string {
+  const code = (cause as { code?: string }).code ?? "";
+  if (code.includes("permission-denied")) {
+    return "L’annulation a été refusée : la vente est déjà annulée, ou elle n’est pas de votre boutique.";
+  }
+  if (code.includes("unauthenticated")) return "Votre session a expiré. Reconnectez-vous.";
+  return "L’annulation n’a pas abouti.";
 }
 
 /**

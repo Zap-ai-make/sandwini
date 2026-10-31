@@ -31,6 +31,7 @@ import {
   type DocumentDossier,
   type TypeDocument,
   type Vente,
+  ventesActives,
 } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
@@ -245,7 +246,8 @@ export default function PageDossiers() {
    */
   const maintenant = new Date();
   const dossiers = dossiersEnAttente(
-    ventes ?? [],
+    /* Les papiers d'une vente annulée ne sont plus à suivre (S25). */
+    ventesActives(ventes ?? []),
     documents ?? [],
     motos ?? [],
     { etat },

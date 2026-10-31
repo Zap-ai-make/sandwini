@@ -1,8 +1,19 @@
 "use client";
 
-import { Check, CircleAlert, Info, KeyRound, Minus, Printer, ReceiptText } from "lucide-react";
+import {
+  Ban,
+  Check,
+  CircleAlert,
+  Info,
+  KeyRound,
+  Minus,
+  Pencil,
+  Printer,
+  ReceiptText,
+} from "lucide-react";
 import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
+import { AnnulerVenteModal } from "@/components/AnnulerVenteModal";
 import { DossierDocuments } from "@/components/DossierDocuments";
 import { Avis } from "@/components/patrons/Avis";
 import { Champ } from "@/components/patrons/Champ";
@@ -129,6 +140,23 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
   const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
   const client = vente ? clients.find((fiche) => fiche.id === vente.clientId) : undefined;
 
+  /* **Modifier et annuler** (S25) : le responsable, et le gérant de la
+     boutique de la vente (D109) — la même garde que la règle. Aucun des deux
+     gestes sur une vente déjà annulée : elle ne bouge plus. */
+  const [annulationOuverte, setAnnulationOuverte] = useState(false);
+  const [refusAnnulation, setRefusAnnulation] = useState<string | null>(null);
+  /* Lu sur le champ, et non par `estAnnulee` : un appel de fonction sur la
+     vente laisse croire au compilateur qu'elle pourrait changer, et il renonce
+     alors à mémoïser les écoutes qui en dépendent. */
+  const annulee = vente?.annulation != null;
+  const peutCorriger =
+    vente !== null &&
+    !annulee &&
+    session.statut === "connecte" &&
+    (session.utilisateur.role === "responsable" ||
+      (session.utilisateur.role === "gerant" &&
+        session.utilisateur.boutiqueId === vente.boutiqueId));
+
   /* Les totaux affichés viennent des versements, pas des champs de la vente :
      ceux-ci sont un cache que deux appareils hors ligne peuvent s'écraser
      mutuellement (D56). Tant que les versements ne sont pas lus, `suivi` reste
@@ -181,6 +209,31 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
                 Fiche de la moto
               </Link>
             )}
+            {peutCorriger && (
+              <>
+                {/* La modale de vente vit sur l'écran des ventes : la
+                    correction s'y ouvre, quel que soit l'écran d'où l'on vient. */}
+                <Link
+                  href={`/motos/ventes?vente=${vente.id}&corriger=${vente.id}`}
+                  className="bouton bouton-neutre"
+                >
+                  <Pencil aria-hidden="true" className="size-4" />
+                  Modifier
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRefusAnnulation(null);
+                    setAnnulationOuverte(true);
+                  }}
+                  disabled={versements === null}
+                  className="bouton bouton-neutre"
+                >
+                  <Ban aria-hidden="true" className="size-4" />
+                  Annuler la vente
+                </button>
+              </>
+            )}
           </>
         ) : undefined
       }
@@ -191,6 +244,24 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
         <EtatChargement>Chargement de la vente…</EtatChargement>
       ) : (
         <>
+          <EtatErreur message={refusAnnulation} className="mb-4" />
+          {vente.annulation && (
+            <Avis role="status" ton="alerte" titre="Vente annulée" className="mb-4">
+              {vente.annulation.motif}
+              <span className="block text-corps text-encre-doux">
+                {vente.annulation.par.nom || "Auteur inconnu"}
+                {vente.annulation.le ? `, le ${formaterDate(vente.annulation.le)}` : ""}
+              </span>
+              {vente.annulation.remplaceeParId && (
+                <Link
+                  href={`${base}?vente=${vente.annulation.remplaceeParId}`}
+                  className="mt-1 inline-block font-medium underline"
+                >
+                  Voir la vente qui la remplace
+                </Link>
+              )}
+            </Avis>
+          )}
           {estRenumerotee(vente) && (
             <Avis role="status" ton="alerte" titre="Ce reçu a été renuméroté" className="mb-4">
               Un autre appareil avait déjà attribué{" "}
@@ -211,11 +282,13 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
 
           <EffetVente vente={vente} suivi={suivi} />
 
-          {suivi && peutRemettreMoto(vente, suivi.resteDu) && <RemiseMoto vente={vente} />}
+          {!annulee && suivi && peutRemettreMoto(vente, suivi.resteDu) && (
+            <RemiseMoto vente={vente} />
+          )}
 
           {/* Les papiers avant les versements : c'est le geste du jour quand le
               client repasse, et l'argent est déjà réglé sur la ligne du haut. */}
-          <PapiersDeLaVente vente={vente} moto={moto} />
+          {!annulee && <PapiersDeLaVente vente={vente} moto={moto} />}
 
           <section>
             <TitrePanneau>Les versements</TitrePanneau>
@@ -223,7 +296,7 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
             {/* Le formulaire n’apparaît qu’une fois les versements lus : leur
                 nombre donne le rang du reçu, et leur somme le reste réellement
                 dû. Sans eux, on numéroterait à l’aveugle. */}
-            {suivi && suivi.resteDu > 0 && (
+            {!annulee && suivi && suivi.resteDu > 0 && (
               <FormulaireVersement
                 vente={vente}
                 versements={versements ?? []}
@@ -243,6 +316,15 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
             <TitrePanneau>Marge</TitrePanneau>
             {estResponsable ? <Marge id={id} /> : <MargeMasquee />}
           </section>
+
+          {annulationOuverte && (
+            <AnnulerVenteModal
+              vente={vente}
+              versements={versements ?? []}
+              onFermer={() => setAnnulationOuverte(false)}
+              onRefus={setRefusAnnulation}
+            />
+          )}
         </>
       )}
     </PanneauLateral>

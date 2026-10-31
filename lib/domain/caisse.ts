@@ -36,6 +36,8 @@ export const ORIGINES_MOUVEMENT = [
   "remboursement_piece",
   "depense",
   "avance_prestataire",
+  /* L'argent d'une vente annulée qui ressort (S25), toujours en sortie. */
+  "annulation_vente",
   "autre",
 ] as const;
 export type OrigineMouvement = (typeof ORIGINES_MOUVEMENT)[number];
@@ -55,6 +57,7 @@ export const LIBELLE_ORIGINE: Record<OrigineMouvement, string> = {
   remboursement_piece: "Remboursement",
   depense: "Sortie",
   avance_prestataire: "Avance prestataire",
+  annulation_vente: "Vente annulée",
   autre: "Autre",
 };
 

@@ -49,6 +49,8 @@ function vente(fait: Partial<Vente> & { date: Date; prixConvenu: number }): Vent
     lienSuiviEnvoyeAt: null,
     statutDossier: "ouvert",
     dateClotureDossier: null,
+    annulation: null,
+    remplaceId: null,
     operateur: "",
     ...fait,
   } as Vente;
@@ -234,6 +236,27 @@ describe("le mois vide — décision 6", () => {
   it("cesse de l’être dès qu’un versement est tombé, même sans vente ce mois-là", () => {
     const chiffres = chiffresDuMois(SEPTEMBRE, [], [versement(le(9), 50_000)], new Map());
     expect(chiffres.vide).toBe(false);
+  });
+});
+
+/* S25 : une vente annulée ne s'est pas vendue, et son argent a été rendu. */
+describe("les ventes annulées ne comptent pas", () => {
+  const annulation = {
+    le: le(25),
+    par: { uid: "ger-1", nom: "Awa" },
+    motif: "Erreur de saisie",
+    remplaceeParId: null,
+  };
+
+  it("ni dans les motos vendues, ni dans l’encaissé, ni dans les répartitions", () => {
+    const annulee = vente({ date: le(3), prixConvenu: 800_000, annulation });
+    const active = vente({ date: le(4), prixConvenu: 700_000 });
+    const versements = [versement(le(3), 800_000, annulee.id), versement(le(4), 700_000, active.id)];
+    const chiffres = chiffresDuMois(SEPTEMBRE, [annulee, active], versements, new Map());
+    expect(chiffres.motosVendues).toBe(1);
+    expect(chiffres.encaisse).toBe(700_000);
+    expect(partsParBoutique(SEPTEMBRE, [annulee, active], (id) => id)[0].compte).toBe(1);
+    expect(partsParMode(SEPTEMBRE, [annulee, active])[0].montant).toBe(700_000);
   });
 });
 

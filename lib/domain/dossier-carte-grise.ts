@@ -132,6 +132,11 @@ export type DossierCarteGrise = {
   /** Qui est venu chercher. Du texte libre : ce n'est pas toujours l'acheteur. */
   remisANom: string;
   remisATelephone: string;
+  /**
+   * La vente de ce dossier a été annulée alors que la carte était déjà partie
+   * (S25). Le dossier reste au classeur, marqué, jusqu'au retour de la carte.
+   */
+  venteAnnulee: boolean;
 };
 
 /** Ce dossier attend-il encore quelque chose ? */

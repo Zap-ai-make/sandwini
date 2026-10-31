@@ -305,6 +305,11 @@ function Liste({
         className="text-left"
       >
         {dossier.clientNom || "—"}
+        {/* La vente a été annulée alors que la carte était déjà partie
+            (S25) : la ligne reste jusqu'au retour, et le dit. */}
+        {dossier.venteAnnulee && (
+          <span className="pastille pastille-retard ml-2 align-middle">Vente annulée</span>
+        )}
       </button>
     ),
     moto: (dossier) => dossier.motoLibelle || "—",

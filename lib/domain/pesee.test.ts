@@ -94,6 +94,31 @@ describe("peserBoutiques — les motos", () => {
     expect(pesee.get("SDO")?.motos.resteDu).toBe(500_000);
   });
 
+  /* S25 : une vente annulée ne s'est pas vendue, et ne doit plus rien. */
+  it("ignore les ventes annulées", () => {
+    const pesee = peserBoutiques(
+      {
+        ...RIEN,
+        ventes: [
+          vente({ id: "a", resteDu: 100_000 }),
+          vente({
+            id: "b",
+            resteDu: 700_000,
+            annulation: {
+              le: CE_MOIS,
+              par: { uid: "ger-1", nom: "Awa" },
+              motif: "Erreur de saisie",
+              remplaceeParId: null,
+            },
+          }),
+        ],
+      },
+      MAINTENANT,
+    );
+    expect(pesee.get("SDO")?.motos.ventesDuMois).toBe(1);
+    expect(pesee.get("SDO")?.motos.resteDu).toBe(100_000);
+  });
+
   it("sépare les boutiques", () => {
     const pesee = peserBoutiques(
       { ...RIEN, ventes: [vente({ boutiqueId: "SDO" }), vente({ id: "v2", boutiqueId: "ABC" })] },

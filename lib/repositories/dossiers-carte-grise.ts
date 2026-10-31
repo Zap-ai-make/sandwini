@@ -81,6 +81,35 @@ export function ecouterDossiersCarteGrise(
   );
 }
 
+/**
+ * Le dossier de carte grise d'une vente, ou `null` s'il n'y en a pas (S25).
+ *
+ * **Une requête, et non la lecture du document par son identifiant.** Une
+ * vente d'avant S59 peut ne pas avoir de dossier ; lire un document absent
+ * sous une règle qui consulte `resource.data` est un refus, que l'écran ne
+ * saurait pas distinguer d'un vrai défaut de droits. La requête, bornée à la
+ * boutique comme la règle l'exige d'un gérant, rend simplement une liste vide.
+ *
+ * Le dossier arrive **enveloppé** : `{ dossier: null }` dit « lu, et il n'y en
+ * a pas », ce qu'un `null` nu confondrait avec « pas encore lu ».
+ */
+export function ecouterDossierDeVente(
+  vente: { id: string; boutiqueId: string },
+  auChangement: (lu: { dossier: DossierCarteGrise | null }) => void,
+  enErreur: (cause: unknown) => void,
+): () => void {
+  const requete = query(
+    collection(db(), COLLECTION),
+    where("boutiqueId", "==", vente.boutiqueId),
+    where("venteId", "==", vente.id),
+  );
+  return onSnapshot(
+    requete,
+    (instantane) => auChangement({ dossier: instantane.docs.map(lireDossier)[0] ?? null }),
+    enErreur,
+  );
+}
+
 function lireDossier(instantane: QueryDocumentSnapshot<DocumentData>): DossierCarteGrise {
   const donnees = instantane.data();
   return {
@@ -110,6 +139,7 @@ function lireDossier(instantane: QueryDocumentSnapshot<DocumentData>): DossierCa
     remisLe: versDate(donnees.remisLe),
     remisANom: typeof donnees.remisANom === "string" ? donnees.remisANom : "",
     remisATelephone: typeof donnees.remisATelephone === "string" ? donnees.remisATelephone : "",
+    venteAnnulee: donnees.venteAnnulee === true,
   };
 }
 

@@ -47,6 +47,7 @@ import {
   type Vente,
 } from "@/lib/domain/vente";
 import type { VentePiece } from "@/lib/domain/vente-piece";
+import { saisieDeCorrection } from "@/lib/domain/annulation-vente";
 import { numeroLisible } from "@/lib/domain/numerotation";
 import { prochainNumero } from "@/lib/numerotation/compteur";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -54,7 +55,14 @@ import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
-import { ecouterVentes, enregistrerVentes, messageErreurVente } from "@/lib/repositories/ventes";
+import {
+  corrigerVente,
+  ecouterVentes,
+  enregistrerVentes,
+  messageErreurAnnulation,
+  messageErreurVente,
+  type VenteAAnnuler,
+} from "@/lib/repositories/ventes";
 import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
 
 /**
@@ -137,6 +145,7 @@ const PREMIERS_RESULTATS = 8;
 export function ModaleVente({
   onFermer,
   depart,
+  corrige,
 }: {
   onFermer: () => void;
   /**
@@ -149,13 +158,31 @@ export function ModaleVente({
    * toujours.
    */
   depart?: Partial<SaisieVente>;
+  /**
+   * La vente à corriger (S25), avec ses versements et son dossier.
+   *
+   * La modale s'ouvre remplie de ce qui avait été saisi ; « Enregistrer la
+   * correction » annule l'ancienne et écrit la nouvelle, sous un nouveau
+   * numéro, en un seul lot (`corrigerVente`). Tout se passe dans **la
+   * boutique de la vente**, même ouverte depuis « Toutes les boutiques » :
+   * c'est son stock, et son compteur de numéros.
+   */
+  corrige?: VenteAAnnuler;
 }) {
-  const { perimetre } = usePerimetre();
+  const { perimetre, boutiques } = usePerimetre();
   const session = useSession();
   const catalogue = useCatalogue();
   const { clients, lus, chargement: clientsEnCours } = useFichierClients();
 
-  const boutiqueId = perimetre.boutiqueId;
+  const enCorrection = corrige !== undefined;
+  const boutiqueId = corrige ? corrige.vente.boutiqueId : perimetre.boutiqueId;
+  /* Une vente se fait dans une boutique : celle du périmètre, ou celle de la
+     vente qu'on corrige. */
+  const dansUneBoutique = enCorrection || perimetre.type === "boutique";
+  const codeBoutique = corrige
+    ? (boutiques.find((boutique) => boutique.id === corrige.vente.boutiqueId)?.code ??
+      corrige.vente.boutiqueId)
+    : perimetre.code;
 
   const souscrireStock = useCallback(
     (auChangement: (motos: Moto[]) => void, enErreur: (cause: unknown) => void) =>
@@ -180,10 +207,10 @@ export function ModaleVente({
      l'écran de vente de pièces connaît ceux des motos. */
   const souscrireVentesPieces = useCallback(
     (auChangement: (ventes: VentePiece[]) => void, enErreur: (cause: unknown) => void) =>
-      perimetre.type === "boutique"
+      dansUneBoutique
         ? ecouterVentesPieces(boutiqueId, auChangement, enErreur)
         : () => {},
-    [boutiqueId, perimetre.type],
+    [boutiqueId, dansUneBoutique],
   );
   const { valeur: ventesPieces } = useAbonnement(
     souscrireVentesPieces,
@@ -202,9 +229,11 @@ export function ModaleVente({
      lui qui tient la règle du montant reçu selon le mode de paiement, et la
      contourner poserait un acompte incohérent avec le prix pré-rempli. */
   const [saisie, setSaisie] = useState<SaisieVenteGroupee>(() =>
-    depart
-      ? appliquerSaisieGroupee(SAISIE_GROUPEE_VIDE, groupeDepuisDepart(depart), false)
-      : SAISIE_GROUPEE_VIDE,
+    corrige
+      ? saisieDeCorrection(corrige.vente, corrige.versements)
+      : depart
+        ? appliquerSaisieGroupee(SAISIE_GROUPEE_VIDE, groupeDepuisDepart(depart), false)
+        : SAISIE_GROUPEE_VIDE,
   );
   /* **La saisie du client vit ici, et pas dans un formulaire à part.** C'est ce
      que le commanditaire a demandé après essai : le client neuf n'a pas
@@ -227,7 +256,9 @@ export function ModaleVente({
 
   /* Le montant reçu a-t-il été tapé à la main ? Tant que non, il suit le mode
      de paiement — voir `changer` juste en dessous. */
-  const [montantTouche, setMontantTouche] = useState(false);
+  /* En correction, le montant reçu est ce qui a déjà été versé : il ne doit
+     pas suivre le mode de paiement comme un champ neuf. */
+  const [montantTouche, setMontantTouche] = useState(enCorrection);
 
   /* La règle du montant reçu vit dans le domaine, où un test unitaire peut
      l'atteindre : elle a traversé tout un lot sans jouer, faute de pouvoir
@@ -260,12 +291,17 @@ export function ModaleVente({
      réservée qui resterait dans la liste finirait par être vendue deux fois —
      et c'est la seule prévention possible : hors ligne, aucun serveur ne peut
      arbitrer entre deux appareils (limite assumée de S8). */
+  /* En correction, la moto de la vente reste proposée : elle est vendue, mais
+     c'est à cette vente-là, et la correction la rend avant de la revendre. */
+  const motoCorrigee = corrige?.vente.motoId ?? null;
   const vendables = useMemo(
-    () => (stock ?? []).filter((moto) => moto.statut === "en_stock"),
-    [stock],
+    () =>
+      (stock ?? []).filter((moto) => moto.statut === "en_stock" || moto.id === motoCorrigee),
+    [stock, motoCorrigee],
   );
 
-  const auPlafond = saisie.motos.length >= MOTOS_PAR_VENTE_MAX;
+  /* Une correction remplace une vente par une vente : une seule moto. */
+  const auPlafond = saisie.motos.length >= (enCorrection ? 1 : MOTOS_PAR_VENTE_MAX);
   const chercheMoto = rechercheMoto.trim().length > 0;
   const motosTrouvees = useMemo(() => {
     const cherche = normaliserChassis(rechercheMoto);
@@ -301,8 +337,8 @@ export function ModaleVente({
   const clientChoisi = clients.find((client) => client.id === saisie.clientId);
 
   const numeroAVenir =
-    boutiqueId && perimetre.type === "boutique"
-      ? prochainNumero({ boutiqueId, code: perimetre.code }, numerosConnus)
+    boutiqueId && dansUneBoutique
+      ? prochainNumero({ boutiqueId, code: codeBoutique }, numerosConnus)
       : null;
 
   /**
@@ -364,7 +400,7 @@ export function ModaleVente({
    * vendable à quelqu'un d'autre, pendant que le client repart avec elle.
    */
   function enregistrer() {
-    if (session.statut !== "connecte" || !boutiqueId || perimetre.type !== "boutique") return;
+    if (session.statut !== "connecte" || !boutiqueId || !dansUneBoutique) return;
 
     const clientRetenu = saisie.clientId;
     const clientANaitre = clientRetenu === "";
@@ -455,11 +491,17 @@ export function ModaleVente({
       };
     });
 
-    const { ventes: ecrites, enregistre } = enregistrerVentes(
-      aEcrire,
-      { boutique: { boutiqueId, code: perimetre.code }, numerosConnus },
-      auteur,
-    );
+    const contexte = { boutique: { boutiqueId, code: codeBoutique }, numerosConnus };
+
+    if (corrige) {
+      /* La correction : l'ancienne annulée, la nouvelle écrite, un seul lot. */
+      const { vente: corrigee, enregistre } = corrigerVente(corrige, aEcrire[0], contexte, auteur);
+      enregistre.catch((cause: unknown) => dire(messageErreurAnnulation(cause)));
+      setEnregistrees([corrigee]);
+      return;
+    }
+
+    const { ventes: ecrites, enregistre } = enregistrerVentes(aEcrire, contexte, auteur);
     enregistre.catch((cause: unknown) => dire(messageErreurVente(cause)));
 
     setEnregistrees(ecrites);
@@ -481,7 +523,7 @@ export function ModaleVente({
   );
   const resteDu = Math.max(total - Math.min(encaisse, total), 0);
 
-  if (perimetre.type !== "boutique") {
+  if (!dansUneBoutique) {
     return (
       <Modale
         ouvert
@@ -508,13 +550,21 @@ export function ModaleVente({
       <Modale
         ouvert
         onFermer={fermer}
-        titre={seule ? "Vente enregistrée" : `${enregistrees.length} ventes enregistrées`}
+        titre={
+          enCorrection
+            ? "Vente corrigée"
+            : seule
+              ? "Vente enregistrée"
+              : `${enregistrees.length} ventes enregistrées`
+        }
         taille="moyenne"
         pied={
           <>
-            <button type="button" onClick={repartirDeZero} className="bouton bouton-neutre">
-              Enregistrer une autre vente
-            </button>
+            {!enCorrection && (
+              <button type="button" onClick={repartirDeZero} className="bouton bouton-neutre">
+                Enregistrer une autre vente
+              </button>
+            )}
             {/* `repartirDeZero` et non `fermer` : le lien enlève déjà
                 `?nouvelle=1` de l'adresse, ce qui referme la modale. Appeler
                 la fermeture ici lancerait un second changement d'adresse en
@@ -537,7 +587,12 @@ export function ModaleVente({
               qu'on dicte au client et qu'on écrit sur les reçus : « 2 ventes
               enregistrées » obligerait à aller les chercher dans la liste. */}
           <p className="font-medium text-encre">
-            {seule ? "Vente enregistrée" : "Ventes enregistrées"} —{" "}
+            {enCorrection
+              ? "Vente corrigée"
+              : seule
+                ? "Vente enregistrée"
+                : "Ventes enregistrées"}{" "}
+            —{" "}
             {enregistrees.map((vente, rang) => (
               <span key={vente.id}>
                 {rang > 0 && " · "}
@@ -554,7 +609,9 @@ export function ModaleVente({
     <Modale
       ouvert
       onFermer={fermer}
-      titre="Nouvelle vente"
+      titre={
+        corrige ? `Modifier la vente n° ${numeroLisible(corrige.vente.numero)}` : "Nouvelle vente"
+      }
       taille="large"
       pied={
         <>
@@ -570,11 +627,13 @@ export function ModaleVente({
             </span>
           </p>
           <div className="ml-auto flex flex-wrap items-center gap-2">
+            {/* « Fermer » en correction : « Annuler » s'y lirait comme
+                l'annulation de la vente, qui est un tout autre geste. */}
             <button type="button" onClick={fermer} className="bouton bouton-neutre">
-              Annuler
+              {enCorrection ? "Fermer" : "Annuler"}
             </button>
             <button type="button" onClick={enregistrer} className="bouton bouton-principal">
-              Enregistrer la vente
+              {enCorrection ? "Enregistrer la correction" : "Enregistrer la vente"}
             </button>
           </div>
         </>

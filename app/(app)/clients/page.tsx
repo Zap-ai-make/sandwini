@@ -9,7 +9,7 @@ import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { chercherClients, formaterTelephone, nomComplet, type Client } from "@/lib/domain/client";
 import { formaterDateCourte } from "@/lib/domain/format";
-import type { Vente } from "@/lib/domain/vente";
+import { ventesActives, type Vente } from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
@@ -64,7 +64,7 @@ export default function PageClients() {
 
   const achatsParClient = useMemo(() => {
     const table = new Map<string, Date[]>();
-    for (const vente of ventes ?? []) {
+    for (const vente of ventesActives(ventes ?? [])) {
       if (!vente.date) continue;
       const deja = table.get(vente.clientId);
       if (deja) deja.push(vente.date);

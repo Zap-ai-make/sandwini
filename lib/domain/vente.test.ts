@@ -54,6 +54,8 @@ import {
   type VenteCherchable,
   type Versement,
   lireEmporte,
+  estAnnulee,
+  ventesActives,
 } from "./vente";
 
 /**
@@ -328,6 +330,8 @@ describe("recherche d’une vente", () => {
     lienSuiviEnvoyeAt: null,
     statutDossier: "ouvert",
     dateClotureDossier: null,
+    annulation: null,
+    remplaceId: null,
     operateur: "Awa Sawadogo",
     ...partie,
   });
@@ -497,6 +501,8 @@ const venteS9 = (partie: Partial<Vente> = {}): Vente => ({
   lienSuiviEnvoyeAt: null,
   statutDossier: "ouvert",
   dateClotureDossier: null,
+  annulation: null,
+  remplaceId: null,
   operateur: "Awa Sawadogo",
   ...partie,
 });
@@ -846,6 +852,48 @@ describe("paiementsDeLaPeriode", () => {
        septembre, elle vaut ce qu'elle vaut depuis toujours. */
     expect(retenue.totalPaye).toBe(500_000);
     expect(retenue.resteDu).toBe(700_000);
+  });
+});
+
+/* S25 : une vente annulée reste en base, et sort de tout ce qui additionne. */
+describe("les ventes annulées", () => {
+  const annulee = venteS9({
+    id: "annulee",
+    totalPaye: 400_000,
+    resteDu: 800_000,
+    annulation: {
+      le: new Date(2026, 9, 30),
+      par: { uid: "ger-1", nom: "Awa" },
+      motif: "Erreur de saisie",
+      remplaceeParId: null,
+    },
+  });
+  const active = venteS9({ id: "active" });
+
+  it("se reconnaissent", () => {
+    expect(estAnnulee(annulee)).toBe(true);
+    expect(estAnnulee(active)).toBe(false);
+  });
+
+  it("sortent de la liste des ventes actives", () => {
+    expect(ventesActives([annulee, active]).map((v) => v.id)).toEqual(["active"]);
+  });
+
+  it("ne comptent plus dans le bilan de la liste des ventes", () => {
+    expect(bilanVentes([annulee, active]).ventes).toBe(1);
+  });
+
+  it("sortent du suivi des paiements, dettes comme tranches", () => {
+    const lignes = suivrePaiements(
+      [annulee, active],
+      [versement({ id: "p1", venteId: "annulee", montant: 400_000 })],
+      MAINTENANT,
+    );
+    expect(lignes.map((ligne) => ligne.vente.id)).toEqual(["active"]);
+  });
+
+  it("sortent de l’historique d’un client", () => {
+    expect(ventesDuClient([annulee, active], "client-1").map((v) => v.id)).toEqual(["active"]);
   });
 });
 

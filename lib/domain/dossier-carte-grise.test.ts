@@ -492,6 +492,7 @@ describe("rouvrir une ligne pour la corriger", () => {
     remisLe: new Date(2026, 6, 29, 12),
     remisANom: "",
     remisATelephone: "70518381",
+    venteAnnulee: false,
   };
 
   it("remet chaque case dans l’état où elle a été laissée", () => {
@@ -604,6 +605,7 @@ describe("chercher dans la liste", () => {
     remisLe: null,
     remisANom: "",
     remisATelephone: "70518381",
+    venteAnnulee: false,
   };
   const autre: DossierCarteGrise = {
     ...base,
@@ -615,6 +617,7 @@ describe("chercher dans la liste", () => {
     prestataireNom: "KABORE",
     immatriculation: "",
     remisATelephone: "",
+    venteAnnulee: false,
     deposeLe: new Date(2026, 5, 2, 12),
   };
   const liste = [base, autre];

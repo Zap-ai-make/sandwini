@@ -199,7 +199,49 @@ export type Vente = {
    * droit.
    */
   operateur: string;
+  /**
+   * L'annulation de la vente (S25), ou `null` pour une vente qui tient.
+   *
+   * Une vente annulée **reste en base** : rien ne s'efface (D10). Elle sort de
+   * tout ce qui additionne — `ventesActives` — et ne reçoit plus aucun geste.
+   */
+  annulation: AnnulationVente | null;
+  /** La vente qu'elle corrige, quand elle est née d'une correction (S25). */
+  remplaceId: string | null;
 };
+
+/**
+ * Qui a annulé une vente, quand, et pourquoi (S25).
+ *
+ * Le motif est obligatoire : c'est lui qui rend une annulation lisible des mois
+ * plus tard, et la règle le refuse vide.
+ */
+export type AnnulationVente = {
+  /** La date de l'appareil, comme toute date métier (D38). */
+  le: Date | null;
+  par: { uid: string; nom: string };
+  motif: string;
+  /** La vente qui remplace celle-ci, quand l'annulation est une correction. */
+  remplaceeParId: string | null;
+};
+
+/** Une vente annulée (S25). L'absence du champ — une vente d'avant — vaut « non ». */
+export function estAnnulee(vente: { annulation?: AnnulationVente | null }): boolean {
+  return vente.annulation != null;
+}
+
+/**
+ * Les ventes qui tiennent : tout ce qui additionne passe par ici (S25).
+ *
+ * Une vente annulée ne s'est pas vendue, et son argent a été rendu : la laisser
+ * dans un total ferait compter deux fois — la vente, puis le remboursement que
+ * la caisse montre déjà.
+ */
+export function ventesActives<T extends { annulation?: AnnulationVente | null }>(
+  ventes: readonly T[],
+): T[] {
+  return ventes.filter((vente) => !estAnnulee(vente));
+}
 
 export type Versement = {
   id: string;
@@ -483,9 +525,10 @@ export type BilanVentes = {
  * une carte de plus les ferait entrer par la fenêtre.
  */
 export function bilanVentes(
-  ventes: readonly Pick<Vente, "prixConvenu" | "totalPaye" | "resteDu">[],
+  ventes: readonly (Pick<Vente, "prixConvenu" | "totalPaye" | "resteDu"> &
+    Partial<Pick<Vente, "annulation">>)[],
 ): BilanVentes {
-  return ventes.reduce<BilanVentes>(
+  return ventesActives(ventes).reduce<BilanVentes>(
     (bilan, vente) => ({
       ventes: bilan.ventes + 1,
       chiffreAffaires: bilan.chiffreAffaires + vente.prixConvenu,
@@ -671,7 +714,9 @@ export function suivrePaiements(
     if (liste) liste.push(versement);
     else parVente.set(versement.venteId, [versement]);
   }
-  return ventes.map((vente) => lignePaiement(vente, parVente.get(vente.id) ?? [], maintenant));
+  return ventesActives(ventes).map((vente) =>
+    lignePaiement(vente, parVente.get(vente.id) ?? [], maintenant),
+  );
 }
 
 /** De la plus ancienne à la plus récente : on relance d'abord celui qui doit depuis le plus longtemps. */
@@ -890,7 +935,7 @@ export function peutRemettreMoto(vente: Vente, resteDu: number): boolean {
  */
 export function ventesDuClient(ventes: readonly Vente[], clientId: string): Vente[] {
   if (!clientId) return [];
-  return ventes
+  return ventesActives(ventes)
     .filter((vente) => vente.clientId === clientId)
     .sort((a, b) => (b.date?.getTime() ?? 0) - (a.date?.getTime() ?? 0));
 }

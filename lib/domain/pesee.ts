@@ -2,7 +2,7 @@ import { moisDe, memeMois } from "./chiffres";
 import type { Moto } from "./moto";
 import { etatStock, stockParPiece, type MouvementPiece, type Piece } from "./piece";
 import type { RetourPiece } from "./retour";
-import type { Vente } from "./vente";
+import { ventesActives, type Vente } from "./vente";
 import { margeVentePiece, type VentePiece } from "./vente-piece";
 
 /**
@@ -149,7 +149,8 @@ export function peserBoutiques(sources: SourcesPesee, maintenant: Date): Map<str
     pour(moto.boutiqueId).motos.enStock += 1;
   }
 
-  for (const vente of sources.ventes ?? []) {
+  /* Une vente annulée (S25) ne s'est pas vendue et ne doit plus rien. */
+  for (const vente of ventesActives(sources.ventes ?? [])) {
     const ligne = pour(vente.boutiqueId).motos;
     if (vente.date !== null && memeMois(moisDe(vente.date), mois)) ligne.ventesDuMois += 1;
     ligne.resteDu += vente.resteDu;

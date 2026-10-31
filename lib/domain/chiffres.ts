@@ -1,5 +1,12 @@
 import { LOCALE } from "./format";
-import { LIBELLE_MODE, type ModePaiement, type Vente, type Versement } from "./vente";
+import {
+  LIBELLE_MODE,
+  estAnnulee,
+  ventesActives,
+  type ModePaiement,
+  type Vente,
+  type Versement,
+} from "./vente";
 
 /**
  * Les chiffres d'un mois, calculés à la lecture (S24).
@@ -137,10 +144,15 @@ export function chiffresDuMois(
   versements: readonly Versement[],
   marges: MargeParVente,
 ): ChiffresDuMois {
-  const duMois = ventes.filter((vente) => dansLeMois(vente.date, mois));
+  /* Une vente annulée sort des quatre chiffres (S25), et ses versements avec
+     elle : l'argent a été rendu, la caisse montre la sortie. */
+  const annulees = new Set(ventes.filter(estAnnulee).map((vente) => vente.id));
+  const actives = ventesActives(ventes);
+  const duMois = actives.filter((vente) => dansLeMois(vente.date, mois));
   const avant = moisPrecedent(mois);
 
   const encaisse = versements
+    .filter((versement) => !annulees.has(versement.venteId))
     .filter((versement) => dansLeMois(versement.date, mois))
     .reduce((somme, versement) => somme + versement.montant, 0);
 
@@ -163,7 +175,7 @@ export function chiffresDuMois(
 
   return {
     motosVendues: duMois.length,
-    motosVenduesAvant: ventes.filter((vente) => dansLeMois(vente.date, avant)).length,
+    motosVenduesAvant: actives.filter((vente) => dansLeMois(vente.date, avant)).length,
     encaisse,
     marge,
     margePartiellementEncaissee: connues.some((vente) => vente.modePaiement !== "comptant"),
@@ -210,7 +222,7 @@ export function partsParBoutique(
   nomDeLaBoutique: (id: string) => string,
 ): Part[] {
   const parBoutique = new Map<string, { libelle: string; montant: number; compte: number }>();
-  for (const vente of ventes) {
+  for (const vente of ventesActives(ventes)) {
     if (!dansLeMois(vente.date, mois)) continue;
     const actuel = parBoutique.get(vente.boutiqueId) ?? {
       libelle: nomDeLaBoutique(vente.boutiqueId),
@@ -229,7 +241,7 @@ export function partsParBoutique(
 /** Le même mois, réparti par mode de paiement. */
 export function partsParMode(mois: Mois, ventes: readonly Vente[]): Part[] {
   const parMode = new Map<string, { libelle: string; montant: number; compte: number }>();
-  for (const vente of ventes) {
+  for (const vente of ventesActives(ventes)) {
     if (!dansLeMois(vente.date, mois)) continue;
     const mode: ModePaiement = vente.modePaiement;
     const actuel = parMode.get(mode) ?? { libelle: LIBELLE_MODE[mode], montant: 0, compte: 0 };

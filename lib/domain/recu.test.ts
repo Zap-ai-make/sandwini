@@ -52,6 +52,8 @@ const vente = (partie: Partial<Vente> = {}): Vente => ({
   lienSuiviEnvoyeAt: null,
   statutDossier: "ouvert",
   dateClotureDossier: null,
+  annulation: null,
+  remplaceId: null,
   operateur: "Awa Sawadogo",
   ...partie,
 });

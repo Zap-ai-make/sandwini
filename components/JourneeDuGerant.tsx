@@ -6,7 +6,14 @@ import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
 import { nomComplet } from "@/lib/domain/client";
 import { formaterHeure, formaterMontant, memeJour } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
-import { LIBELLE_MODE, LIBELLE_MOYEN, type Vente, type Versement } from "@/lib/domain/vente";
+import {
+  LIBELLE_MODE,
+  LIBELLE_MOYEN,
+  estAnnulee,
+  ventesActives,
+  type Vente,
+  type Versement,
+} from "@/lib/domain/vente";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useCatalogue } from "@/lib/repositories/catalogue";
@@ -85,8 +92,11 @@ export function JourneeDuGerant() {
     const nom = (id: string) => nomDuClient.get(id) ?? "Client inconnu";
 
     const lignes: Ecriture[] = [];
+    /* Une vente annulée sort de la journée, ses versements avec elle (S25) :
+       l'argent a été rendu, et la caisse le montre. */
+    const annulees = new Set(ventes.filter(estAnnulee).map((vente) => vente.id));
 
-    for (const vente of ventes) {
+    for (const vente of ventesActives(ventes)) {
       if (!memeJour(vente.date, aujourdhui)) continue;
       lignes.push({
         cle: `vente-${vente.id}`,
@@ -98,7 +108,7 @@ export function JourneeDuGerant() {
     }
 
     for (const versement of versements) {
-      if (!memeJour(versement.date, aujourdhui)) continue;
+      if (annulees.has(versement.venteId) || !memeJour(versement.date, aujourdhui)) continue;
       lignes.push({
         cle: `versement-${versement.id}`,
         quand: versement.date as Date,
