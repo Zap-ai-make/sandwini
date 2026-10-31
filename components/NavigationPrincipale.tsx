@@ -379,15 +379,9 @@ function LesBoutiques({ repliee, chemin }: { repliee: boolean; chemin: string })
                 ].join(" ")}
               >
                 <Store aria-hidden="true" className="mt-0.5 size-4 shrink-0 self-start opacity-85" />
+                {/* Le nom seul : le code de trois lettres qui le suivait
+                    embrouillait le commanditaire (31 octobre 2026). */}
                 <span className="colonne-libelle min-w-0 flex-1">{boutique.nom}</span>
-                {/* Le même creux que les comptes voisins, et non la plaque
-                    jaune. D70 autorise le jaune sur un code boutique, mais la
-                    maquette `b2:47` ne le prend pas ici — et elle a raison :
-                    huit pavés jaunes empilés dans une colonne de navigation
-                    referaient d'un signal une couleur de décor, ce que ce lot
-                    corrige partout ailleurs. Le jaune reste où il tranche : le
-                    bandeau, qui dit où l'on écrit. */}
-                <span className="colonne-libelle colonne-compte">{boutique.code}</span>
               </button>
             </li>
           );

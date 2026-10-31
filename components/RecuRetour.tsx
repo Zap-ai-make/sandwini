@@ -1,4 +1,3 @@
-import type { Boutique } from "@/lib/domain/boutique";
 import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { montantEnLettres } from "@/lib/domain/lettres";
 import { numeroLisible } from "@/lib/domain/numerotation";
@@ -18,13 +17,7 @@ import { EntetePieces } from "@/components/EntetePieces";
  * Le composant ne lit rien : il reçoit tout. L'impression s'appuie sur le
  * marqueur `a-imprimer` posé par son panneau.
  */
-export function RecuRetour({
-  retour,
-  boutique,
-}: {
-  retour: RetourPiece;
-  boutique: Boutique | null;
-}) {
+export function RecuRetour({ retour }: { retour: RetourPiece }) {
   return (
     <article
       aria-label={`Reçu de retour sur la facture n° ${numeroLisible(retour.venteNumero)}`}
@@ -114,11 +107,6 @@ export function RecuRetour({
       </p>
 
       <p className="facture-acquitte mt-4">REMBOURSÉ</p>
-
-      <p className="mt-6 text-legende text-right">
-        Établi par {retour.operateur || "opérateur non enregistré"}
-        {boutique ? ` — ${boutique.nom}` : ""}
-      </p>
     </article>
   );
 }

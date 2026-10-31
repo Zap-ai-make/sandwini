@@ -159,7 +159,6 @@ export default function PageNouvelleMoto() {
                       <span className="block text-legende text-encre-doux">{boutique.adresse}</span>
                     )}
                   </span>
-                  <span className="plaque-code shrink-0 text-encre-doux">{boutique.code}</span>
                 </button>
               </li>
             ))

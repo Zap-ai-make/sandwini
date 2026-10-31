@@ -179,8 +179,7 @@ function LigneUtilisateur({
               (utilisateur.boutiqueId ? (
                 <>
                   {" · "}
-                  <span className="plaque-code">{utilisateur.boutiqueId}</span>
-                  {boutique ? ` ${boutique.nom}` : ""}
+                  {boutique ? boutique.nom : utilisateur.boutiqueId}
                 </>
               ) : (
                 <span className="text-alerte"> · aucune boutique</span>
@@ -377,7 +376,7 @@ function Rattachement({
           <option value="">Aucune</option>
           {boutiques.map((boutique) => (
             <option key={boutique.id} value={boutique.id}>
-              {boutique.code} · {boutique.nom}
+              {boutique.nom}
             </option>
           ))}
         </select>
@@ -531,7 +530,7 @@ function FormulaireGerant({
             <option value="">Aucune pour l’instant</option>
             {boutiques.map((boutique) => (
               <option key={boutique.id} value={boutique.id}>
-                {boutique.code} · {boutique.nom}
+                {boutique.nom}
               </option>
             ))}
           </select>

@@ -5,6 +5,7 @@ import { useState } from "react";
 import { Avis } from "@/components/patrons/Avis";
 import { compter, formaterDateCourte, formaterMontant } from "@/lib/domain/format";
 import type { CartePartie, Depart } from "@/lib/domain/paquet";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Tout ce qui est parti chez un prestataire (20 octobre 2026).
@@ -99,7 +100,7 @@ export function HistoriqueDesDeparts({
                     className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-1"
                   >
                     <span className="plaque-code shrink-0 text-legende text-encre">
-                      {carte.numero}
+                      {numeroLisible(carte.numero)}
                     </span>
                     <span className="min-w-0 flex-1 truncate text-legende text-encre-doux">
                       {carte.client}

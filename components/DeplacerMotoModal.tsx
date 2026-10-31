@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Champ } from "@/components/patrons/Champ";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
-import type { Boutique } from "@/lib/domain/boutique";
+import { nomDeBoutique, type Boutique } from "@/lib/domain/boutique";
 import type { Moto } from "@/lib/domain/moto";
 import {
   LONGUEUR_MOTIF_MAX,
@@ -122,7 +122,7 @@ export function DeplacerMotoModal({
         <div className="rounded-plaque border border-bord bg-fond p-3">
           <p className="font-code text-encre">{moto.numeroChassis}</p>
           <p className="text-corps text-encre-doux">
-            Aujourd’hui à <span className="plaque-code">{moto.boutiqueId}</span>
+            Aujourd’hui à {nomDeBoutique(boutiques, moto.boutiqueId)}
           </p>
         </div>
 
@@ -139,7 +139,7 @@ export function DeplacerMotoModal({
             <option value="">Choisir…</option>
             {destinations.map((boutique) => (
               <option key={boutique.id} value={boutique.id}>
-                {boutique.code} · {boutique.nom}
+                {boutique.nom}
               </option>
             ))}
           </select>

@@ -26,7 +26,7 @@ import {
   normaliserNom,
   type Client,
 } from "@/lib/domain/client";
-import { formaterNombre } from "@/lib/domain/format";
+import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
 import {
   LIBELLE_MODE,
@@ -177,6 +177,16 @@ function Ventes() {
 
   const colonnes = useMemo<Colonne<Cherchable>[]>(() => {
     const liste: Colonne<Cherchable>[] = [
+      /* **La date de la vente, en tête** (31 octobre 2026, demande du
+         commanditaire). Sans elle, deux ventes au même client ne se
+         distinguaient qu'en ouvrant la fiche. « à l'instant » pour une vente
+         dont le serveur n'a pas encore posé l'heure (D82). */
+      {
+        cle: "date",
+        titre: "Date",
+        chiffre: true,
+        rendu: (ligne) => (ligne.vente.date ? formaterDateCourte(ligne.vente.date) : "à l’instant"),
+      },
       /* **La colonne « Pièce » est partie** (26 octobre 2026, demande du
          commanditaire). Le numéro de reçu reste dans le panneau de la vente,
          où on le lit quand on en a besoin ; en tête de liste il servait

@@ -12,7 +12,8 @@ import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import { LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
 import { destinationsPossibles, raisonDeNePasPartir, type Transfert } from "@/lib/domain/transfert";
-import type { Boutique } from "@/lib/domain/boutique";
+import { nomDeBoutique, type Boutique } from "@/lib/domain/boutique";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterBoutiques } from "@/lib/repositories/boutiques";
 import { useCatalogue, type Catalogue } from "@/lib/repositories/catalogue";
@@ -36,6 +37,7 @@ import { ecouterArriveeDeLaMoto } from "@/lib/repositories/transferts";
 export function FicheMoto({ id }: { id: string }) {
   const session = useSession();
   const catalogue = useCatalogue();
+  const { boutiques: boutiquesVisibles } = usePerimetre();
 
   const souscrire = useCallback(
     (auChangement: (moto: Moto | null) => void, enErreur: (cause: unknown) => void) =>
@@ -94,7 +96,7 @@ export function FicheMoto({ id }: { id: string }) {
 
           <dl className="mt-6 cadre cadre-liste">
             <Ligne titre="Statut" valeur={LIBELLE_STATUT[moto.statut]} />
-            <Ligne titre="Boutique" valeur={moto.boutiqueId} code />
+            <Ligne titre="Boutique" valeur={nomDeBoutique(boutiquesVisibles, moto.boutiqueId)} />
             <Ligne titre="Provenance" valeur={catalogue.nomProvenance(moto.provenanceId)} />
             {moto.couleur && <Ligne titre="Couleur" valeur={moto.couleur} />}
             {moto.annee !== null && <Ligne titre="Année" valeur={String(moto.annee)} />}

@@ -4,6 +4,7 @@ import type { Moto } from "./moto";
 
 const nomMarque = (id: string) => ({ ya: "Yamaha" })[id] ?? (id ? "—" : "");
 const nomModele = (id: string) => ({ cry: "Crypton" })[id] ?? (id ? "—" : "");
+const nomBoutique = (id: string) => ({ PTG: "Pouytenga" })[id] ?? id;
 
 const moto = (p: Partial<Moto> = {}): Moto => ({
   id: "m1",
@@ -36,15 +37,22 @@ const cellule = (ligne: readonly (string | number | null)[], colonne: string) =>
 
 describe("lignesMotosExport", () => {
   it("ouvre sur une ligne d’en-tête", () => {
-    expect(lignesMotosExport([], nomMarque, nomModele)).toEqual([[...EN_TETE_EXPORT]]);
+    expect(lignesMotosExport([], nomMarque, nomModele, nomBoutique)).toEqual([[...EN_TETE_EXPORT]]);
   });
 
   it("écrit une moto, cadre et désignation compris", () => {
-    const [, ligne] = lignesMotosExport([moto()], nomMarque, nomModele);
+    const [, ligne] = lignesMotosExport([moto()], nomMarque, nomModele, nomBoutique);
     expect(cellule(ligne, "Châssis")).toBe("LC6PCJ1A9K0000123");
     expect(cellule(ligne, "Marque")).toBe("Yamaha");
     expect(cellule(ligne, "Modèle")).toBe("Crypton");
     expect(cellule(ligne, "Couleur")).toBe("Rouge");
+  });
+
+  /* Le code de trois lettres embrouillait le commanditaire (31 octobre
+     2026) : la boutique se lit sous son nom, dans l'export comme à l'écran. */
+  it("écrit le nom de la boutique, et non son code", () => {
+    const [, ligne] = lignesMotosExport([moto()], nomMarque, nomModele, nomBoutique);
+    expect(cellule(ligne, "Boutique")).toBe("Pouytenga");
   });
 
   /**
@@ -66,8 +74,8 @@ describe("lignesMotosExport", () => {
       moto({ prixVenteConseille: 1_100_000 }),
       moto({ id: "m2", prixVenteConseille: 975_000 }),
     ];
-    const plat = JSON.stringify(lignesMotosExport(motos, nomMarque, nomModele));
-    const fichier = new TextDecoder().decode(motosEnClasseur(motos, nomMarque, nomModele));
+    const plat = JSON.stringify(lignesMotosExport(motos, nomMarque, nomModele, nomBoutique));
+    const fichier = new TextDecoder().decode(motosEnClasseur(motos, nomMarque, nomModele, nomBoutique));
 
     for (const dedans of [plat, fichier]) {
       expect(dedans).not.toContain("1100000");
@@ -94,32 +102,32 @@ describe("lignesMotosExport", () => {
    */
   it("n’abîme plus une valeur qui ressemble à une formule", () => {
     for (const texte of ["=1+1", "+1", "-1", "@SUM(A1)"]) {
-      const [, ligne] = lignesMotosExport([moto({ couleur: texte })], nomMarque, nomModele);
+      const [, ligne] = lignesMotosExport([moto({ couleur: texte })], nomMarque, nomModele, nomBoutique);
       expect(cellule(ligne, "Couleur"), texte).toBe(texte);
     }
     const fichier = new TextDecoder().decode(
-      motosEnClasseur([moto({ couleur: "=1+1" })], nomMarque, nomModele),
+      motosEnClasseur([moto({ couleur: "=1+1" })], nomMarque, nomModele, nomBoutique),
     );
     expect(fichier).not.toContain("<f>");
   });
 
   it("écrit l’année en nombre, pour qu’elle se trie comme un nombre", () => {
-    const [, ligne] = lignesMotosExport([moto({ annee: 2024 })], nomMarque, nomModele);
+    const [, ligne] = lignesMotosExport([moto({ annee: 2024 })], nomMarque, nomModele, nomBoutique);
     expect(cellule(ligne, "Année")).toBe(2024);
-    const [, sans] = lignesMotosExport([moto({ annee: null })], nomMarque, nomModele);
+    const [, sans] = lignesMotosExport([moto({ annee: null })], nomMarque, nomModele, nomBoutique);
     expect(cellule(sans, "Année")).toBeNull();
   });
 
   it("laisse la cellule vide quand le modèle n’a pas été saisi", () => {
-    const [, ligne] = lignesMotosExport([moto({ modeleId: "" })], nomMarque, nomModele);
+    const [, ligne] = lignesMotosExport([moto({ modeleId: "" })], nomMarque, nomModele, nomBoutique);
     expect(cellule(ligne, "Modèle")).toBe("");
     expect(cellule(ligne, "Marque")).toBe("Yamaha");
   });
 
   it("écrit une date lisible, et rien quand elle manque", () => {
-    const [, avec] = lignesMotosExport([moto()], nomMarque, nomModele);
+    const [, avec] = lignesMotosExport([moto()], nomMarque, nomModele, nomBoutique);
     expect(cellule(avec, "Entrée")).toBe("01/09/2026");
-    const [, sans] = lignesMotosExport([moto({ dateEntree: null })], nomMarque, nomModele);
+    const [, sans] = lignesMotosExport([moto({ dateEntree: null })], nomMarque, nomModele, nomBoutique);
     expect(cellule(sans, "Entrée")).toBe("");
   });
 
@@ -128,6 +136,7 @@ describe("lignesMotosExport", () => {
       [moto({ numeroChassis: "AAA" }), moto({ id: "m2", numeroChassis: "BBB" })],
       nomMarque,
       nomModele,
+      nomBoutique,
     );
     expect(cellule(premiere, "Châssis")).toBe("AAA");
     expect(cellule(seconde, "Châssis")).toBe("BBB");
@@ -136,13 +145,13 @@ describe("lignesMotosExport", () => {
 
 describe("motosEnClasseur", () => {
   it("rend une archive qu’un tableur saura ouvrir", () => {
-    const octets = motosEnClasseur([moto()], nomMarque, nomModele);
+    const octets = motosEnClasseur([moto()], nomMarque, nomModele, nomBoutique);
     expect([...octets.slice(0, 2)]).toEqual([0x50, 0x4b]);
     expect(new TextDecoder().decode(octets)).toContain("xl/worksheets/sheet1.xml");
   });
 
   it("nomme la feuille d’après ce qu’elle contient", () => {
-    const contenu = new TextDecoder().decode(motosEnClasseur([], nomMarque, nomModele));
+    const contenu = new TextDecoder().decode(motosEnClasseur([], nomMarque, nomModele, nomBoutique));
     expect(contenu).toContain('name="Motos"');
   });
 });

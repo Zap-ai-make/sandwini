@@ -12,10 +12,10 @@ import { formaterMontant } from "@/lib/domain/format";
 import type { RetourPiece } from "@/lib/domain/retour";
 import { peut } from "@/lib/domain/roles";
 import { textePartageVentePiece, type VentePiece } from "@/lib/domain/vente-piece";
-import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterRetoursDeVente } from "@/lib/repositories/retours-pieces";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Le reçu d'une vente de pièces, dans un panneau (S64).
@@ -37,10 +37,8 @@ export function PanneauVentePiece({
   base?: string;
 }) {
   const session = useSession();
-  const { boutiques } = usePerimetre();
   const { clients } = useFichierClients();
 
-  const boutique = boutiques.find((b) => b.id === vente.boutiqueId) ?? null;
   /* Vente récente : `clientId` porte le nom tapé au comptoir (pas de fiche).
      Vente ancienne : un identifiant qu'on résout en fiche. « Fiche connue → son
      nom, sinon la chaîne EST le nom » couvre les deux sans migration. */
@@ -91,7 +89,7 @@ export function PanneauVentePiece({
 
       <Actions
         texte={textePartageVentePiece(vente, nom, IDENTITE.raisonSociale)}
-        titre={`Reçu de vente ${vente.numero}`}
+        titre={`Reçu de vente ${numeroLisible(vente.numero)}`}
       />
 
       {/* `a-imprimer` : ce qui sort de l'imprimante, et rien d'autre (la règle
@@ -100,7 +98,6 @@ export function PanneauVentePiece({
       <div className="a-imprimer mt-4 print:mt-0">
         <RecuPiece
           vente={vente}
-          boutique={boutique}
           client={client}
           nomLibre={client ? "" : vente.clientId}
         />

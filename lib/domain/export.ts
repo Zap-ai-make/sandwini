@@ -65,6 +65,9 @@ export function lignesMotosExport(
   motos: readonly Moto[],
   nomMarque: (id: string) => string,
   nomModele: (id: string) => string,
+  /* Le nom, et non le code de trois lettres, qui embrouillait le
+     commanditaire (31 octobre 2026). */
+  nomBoutique: (id: string) => string,
 ): Cellule[][] {
   return [
     [...EN_TETE_EXPORT],
@@ -80,7 +83,7 @@ export function lignesMotosExport(
          texte, et c'est le genre de colonne qu'on trie. */
       moto.annee,
       LIBELLE_STATUT[moto.statut],
-      moto.boutiqueId,
+      nomBoutique(moto.boutiqueId),
       moto.numeroMoteur,
       jour(moto.dateEntree),
     ]),
@@ -92,8 +95,9 @@ export function motosEnClasseur(
   motos: readonly Moto[],
   nomMarque: (id: string) => string,
   nomModele: (id: string) => string,
+  nomBoutique: (id: string) => string,
 ): Uint8Array<ArrayBuffer> {
-  return classeur("Motos", lignesMotosExport(motos, nomMarque, nomModele));
+  return classeur("Motos", lignesMotosExport(motos, nomMarque, nomModele, nomBoutique));
 }
 
 /** `motos-2026-10-08.xlsx` — daté, pour que deux exports ne se confondent pas. */

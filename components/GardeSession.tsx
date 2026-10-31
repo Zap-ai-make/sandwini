@@ -146,8 +146,7 @@ export function GardeEspace({ espace, children }: { espace: Espace; children: Re
         </p>
       ) : (
         <p className="text-encre-doux">
-          <span className="plaque-code">{perimetre.code}</span>
-          {perimetre.nom ? ` ${perimetre.nom}` : ""} ne vend pas de {marchandise}
+          {perimetre.nom || "Cette boutique"} ne vend pas de {marchandise}
           {peutChoisir
             ? " : choisissez une autre boutique dans le bandeau, en haut de l’écran."
             : " : cet espace n’existe donc pas pour elle. Ce n’est pas une erreur de votre part."}

@@ -52,7 +52,7 @@ export default function PageRetour() {
  */
 function Retour() {
   const session = useSession();
-  const { perimetre, boutiques } = usePerimetre();
+  const { perimetre } = usePerimetre();
   const parametres = useParams<{ venteId: string }>();
   const venteId = parametres.venteId;
   const boutiqueId = perimetre.boutiqueId;
@@ -120,7 +120,6 @@ function Retour() {
     );
   }
 
-  const boutique = boutiques.find((b) => b.id === boutiqueId) ?? null;
 
   /* Le reçu de retour, une fois le retour fait. L'écran bascule entièrement
      dessus : la saisie n'a plus lieu d'être. */
@@ -145,7 +144,7 @@ function Retour() {
           </div>
         </div>
         <div className="a-imprimer mt-4 print:mt-0">
-          <RecuRetour retour={fait} boutique={boutique} />
+          <RecuRetour retour={fait} />
         </div>
       </div>
     );

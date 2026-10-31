@@ -12,6 +12,7 @@ import {
   type EtapeRelais,
 } from "@/lib/domain/dossier";
 import { formaterDateCourte, formaterMontant } from "@/lib/domain/format";
+import { numeroLisible } from "@/lib/domain/numerotation";
 import {
   LIBELLE_DOCUMENT,
   LIBELLE_STATUT_DOCUMENT,
@@ -79,7 +80,7 @@ export function RelaisDocument({
           id="titre-relais"
           className="text-bloc font-bold tracking-tight text-encre"
         >
-          {LIBELLE_DOCUMENT[document.type]} de <span className="plaque-code">{numero}</span>
+          {LIBELLE_DOCUMENT[document.type]} de <span className="plaque-code">{numeroLisible(numero)}</span>
         </h2>
 
         {/* Jamais la couleur seule : le retard est écrit, et chiffré — « en

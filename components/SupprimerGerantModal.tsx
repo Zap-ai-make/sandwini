@@ -4,6 +4,8 @@ import { LoaderCircle, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { Modale } from "@/components/patrons/Modale";
+import { nomDeBoutique } from "@/lib/domain/boutique";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import {
   messageErreurUtilisateur,
   supprimerGerant,
@@ -35,6 +37,7 @@ export function SupprimerGerantModal({
   ouvert: boolean;
   onFermer: () => void;
 }) {
+  const { boutiques } = usePerimetre();
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -91,7 +94,7 @@ export function SupprimerGerantModal({
           <p className="text-corps wrap-break-word text-encre-doux">{utilisateur.email}</p>
           {utilisateur.boutiqueId && (
             <p className="text-corps text-encre-doux">
-              Rattaché à <span className="plaque-code">{utilisateur.boutiqueId}</span>
+              Rattaché à {nomDeBoutique(boutiques, utilisateur.boutiqueId)}
             </p>
           )}
         </div>

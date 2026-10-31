@@ -7,6 +7,7 @@ import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterMontant } from "@/lib/domain/format";
 import { useCeQuiAttend, type Attente } from "@/lib/repositories/comptes";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Ce qui demande une décision, toutes boutiques réunies — le tableau d’A2.
@@ -55,7 +56,7 @@ export function CeQuiDemandeUneDecision({ className }: { className?: string } = 
       principal: true,
       rendu: (ligne) => (
         <Link href={ligne.href} className="plaque-code text-encre underline-offset-2 hover:underline">
-          {ligne.numero}
+          {numeroLisible(ligne.numero)}
         </Link>
       ),
     },
@@ -182,7 +183,7 @@ export function AFaireAujourdhui({ className }: { className?: string } = {}) {
                       numéro coupé ne se dicte plus au téléphone. Même correctif
                       qu'en A6, A7 et A8 (S29). */}
                   <span className="plaque-code whitespace-nowrap text-encre-doux">
-                    {ligne.numero}
+                    {numeroLisible(ligne.numero)}
                   </span>
                 </span>
                 <span className="block text-corps text-encre-doux">

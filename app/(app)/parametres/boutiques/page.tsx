@@ -122,17 +122,6 @@ function LigneBoutique({ boutique }: { boutique: Boutique }) {
   return (
     <li className="px-4 py-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span
-          className={[
-            "plaque-code flex h-8 shrink-0 items-center rounded-plaque border px-2 text-sm leading-none",
-            boutique.actif
-              ? "border-plaque-bord bg-plaque text-encre-fixe"
-              : "border-bord text-encre-doux",
-          ].join(" ")}
-        >
-          {boutique.code}
-        </span>
-
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-2">
             <span className="font-medium text-encre">{boutique.nom}</span>

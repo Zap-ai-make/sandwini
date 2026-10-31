@@ -16,6 +16,7 @@ import { useCatalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterMoto } from "@/lib/repositories/motos";
 import { ecouterVente, ecouterVersements } from "@/lib/repositories/ventes";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Le panneau qui montre un reçu et permet de l'imprimer ou de le partager.
@@ -149,7 +150,7 @@ export function PanneauRecu({
       ) : (
         <>
           <Actions base={base}
-            titre={`${LIBELLE_TYPE_RECU[contenu.type]} ${contenu.numero}`}
+            titre={`${LIBELLE_TYPE_RECU[contenu.type]} ${numeroLisible(contenu.numero)}`}
             texte={textePartage(contenu, IDENTITE.raisonSociale, formaterMontant, formaterDate)}
             venteId={contenu.vente.id}
           />

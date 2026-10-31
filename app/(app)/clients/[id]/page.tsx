@@ -20,6 +20,7 @@ import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterVentes } from "@/lib/repositories/ventes";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * La fiche d'un client : qui il est, et ce qu'il a acheté (S54).
@@ -85,7 +86,7 @@ export default function PageClient() {
         principal: true,
         rendu: (vente) => (
           <Link href={`${base}?vente=${vente.id}`} className="lien font-code">
-            {vente.numero}
+            {numeroLisible(vente.numero)}
           </Link>
         ),
       },

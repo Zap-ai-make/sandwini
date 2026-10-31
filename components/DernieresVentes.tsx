@@ -16,6 +16,7 @@ import { useCatalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterVentes } from "@/lib/repositories/ventes";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Les dernières ventes, toutes boutiques — la seconde section d’A2
@@ -104,7 +105,7 @@ export function DernieresVentes({ className }: { className?: string } = {}) {
           href={`/motos/ventes?vente=${ligne.vente.id}`}
           className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
         >
-          {ligne.vente.numero}
+          {numeroLisible(ligne.vente.numero)}
         </Link>
       ),
     },

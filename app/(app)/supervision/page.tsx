@@ -11,7 +11,7 @@ import { TetePage } from "@/components/patrons/Page";
 import { LIBELLE_METIER, reunirMetiers, type Metier } from "@/lib/domain/boutique";
 import { ESPACES } from "@/lib/domain/espaces";
 import { formaterMois, formaterMontant, formaterNombre } from "@/lib/domain/format";
-import { CODE_ENTREPRISE, usePerimetre } from "@/lib/perimetre/perimetre";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useCeQuiAttend } from "@/lib/repositories/comptes";
 import {
   PESEE_VIDE,
@@ -103,11 +103,9 @@ export default function Supervision() {
         <nav aria-label="Boutiques" className="mt-6">
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {/* L’entreprise entière vient en premier : c’est la vue par défaut du
-                responsable, et choisir une boutique est le geste qui rétrécit. La
-                plaque porte le code de l’entreprise, comme dans le bandeau. */}
+                responsable, et choisir une boutique est le geste qui rétrécit. */}
             <li>
               <CarteBoutique
-                code={CODE_ENTREPRISE}
                 nom="Toutes les boutiques"
                 dessous={
                   actives.length === 1
@@ -136,7 +134,6 @@ export default function Supervision() {
             {actives.map((boutique) => (
               <li key={boutique.id}>
                 <CarteBoutique
-                  code={boutique.code}
                   nom={boutique.nom}
                   /* Le métier est écrit, jamais porté par la seule couleur de
                      la plaque (DESIGN.md §5). */
@@ -189,7 +186,6 @@ export default function Supervision() {
  * taille du doigt, et personne n’a à viser trois mots.
  */
 function CarteBoutique({
-  code,
   nom,
   dessous,
   href,
@@ -198,7 +194,6 @@ function CarteBoutique({
   retards,
   chiffres,
 }: {
-  code: string;
   nom: string;
   dessous: string;
   href: string;
@@ -225,9 +220,6 @@ function CarteBoutique({
       className="cadre flex h-full flex-col gap-3 p-4 hover:border-bord-fort hover:bg-survol focus-visible:bg-survol"
     >
       <span className="flex items-start gap-3">
-        <span className="plaque-code flex h-8 shrink-0 items-center rounded-plaque border border-plaque-bord bg-plaque px-2 text-sm leading-none text-encre-fixe">
-          {code}
-        </span>
         <span className="min-w-0 flex-1">
           <span className="block font-medium text-encre">{nom}</span>
           <span className="block text-corps text-encre-doux">{dessous}</span>

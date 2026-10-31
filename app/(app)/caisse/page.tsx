@@ -188,7 +188,6 @@ function BilanDesBoutiques() {
                     <div key={ligne.boutiqueId} className="grid gap-0.5">
                       <div className="flex flex-wrap items-baseline justify-between gap-x-3">
                         <dt className="flex min-w-0 items-center gap-2 text-corps text-encre">
-                          <span className="plaque-code">{ligne.code}</span>
                           <span className="min-w-0 truncate font-medium">{ligne.nom}</span>
                         </dt>
                         <dd className="font-code text-corps font-semibold tabular-nums text-encre">

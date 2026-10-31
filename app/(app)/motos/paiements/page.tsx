@@ -44,6 +44,7 @@ import { ecouterReglages } from "@/lib/repositories/entreprise";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/ventes";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Le suivi des paiements (§6.3).
@@ -195,7 +196,7 @@ export default function PagePaiements() {
             href={`/motos/paiements?vente=${ligne.vente.id}`}
             className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
           >
-            {ligne.vente.numero}
+            {numeroLisible(ligne.vente.numero)}
           </Link>
         ),
       },
@@ -285,13 +286,13 @@ export default function PagePaiements() {
                la remise se fait toujours. */
             <Link
               href={`/motos/paiements?vente=${ligne.vente.id}`}
-              aria-label={`Voir la vente ${ligne.vente.numero}`}
+              aria-label={`Voir la vente ${numeroLisible(ligne.vente.numero)}`}
               className="bouton bouton-neutre h-9 px-3 text-legende"
             >
               Voir
             </Link>
           ) : (
-            <Encaisser vente={ligne.vente.id} numero={ligne.vente.numero} />
+            <Encaisser vente={ligne.vente.id} numero={numeroLisible(ligne.vente.numero)} />
           ),
       },
     ],

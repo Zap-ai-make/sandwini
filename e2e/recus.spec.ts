@@ -93,7 +93,6 @@ test.describe("le reçu de vente", () => {
     await expect(recu).toContainText("1 200 000 FCFA");
     await expect(recu).toContainText("400 000 FCFA");
     await expect(recu).toContainText("800 000 FCFA");
-    await expect(recu).toContainText("Espèces");
     /* Le pied nomme le gérant en regard du trait du client (`c4:76-86`) : la
        légende d'une signature, et non plus la phrase « Établi par ». */
     await expect(recu).toContainText("Le gérant");

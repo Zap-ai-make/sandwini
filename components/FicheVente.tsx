@@ -194,9 +194,9 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
           {estRenumerotee(vente) && (
             <Avis role="status" ton="alerte" titre="Ce reçu a été renuméroté" className="mb-4">
               Un autre appareil avait déjà attribué{" "}
-              <span className="plaque-code">{vente.numeroInitial}</span> pendant la coupure. Le
+              <span className="plaque-code">{numeroLisible(vente.numeroInitial)}</span> pendant la coupure. Le
               numéro qui fait foi est désormais{" "}
-              <span className="plaque-code">{vente.numero}</span>. Si le client détient un reçu
+              <span className="plaque-code">{numeroLisible(vente.numero)}</span>. Si le client détient un reçu
               portant l’ancien, remettez-lui le nouveau.
             </Avis>
           )}
@@ -436,7 +436,7 @@ function ListeVersements({ versements, base }: { versements: Versement[] | null;
                   className="inline-flex items-center gap-1 font-medium text-encre underline underline-offset-2"
                 >
                   <ReceiptText aria-hidden="true" className="size-3.5" />
-                  Reçu <span className="plaque-code">{versement.numeroRecu}</span>
+                  Reçu <span className="plaque-code">{numeroLisible(versement.numeroRecu)}</span>
                 </Link>
               </>
             )}

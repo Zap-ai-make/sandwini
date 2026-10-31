@@ -13,6 +13,7 @@ import { useCatalogue } from "@/lib/repositories/catalogue";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterStock } from "@/lib/repositories/motos";
 import { ecouterVentes, ecouterVersementsDuPerimetre } from "@/lib/repositories/ventes";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Ce que j’ai fait aujourd’hui.
@@ -91,7 +92,7 @@ export function JourneeDuGerant() {
         cle: `vente-${vente.id}`,
         quand: vente.date as Date,
         sorte: "vente",
-        texte: `Vente ${vente.numero}`,
+        texte: `Vente ${numeroLisible(vente.numero)}`,
         detail: `${nom(vente.clientId)} · ${LIBELLE_MODE[vente.modePaiement]}`,
       });
     }
@@ -103,7 +104,7 @@ export function JourneeDuGerant() {
         quand: versement.date as Date,
         sorte: "versement",
         texte: `Versement ${formaterMontant(versement.montant)}`,
-        detail: `${LIBELLE_MOYEN[versement.moyenPaiement]} · ${versement.numeroRecu}`,
+        detail: `${LIBELLE_MOYEN[versement.moyenPaiement]} · ${numeroLisible(versement.numeroRecu)}`,
       });
     }
 

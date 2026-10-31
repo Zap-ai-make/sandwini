@@ -36,6 +36,7 @@ import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { useFichierClients } from "@/lib/repositories/fichier-clients";
 import { ecouterVentesPieces } from "@/lib/repositories/ventes-pieces";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 export default function PageVentesPieces() {
   return (
@@ -134,7 +135,7 @@ function VentesPieces() {
           href={`/pieces/ventes?vente=${vente.id}`}
           className="plaque-code text-encre underline decoration-bord underline-offset-4 hover:decoration-encre"
         >
-          {vente.numero}
+          {numeroLisible(vente.numero)}
         </Link>
       ),
     },

@@ -40,6 +40,7 @@ import {
 } from "@/lib/repositories/ventes-pieces";
 import type { Vente } from "@/lib/domain/vente";
 import type { VentePiece } from "@/lib/domain/vente-piece";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Le libellé du lien de réparation, quand le refus s'en répare un (D90).
@@ -228,7 +229,7 @@ function VendrePieces() {
       {enregistree && (
         <div role="status" className="mt-6 cadre p-4 max-w-[46rem]">
           <p className="font-medium text-encre">
-            Vente enregistrée — <span className="plaque-code">{enregistree.numero}</span>
+            Vente enregistrée — <span className="plaque-code">n° {numeroLisible(enregistree.numero)}</span>
           </p>
           {/* Le reçu existe enfin (S64) : il s'ouvre dans l'historique, d'où il
               s'imprime et se partage. Le reçu est consultable tout de suite,

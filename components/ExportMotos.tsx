@@ -2,10 +2,12 @@
 
 import { ChevronDown, Download, FileSpreadsheet, Printer } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { nomDeBoutique } from "@/lib/domain/boutique";
 import { motosEnClasseur, nomFichierExport } from "@/lib/domain/export";
 import { TYPE_CLASSEUR } from "@/lib/domain/xlsx";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
+import { usePerimetre } from "@/lib/perimetre/perimetre";
 
 /**
  * Le bouton qui emporte les motos cochées (S50).
@@ -48,6 +50,7 @@ export function ExportMotos({
    */
   actions?: ReactNode;
 }) {
+  const { boutiques } = usePerimetre();
   const [echec, setEchec] = useState<string | null>(null);
   /* Le menu des deux formats (27 octobre 2026) : « enlève Excel, et quand on
      clique dessus, deux options : PDF et Excel ». Le bouton ne promet plus un
@@ -79,7 +82,7 @@ export function ExportMotos({
       /* Plus d'indicateur d'ordre des octets à poser : un classeur déclare son
          codage dans son XML, là où un CSV sans marque sortait « Côte d'Ivoire »
          en « CÃ´te d'Ivoire ». */
-      const blob = new Blob([motosEnClasseur(motos, nomMarque, nomModele)], {
+      const blob = new Blob([motosEnClasseur(motos, nomMarque, nomModele, (id) => nomDeBoutique(boutiques, id))], {
         type: TYPE_CLASSEUR,
       });
       const adresse = URL.createObjectURL(blob);

@@ -7,8 +7,6 @@ import type { Moto } from "@/lib/domain/moto";
 import { numeroLisible } from "@/lib/domain/numerotation";
 import { LIBELLE_TYPE_RECU, type ContenuRecu } from "@/lib/domain/recu";
 import {
-  LIBELLE_MODE,
-  LIBELLE_MOYEN,
   inclusionsDeVente,
   papiersEmportesDeVente,
   type Vente,
@@ -105,12 +103,6 @@ export function Recu({
           <p>{adresse}</p>
           <p>Tél : {telephones.join(" · ")}</p>
           <p>Secrétariat : {formaterTelephone(IDENTITE.secretariat)}</p>
-          {/* IFU et RCCM sont obligatoires **en tête** d'un document commercial
-              au Burkina Faso. Ils restent donc là, sous l'identité, même si le
-              carnet les porte plus discrètement. */}
-          <p>
-            RCCM {IDENTITE.rccm} · IFU {IDENTITE.ifu}
-          </p>
         </div>
       </header>
 
@@ -210,22 +202,9 @@ export function Recu({
         </tbody>
       </table>
 
-      {/* Le règlement sur sa ligne : le carnet ne le porte pas — il ne connaît
-          que l'espèce — mais le produit vend à crédit et en tranches, et c'est
-          la confusion la plus coûteuse du comptoir. */}
-      <p className="mt-3 text-corps">
-        <span className="facture-intitule">Règlement :</span>{" "}
-        <span className="font-semibold">
-          {[
-            LIBELLE_MODE[vente.modePaiement],
-            contenu.moyenPaiement ? LIBELLE_MOYEN[contenu.moyenPaiement] : null,
-            contenu.reference ? `réf. ${contenu.reference}` : null,
-          ]
-            .filter(Boolean)
-            .join(" · ")}
-        </span>
-      </p>
-
+      {/* **Plus de ligne « Règlement »** (31 octobre 2026) : le commanditaire
+          l'a retirée. Le reste à payer, en bas, dit déjà si la moto est
+          soldée ; le moyen et la référence restent sur la fiche de la vente. */}
       <div className="mt-4 grid items-end gap-6 sm:grid-cols-2 print:grid-cols-2">
         <div className="self-end">
           {contenu.type === "versement" && (
@@ -278,10 +257,14 @@ export function Recu({
 
       {contenu.type === "vente" && <CeQuiPart vente={vente} />}
 
-      <p className="mt-6 text-legende text-right">
-        Établi par {contenu.operateur || "opérateur non enregistré"}
-        {boutique ? ` — ${boutique.nom}` : ""}
-      </p>
+      {/* **RCCM et IFU en pied de page** (31 octobre 2026), à la demande du
+          commanditaire : l'en-tête garde le nom et les numéros qu'on appelle,
+          les mentions légales vont en bas, comme sur la plupart des factures.
+          « Établi par » est parti : l'adresse électronique d'un compte n'a
+          rien à faire sur le papier du client. */}
+      <footer className="mt-6 border-t border-[var(--facture-trait)] pt-2 text-center text-legende">
+        RCCM {IDENTITE.rccm} · IFU {IDENTITE.ifu}
+      </footer>
     </article>
   );
 }

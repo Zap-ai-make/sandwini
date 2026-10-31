@@ -57,6 +57,7 @@ import { ecouterDossiersCarteGrise } from "@/lib/repositories/dossiers-carte-gri
  */
 const AUCUN_DOSSIER: DossierCarteGrise[] = [];
 import { ecouterDossiers, ecouterRetoursCartes, ecouterVentes } from "@/lib/repositories/ventes";
+import { numeroLisible } from "@/lib/domain/numerotation";
 
 /**
  * Les dossiers en attente (§7.3).
@@ -326,7 +327,7 @@ export default function PageDossiers() {
             href={`/motos/ventes?vente=${dossier.venteId}`}
             className="plaque-code whitespace-nowrap text-encre underline-offset-2 hover:underline"
           >
-            {dossier.numero}
+            {numeroLisible(dossier.numero)}
           </Link>
         ),
       },
@@ -369,7 +370,7 @@ export default function PageDossiers() {
                 type="checkbox"
                 checked={choisies.has(dossier.venteId)}
                 onChange={(evenement) => basculer(dossier.venteId, evenement.target.checked)}
-                aria-label={`Confier la carte grise de ${dossier.numero}`}
+                aria-label={`Confier la carte grise de ${numeroLisible(dossier.numero)}`}
                 className="mr-2 size-4 accent-[var(--color-solde)]"
               />
             )}
@@ -451,7 +452,10 @@ export default function PageDossiers() {
         /* Lu sur les VENTES et non sur les dossiers : un paquet survit à la
            clôture de ses dossiers — une carte revenue sort de la file — et son
            numéro doit rester lisible dans le détail du paquet. */
-        numeroDe={(venteId) => ventes?.find((vente) => vente.id === venteId)?.numero ?? venteId}
+        numeroDe={(venteId) => {
+          const numero = ventes?.find((vente) => vente.id === venteId)?.numero;
+          return numero ? numeroLisible(numero) : venteId;
+        }}
       />
 
       {/* La barre n'existe que quand quelque chose est coché : un bandeau

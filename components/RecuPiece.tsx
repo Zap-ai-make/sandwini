@@ -1,9 +1,7 @@
-import type { Boutique } from "@/lib/domain/boutique";
 import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
 import { formaterMontant, formaterNombre } from "@/lib/domain/format";
 import { montantEnLettres } from "@/lib/domain/lettres";
 import { numeroLisible } from "@/lib/domain/numerotation";
-import { LIBELLE_MOYEN } from "@/lib/domain/vente";
 import type { VentePiece } from "@/lib/domain/vente-piece";
 import { EntetePieces } from "@/components/EntetePieces";
 
@@ -37,12 +35,10 @@ import { EntetePieces } from "@/components/EntetePieces";
  */
 export function RecuPiece({
   vente,
-  boutique,
   client,
   nomLibre = "",
 }: {
   vente: VentePiece;
-  boutique: Boutique | null;
   client: Client | null;
   /**
    * Le nom tapé au comptoir, quand la vente ne renvoie à aucune fiche (le cas
@@ -129,11 +125,6 @@ export function RecuPiece({
         </tbody>
       </table>
 
-      <p className="mt-3 text-corps">
-        <span className="facture-intitule">Règlement :</span>{" "}
-        <span className="font-semibold">{LIBELLE_MOYEN[vente.moyenPaiement]}</span>
-      </p>
-
       <div className="mt-4 grid items-end gap-6 sm:grid-cols-2 print:grid-cols-2">
         <p className="facture-signature self-end">Signature du client</p>
 
@@ -154,11 +145,6 @@ export function RecuPiece({
           a pas de « reste à payer » à porter, et le client repart avec sa pièce
           et sa preuve de paiement. */}
       <p className="facture-acquitte mt-4">ACQUITTÉ</p>
-
-      <p className="mt-6 text-legende text-right">
-        Établi par {vente.operateur || "opérateur non enregistré"}
-        {boutique ? ` — ${boutique.nom}` : ""}
-      </p>
     </article>
   );
 }
