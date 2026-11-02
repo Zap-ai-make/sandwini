@@ -208,8 +208,12 @@ export async function creerBoutique(
      donc le dialogue qu'on vise, et non plus le formulaire. */
   await page.getByRole("button", { name: "Ajouter une boutique" }).click();
   const formulaire = page.getByRole("dialog");
-  await formulaire.getByLabel("Nom de la boutique").fill(`Boutique ${code}`);
-  await formulaire.getByLabel(/^Code/).fill(code);
+  /* **Le nom commence par le code**, parce que le code ne se tape plus : il se
+     déduit des trois premières lettres du nom depuis le 23 octobre 2026
+     (`engendrerCode`). C'est le seul moyen de garder la boutique attendue
+     — son identifiant, la valeur du sélecteur de périmètre, le préfixe des
+     numéros — sans écrire en base par le SDK Admin. */
+  await formulaire.getByLabel("Nom de la boutique").fill(`${code} Boutique`);
   for (const metier of metiers) {
     await formulaire.getByRole("checkbox", { name: metier, exact: true }).check();
   }
@@ -361,15 +365,17 @@ export function chassisUnique(prefixe: string): string {
  *
  * **Les deux listes sont vides tant qu'on n'a pas tapé** (S44) : ce n'est pas
  * une commodité du décor, c'est le comportement même de l'écran. Remplir le
- * champ de recherche est donc la seule façon de faire apparaître le bouton
- * radio — et c'est aussi ce qui donne au test un point d'attente réel.
+ * champ de recherche est donc la seule façon de faire apparaître la case
+ * — et c'est aussi ce qui donne au test un point d'attente réel.
  */
 export async function ouvrirLaVente(
   page: Page,
   { chassis, client }: { chassis: string; client: string },
 ) {
   await page.getByLabel("Chercher dans le stock").fill(chassis);
-  await page.getByRole("radio", { name: new RegExp(chassis) }).check();
+  /* **Une case, plus un radio**, depuis que plusieurs motos se vendent en une
+     saisie (S60) : la moto se coche, le client se choisit toujours seul. */
+  await page.getByRole("checkbox", { name: new RegExp(chassis) }).check();
   await page.getByLabel("Chercher un client").fill(client);
   await page.getByRole("radio", { name: new RegExp(client) }).check();
 }
@@ -412,12 +418,16 @@ export async function vendre(
      de la place d'un bouton. */
   await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
   await ouvrirLaVente(page, { chassis, client });
-  await page.getByLabel("Prix convenu", { exact: true }).fill(options.prix);
+  await page.getByLabel("Prix convenu, ligne 1").fill(options.prix);
   await choisirDansLaListe(page, "Mode de paiement", options.mode);
   await page.getByLabel(/Montant reçu/).fill(options.encaisse);
   await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
-  const confirmation = contenu(page).getByRole("status");
+  /* La confirmation vit dans la modale, rendue hors du `main` : c'est elle
+     qu'on vise, et plus le contenu de la page. */
+  const confirmation = page
+    .getByRole("dialog", { name: "Vente enregistrée" })
+    .getByRole("status");
   await expect(confirmation).toContainText("Vente enregistrée", { timeout: 20_000 });
   const numero = (await confirmation.locator(".plaque-code").textContent())!.trim();
 
@@ -498,12 +508,14 @@ export async function vendreDansLeTerrain(
 
   await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
   await ouvrirLaVente(page, { chassis, client });
-  await page.getByLabel("Prix convenu", { exact: true }).fill("1200000");
+  await page.getByLabel("Prix convenu, ligne 1").fill("1200000");
   await choisirDansLaListe(page, "Mode de paiement", options.mode ?? "Crédit");
   await page.getByLabel(/Montant reçu/).fill("400000");
   await page.getByRole("button", { name: "Enregistrer la vente" }).click();
 
-  const confirmation = contenu(page).getByRole("status");
+  const confirmation = page
+    .getByRole("dialog", { name: "Vente enregistrée" })
+    .getByRole("status");
   await expect(confirmation).toContainText("Vente enregistrée", { timeout: 20_000 });
   const numero = (await confirmation.locator(".plaque-code").textContent())!.trim();
   return { chassis, client, numero };

@@ -132,12 +132,12 @@ test.describe("le responsable passe d'un espace à l'autre", () => {
        cette ancre, l'absence de l'onglet passerait aussi pendant le chargement,
        c'est-à-dire pour la mauvaise raison. */
     await selecteurPerimetre(page).selectOption(codeMotos);
-    await expect(page.getByRole("banner")).toContainText(`Boutique ${codeMotos}`);
+    await expect(page.getByRole("banner")).toContainText(`${codeMotos} Boutique`);
     await expect(nav(page).getByRole("link", { name: "Motos" })).toBeVisible();
     await expect(nav(page).getByRole("link", { name: "Pièces" })).toHaveCount(0);
 
     await selecteurPerimetre(page).selectOption(codePieces);
-    await expect(page.getByRole("banner")).toContainText(`Boutique ${codePieces}`);
+    await expect(page.getByRole("banner")).toContainText(`${codePieces} Boutique`);
     await expect(nav(page).getByRole("link", { name: "Pièces" })).toBeVisible();
     await expect(nav(page).getByRole("link", { name: "Motos" })).toHaveCount(0);
   });
@@ -165,7 +165,7 @@ test.describe("le responsable passe d'un espace à l'autre", () => {
 
     // On se met d’abord dans une boutique : c’est l’état d’où l’on veut ressortir.
     await selecteurPerimetre(page).selectOption(code);
-    await expect(page.getByRole("banner")).toContainText(`Boutique ${code}`);
+    await expect(page.getByRole("banner")).toContainText(`${code} Boutique`);
 
     await page.goto("/supervision", { waitUntil: "load" });
     await page
