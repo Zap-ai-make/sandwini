@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { TitreSection } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { LOT_A_DEPOSER, type DepotCarteGrise } from "@/lib/domain/depots-carte-grise";
 import { depuisQuand, formaterDateCourte, formaterNombre } from "@/lib/domain/format";
@@ -106,9 +105,9 @@ export function DepotsCartesGrises({
     },
   ];
 
+  /* Pas de titre : l'onglet « Dépôts » qui le porte le dit déjà. */
   return (
-    <section aria-labelledby="titre-depots" className="mt-6">
-      <TitreSection id="titre-depots">Les dépôts</TitreSection>
+    <section aria-label="Les dépôts">
       <div className="cadre cadre-tableau">
         <Tableau
           legende="Les dépôts de cartes grises, du plus récent au plus ancien. Une ligne ouvre ses dossiers."

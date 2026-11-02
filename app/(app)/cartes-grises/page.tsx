@@ -211,6 +211,10 @@ function titreDuLot(lot: string, depot: DepotCarteGrise | null): string {
  * **Le classeur ne paraît que dans un lot, ou pour une recherche.** Sur la
  * liste des dépôts, taper un nom remplace le tableau par les dossiers trouvés,
  * tous lots confondus ; vider le champ le rend.
+ *
+ * **Les retraits se lisent depuis la liste, sans ouvrir de lot** (2 novembre
+ * 2026) : « impossible d'y accéder directement ». Le premier onglet y montre
+ * les dépôts, le second tous les dossiers retirés, quel que soit leur lot.
  */
 function Vue({
   lot,
@@ -270,51 +274,49 @@ function Vue({
         </div>
       </div>
 
-      {!classeur ? (
-        chargement ? (
-          <EtatChargement>Lecture des dossiers…</EtatChargement>
-        ) : (
-          depots
-        )
-      ) : (
-        <Onglets
-          className="mt-6"
-          libelle="Les dossiers"
-          valeur={panneau}
-          changer={setPanneau}
-          onglets={[
-            {
-              valeur: "cours",
-              libelle: `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}`,
-              contenu: (
-                <Liste
-                  dossiers={cours}
-                  chargement={chargement}
-                  boutiqueId={boutiqueId}
-                  prestataires={prestataires}
-                  auteur={auteur}
-                  /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
-                     vivent les dossiers partis chez un prestataire. */
-                  permettreRetour
-                />
-              ),
-            },
-            {
-              valeur: "historique",
-              libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
-              contenu: (
-                <Liste
-                  dossiers={termines}
-                  chargement={chargement}
-                  boutiqueId={boutiqueId}
-                  prestataires={prestataires}
-                  auteur={auteur}
-                />
-              ),
-            },
-          ]}
-        />
-      )}
+      <Onglets
+        className="mt-6"
+        libelle="Les dossiers"
+        valeur={panneau}
+        changer={setPanneau}
+        onglets={[
+          {
+            valeur: "cours",
+            libelle: classeur ? `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}` : "Dépôts",
+            contenu: !classeur ? (
+              chargement ? (
+                <EtatChargement>Lecture des dossiers…</EtatChargement>
+              ) : (
+                depots
+              )
+            ) : (
+              <Liste
+                dossiers={cours}
+                chargement={chargement}
+                boutiqueId={boutiqueId}
+                prestataires={prestataires}
+                auteur={auteur}
+                /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
+                   vivent les dossiers partis chez un prestataire. */
+                permettreRetour
+              />
+            ),
+          },
+          {
+            valeur: "historique",
+            libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
+            contenu: (
+              <Liste
+                dossiers={termines}
+                chargement={chargement}
+                boutiqueId={boutiqueId}
+                prestataires={prestataires}
+                auteur={auteur}
+              />
+            ),
+          },
+        ]}
+      />
     </>
   );
 }
