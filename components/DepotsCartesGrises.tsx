@@ -1,102 +1,122 @@
 "use client";
 
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { TitreSection } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import type { DepotCarteGrise } from "@/lib/domain/depots-carte-grise";
+import { LOT_A_DEPOSER, type DepotCarteGrise } from "@/lib/domain/depots-carte-grise";
 import { depuisQuand, formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 
+/** L'adresse d'un lot : l'écran des dossiers, réduit à ceux-là. */
+export function adresseDuLot(lot: string): string {
+  return `/cartes-grises?lot=${encodeURIComponent(lot)}`;
+}
+
+/** Une ligne du tableau : un dépôt, ou le lot de ce qui n'est pas encore parti. */
+type Ligne = { cle: string; depot: DepotCarteGrise | null; pris: number };
+
 /**
- * Les dépôts de cartes grises, au-dessus du classeur (31 octobre 2026).
+ * Les dépôts de cartes grises (31 octobre 2026), seuls à l'écran depuis le
+ * 2 novembre.
  *
  * « Le tableau de carte grise doit être intuitif comme celui des arrivages :
  * on voit combien est reçu, ce qui reste, le total pris, avec une barre de
  * progression. » Une ligne par paquet confié — un prestataire, un jour —, sur
  * le dessin du tableau des arrivages, pour que l'œil y retrouve ses repères.
  *
- * **La ligne filtre le classeur, elle ne le remplace pas.** Le classeur à dix
- * colonnes reste la forme que le commanditaire connaît ; un clic sur un dépôt
- * n'y laisse que ses dossiers, un second clic les rend tous.
+ * **Une ligne ouvre son lot.** Le classeur entier sous ce tableau faisait
+ * deux écrans en un — « ce n'est pas intuitif et ça pollue » : il ne s'ouvre
+ * plus que réduit au lot qu'on a choisi.
+ *
+ * **« À déposer » vient en tête** : ce qui n'est parti chez personne est la
+ * seule file qui attend un geste, et une ligne qu'on vient de créer y arrive.
  */
 export function DepotsCartesGrises({
   depots,
-  choisi,
-  choisir,
+  aDeposer,
 }: {
   depots: readonly DepotCarteGrise[];
-  choisi: string | null;
-  choisir: (cle: string | null) => void;
+  aDeposer: number;
 }) {
-  if (depots.length === 0) return null;
+  const router = useRouter();
 
-  const colonnes: Colonne<DepotCarteGrise>[] = [
+  const lignes: Ligne[] = [
+    ...(aDeposer > 0 ? [{ cle: LOT_A_DEPOSER, depot: null, pris: aDeposer }] : []),
+    ...depots.map((depot) => ({ cle: depot.cle, depot, pris: depot.pris })),
+  ];
+  if (lignes.length === 0) return null;
+
+  const colonnes: Colonne<Ligne>[] = [
     {
       cle: "depot",
       titre: "Dépôt",
       principal: true,
-      rendu: (depot) => (
-        /* Le bouton sert le clavier et le lecteur d'écran ; la souris, elle,
-           a toute la ligne. */
-        <button
-          type="button"
-          onClick={(evenement) => {
-            evenement.stopPropagation();
-            choisir(depot.cle === choisi ? null : depot.cle);
-          }}
-          aria-pressed={depot.cle === choisi}
+      rendu: ({ cle, depot }) => (
+        /* Le lien sert le clavier et le lecteur d'écran ; la souris, elle, a
+           toute la ligne. `stopPropagation` évite d'ouvrir deux fois. */
+        <Link
+          href={adresseDuLot(cle)}
+          onClick={(evenement) => evenement.stopPropagation()}
           className="text-left font-medium text-encre hover:underline"
         >
-          {depot.prestataireNom || "Prestataire non noté"}
-          <span className="block text-corps font-normal text-encre-doux">
-            {depot.deposeLe
-              ? `${formaterDateCourte(depot.deposeLe)} · ${depuisQuand(depot.deposeLe)}`
-              : "Date non notée"}
-          </span>
-        </button>
+          {depot === null ? (
+            "À déposer"
+          ) : (
+            <>
+              {depot.prestataireNom || "Prestataire non noté"}
+              <span className="block text-corps font-normal text-encre-doux">
+                {depot.deposeLe
+                  ? `${formaterDateCourte(depot.deposeLe)} · ${depuisQuand(depot.deposeLe)}`
+                  : "Date non notée"}
+              </span>
+            </>
+          )}
+        </Link>
       ),
     },
     {
       cle: "pris",
       titre: "Pris",
       chiffre: true,
-      rendu: (depot) => formaterNombre(depot.pris),
+      rendu: (ligne) => formaterNombre(ligne.pris),
     },
     {
       cle: "retour",
       titre: "Retour",
-      rendu: (depot) => <BarreRetour depot={depot} />,
+      rendu: ({ depot }) => (depot === null ? null : <BarreRetour depot={depot} />),
     },
     {
       cle: "etat",
       titre: "État",
-      rendu: (depot) => (
-        <div>
-          {depot.restent === 0 ? (
-            <span className="pastille pastille-solde">Tout est revenu</span>
-          ) : (
-            <span className="pastille pastille-retard">
-              {formaterNombre(depot.restent)} dehors
+      rendu: ({ depot }) =>
+        depot === null ? null : (
+          <div>
+            {depot.restent === 0 ? (
+              <span className="pastille pastille-solde">Tout est revenu</span>
+            ) : (
+              <span className="pastille pastille-retard">
+                {formaterNombre(depot.restent)} dehors
+              </span>
+            )}
+            <span className="mt-1 block text-legende text-encre-doux">
+              {formaterNombre(depot.recus)} / {formaterNombre(depot.pris)}
             </span>
-          )}
-          <span className="mt-1 block text-legende text-encre-doux">
-            {formaterNombre(depot.recus)} / {formaterNombre(depot.pris)}
-          </span>
-        </div>
-      ),
+          </div>
+        ),
     },
   ];
 
   return (
     <section aria-labelledby="titre-depots" className="mt-6">
       <TitreSection id="titre-depots">Les dépôts</TitreSection>
-      <div className="cadre cadre-tableau lg:max-h-[24rem]">
+      <div className="cadre cadre-tableau">
         <Tableau
-          legende="Les dépôts de cartes grises, du plus récent au plus ancien. Une ligne filtre le classeur sur ses dossiers."
+          legende="Les dépôts de cartes grises, du plus récent au plus ancien. Une ligne ouvre ses dossiers."
           colonnes={colonnes}
-          lignes={[...depots]}
-          cleDe={(depot) => depot.cle}
-          cleActive={choisi}
-          reglee={(depot) => depot.restent === 0}
-          ouvrir={(depot) => choisir(depot.cle === choisi ? null : depot.cle)}
+          lignes={lignes}
+          cleDe={(ligne) => ligne.cle}
+          reglee={({ depot }) => depot !== null && depot.restent === 0}
+          ouvrir={(ligne) => router.push(adresseDuLot(ligne.cle))}
         />
       </div>
     </section>

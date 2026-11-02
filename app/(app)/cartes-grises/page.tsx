@@ -1,7 +1,8 @@
 "use client";
 
 import { PackageCheck, Plus, Search } from "lucide-react";
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { DepotsCartesGrises } from "@/components/DepotsCartesGrises";
 import { GardeEspace } from "@/components/GardeSession";
@@ -13,7 +14,13 @@ import { TetePage } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
 import { normaliserNom } from "@/lib/domain/client";
-import { cleDepot, depotsDeCartesGrises } from "@/lib/domain/depots-carte-grise";
+import {
+  depotsDeCartesGrises,
+  dossiersDuLot,
+  LOT_A_DEPOSER,
+  nombreADeposer,
+  type DepotCarteGrise,
+} from "@/lib/domain/depots-carte-grise";
 import {
   aMarquerRecu,
   chercherDossiers,
@@ -55,9 +62,13 @@ import { ecouterPrestataires } from "@/lib/repositories/prestataires";
  * partage porte sur les lignes montrées, jamais sur ce qu'une ligne dit.
  */
 export default function PageDossiersCarteGrise() {
+  /* `useSearchParams` exige une frontière Suspense pour la génération
+     statique : sans elle, le build échoue sur cette page. */
   return (
     <GardeEspace espace="cartes_grises">
-      <Ecran />
+      <Suspense fallback={null}>
+        <Ecran />
+      </Suspense>
     </GardeEspace>
   );
 }
@@ -66,13 +77,17 @@ type Panneau = "cours" | "historique";
 
 const AUCUN_PRESTATAIRE: Prestataire[] = [];
 
+/**
+ * **Deux vues, une adresse** (2 novembre 2026). Sans `?lot=`, l'écran ne montre
+ * que les dépôts ; avec, le classeur réduit à ce lot. Le lot vit dans
+ * l'adresse et non dans un état : le bouton retour du téléphone ramène ainsi
+ * à la liste des dépôts, comme on s'y attend.
+ */
 function Ecran() {
   const session = useSession();
   const { perimetre } = usePerimetre();
-  const [panneau, setPanneau] = useState<Panneau>("cours");
+  const lot = useSearchParams().get("lot");
   const [creation, setCreation] = useState(false);
-  const [recherche, setRecherche] = useState("");
-  const [depotChoisi, setDepotChoisi] = useState<string | null>(null);
 
   /**
    * **Toute l'entreprise dès que le périmètre porte le métier.** C'est ce que
@@ -101,39 +116,30 @@ function Ecran() {
     "La liste des prestataires n’a pas pu être chargée.",
   );
 
-  /* **La recherche porte sur les deux onglets à la fois.** C'est la demande, et
-     c'est la bonne : celui qui cherche un nom ne sait pas si le papier est
-     encore dehors ou déjà rendu — c'est même souvent la question qu'il pose. */
   const depots = useMemo(() => depotsDeCartesGrises(valeur ?? []), [valeur]);
-  const depot = depots.find((candidat) => candidat.cle === depotChoisi) ?? null;
-
-  /* Un dépôt choisi borne le classeur à ses dossiers, avant la recherche : on
-     cherche alors un nom dans ce paquet-là. Un dépôt disparu — son dernier
-     dossier modifié — ne filtre plus rien. */
-  const trouves = useMemo(
-    () =>
-      chercherDossiers(
-        depot ? (valeur ?? []).filter((dossier) => cleDepot(dossier) === depot.cle) : (valeur ?? []),
-        recherche,
-        normaliserNom,
-      ),
-    [valeur, recherche, depot],
+  const aDeposer = useMemo(() => nombreADeposer(valeur ?? []), [valeur]);
+  /* Le lot ouvert borne le classeur avant la recherche : on cherche alors un
+     nom dans ce paquet-là. Sans lot, la recherche porte sur tous les
+     dossiers — celui qui cherche un client ne sait pas dans quel lot il est. */
+  const dossiers = useMemo(
+    () => (lot === null ? (valeur ?? []) : dossiersDuLot(valeur ?? [], lot)),
+    [valeur, lot],
   );
 
   if (session.statut !== "connecte") return null;
   const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
 
-  const { cours, termines } = rangerDossiers(trouves);
-
   /* Une ligne appartient à la boutique des cartes grises : sans boutique
      choisie, il n'y a pas de propriétaire à lui donner. */
   const boutiqueId = perimetre.boutiqueId;
   const connus = prestataires ?? AUCUN_PRESTATAIRE;
+  const depot = lot === null ? null : (depots.find((candidat) => candidat.cle === lot) ?? null);
 
   return (
     <div>
       <TetePage
-        titre="Dossiers"
+        retour={lot === null ? undefined : { href: "/cartes-grises", libelle: "Les dépôts" }}
+        titre={lot === null ? "Dossiers" : titreDuLot(lot, depot)}
         actions={
           boutiqueId !== null ? (
             <button
@@ -148,10 +154,98 @@ function Ecran() {
         }
       />
 
-      {erreur === null && (
-        <DepotsCartesGrises depots={depots} choisi={depot?.cle ?? null} choisir={setDepotChoisi} />
+      {/* **La liste entière manque, et l'écran n'a plus rien à montrer.** Un
+          bandeau au-dessus d'un tableau vide laisserait croire qu'il n'y a
+          aucun dossier — ce qui est la pire des deux réponses possibles ici. */}
+      {erreur !== null ? (
+        <ErreurDeLecture
+          titre="Les dossiers n’ont pas pu être lus"
+          echec={echec}
+          reessayer={reessayer}
+          sortie={{ href: "/prestataires", libelle: "Voir les prestataires" }}
+        >
+          Sans cette lecture, impossible de dire ce qui est dehors ni chez qui. La liste des
+          prestataires, elle, reste consultable.
+        </ErreurDeLecture>
+      ) : (
+        /* La clé remet la recherche et l'onglet à zéro d'une vue à l'autre :
+           un mot cherché dans un lot ne doit pas masquer les dépôts au retour. */
+        <Vue
+          key={lot ?? ""}
+          lot={lot}
+          dossiers={dossiers}
+          chargement={valeur === null}
+          lotVide={lot !== null && lot !== LOT_A_DEPOSER && valeur !== null && depot === null}
+          depots={lot === null ? <DepotsCartesGrises depots={depots} aDeposer={aDeposer} /> : null}
+          boutiqueId={boutiqueId}
+          prestataires={connus}
+          auteur={auteur}
+        />
       )}
 
+      {creation && boutiqueId !== null && (
+        <LigneModale
+          dossier={null}
+          boutiqueId={boutiqueId}
+          prestataires={connus}
+          auteur={auteur}
+          onFermer={() => setCreation(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Le titre d'un lot ouvert : le prestataire et le jour, comme dans le tableau. */
+function titreDuLot(lot: string, depot: DepotCarteGrise | null): string {
+  if (lot === LOT_A_DEPOSER) return "À déposer";
+  if (depot === null) return "Dépôt";
+  const nom = depot.prestataireNom || "Prestataire non noté";
+  return depot.deposeLe ? `${nom} · ${formaterDateCourte(depot.deposeLe)}` : nom;
+}
+
+/**
+ * Ce qui se montre sous le titre : la recherche, puis les dépôts ou le
+ * classeur.
+ *
+ * **Le classeur ne paraît que dans un lot, ou pour une recherche.** Sur la
+ * liste des dépôts, taper un nom remplace le tableau par les dossiers trouvés,
+ * tous lots confondus ; vider le champ le rend.
+ */
+function Vue({
+  lot,
+  dossiers,
+  chargement,
+  lotVide,
+  depots,
+  boutiqueId,
+  prestataires,
+  auteur,
+}: {
+  lot: string | null;
+  dossiers: readonly DossierCarteGrise[];
+  chargement: boolean;
+  /** Le lot de l'adresse n'a plus de dossier : son dernier a changé de dépôt. */
+  lotVide: boolean;
+  depots: ReactNode;
+  boutiqueId: string | null;
+  prestataires: Prestataire[];
+  auteur: { uid: string; nom: string };
+}) {
+  const [panneau, setPanneau] = useState<Panneau>("cours");
+  const [recherche, setRecherche] = useState("");
+
+  /* **La recherche porte sur les deux onglets à la fois.** C'est la demande, et
+     c'est la bonne : celui qui cherche un nom ne sait pas si le papier est
+     encore dehors ou déjà rendu — c'est même souvent la question qu'il pose. */
+  const { cours, termines } = rangerDossiers(chercherDossiers(dossiers, recherche, normaliserNom));
+  const classeur = lot !== null || recherche.trim() !== "";
+
+  /* Le retour est déjà en tête de page : seul le constat reste ici. */
+  if (lotVide) return <p className="mt-6 text-corps text-encre">Ce dépôt n’a plus aucun dossier.</p>;
+
+  return (
+    <>
       <div className="mt-6">
         <label htmlFor="recherche-dossier" className="block text-sm font-medium text-encre">
           Chercher un dossier
@@ -176,89 +270,52 @@ function Ecran() {
         </div>
       </div>
 
-      {/* **La liste entière manque, et l'écran n'a plus rien à montrer.** Un
-          bandeau au-dessus d'un tableau vide laisserait croire qu'il n'y a
-          aucun dossier — ce qui est la pire des deux réponses possibles ici. */}
-      {erreur !== null ? (
-        <ErreurDeLecture
-          titre="Les dossiers n’ont pas pu être lus"
-          echec={echec}
-          reessayer={reessayer}
-          sortie={{ href: "/prestataires", libelle: "Voir les prestataires" }}
-        >
-          Sans cette lecture, impossible de dire ce qui est dehors ni chez qui. La liste des
-          prestataires, elle, reste consultable.
-        </ErreurDeLecture>
+      {!classeur ? (
+        chargement ? (
+          <EtatChargement>Lecture des dossiers…</EtatChargement>
+        ) : (
+          depots
+        )
       ) : (
-        <>
-          {depot && (
-            <div className="mt-6 flex flex-wrap items-center gap-3 rounded-carte border border-bord bg-fond p-3">
-              <p className="text-corps text-encre">
-                Dépôt de{" "}
-                <strong className="font-semibold">
-                  {depot.prestataireNom || "prestataire non noté"}
-                </strong>
-                {depot.deposeLe ? ` du ${formaterDateCourte(depot.deposeLe)}` : ""}
-              </p>
-              <button
-                type="button"
-                onClick={() => setDepotChoisi(null)}
-                className="bouton bouton-discret"
-              >
-                Tout afficher
-              </button>
-            </div>
-          )}
-          <Onglets
-            className="mt-6"
-            libelle="Les dossiers"
-            valeur={panneau}
-            changer={setPanneau}
-            onglets={[
-              {
-                valeur: "cours",
-                libelle: `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}`,
-                contenu: (
-                  <Liste
-                    dossiers={cours}
-                    chargement={valeur === null}
-                    boutiqueId={boutiqueId}
-                    prestataires={connus}
-                    auteur={auteur}
-                    /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
-                       vivent les dossiers partis chez un prestataire. */
-                    permettreRetour
-                  />
-                ),
-              },
-              {
-                valeur: "historique",
-                libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
-                contenu: (
-                  <Liste
-                    dossiers={termines}
-                    chargement={valeur === null}
-                    boutiqueId={boutiqueId}
-                    prestataires={connus}
-                    auteur={auteur}
-                  />
-                ),
-              },
-            ]}
-          />
-        </>
-      )}
-
-      {creation && boutiqueId !== null && (
-        <LigneModale
-          dossier={null}
-          boutiqueId={boutiqueId}
-          prestataires={connus}
-          auteur={auteur}
-          onFermer={() => setCreation(false)}
+        <Onglets
+          className="mt-6"
+          libelle="Les dossiers"
+          valeur={panneau}
+          changer={setPanneau}
+          onglets={[
+            {
+              valeur: "cours",
+              libelle: `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}`,
+              contenu: (
+                <Liste
+                  dossiers={cours}
+                  chargement={chargement}
+                  boutiqueId={boutiqueId}
+                  prestataires={prestataires}
+                  auteur={auteur}
+                  /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
+                     vivent les dossiers partis chez un prestataire. */
+                  permettreRetour
+                />
+              ),
+            },
+            {
+              valeur: "historique",
+              libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
+              contenu: (
+                <Liste
+                  dossiers={termines}
+                  chargement={chargement}
+                  boutiqueId={boutiqueId}
+                  prestataires={prestataires}
+                  auteur={auteur}
+                />
+              ),
+            },
+          ]}
         />
       )}
-    </div>
+    </>
   );
 }
 
