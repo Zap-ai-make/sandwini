@@ -48,8 +48,6 @@ const serwist = new Serwist({
       /* La correction d'une vente (S25) s'ouvre par `?corriger=`. */
       /^corriger$/,
       /^recu$/,
-      /* Le lot ouvert des cartes grises (2 novembre 2026), par `?lot=`. */
-      /^lot$/,
     ],
   },
   /* Une mise à jour n'emporte jamais une saisie en cours (S34, réponse 5).

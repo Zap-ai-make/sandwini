@@ -1,35 +1,33 @@
 "use client";
 
 import { PackageCheck, Plus, Search } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 
 import { DepotsCartesGrises } from "@/components/DepotsCartesGrises";
 import { GardeEspace } from "@/components/GardeSession";
 import { LigneModale } from "@/components/GestesDossierCarteGrise";
 import { EtatErreurSaisie } from "@/components/patrons/Etats";
 import { ErreurDeLecture, EtatChargement } from "@/components/patrons/Etats";
-import { Onglets } from "@/components/patrons/Onglets";
 import { TetePage } from "@/components/patrons/Page";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { useSession } from "@/lib/auth/session";
 import { normaliserNom } from "@/lib/domain/client";
-import {
-  depotsDeCartesGrises,
-  dossiersDuLot,
-  LOT_A_DEPOSER,
-  nombreADeposer,
-  type DepotCarteGrise,
-} from "@/lib/domain/depots-carte-grise";
+import { depotsDeCartesGrises, dossiersDuLot } from "@/lib/domain/depots-carte-grise";
 import {
   aMarquerRecu,
   chercherDossiers,
   ENTETES_LIGNE,
   ORDRE_LIGNE,
-  rangerDossiers,
   type CleColonneLigne,
   type DossierCarteGrise,
 } from "@/lib/domain/dossier-carte-grise";
+import {
+  compterParEtat,
+  ETATS_CLASSEUR,
+  LIBELLE_ETAT_CLASSEUR,
+  rangerSelonEtat,
+  type EtatClasseur,
+} from "@/lib/domain/filtres-carte-grise";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import type { Prestataire } from "@/lib/domain/prestataire";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -56,38 +54,31 @@ import { ecouterPrestataires } from "@/lib/repositories/prestataires";
  * tableur : on ouvre la ligne, on remplit la case, on enregistre. Le statut ne
  * se choisit plus, il se déduit du remplissage.
  *
- * **Deux onglets subsistent, et ce ne sont pas des colonnes.** Son fichier est
- * une seule feuille ; mais entre le dépôt et le retrait il passe presque un an,
- * et mêler les dossiers rendus à ceux qu'on attend enterrerait les seconds. Le
- * partage porte sur les lignes montrées, jamais sur ce qu'une ligne dit.
+ * **Une seule page, trois filtres qui se combinent** (6 novembre 2026) : « c'est
+ * comme s'il y avait deux pages, tout devrait être imbriqué ». La recherche,
+ * le lot (le bandeau de cartes) et l'état réduisent le même classeur, sur
+ * place ; aucun ne change d'écran. Les onglets Dépôt et Retrait deviennent les
+ * choix du filtre d'état, qui s'ouvre sur « En cours » : entre le dépôt et le
+ * retrait il passe presque un an, et les dossiers rendus enterreraient ceux
+ * qu'on attend.
  */
 export default function PageDossiersCarteGrise() {
-  /* `useSearchParams` exige une frontière Suspense pour la génération
-     statique : sans elle, le build échoue sur cette page. */
   return (
     <GardeEspace espace="cartes_grises">
-      <Suspense fallback={null}>
-        <Ecran />
-      </Suspense>
+      <Ecran />
     </GardeEspace>
   );
 }
 
-type Panneau = "cours" | "historique";
-
 const AUCUN_PRESTATAIRE: Prestataire[] = [];
 
-/**
- * **Deux vues, une adresse** (2 novembre 2026). Sans `?lot=`, l'écran ne montre
- * que les dépôts ; avec, le classeur réduit à ce lot. Le lot vit dans
- * l'adresse et non dans un état : le bouton retour du téléphone ramène ainsi
- * à la liste des dépôts, comme on s'y attend.
- */
 function Ecran() {
   const session = useSession();
   const { perimetre } = usePerimetre();
-  const lot = useSearchParams().get("lot");
   const [creation, setCreation] = useState(false);
+  const [recherche, setRecherche] = useState("");
+  const [lotChoisi, setLotChoisi] = useState<string | null>(null);
+  const [etat, setEtat] = useState<EtatClasseur>("en_cours");
 
   /**
    * **Toute l'entreprise dès que le périmètre porte le métier.** C'est ce que
@@ -117,14 +108,21 @@ function Ecran() {
   );
 
   const depots = useMemo(() => depotsDeCartesGrises(valeur ?? []), [valeur]);
-  const aDeposer = useMemo(() => nombreADeposer(valeur ?? []), [valeur]);
-  /* Le lot ouvert borne le classeur avant la recherche : on cherche alors un
-     nom dans ce paquet-là. Sans lot, la recherche porte sur tous les
-     dossiers — celui qui cherche un client ne sait pas dans quel lot il est. */
-  const dossiers = useMemo(
-    () => (lot === null ? (valeur ?? []) : dossiersDuLot(valeur ?? [], lot)),
-    [valeur, lot],
+  /* Un lot dont le dernier dossier a changé de dépôt disparaît du bandeau :
+     le filtre tombe avec lui, plutôt que de montrer un classeur vide sans
+     carte choisie pour l'expliquer. */
+  const lot = lotChoisi !== null && depots.some((depot) => depot.cle === lotChoisi) ? lotChoisi : null;
+
+  /* **Le lot et la recherche d'abord, l'état ensuite** : les comptes des
+     boutons d'état disent ainsi ce que contient le lot choisi, ou ce que la
+     recherche a trouvé — celui qui cherche un nom ne sait pas si le papier
+     est encore dehors ou déjà rendu, et le compte le lui dit. */
+  const trouves = useMemo(
+    () => chercherDossiers(dossiersDuLot(valeur ?? [], lot), recherche, normaliserNom),
+    [valeur, lot, recherche],
   );
+  const comptes = useMemo(() => compterParEtat(trouves), [trouves]);
+  const montres = useMemo(() => rangerSelonEtat(trouves, etat), [trouves, etat]);
 
   if (session.statut !== "connecte") return null;
   const auteur = { uid: session.utilisateur.uid, nom: session.utilisateur.nom };
@@ -133,13 +131,11 @@ function Ecran() {
      choisie, il n'y a pas de propriétaire à lui donner. */
   const boutiqueId = perimetre.boutiqueId;
   const connus = prestataires ?? AUCUN_PRESTATAIRE;
-  const depot = lot === null ? null : (depots.find((candidat) => candidat.cle === lot) ?? null);
 
   return (
     <div>
       <TetePage
-        retour={lot === null ? undefined : { href: "/cartes-grises", libelle: "Les dépôts" }}
-        titre={lot === null ? "Dossiers" : titreDuLot(lot, depot)}
+        titre="Dossiers"
         actions={
           boutiqueId !== null ? (
             <button
@@ -168,19 +164,66 @@ function Ecran() {
           prestataires, elle, reste consultable.
         </ErreurDeLecture>
       ) : (
-        /* La clé remet la recherche et l'onglet à zéro d'une vue à l'autre :
-           un mot cherché dans un lot ne doit pas masquer les dépôts au retour. */
-        <Vue
-          key={lot ?? ""}
-          lot={lot}
-          dossiers={dossiers}
-          chargement={valeur === null}
-          lotVide={lot !== null && lot !== LOT_A_DEPOSER && valeur !== null && depot === null}
-          depots={lot === null ? <DepotsCartesGrises depots={depots} aDeposer={aDeposer} /> : null}
-          boutiqueId={boutiqueId}
-          prestataires={connus}
-          auteur={auteur}
-        />
+        <>
+          <div>
+            <label htmlFor="recherche-dossier" className="block text-sm font-medium text-encre">
+              Chercher un dossier
+            </label>
+            <div className="relative mt-1.5">
+              <Search
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
+              />
+              <input
+                id="recherche-dossier"
+                type="search"
+                inputMode="search"
+                autoComplete="off"
+                placeholder="Un nom, un téléphone, un châssis, une plaque, une date…"
+                value={recherche}
+                onChange={(evenement) => setRecherche(evenement.target.value)}
+                /* Bornée comme les autres recherches du produit : un champ qui
+                   traverse l'écran fait perdre le début de la ligne à l'œil. */
+                className="saisie pr-3 pl-9 placeholder:text-encre-doux sm:max-w-96"
+              />
+            </div>
+          </div>
+
+          <DepotsCartesGrises
+            depots={depots}
+            total={(valeur ?? []).length}
+            choisi={lot}
+            choisir={setLotChoisi}
+          />
+
+          <div role="group" aria-label="Filtrer par état" className="mt-4 flex flex-wrap gap-2">
+            {ETATS_CLASSEUR.map((choix) => (
+              <button
+                key={choix}
+                type="button"
+                onClick={() => setEtat(choix)}
+                aria-pressed={etat === choix}
+                className={`bouton ${etat === choix ? "bouton-principal" : "bouton-discret"}`}
+              >
+                {LIBELLE_ETAT_CLASSEUR[choix]}
+                {comptes[choix] > 0 ? ` (${formaterNombre(comptes[choix])})` : ""}
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-4">
+            <Liste
+              dossiers={montres}
+              chargement={valeur === null}
+              boutiqueId={boutiqueId}
+              prestataires={connus}
+              auteur={auteur}
+              /* Le retour en bloc vise les dossiers partis chez un
+                 prestataire : il n'a rien à faire parmi les retirés. */
+              permettreRetour={etat !== "retires"}
+            />
+          </div>
+        </>
       )}
 
       {creation && boutiqueId !== null && (
@@ -193,131 +236,6 @@ function Ecran() {
         />
       )}
     </div>
-  );
-}
-
-/** Le titre d'un lot ouvert : le prestataire et le jour, comme dans le tableau. */
-function titreDuLot(lot: string, depot: DepotCarteGrise | null): string {
-  if (lot === LOT_A_DEPOSER) return "À déposer";
-  if (depot === null) return "Dépôt";
-  const nom = depot.prestataireNom || "Prestataire non noté";
-  return depot.deposeLe ? `${nom} · ${formaterDateCourte(depot.deposeLe)}` : nom;
-}
-
-/**
- * Ce qui se montre sous le titre : la recherche, puis les dépôts ou le
- * classeur.
- *
- * **Le classeur ne paraît que dans un lot, ou pour une recherche.** Sur la
- * liste des dépôts, taper un nom remplace le tableau par les dossiers trouvés,
- * tous lots confondus ; vider le champ le rend.
- *
- * **Les retraits se lisent depuis la liste, sans ouvrir de lot** (2 novembre
- * 2026) : « impossible d'y accéder directement ». Le premier onglet y montre
- * les dépôts, le second tous les dossiers retirés, quel que soit leur lot.
- */
-function Vue({
-  lot,
-  dossiers,
-  chargement,
-  lotVide,
-  depots,
-  boutiqueId,
-  prestataires,
-  auteur,
-}: {
-  lot: string | null;
-  dossiers: readonly DossierCarteGrise[];
-  chargement: boolean;
-  /** Le lot de l'adresse n'a plus de dossier : son dernier a changé de dépôt. */
-  lotVide: boolean;
-  depots: ReactNode;
-  boutiqueId: string | null;
-  prestataires: Prestataire[];
-  auteur: { uid: string; nom: string };
-}) {
-  const [panneau, setPanneau] = useState<Panneau>("cours");
-  const [recherche, setRecherche] = useState("");
-
-  /* **La recherche porte sur les deux onglets à la fois.** C'est la demande, et
-     c'est la bonne : celui qui cherche un nom ne sait pas si le papier est
-     encore dehors ou déjà rendu — c'est même souvent la question qu'il pose. */
-  const { cours, termines } = rangerDossiers(chercherDossiers(dossiers, recherche, normaliserNom));
-  const classeur = lot !== null || recherche.trim() !== "";
-
-  /* Le retour est déjà en tête de page : seul le constat reste ici. */
-  if (lotVide) return <p className="mt-6 text-corps text-encre">Ce dépôt n’a plus aucun dossier.</p>;
-
-  return (
-    <>
-      <div className="mt-6">
-        <label htmlFor="recherche-dossier" className="block text-sm font-medium text-encre">
-          Chercher un dossier
-        </label>
-        <div className="relative mt-1.5">
-          <Search
-            aria-hidden="true"
-            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-encre-doux"
-          />
-          <input
-            id="recherche-dossier"
-            type="search"
-            inputMode="search"
-            autoComplete="off"
-            placeholder="Un nom, un téléphone, un châssis, une plaque, une date…"
-            value={recherche}
-            onChange={(evenement) => setRecherche(evenement.target.value)}
-            /* Bornée comme les autres recherches du produit : un champ qui
-               traverse l'écran fait perdre le début de la ligne à l'œil. */
-            className="saisie pr-3 pl-9 placeholder:text-encre-doux sm:max-w-96"
-          />
-        </div>
-      </div>
-
-      <Onglets
-        className="mt-6"
-        libelle="Les dossiers"
-        valeur={panneau}
-        changer={setPanneau}
-        onglets={[
-          {
-            valeur: "cours",
-            libelle: classeur ? `Dépôt${cours.length > 0 ? ` (${cours.length})` : ""}` : "Dépôts",
-            contenu: !classeur ? (
-              chargement ? (
-                <EtatChargement>Lecture des dossiers…</EtatChargement>
-              ) : (
-                depots
-              )
-            ) : (
-              <Liste
-                dossiers={cours}
-                chargement={chargement}
-                boutiqueId={boutiqueId}
-                prestataires={prestataires}
-                auteur={auteur}
-                /* Le retour en bloc ne vaut que pour le dépôt : c'est là que
-                   vivent les dossiers partis chez un prestataire. */
-                permettreRetour
-              />
-            ),
-          },
-          {
-            valeur: "historique",
-            libelle: `Retrait${termines.length > 0 ? ` (${termines.length})` : ""}`,
-            contenu: (
-              <Liste
-                dossiers={termines}
-                chargement={chargement}
-                boutiqueId={boutiqueId}
-                prestataires={prestataires}
-                auteur={auteur}
-              />
-            ),
-          },
-        ]}
-      />
-    </>
   );
 }
 

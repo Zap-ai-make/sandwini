@@ -1,5 +1,5 @@
 import { normaliserNom } from "./client";
-import { attendUnRetour, dossierEnCours, type DossierCarteGrise } from "./dossier-carte-grise";
+import { attendUnRetour, type DossierCarteGrise } from "./dossier-carte-grise";
 
 /**
  * Les dépôts de cartes grises, lus comme les arrivages (31 octobre 2026).
@@ -78,36 +78,18 @@ export function depotsDeCartesGrises(dossiers: readonly DossierDepose[]): DepotC
 }
 
 /**
- * Le lot des dossiers qui ne sont partis chez personne (2 novembre 2026).
+ * Les dossiers d'un lot, ou tous quand aucun n'est choisi (6 novembre 2026).
  *
- * L'écran ne montre plus que les dépôts, et chacun s'ouvre sur ses dossiers :
- * une ligne qu'on vient de créer n'a pas encore de dépôt, il lui faut un lot à
- * elle pour ne pas disparaître. Sans « | », cette clé ne peut pas croiser
- * celle d'un dépôt (`cleDepot` en porte toujours un).
+ * Le lot est un filtre du classeur, sur place : un clic sur sa carte réduit
+ * la liste, un second la rend entière. Un lot dont le dernier dossier a
+ * changé de dépôt n'a plus rien à montrer.
  */
-export const LOT_A_DEPOSER = "a-deposer";
-
-/** Le lot d'un dossier : son dépôt, ou « à déposer » s'il n'est jamais parti. */
-export function lotDuDossier(dossier: DossierDepose): string {
-  return cleDepot(dossier) ?? LOT_A_DEPOSER;
-}
-
-/** Les dossiers d'un lot ; aucun pour un dépôt dont le dernier dossier a changé. */
-export function dossiersDuLot<T extends DossierDepose>(dossiers: readonly T[], lot: string): T[] {
-  return dossiers.filter((dossier) => lotDuDossier(dossier) === lot);
-}
-
-/**
- * Combien de dossiers attendent encore d'être confiés à un prestataire.
- *
- * Un dossier clos sans être parti — remis directement, ou sans objet après une
- * vente annulée — n'attend plus rien : il ne compte pas.
- */
-export function nombreADeposer(
-  dossiers: readonly (DossierDepose & Pick<DossierCarteGrise, "statut">)[],
-): number {
-  return dossiers.filter((dossier) => cleDepot(dossier) === null && dossierEnCours(dossier))
-    .length;
+export function dossiersDuLot<T extends DossierDepose>(
+  dossiers: readonly T[],
+  lot: string | null,
+): T[] {
+  if (lot === null) return [...dossiers];
+  return dossiers.filter((dossier) => cleDepot(dossier) === lot);
 }
 
 function jour(date: Date): string {

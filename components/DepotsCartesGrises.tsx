@@ -1,151 +1,117 @@
 "use client";
 
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Tableau, type Colonne } from "@/components/patrons/Tableau";
-import { LOT_A_DEPOSER, type DepotCarteGrise } from "@/lib/domain/depots-carte-grise";
-import { depuisQuand, formaterDateCourte, formaterNombre } from "@/lib/domain/format";
-
-/** L'adresse d'un lot : l'écran des dossiers, réduit à ceux-là. */
-export function adresseDuLot(lot: string): string {
-  return `/cartes-grises?lot=${encodeURIComponent(lot)}`;
-}
-
-/** Une ligne du tableau : un dépôt, ou le lot de ce qui n'est pas encore parti. */
-type Ligne = { cle: string; depot: DepotCarteGrise | null; pris: number };
+import type { ReactNode } from "react";
+import type { DepotCarteGrise } from "@/lib/domain/depots-carte-grise";
+import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 
 /**
- * Les dépôts de cartes grises (31 octobre 2026), seuls à l'écran depuis le
- * 2 novembre.
+ * Les lots de cartes grises, en bandeau au-dessus du classeur (6 novembre 2026).
  *
  * « Le tableau de carte grise doit être intuitif comme celui des arrivages :
  * on voit combien est reçu, ce qui reste, le total pris, avec une barre de
- * progression. » Une ligne par paquet confié — un prestataire, un jour —, sur
- * le dessin du tableau des arrivages, pour que l'œil y retrouve ses repères.
+ * progression » (31 octobre). Puis : « c'est comme s'il y avait deux pages,
+ * tout devrait être imbriqué ». Chaque carte garde la barre et les nombres du
+ * lot, et **un clic filtre le classeur sur place** ; un second clic, ou
+ * « Tous les lots », le rend entier. Rien ne change de page.
  *
- * **Une ligne ouvre son lot.** Le classeur entier sous ce tableau faisait
- * deux écrans en un — « ce n'est pas intuitif et ça pollue » : il ne s'ouvre
- * plus que réduit au lot qu'on a choisi.
- *
- * **« À déposer » vient en tête** : ce qui n'est parti chez personne est la
- * seule file qui attend un geste, et une ligne qu'on vient de créer y arrive.
+ * Un bandeau et non un tableau : le classeur reste sous les yeux, et la
+ * rangée se fait défiler sur le côté quand les lots s'accumulent.
  */
 export function DepotsCartesGrises({
   depots,
-  aDeposer,
+  total,
+  choisi,
+  choisir,
 }: {
   depots: readonly DepotCarteGrise[];
-  aDeposer: number;
+  /** Tous les dossiers du périmètre, pour la carte « Tous les lots ». */
+  total: number;
+  choisi: string | null;
+  choisir: (lot: string | null) => void;
 }) {
-  const router = useRouter();
+  if (depots.length === 0) return null;
 
-  const lignes: Ligne[] = [
-    ...(aDeposer > 0 ? [{ cle: LOT_A_DEPOSER, depot: null, pris: aDeposer }] : []),
-    ...depots.map((depot) => ({ cle: depot.cle, depot, pris: depot.pris })),
-  ];
-  if (lignes.length === 0) return null;
-
-  const colonnes: Colonne<Ligne>[] = [
-    {
-      cle: "depot",
-      titre: "Dépôt",
-      principal: true,
-      rendu: ({ cle, depot }) => (
-        /* Le lien sert le clavier et le lecteur d'écran ; la souris, elle, a
-           toute la ligne. `stopPropagation` évite d'ouvrir deux fois. */
-        <Link
-          href={adresseDuLot(cle)}
-          onClick={(evenement) => evenement.stopPropagation()}
-          className="text-left font-medium text-encre hover:underline"
-        >
-          {depot === null ? (
-            "À déposer"
-          ) : (
-            <>
-              {depot.prestataireNom || "Prestataire non noté"}
-              <span className="block text-corps font-normal text-encre-doux">
-                {depot.deposeLe
-                  ? `${formaterDateCourte(depot.deposeLe)} · ${depuisQuand(depot.deposeLe)}`
-                  : "Date non notée"}
-              </span>
-            </>
-          )}
-        </Link>
-      ),
-    },
-    {
-      cle: "pris",
-      titre: "Pris",
-      chiffre: true,
-      rendu: (ligne) => formaterNombre(ligne.pris),
-    },
-    {
-      cle: "retour",
-      titre: "Retour",
-      rendu: ({ depot }) => (depot === null ? null : <BarreRetour depot={depot} />),
-    },
-    {
-      cle: "etat",
-      titre: "État",
-      rendu: ({ depot }) =>
-        depot === null ? null : (
-          <div>
-            {depot.restent === 0 ? (
-              <span className="pastille pastille-solde">Tout est revenu</span>
-            ) : (
-              <span className="pastille pastille-retard">
-                {formaterNombre(depot.restent)} dehors
-              </span>
-            )}
-            <span className="mt-1 block text-legende text-encre-doux">
-              {formaterNombre(depot.recus)} / {formaterNombre(depot.pris)}
-            </span>
-          </div>
-        ),
-    },
-  ];
-
-  /* Pas de titre : l'onglet « Dépôts » qui le porte le dit déjà. */
   return (
-    <section aria-label="Les dépôts">
-      <div className="cadre cadre-tableau">
-        <Tableau
-          legende="Les dépôts de cartes grises, du plus récent au plus ancien. Une ligne ouvre ses dossiers."
-          colonnes={colonnes}
-          lignes={lignes}
-          cleDe={(ligne) => ligne.cle}
-          reglee={({ depot }) => depot !== null && depot.restent === 0}
-          ouvrir={(ligne) => router.push(adresseDuLot(ligne.cle))}
-        />
-      </div>
-    </section>
+    <div role="group" aria-label="Filtrer par lot" className="mt-6 flex gap-2 overflow-x-auto pb-1">
+      <CarteLot actif={choisi === null} choisir={() => choisir(null)}>
+        <span className="block font-medium text-encre">Tous les lots</span>
+        <span className="block font-code text-legende tabular-nums text-encre-doux">
+          {formaterNombre(total)}
+        </span>
+      </CarteLot>
+
+      {depots.map((depot) => (
+        <CarteLot
+          key={depot.cle}
+          actif={choisi === depot.cle}
+          choisir={() => choisir(choisi === depot.cle ? null : depot.cle)}
+        >
+          <span className="block truncate font-medium text-encre">
+            {depot.prestataireNom || "Prestataire non noté"}
+          </span>
+          <span className="block text-legende text-encre-doux">
+            {depot.deposeLe ? formaterDateCourte(depot.deposeLe) : "Date non notée"}
+          </span>
+          <BarreRetour depot={depot} />
+        </CarteLot>
+      ))}
+    </div>
+  );
+}
+
+/** Une carte du bandeau : un bouton qui se presse, comme les filtres d'état. */
+function CarteLot({
+  actif,
+  choisir,
+  children,
+}: {
+  actif: boolean;
+  choisir: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={choisir}
+      aria-pressed={actif}
+      className={[
+        "w-44 shrink-0 rounded-carte border bg-papier text-left",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-encre",
+        /* La bordure épaissie se paie sur la marge intérieure : la carte
+           choisie ne bouge pas d'un pixel, et ses voisines non plus. */
+        actif ? "border-2 border-encre px-[11px] py-[9px]" : "border-bord px-3 py-2.5 hover:bg-survol",
+      ].join(" ")}
+    >
+      {children}
+    </button>
   );
 }
 
 /**
- * La barre du retour : la part revenue du paquet.
+ * La barre du retour : la part revenue du lot.
  *
  * Le même dessin que l'écoulement d'un arrivage (`BarreEcoulement`) : la piste,
- * la part pleine en vert, et les deux nombres dessous — une longueur se
- * compare, elle ne se lit pas.
+ * la part pleine en vert, et les nombres dessous — une longueur se compare,
+ * elle ne se lit pas.
  */
 function BarreRetour({ depot }: { depot: DepotCarteGrise }) {
   const part = depot.pris === 0 ? 0 : Math.round((depot.recus / depot.pris) * 100);
   return (
-    <div className="min-w-36">
-      <div className="h-2 overflow-hidden rounded-full bg-fond">
-        <div
-          className="h-full rounded-full"
+    <span className="mt-2 block">
+      <span className="block h-1.5 overflow-hidden rounded-full bg-fond">
+        <span
+          className="block h-full rounded-full"
           style={{ width: `${part}%`, background: "var(--color-solde)" }}
         />
-      </div>
-      <p className="mt-1 text-legende text-encre-doux">
-        <span className="font-semibold text-encre">{formaterNombre(depot.recus)}</span>{" "}
-        reçu{depot.recus > 1 ? "s" : ""}
-        {" · "}
-        <span className="font-semibold text-encre">{formaterNombre(depot.restent)}</span>{" "}
-        reste{depot.restent > 1 ? "nt" : ""}
-      </p>
-    </div>
+      </span>
+      <span className="mt-1 flex items-baseline justify-between gap-2 text-legende">
+        <span className="font-code tabular-nums text-encre">
+          {formaterNombre(depot.recus)} / {formaterNombre(depot.pris)}
+        </span>
+        {depot.restent > 0 && (
+          <span className="text-alerte">{formaterNombre(depot.restent)} dehors</span>
+        )}
+      </span>
+    </span>
   );
 }

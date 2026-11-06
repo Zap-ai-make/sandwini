@@ -1,12 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  cleDepot,
-  depotsDeCartesGrises,
-  dossiersDuLot,
-  LOT_A_DEPOSER,
-  lotDuDossier,
-  nombreADeposer,
-} from "./depots-carte-grise";
+import { cleDepot, depotsDeCartesGrises, dossiersDuLot } from "./depots-carte-grise";
 import type { DossierCarteGrise } from "./dossier-carte-grise";
 
 /**
@@ -107,69 +100,26 @@ describe("depotsDeCartesGrises", () => {
 });
 
 /**
- * Le lot qu'on ouvre (2 novembre 2026).
+ * Le filtre par lot (6 novembre 2026).
  *
- * « C'est fait en deux parties, ce n'est pas intuitif et ça pollue » : l'écran
- * ne montre plus que les dépôts, et un clic sur l'un d'eux ouvre le classeur
- * réduit à ses dossiers. Ceux qui ne sont partis chez personne forment un lot
- * à eux, « À déposer » — sans lui, une ligne qu'on vient de créer n'aurait
- * nulle part où apparaître.
+ * Un clic sur un lot du bandeau réduit le classeur à ses dossiers, sur place :
+ * le lot est un filtre, pas une page où l'on entre.
  */
-describe("lotDuDossier", () => {
-  it("rend la clé du dépôt d’un dossier parti", () => {
-    const parti = dossier({ prestataireNom: "Kaboré", deposeLe: LE_15_SEPT });
-    expect(lotDuDossier(parti)).toBe(cleDepot(parti));
-  });
-
-  it("range un dossier jamais parti dans le lot « à déposer »", () => {
-    expect(lotDuDossier(dossier({}))).toBe(LOT_A_DEPOSER);
-  });
-
-  it("ne confond jamais le lot « à déposer » avec un dépôt", () => {
-    /* Un prestataire nommé comme la clé ne doit pas y tomber. */
-    const piege = dossier({ prestataireNom: LOT_A_DEPOSER, deposeLe: LE_15_SEPT });
-    expect(lotDuDossier(piege)).not.toBe(LOT_A_DEPOSER);
-  });
-});
-
 describe("dossiersDuLot", () => {
   const kabore = dossier({ id: "k", prestataireNom: "Kaboré", deposeLe: LE_15_SEPT });
   const ouedraogo = dossier({ id: "o", prestataireNom: "Ouédraogo", deposeLe: LE_20_OCT });
   const neuf = dossier({ id: "n" });
   const tous = [kabore, ouedraogo, neuf];
 
-  it("ne garde que les dossiers du dépôt ouvert", () => {
-    expect(dossiersDuLot(tous, cleDepot(kabore)!).map((d) => d.id)).toEqual(["k"]);
+  it("ne garde que les dossiers du lot choisi", () => {
+    expect(dossiersDuLot(tous, cleDepot(kabore)).map((d) => d.id)).toEqual(["k"]);
   });
 
-  it("ouvre le lot « à déposer » sur les dossiers qui ne sont partis chez personne", () => {
-    expect(dossiersDuLot(tous, LOT_A_DEPOSER).map((d) => d.id)).toEqual(["n"]);
+  it("rend tous les dossiers quand aucun lot n'est choisi", () => {
+    expect(dossiersDuLot(tous, null).map((d) => d.id)).toEqual(["k", "o", "n"]);
   });
 
-  it("rend une liste vide pour un dépôt qui n’a plus de dossier", () => {
+  it("rend une liste vide pour un lot qui n'a plus de dossier", () => {
     expect(dossiersDuLot(tous, "personne|2026-01-01")).toEqual([]);
-  });
-});
-
-describe("nombreADeposer", () => {
-  it("compte les dossiers qui attendent encore d’être confiés", () => {
-    expect(
-      nombreADeposer([
-        dossier({ id: "a" }),
-        dossier({ id: "b" }),
-        dossier({ id: "c", prestataireNom: "Kaboré", deposeLe: LE_15_SEPT }),
-      ]),
-    ).toBe(2);
-  });
-
-  it("ne compte pas un dossier clos sans être parti", () => {
-    /* Remis au client sans passer par un prestataire, ou sans objet après une
-       vente annulée : il n'attend plus de dépôt. */
-    expect(
-      nombreADeposer([
-        dossier({ id: "a", statut: "remis" }),
-        dossier({ id: "b", statut: "non_applicable" }),
-      ]),
-    ).toBe(0);
   });
 });
