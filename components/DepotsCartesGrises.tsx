@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { CarteFiltre } from "@/components/patrons/CarteFiltre";
 import type { DepotCarteGrise } from "@/lib/domain/depots-carte-grise";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 
@@ -33,15 +33,15 @@ export function DepotsCartesGrises({
 
   return (
     <div role="group" aria-label="Filtrer par lot" className="mt-6 flex gap-2 overflow-x-auto pb-1">
-      <CarteLot actif={choisi === null} choisir={() => choisir(null)}>
+      <CarteFiltre actif={choisi === null} choisir={() => choisir(null)}>
         <span className="block font-medium text-encre">Tous les lots</span>
         <span className="block font-code text-legende tabular-nums text-encre-doux">
           {formaterNombre(total)}
         </span>
-      </CarteLot>
+      </CarteFiltre>
 
       {depots.map((depot) => (
-        <CarteLot
+        <CarteFiltre
           key={depot.cle}
           actif={choisi === depot.cle}
           choisir={() => choisir(choisi === depot.cle ? null : depot.cle)}
@@ -53,37 +53,9 @@ export function DepotsCartesGrises({
             {depot.deposeLe ? formaterDateCourte(depot.deposeLe) : "Date non notée"}
           </span>
           <BarreRetour depot={depot} />
-        </CarteLot>
+        </CarteFiltre>
       ))}
     </div>
-  );
-}
-
-/** Une carte du bandeau : un bouton qui se presse, comme les filtres d'état. */
-function CarteLot({
-  actif,
-  choisir,
-  children,
-}: {
-  actif: boolean;
-  choisir: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={choisir}
-      aria-pressed={actif}
-      className={[
-        "w-44 shrink-0 rounded-carte border bg-papier text-left",
-        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-encre",
-        /* La bordure épaissie se paie sur la marge intérieure : la carte
-           choisie ne bouge pas d'un pixel, et ses voisines non plus. */
-        actif ? "border-2 border-encre px-[11px] py-[9px]" : "border-bord px-3 py-2.5 hover:bg-survol",
-      ].join(" ")}
-    >
-      {children}
-    </button>
   );
 }
 

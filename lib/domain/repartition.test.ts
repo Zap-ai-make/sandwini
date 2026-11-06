@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { repartirParMarque } from "./repartition";
+import type { Boutique } from "./boutique";
+import { repartirParBoutique, repartirParMarque } from "./repartition";
 import type { Moto } from "./moto";
 
 /* Les noms viennent du catalogue dans le produit ; ici deux tables suffisent,
@@ -134,5 +135,70 @@ describe("repartirParMarque", () => {
       const somme = marque.modeles.reduce((total, m) => total + m.compte, 0);
       expect(somme, marque.libelle).toBe(marque.compte);
     }
+  });
+});
+
+/**
+ * Le stock par boutique (6 novembre 2026).
+ *
+ * Sur « Toutes les boutiques », la répartition par marque cède la place au
+ * nombre de motos de chaque magasin : c'est la question que le responsable
+ * pose en ouvrant le stock de l'entreprise — où sont les motos.
+ */
+describe("repartirParBoutique", () => {
+  const boutique = (id: string, nom: string, partie: Partial<Boutique> = {}): Boutique => ({
+    id,
+    nom,
+    code: id,
+    metiers: ["motos"],
+    adresse: "",
+    telephone: "",
+    actif: true,
+    ...partie,
+  });
+  const dans = (boutiqueId: string, i: number): Moto => ({ ...moto("ya", "cry", i), boutiqueId });
+
+  const BOUTIQUES = [
+    boutique("POU", "Pouytenga"),
+    boutique("OUA", "Ouagadougou"),
+    boutique("FAT", "Fatas", { metiers: ["pieces"] }),
+    boutique("KAY", "Kaya"),
+  ];
+
+  it("compte les motos de chaque boutique qui en vend, rangées par nom", () => {
+    const motos = [dans("POU", 1), dans("POU", 2), dans("OUA", 3)];
+    expect(repartirParBoutique(motos, BOUTIQUES)).toEqual([
+      { boutiqueId: "KAY", nom: "Kaya", compte: 0 },
+      { boutiqueId: "OUA", nom: "Ouagadougou", compte: 1 },
+      { boutiqueId: "POU", nom: "Pouytenga", compte: 2 },
+    ]);
+  });
+
+  it("montre une boutique à zéro : un magasin vide est une réponse", () => {
+    expect(repartirParBoutique([], BOUTIQUES).map((b) => b.compte)).toEqual([0, 0, 0]);
+  });
+
+  it("laisse de côté une boutique sans motos qui n'en vend pas, ou fermée", () => {
+    const fermee = boutique("ZIN", "Ziniaré", { actif: false });
+    const ids = repartirParBoutique([], [...BOUTIQUES, fermee]).map((b) => b.boutiqueId);
+    expect(ids).not.toContain("FAT");
+    expect(ids).not.toContain("ZIN");
+  });
+
+  it("garde une boutique qui porte encore des motos, même fermée", () => {
+    /* Une moto restée dans un magasin fermé doit se voir : la cacher, ce
+       serait la perdre de vue. */
+    const fermee = boutique("ZIN", "Ziniaré", { actif: false });
+    const lignes = repartirParBoutique([dans("ZIN", 1)], [...BOUTIQUES, fermee]);
+    expect(lignes.find((b) => b.boutiqueId === "ZIN")?.compte).toBe(1);
+  });
+
+  it("nomme par son identifiant une boutique que la liste ne connaît pas", () => {
+    const lignes = repartirParBoutique([dans("XXX", 1)], BOUTIQUES);
+    expect(lignes.find((b) => b.boutiqueId === "XXX")).toEqual({
+      boutiqueId: "XXX",
+      nom: "XXX",
+      compte: 1,
+    });
   });
 });

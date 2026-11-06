@@ -288,6 +288,24 @@ describe("filtrerMotos", () => {
   it("ne renvoie rien quand la recherche ne correspond à personne", () => {
     expect(filtrerMotos(stock, { ...FILTRES_VIDES, recherche: "ZZZ" })).toHaveLength(0);
   });
+
+  /* **Le filtre par boutique** (6 novembre 2026), à côté de la marque et du
+     modèle : sur « Toutes les boutiques », le responsable veut lire le stock
+     d'un seul magasin sans quitter la vue d'ensemble. */
+  it("filtre par boutique, et se combine avec la marque", () => {
+    const deux = [
+      moto({ id: "a", boutiqueId: "POU", marqueId: "m1" }),
+      moto({ id: "b", boutiqueId: "OUA", marqueId: "m1" }),
+      moto({ id: "c", boutiqueId: "POU", marqueId: "m2" }),
+    ];
+    expect(filtrerMotos(deux, { ...FILTRES_VIDES, boutiqueId: "POU" }).map((m) => m.id)).toEqual([
+      "a",
+      "c",
+    ]);
+    expect(
+      filtrerMotos(deux, { ...FILTRES_VIDES, boutiqueId: "POU", marqueId: "m1" }).map((m) => m.id),
+    ).toEqual(["a"]);
+  });
 });
 
 describe("chassisDejaPris", () => {

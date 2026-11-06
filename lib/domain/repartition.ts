@@ -17,6 +17,7 @@
  * dont la valeur se devinerait.
  */
 
+import type { Boutique } from "./boutique";
 import type { Moto } from "./moto";
 
 /**
@@ -106,4 +107,38 @@ export function repartirParMarque(
         .sort((a, b) => parNombrePuisNom(a, b, MODELE_NON_PRECISE)),
     }))
     .sort((a, b) => parNombrePuisNom(a, b));
+}
+
+export type CompteBoutique = { boutiqueId: string; nom: string; compte: number };
+
+/**
+ * Les motos comptées par boutique (6 novembre 2026).
+ *
+ * Sur « Toutes les boutiques », c'est ce que le responsable veut lire en
+ * premier : où sont les motos. Ce comptage remplace là-bas la répartition par
+ * marque.
+ *
+ * **Une boutique à zéro se montre**, si elle vend des motos et qu'elle est
+ * ouverte : un magasin vide est une réponse, pas une absence. Une boutique
+ * fermée, ou qui ne vend pas de motos, ne paraît que si elle en porte encore
+ * — les cacher alors, ce serait perdre ces motos de vue.
+ *
+ * **Rangées par nom, et non par compte** : les cases ne changent pas de place
+ * quand un filtre change les nombres, et l'œil retrouve chaque magasin où il
+ * l'a laissé.
+ */
+export function repartirParBoutique(
+  motos: readonly Pick<Moto, "boutiqueId">[],
+  boutiques: readonly Pick<Boutique, "id" | "nom" | "metiers" | "actif">[],
+): CompteBoutique[] {
+  const comptes = new Map<string, number>();
+  for (const boutique of boutiques) {
+    if (boutique.actif && boutique.metiers.includes("motos")) comptes.set(boutique.id, 0);
+  }
+  for (const moto of motos) comptes.set(moto.boutiqueId, (comptes.get(moto.boutiqueId) ?? 0) + 1);
+
+  const nomDe = new Map(boutiques.map((boutique) => [boutique.id, boutique.nom]));
+  return [...comptes]
+    .map(([boutiqueId, compte]) => ({ boutiqueId, nom: nomDe.get(boutiqueId) ?? boutiqueId, compte }))
+    .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 }

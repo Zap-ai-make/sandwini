@@ -362,9 +362,11 @@ export type Filtres = {
   recherche: string;
   marqueId: string;
   modeleId: string;
+  /** Vide : toutes. Ne sert que sur « Toutes les boutiques » (6 novembre 2026). */
+  boutiqueId: string;
 };
 
-export const FILTRES_VIDES: Filtres = { recherche: "", marqueId: "", modeleId: "" };
+export const FILTRES_VIDES: Filtres = { recherche: "", marqueId: "", modeleId: "", boutiqueId: "" };
 
 /**
  * Filtre le stock en mémoire.
@@ -382,6 +384,7 @@ export function filtrerMotos(motos: Moto[], filtres: Filtres): Moto[] {
   return motos.filter((moto) => {
     if (filtres.marqueId && moto.marqueId !== filtres.marqueId) return false;
     if (filtres.modeleId && moto.modeleId !== filtres.modeleId) return false;
+    if (filtres.boutiqueId && moto.boutiqueId !== filtres.boutiqueId) return false;
     if (recherche && !moto.numeroChassis.includes(recherche)) return false;
     return true;
   });

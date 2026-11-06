@@ -16,6 +16,7 @@ import { ExportMotos } from "@/components/ExportMotos";
 import { MotosParties } from "@/components/MotosParties";
 import { RepartitionStock } from "@/components/RepartitionStock";
 import { Statut } from "@/components/StatutMoto";
+import { StockParBoutique } from "@/components/StockParBoutique";
 import { Tableau, type Colonne } from "@/components/patrons/Tableau";
 import { formaterDateCourte, formaterNombre } from "@/lib/domain/format";
 import {
@@ -29,6 +30,7 @@ import { useCatalogue } from "@/lib/repositories/catalogue";
 import { DeplacerMotosModal } from "@/components/DeplacerMotosModal";
 import { useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
+import { repartirParBoutique } from "@/lib/domain/repartition";
 import { peut } from "@/lib/domain/roles";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterArrivages } from "@/lib/repositories/arrivages";
@@ -162,8 +164,9 @@ function Stock() {
     };
   }, [arrivages, fournisseurs]);
 
-  /* Les boutiques servent au déplacement groupé seul : la liste des
-     destinations, et le nom qu'on lit dans la confirmation. */
+  /* Les boutiques servent au déplacement groupé — la liste des destinations,
+     et le nom qu'on lit dans la confirmation — et, sur « Toutes les
+     boutiques », aux cases du stock par magasin et à leur filtre. */
   const souscrireBoutiques = useCallback(
     (auChangement: (liste: Boutique[]) => void, enErreur: (cause: unknown) => void) =>
       ecouterBoutiques(auChangement, enErreur),
@@ -174,12 +177,32 @@ function Stock() {
     "La liste des boutiques n’a pas pu être lue.",
   );
 
-  const resultats = useMemo(() => filtrerMotos(stock ?? [], filtres), [stock, filtres]);
+  const toutesBoutiques = perimetre.type === "toutes";
+  /* **Le filtre par boutique ne vaut que sur « Toutes les boutiques ».**
+     Choisi là, puis le périmètre passé sur un magasin, il resterait dans
+     l'état et viderait le tableau d'un stock qui n'a plus que ce magasin. */
+  const boutiqueFiltree = toutesBoutiques ? filtres.boutiqueId : "";
+  const resultats = useMemo(
+    () => filtrerMotos(stock ?? [], { ...filtres, boutiqueId: boutiqueFiltree }),
+    [stock, filtres, boutiqueFiltree],
+  );
+  /* Les cases comptent tout ce que les autres filtres laissent, quelle que
+     soit la boutique choisie : en choisir une ne fait pas tomber les autres à
+     zéro. */
+  const horsBoutique = useMemo(
+    () => (toutesBoutiques ? filtrerMotos(stock ?? [], { ...filtres, boutiqueId: "" }) : []),
+    [toutesBoutiques, stock, filtres],
+  );
+  const comptesBoutiques = useMemo(
+    () => (toutesBoutiques && stock !== null ? repartirParBoutique(horsBoutique, boutiques ?? []) : []),
+    [toutesBoutiques, stock, horsBoutique, boutiques],
+  );
+  const choisirBoutique = (boutiqueId: string) =>
+    setFiltres((actuel) => ({ ...actuel, boutiqueId }));
   const modelesDeLaMarque = filtres.marqueId
     ? catalogue.modeles.filter((modele) => modele.marqueId === filtres.marqueId)
     : catalogue.modeles;
 
-  const toutesBoutiques = perimetre.type === "toutes";
   const basculer = useCallback((id: string) => {
     setCochees((actuel) => {
       const suivant = new Set(actuel);
@@ -309,17 +332,30 @@ function Stock() {
         }
       />
 
-      {/* Le comptage par marque, replié. Posé ici et non dans la branche du
-          tableau : il rend `null` sur une liste vide, donc il s'efface tout
-          seul pendant le chargement, sur une erreur et sur un stock vide — ce
-          qui évite de l'enfermer dans un fragment et de décaler tout le cadre.
-          Il compte ce que l'écran montre, filtres compris. */}
-      <RepartitionStock
-        motos={resultats}
-        filtre={resultats.length !== total}
-        nomMarque={catalogue.nomMarque}
-        nomModele={catalogue.nomModele}
-      />
+      {/* **Sur « Toutes les boutiques », le stock par magasin** remplace le
+          comptage par marque (6 novembre 2026) : c'est la question du
+          responsable devant l'entreprise entière. Dans une boutique, le
+          comptage par marque reste, replié.
+
+          Posés ici et non dans la branche du tableau : tous deux rendent
+          `null` sur une liste vide, donc ils s'effacent seuls pendant le
+          chargement, sur une erreur et sur un stock vide — ce qui évite de les
+          enfermer dans un fragment et de décaler tout le cadre. */}
+      {toutesBoutiques ? (
+        <StockParBoutique
+          comptes={comptesBoutiques}
+          total={horsBoutique.length}
+          choisie={boutiqueFiltree}
+          choisir={choisirBoutique}
+        />
+      ) : (
+        <RepartitionStock
+          motos={resultats}
+          filtre={resultats.length !== total}
+          nomMarque={catalogue.nomMarque}
+          nomModele={catalogue.nomModele}
+        />
+      )}
 
       {/* Ce qui a quitte cette boutique (S17). Meme traitement que le bloc
           ci-dessus : il rend `null` quand il n'y a rien, donc il s'efface seul
@@ -356,6 +392,21 @@ function Stock() {
               role="group"
               aria-label="Filtrer le stock"
             >
+              {/* La même boutique que les cases du dessus : les deux tiennent
+                  un seul filtre. */}
+              {toutesBoutiques && (
+                <Filtre
+                  id="filtre-boutique"
+                  libelle="Boutique"
+                  valeur={boutiqueFiltree}
+                  changer={choisirBoutique}
+                  options={comptesBoutiques.map((boutique) => ({
+                    valeur: boutique.boutiqueId,
+                    libelle: boutique.nom,
+                  }))}
+                  tous="Toutes les boutiques"
+                />
+              )}
               <Filtre
                 id="filtre-marque"
                 libelle="Marque"
