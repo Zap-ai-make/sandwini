@@ -14,6 +14,7 @@ import {
   LIGNE_VIDE,
   ligneDuDossier,
   ligneEstVide,
+  ligneNeuve,
   ligneSuivante,
   ORDRE_LIGNE,
   rangerDossiers,
@@ -576,6 +577,26 @@ describe("enchaîner plusieurs lignes", () => {
     expect(ligneEstVide(ligneSuivante({ ...LIGNE_VIDE, depot: "2025-08-18", transite: "BOHARY" }))).toBe(
       true,
     );
+  });
+
+  /* **La date du jour dans `Depot`, par défaut** (9 novembre 2026) : « quand
+     on ajoute une ligne ou plusieurs, la date d'ajout doit être la date du
+     jour ». Elle reste modifiable, et les lignes suivantes en héritent. */
+  it("ouvre une ligne neuve sur la date du jour dans Depot", () => {
+    expect(ligneNeuve(new Date(2026, 10, 9, 17, 45))).toEqual({
+      ...LIGNE_VIDE,
+      depot: "2026-11-09",
+    });
+  });
+
+  it("tient encore pour vide une ligne neuve qu’on n’a pas touchée", () => {
+    /* La date pré-remplie n'est pas une saisie : sans quoi ouvrir la feuille
+       puis l'enregistrer telle quelle écrirait un dossier fantôme. */
+    expect(ligneEstVide(ligneNeuve(new Date(2026, 10, 9)))).toBe(true);
+  });
+
+  it("passe la date du jour aux lignes suivantes", () => {
+    expect(ligneSuivante(ligneNeuve(new Date(2026, 10, 9))).depot).toBe("2026-11-09");
   });
 });
 

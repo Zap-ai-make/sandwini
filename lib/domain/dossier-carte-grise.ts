@@ -499,6 +499,20 @@ export function ligneSuivante(precedente: SaisieLigne): SaisieLigne {
 }
 
 /**
+ * La première ligne d'une feuille neuve : la date du jour dans `Depot`
+ * (9 novembre 2026).
+ *
+ * « Quand on ajoute une ligne ou plusieurs, par défaut la date d'ajout doit
+ * être la date du jour. » Pré-remplie et non imposée : elle se corrige, ou se
+ * vide si les papiers ne sont pas encore partis — une ligne datée compte comme
+ * « Sortis » (`statutDeLaLigne`). Les lignes suivantes en héritent par
+ * `ligneSuivante`. `aujourdhui` est passé : le domaine ne lit pas d'horloge.
+ */
+export function ligneNeuve(aujourdhui: Date): SaisieLigne {
+  return { ...LIGNE_VIDE, depot: jourLocal(aujourdhui) };
+}
+
+/**
  * Une ligne où personne n'a rien tapé.
  *
  * On clique « + » une fois de trop, et cela n'a pas à devenir une erreur : à

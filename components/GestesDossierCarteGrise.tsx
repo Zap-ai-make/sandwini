@@ -9,10 +9,10 @@ import { LONGUEUR_NOM_MAX, LONGUEUR_TELEPHONE_MAX } from "@/lib/domain/client";
 import {
   ENTETES_LIGNE,
   estTerminal,
-  LIGNE_VIDE,
   LONGUEUR_IMMATRICULATION_MAX,
   ligneDuDossier,
   ligneEstVide,
+  ligneNeuve,
   ligneSuivante,
   ORDRE_LIGNE,
   validerLigne,
@@ -92,7 +92,7 @@ export function LigneModale({
   const correction = dossier !== null;
 
   const [lignes, setLignes] = useState<SaisieLigne[]>(() =>
-    dossier ? [ligneDuDossier(dossier)] : [LIGNE_VIDE],
+    dossier ? [ligneDuDossier(dossier)] : [ligneNeuve(new Date())],
   );
   const [refus, setRefus] = useState<Refus | null>(null);
 
