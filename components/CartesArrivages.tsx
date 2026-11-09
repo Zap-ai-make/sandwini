@@ -1,6 +1,5 @@
 import type { BilanArrivages } from "@/lib/domain/arrivage";
-import { Chiffre } from "@/components/patrons/Chiffre";
-import { formaterNombre } from "@/lib/domain/format";
+import { CarteChiffre } from "@/components/patrons/CarteChiffre";
 
 /**
  * Les cinq compteurs de tête de l'espace arrivages (S43).
@@ -26,15 +25,7 @@ export function CartesArrivages({ bilan }: { bilan: BilanArrivages }) {
     <div className="mb-5 grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
       {cartes.map((carte) => (
         <div key={carte.nom} className="cadre p-4">
-          <p className="text-legende font-bold tracking-[0.07em] text-encre-doux uppercase">
-            {carte.nom}
-          </p>
-          <p
-            className="mt-1 font-code text-chiffre leading-tight tabular-nums"
-            style={{ color: carte.couleur }}
-          >
-            <Chiffre valeur={formaterNombre(carte.valeur)} />
-          </p>
+          <CarteChiffre nom={carte.nom} valeur={carte.valeur} couleur={carte.couleur} />
         </div>
       ))}
     </div>

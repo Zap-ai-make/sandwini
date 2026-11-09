@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Boutique } from "./boutique";
-import { repartirParBoutique, repartirParMarque } from "./repartition";
+import { bilanStock, repartirParBoutique, repartirParMarque } from "./repartition";
 import type { Moto } from "./moto";
 
 /* Les noms viennent du catalogue dans le produit ; ici deux tables suffisent,
@@ -200,5 +200,34 @@ describe("repartirParBoutique", () => {
       nom: "XXX",
       compte: 1,
     });
+  });
+});
+
+/**
+ * Les cartes de tête du stock (9 novembre 2026), sur le dessin de celles des
+ * arrivages : « nombre de motos en stock, vendues, marques… ». Elles comptent
+ * la liste qu'on leur donne — l'écran leur passe ce que ses filtres laissent.
+ */
+describe("bilanStock", () => {
+  const avec = (partie: Partial<Moto>, i: number): Moto => ({ ...moto("ya", "cry", i), ...partie });
+
+  it("compte les motos, celles en stock, les vendues, les marques et les CMC manquants", () => {
+    expect(
+      bilanStock([
+        avec({ statut: "en_stock", cmcRecu: true }, 1),
+        avec({ statut: "en_stock", cmcRecu: false }, 2),
+        avec({ statut: "vendue", cmcRecu: false, marqueId: "ha" }, 3),
+        avec({ statut: "reservee", cmcRecu: true, marqueId: "ap" }, 4),
+      ]),
+    ).toEqual({ motos: 4, enStock: 2, vendues: 1, marques: 3, cmcManquants: 2 });
+  });
+
+  it("rend des zéros pour une liste vide", () => {
+    expect(bilanStock([])).toEqual({ motos: 0, enStock: 0, vendues: 0, marques: 0, cmcManquants: 0 });
+  });
+
+  it("compte autant de marques que la répartition en montre", () => {
+    const motos = [avec({ marqueId: "ya" }, 1), avec({ marqueId: "ya" }, 2), avec({ marqueId: "ha" }, 3)];
+    expect(bilanStock(motos).marques).toBe(repartirParMarque(motos, nomMarque, nomModele).length);
   });
 });

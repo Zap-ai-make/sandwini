@@ -1061,13 +1061,13 @@ for (const {
     for (let i = 0; i < combien; i += 1) await cases.nth(i).check();
     await page.waitForTimeout(400);
   }
-  /* La repartition par marque est un `<details>` replie par defaut : c'est
-     voulu, le tableau du stock repond a la question la plus frequente. Replie,
-     il ne se photographie qu'en titre -- on l'ouvre donc pour regarder ce que
-     la revue doit juger : les comptes, leur ordre, et la ligne « Modele non
-     precise » que S50 vient de rendre possible. */
+  /* La repartition par marque est fermee par defaut : c'est voulu, le
+     tableau du stock repond a la question la plus frequente. Depuis le
+     9 novembre 2026, c'est la carte « Marques » qui l'ouvre -- on la presse
+     pour regarder ce que la revue doit juger : les comptes, leur ordre, et la
+     ligne « Modele non precise » que S50 a rendue possible. */
   if (ouvrirRepartition) {
-    const resume = page.getByText("Répartition par marque");
+    const resume = page.getByRole("button", { name: /Marques/ });
     await resume.waitFor({ timeout: 20000 });
     await resume.click();
     await page.waitForTimeout(600);

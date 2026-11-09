@@ -1,6 +1,5 @@
 "use client";
 
-import { ChevronRight } from "lucide-react";
 import { repartirParMarque } from "@/lib/domain/repartition";
 import { formaterNombre } from "@/lib/domain/format";
 import type { Moto } from "@/lib/domain/moto";
@@ -8,63 +7,34 @@ import type { Moto } from "@/lib/domain/moto";
 /**
  * Combien de motos par marque, et par modèle (S50).
  *
- * **Replié par défaut, et c'est le point.** L'écran du stock répond d'abord à
- * « cette moto-là, je l'ai ? » — un châssis qu'on compare caractère par
- * caractère. Le comptage répond à une autre question, posée plus rarement :
- * « qu'est-ce que j'ai le plus ? ». Déployée en permanence, elle repousserait
- * le tableau hors de l'écran pour servir le geste le moins fréquent.
- *
- * **Un `<details>` et non un bouton à état.** La règle 1 d'`AGENTS.md` :
- * l'élément natif donne le clavier, le repli et le rôle sans une ligne de
- * JavaScript. `FormulaireClient` a préféré un vrai bouton, mais pour une raison
- * qui ne vaut pas ici — il vit dans une modale, et deux mécaniques de repli se
- * contredisent à l'usage. Cet écran n'en a aucune autre.
+ * **Elle s'ouvre depuis la carte « Marques »** (9 novembre 2026) : le bloc
+ * replié qu'elle était a cédé la place aux cartes de tête du stock, et le
+ * nombre de marques mène à son détail. Fermée par défaut, pour la même raison
+ * qu'avant : l'écran du stock répond d'abord à « cette moto-là, je l'ai ? » —
+ * le comptage répond à une question posée plus rarement, et déployé en
+ * permanence il repousserait le tableau hors de l'écran.
  *
  * **Le compte suit les filtres**, parce que la liste reçue est celle que
- * l'écran affiche. Filtrer sur « occasion » puis lire la répartition donne la
- * répartition des occasions — ce qui est la seule lecture cohérente avec un
- * tableau filtré juste en dessous. Le résumé le dit, pour que le nombre ne se
- * confonde pas avec le stock entier.
+ * l'écran affiche — comme les cartes au-dessus.
  */
 export function RepartitionStock({
+  id,
   motos,
-  filtre,
   nomMarque,
   nomModele,
 }: {
+  /** Celui que la carte « Marques » vise par `aria-controls`. */
+  id: string;
   motos: readonly Moto[];
-  /** Vrai si un filtre ou une recherche réduit la liste reçue. */
-  filtre: boolean;
   nomMarque: (id: string) => string;
   nomModele: (id: string) => string;
 }) {
   const marques = repartirParMarque(motos, nomMarque, nomModele);
   if (marques.length === 0) return null;
 
-  const total = motos.length;
-
   return (
-    /* `repli` remplace le triangle natif par un chevron qui pivote et donne au
-       contenu son mouvement d'ouverture (`globals.css`, A10) — le `<details>`
-       reste entier, c'est lui qui tient le clavier, le rôle et l'état. */
-    <details className="repli cadre mb-4 p-4 sm:p-5">
-      <summary className="text-corps text-encre">
-        <ChevronRight
-          aria-hidden="true"
-          className="repli-chevron size-4 shrink-0 translate-y-[0.15em] text-encre-doux"
-        />
-        <span>
-          <span className="font-medium">Répartition par marque</span>{" "}
-          <span className="text-legende text-encre-doux">
-            {formaterNombre(marques.length)}{" "}
-            {marques.length > 1 ? "marques" : "marque"} · {formaterNombre(total)}{" "}
-            {total > 1 ? "motos" : "moto"}
-            {filtre ? " (sur la liste filtrée)" : ""}
-          </span>
-        </span>
-      </summary>
-
-      <ul className="mt-4 grid gap-4">
+    <div id={id} className="cadre mb-4 p-4 sm:p-5">
+      <ul className="grid gap-4">
         {marques.map((marque) => (
           <li key={marque.marqueId}>
             <div className="flex flex-wrap items-baseline justify-between gap-x-3 border-b border-bord pb-1">
@@ -97,6 +67,6 @@ export function RepartitionStock({
           </li>
         ))}
       </ul>
-    </details>
+    </div>
   );
 }

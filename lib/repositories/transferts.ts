@@ -215,6 +215,31 @@ export function ecouterDeparts(
 }
 
 /**
+ * Les transferts arrivés dans cette boutique, ou dans toutes (9 novembre 2026).
+ *
+ * Ils nomment, dans la colonne « Fournisseur » du stock, la boutique d'où une
+ * moto transférée vient (`origineParTransfert`). `null` lit toutes les traces :
+ * seul le responsable regarde « Toutes les boutiques », et la règle le laisse
+ * tout lire. Un gérant pose `versBoutiqueId` — pour la même raison que
+ * `ecouterDeparts` pose `deBoutiqueId` : sans elle, la liste entière serait
+ * refusée.
+ */
+export function ecouterArrivees(
+  boutiqueId: string | null,
+  auChangement: (transferts: Transfert[]) => void,
+  enErreur: (cause: unknown) => void,
+): () => void {
+  const base = collection(db(), "transfertsMotos");
+  const requete = boutiqueId ? query(base, where("versBoutiqueId", "==", boutiqueId)) : base;
+
+  return onSnapshot(
+    requete,
+    (instantane) => auChangement(instantane.docs.map(lireTransfert)),
+    enErreur,
+  );
+}
+
+/**
  * Comment cette moto est arrivée dans la boutique où elle se trouve.
  *
  * Deux égalités, toujours aucun index composite. La contrainte sur

@@ -4,6 +4,7 @@ import { Plus, Search, Truck } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useMemo, useState } from "react";
+import { CartesStock } from "@/components/CartesStock";
 import { FicheMoto } from "@/components/FicheMoto";
 import { PlaqueBoutique } from "@/components/PlaqueBoutique";
 import {
@@ -30,13 +31,15 @@ import { useCatalogue } from "@/lib/repositories/catalogue";
 import { DeplacerMotosModal } from "@/components/DeplacerMotosModal";
 import { useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
-import { repartirParBoutique } from "@/lib/domain/repartition";
+import { bilanStock, repartirParBoutique } from "@/lib/domain/repartition";
+import { origineParTransfert, type Transfert } from "@/lib/domain/transfert";
 import { peut } from "@/lib/domain/roles";
 import { useAbonnement } from "@/lib/repositories/abonnement";
 import { ecouterArrivages } from "@/lib/repositories/arrivages";
 import { ecouterBoutiques } from "@/lib/repositories/boutiques";
 import { ecouterFournisseurs } from "@/lib/repositories/fournisseurs";
 import { ecouterStock } from "@/lib/repositories/motos";
+import { ecouterArrivees } from "@/lib/repositories/transferts";
 import type { Arrivage } from "@/lib/domain/arrivage";
 import type { Fournisseur } from "@/lib/domain/fournisseur";
 
@@ -101,6 +104,9 @@ function Stock() {
      drapeau porté par chaque moto : la liste se recharge en direct à chaque
      écriture Firestore, et un état posé sur les objets repartirait avec eux. */
   const [cochees, setCochees] = useState<ReadonlySet<string>>(new Set());
+  /* La répartition par marque, que la carte « Marques » ouvre (9 novembre
+     2026). Fermée à l'arrivée : le tableau passe d'abord. */
+  const [repartitionOuverte, setRepartitionOuverte] = useState(false);
   /* Avant tout retour anticipé : un hook appelé sous condition change
      l'ordre des hooks d'un rendu à l'autre (règle de React, vue par le lint). */
   const surTitre = useSurTitre("Motos");
@@ -119,6 +125,28 @@ function Stock() {
     echec,
     reessayer,
   } = useAbonnement(souscrire, "Le stock n’a pas pu être chargé.");
+
+  /* **D'où vient une moto transférée** (9 novembre 2026) : « dans la colonne
+     fournisseur, on met le nom de la boutique d'où elle vient ». Les traces de
+     transfert le disent ; la moto, elle, ne garde que sa boutique actuelle.
+     Sans périmètre, on n'écoute rien : une lecture de toutes les traces serait
+     refusée à qui n'est pas responsable. Une lecture qui échoue laisse la
+     colonne à son fournisseur — elle décore, elle ne bloque rien, et la fiche
+     de la moto dit toujours d'où elle arrive. */
+  const sansTransferts = perimetre.type === "aucune";
+  const souscrireTransferts = useCallback(
+    (auChangement: (transferts: Transfert[]) => void, enErreur: (cause: unknown) => void) =>
+      sansTransferts ? () => {} : ecouterArrivees(boutiqueId, auChangement, enErreur),
+    [boutiqueId, sansTransferts],
+  );
+  const { valeur: transferts } = useAbonnement(
+    souscrireTransferts,
+    "Les transferts n’ont pas pu être lus.",
+  );
+  const origines = useMemo(
+    () => origineParTransfert(transferts ?? [], stock ?? []),
+    [transferts, stock],
+  );
 
   /**
    * De qui vient cette moto — la colonne qui remplace « État » et « Année ».
@@ -197,6 +225,7 @@ function Stock() {
     () => (toutesBoutiques && stock !== null ? repartirParBoutique(horsBoutique, boutiques ?? []) : []),
     [toutesBoutiques, stock, horsBoutique, boutiques],
   );
+  const bilan = useMemo(() => bilanStock(resultats), [resultats]);
   const choisirBoutique = (boutiqueId: string) =>
     setFiltres((actuel) => ({ ...actuel, boutiqueId }));
   const modelesDeLaMarque = filtres.marqueId
@@ -268,7 +297,13 @@ function Stock() {
       {
         cle: "fournisseur",
         titre: "Fournisseur",
-        rendu: (moto) => fournisseurDe(moto.arrivageId),
+        /* Une moto arrivée par transfert vient d'une boutique, et c'est elle
+           qu'on nomme — dans sa plaque jaune, comme partout où une boutique
+           se montre : l'œil ne la confond pas avec un fournisseur. */
+        rendu: (moto) => {
+          const origine = origines.get(moto.id);
+          return origine ? <PlaqueBoutique boutiqueId={origine} /> : fournisseurDe(moto.arrivageId);
+        },
       },
       { cle: "couleur", titre: "Couleur", rendu: (moto) => moto.couleur || "—" },
       {
@@ -279,6 +314,18 @@ function Stock() {
         chiffre: true,
         rendu: (moto) =>
           moto.prixVenteConseille === null ? "—" : formaterNombre(moto.prixVenteConseille),
+      },
+      {
+        /* **Le CMC, reçu ou manquant** (9 novembre 2026), le même papier que
+           compte la colonne des arrivages, lu ici moto par moto. */
+        cle: "cmc",
+        titre: "CMC",
+        rendu: (moto) =>
+          moto.cmcRecu ? (
+            <span className="pastille pastille-solde">Reçu</span>
+          ) : (
+            <span className="pastille pastille-retard">Manquant</span>
+          ),
       },
       { cle: "statut", titre: "Statut", rendu: (moto) => <Statut statut={moto.statut} /> },
       {
@@ -298,7 +345,7 @@ function Stock() {
       });
     }
     return liste;
-  }, [catalogue, toutesBoutiques, cochees, basculer, fournisseurDe]);
+  }, [catalogue, toutesBoutiques, cochees, basculer, fournisseurDe, origines]);
 
   if (sansPerimetre)
     return (
@@ -332,28 +379,38 @@ function Stock() {
         }
       />
 
-      {/* **Sur « Toutes les boutiques », le stock par magasin** remplace le
-          comptage par marque (6 novembre 2026) : c'est la question du
-          responsable devant l'entreprise entière. Dans une boutique, le
-          comptage par marque reste, replié.
+      {/* **Les cartes de tête** (9 novembre 2026), sur le dessin de celles des
+          arrivages. Elles n'attendent rien d'autre que le stock : ni pendant
+          le chargement, ni sur une erreur, ni sur un stock vide, où cinq zéros
+          feraient croire à une lecture réussie. Elles comptent ce que les
+          filtres laissent ; la carte « Marques » ouvre la répartition, qui a
+          remplacé le bloc replié du même nom. */}
+      {stock !== null && total > 0 && (
+        <CartesStock
+          bilan={bilan}
+          repartitionOuverte={repartitionOuverte}
+          basculerRepartition={() => setRepartitionOuverte((ouverte) => !ouverte)}
+          repartitionId="repartition-marques"
+        />
+      )}
+      {repartitionOuverte && (
+        <RepartitionStock
+          id="repartition-marques"
+          motos={resultats}
+          nomMarque={catalogue.nomMarque}
+          nomModele={catalogue.nomModele}
+        />
+      )}
 
-          Posés ici et non dans la branche du tableau : tous deux rendent
-          `null` sur une liste vide, donc ils s'effacent seuls pendant le
-          chargement, sur une erreur et sur un stock vide — ce qui évite de les
-          enfermer dans un fragment et de décaler tout le cadre. */}
-      {toutesBoutiques ? (
+      {/* **Sur « Toutes les boutiques », le stock par magasin** (6 novembre
+          2026) : une case par boutique, qui filtre le tableau. Il rend `null`
+          sur une liste vide, donc il s'efface seul pendant le chargement. */}
+      {toutesBoutiques && (
         <StockParBoutique
           comptes={comptesBoutiques}
           total={horsBoutique.length}
           choisie={boutiqueFiltree}
           choisir={choisirBoutique}
-        />
-      ) : (
-        <RepartitionStock
-          motos={resultats}
-          filtre={resultats.length !== total}
-          nomMarque={catalogue.nomMarque}
-          nomModele={catalogue.nomModele}
         />
       )}
 

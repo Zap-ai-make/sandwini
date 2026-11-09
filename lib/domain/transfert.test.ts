@@ -4,6 +4,7 @@ import {
   TRANSFERT_VIDE,
   destinationsGroupees,
   destinationsPossibles,
+  origineParTransfert,
   repartirPourDeplacement,
   peutPartir,
   raisonDeNePasPartir,
@@ -11,6 +12,7 @@ import {
 } from "./transfert";
 import type { Boutique, Metier } from "./boutique";
 import type { Moto, StatutMoto } from "./moto";
+import type { Transfert } from "./transfert";
 
 /**
  * Le déplacement d'une moto d'une boutique à une autre (S17).
@@ -220,5 +222,78 @@ describe("déplacer plusieurs motos d’un coup", () => {
       boutique("MIX", true, ["pieces", "motos"]),
     ];
     expect(destinationsGroupees(melange).map((b) => b.id)).toEqual(["PTG", "MIX"]);
+  });
+});
+
+/**
+ * D'où vient une moto transférée (9 novembre 2026).
+ *
+ * « Si une moto est transférée, dans la colonne fournisseur on met le nom de
+ * la boutique d'où elle vient. » La boutique, c'est celle du dernier trajet qui
+ * l'a amenée là où elle est : une moto passée par trois magasins vient du
+ * dernier, pas du premier.
+ */
+describe("origineParTransfert", () => {
+  const trajet = (
+    id: string,
+    motoId: string,
+    deBoutiqueId: string,
+    versBoutiqueId: string,
+    date: Date | null,
+  ): Transfert => ({
+    id,
+    motoId,
+    numeroChassis: "",
+    deBoutiqueId,
+    versBoutiqueId,
+    motif: "",
+    date,
+    auteur: "",
+  });
+  const ici = (id: string, boutiqueId: string) => ({ id, boutiqueId });
+
+  it("donne la boutique d'où la moto est arrivée", () => {
+    const origines = origineParTransfert(
+      [trajet("t1", "m1", "POU", "OUA", new Date(2026, 9, 1))],
+      [ici("m1", "OUA")],
+    );
+    expect(origines.get("m1")).toBe("POU");
+  });
+
+  it("retient le dernier trajet d'une moto passée par plusieurs boutiques", () => {
+    const origines = origineParTransfert(
+      [
+        trajet("t1", "m1", "POU", "OUA", new Date(2026, 9, 1)),
+        trajet("t2", "m1", "OUA", "KAY", new Date(2026, 9, 5)),
+        trajet("t3", "m1", "KAY", "OUA", new Date(2026, 9, 9)),
+      ],
+      [ici("m1", "OUA")],
+    );
+    expect(origines.get("m1")).toBe("KAY");
+  });
+
+  it("prend pour le plus récent un trajet encore sans date, saisi hors ligne", () => {
+    const origines = origineParTransfert(
+      [
+        trajet("t1", "m1", "POU", "OUA", new Date(2026, 9, 1)),
+        trajet("t2", "m1", "KAY", "OUA", null),
+      ],
+      [ici("m1", "OUA")],
+    );
+    expect(origines.get("m1")).toBe("KAY");
+  });
+
+  it("ne dit rien d'une moto qui n'est pas arrivée par transfert", () => {
+    expect(origineParTransfert([], [ici("m1", "OUA")]).has("m1")).toBe(false);
+  });
+
+  it("ignore un trajet qui ne mène pas là où la moto se trouve", () => {
+    /* Partie de POU vers OUA, revenue à POU par une voie que la liste ne
+       porte pas : elle n'est pas « venue de POU » là où elle est. */
+    const origines = origineParTransfert(
+      [trajet("t1", "m1", "POU", "OUA", new Date(2026, 9, 1))],
+      [ici("m1", "POU")],
+    );
+    expect(origines.has("m1")).toBe(false);
   });
 });

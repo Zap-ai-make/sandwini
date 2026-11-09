@@ -200,3 +200,36 @@ export function repartirPourDeplacement(
 export function destinationsGroupees(boutiques: readonly Boutique[]): Boutique[] {
   return boutiques.filter((boutique) => boutique.actif && tientLesMotos(boutique));
 }
+
+/**
+ * La boutique d'où chaque moto est arrivée, pour celles venues par transfert
+ * (9 novembre 2026).
+ *
+ * « Si une moto est transférée, dans la colonne fournisseur on met le nom de
+ * la boutique d'où elle vient. » C'est le **dernier** trajet qui l'a amenée
+ * là où elle se trouve : une moto passée par trois magasins vient du
+ * dernier. Un trajet sans date vient d'être saisi hors ligne, il est donc le
+ * plus récent. Une moto sans trajet vers sa boutique actuelle n'a pas
+ * d'entrée : elle garde son fournisseur.
+ */
+export function origineParTransfert(
+  transferts: readonly Transfert[],
+  motos: readonly Pick<Moto, "id" | "boutiqueId">[],
+): Map<string, string> {
+  const boutiqueDe = new Map(motos.map((moto) => [moto.id, moto.boutiqueId]));
+  const dernier = new Map<string, Transfert>();
+
+  for (const trajet of transferts) {
+    if (boutiqueDe.get(trajet.motoId) !== trajet.versBoutiqueId) continue;
+    const retenu = dernier.get(trajet.motoId);
+    if (!retenu || plusRecent(trajet, retenu)) dernier.set(trajet.motoId, trajet);
+  }
+
+  return new Map([...dernier].map(([motoId, trajet]) => [motoId, trajet.deBoutiqueId]));
+}
+
+function plusRecent(a: Transfert, b: Transfert): boolean {
+  if (a.date === null) return true;
+  if (b.date === null) return false;
+  return a.date.getTime() > b.date.getTime();
+}

@@ -142,3 +142,34 @@ export function repartirParBoutique(
     .map(([boutiqueId, compte]) => ({ boutiqueId, nom: nomDe.get(boutiqueId) ?? boutiqueId, compte }))
     .sort((a, b) => a.nom.localeCompare(b.nom, "fr"));
 }
+
+export type BilanStock = {
+  motos: number;
+  enStock: number;
+  vendues: number;
+  marques: number;
+  cmcManquants: number;
+};
+
+/**
+ * Les cinq cartes de tête du stock (9 novembre 2026), sur le dessin de celles
+ * des arrivages : « nombre de motos en stock, vendues, marques… ».
+ *
+ * Elles comptent la liste reçue, donc ce que les filtres de l'écran laissent :
+ * choisir une boutique ou une marque change les nombres, comme le tableau.
+ * « Marques » compte comme `repartirParMarque` regroupe — la carte ouvre cette
+ * répartition, et les deux ne doivent pas se contredire. Le CMC manquant se
+ * compte vendues comprises, comme aux arrivages : un papier qui manque à une
+ * moto vendue manque toujours.
+ */
+export function bilanStock(
+  motos: readonly Pick<Moto, "statut" | "marqueId" | "cmcRecu">[],
+): BilanStock {
+  return {
+    motos: motos.length,
+    enStock: motos.filter((moto) => moto.statut === "en_stock").length,
+    vendues: motos.filter((moto) => moto.statut === "vendue").length,
+    marques: new Set(motos.map((moto) => moto.marqueId)).size,
+    cmcManquants: motos.filter((moto) => !moto.cmcRecu).length,
+  };
+}
