@@ -719,6 +719,19 @@ export function ecranCourant(espace: Espace, role: Role, chemin: string): string
   return trouve;
 }
 
+/**
+ * L'entrée de l'écran courant, avec son libellé — ou rien.
+ *
+ * La barre des écrans, sur téléphone, nomme où l'on se trouve. Elle lit la même
+ * réponse que la colonne allume (`ecranCourant`), pour qu'aucun des deux ne
+ * désigne un autre écran que l'autre.
+ */
+export function entreeCourante(espace: Espace, role: Role, chemin: string): EcranDEspace | null {
+  const href = ecranCourant(espace, role, chemin);
+  if (href === null) return null;
+  return ecransVisibles(espace, role).find((ecran) => ecran.href === href) ?? null;
+}
+
 function sousChemin(chemin: string, href: string): boolean {
   return chemin === href || chemin.startsWith(`${href}/`);
 }

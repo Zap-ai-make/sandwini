@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { estRole, LIBELLE_ROLE, peut, ROLES, type Capacite } from "./roles";
+import { estRole, LIBELLE_ROLE, peut, ROLES, situationDuCompte, type Capacite } from "./roles";
 
 describe("estRole", () => {
   it("reconnaît les deux rôles du cahier des charges", () => {
@@ -64,5 +64,27 @@ describe("libellés", () => {
     for (const role of ROLES) {
       expect(LIBELLE_ROLE[role]).toBeTruthy();
     }
+  });
+});
+
+/* Le pied de la colonne, et celui du panneau des écrans sur téléphone, disent
+   sous quel compte l'appareil écrit. Une seule phrase pour les deux. */
+describe("situationDuCompte", () => {
+  it("donne au responsable le nombre de boutiques ouvertes", () => {
+    expect(situationDuCompte("responsable", { type: "toutes", nom: "" }, 3)).toBe(
+      "Responsable · 3 boutiques",
+    );
+    expect(situationDuCompte("responsable", { type: "boutique", nom: "Centre" }, 1)).toBe(
+      "Responsable · 1 boutique",
+    );
+  });
+
+  it("donne au gérant sa boutique, ou dit qu’il n’en a pas", () => {
+    expect(situationDuCompte("gerant", { type: "boutique", nom: "Centre" }, 3)).toBe(
+      "Gérant · Centre",
+    );
+    expect(situationDuCompte("gerant", { type: "aucune", nom: "" }, 3)).toBe(
+      "Gérant · aucune boutique",
+    );
   });
 });

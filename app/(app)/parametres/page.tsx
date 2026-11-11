@@ -13,6 +13,10 @@ import { useEffect } from "react";
  * déjà ces écrans, donc le sommaire les disait deux fois, et on traversait une
  * page de transit pour arriver où l'on allait de toute façon.
  *
+ * **Sur téléphone, ce retrait avait coupé les boutiques et les utilisateurs**
+ * de toute entrée : la barre latérale n'y existe pas. Ils passent depuis le
+ * 11 novembre 2026 par la barre des écrans (`EcransMobiles`).
+ *
  * **Ce qu'elle seule portait a déménagé, et n'a pas été perdu.** La version de
  * l'appareil, l'avis de mise à jour et le bouton d'installation sont descendus
  * sur « Identité de l'entreprise », sous un titre à eux. Les supprimer aurait

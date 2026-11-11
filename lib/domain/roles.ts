@@ -1,3 +1,5 @@
+import { compter } from "./format";
+
 /**
  * Rôles et périmètres.
  *
@@ -70,4 +72,24 @@ const CAPACITES: Record<Role, readonly Capacite[]> = {
 
 export function peut(role: Role, capacite: Capacite): boolean {
   return CAPACITES[role].includes(capacite);
+}
+
+/**
+ * Sous quel compte l'appareil écrit, en une ligne.
+ *
+ * Le pied de la colonne la portait seul ; le panneau des écrans, sur téléphone,
+ * la porte aussi depuis le 11 novembre 2026. Une phrase écrite deux fois finit
+ * par en dire deux.
+ */
+export function situationDuCompte(
+  role: Role,
+  perimetre: { type: "toutes" | "boutique" | "aucune"; nom: string },
+  boutiquesOuvertes: number,
+): string {
+  if (role === "responsable") {
+    return `${LIBELLE_ROLE[role]} · ${compter(boutiquesOuvertes, "boutique")}`;
+  }
+  return perimetre.type === "boutique"
+    ? `${LIBELLE_ROLE[role]} · ${perimetre.nom}`
+    : `${LIBELLE_ROLE[role]} · aucune boutique`;
 }

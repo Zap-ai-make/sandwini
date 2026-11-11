@@ -502,8 +502,8 @@
      maquettes, et il est repris tel quel : jusqu'ici la colonne des écrans
      tenait jusqu'à 768, si bien qu'un tiers de l'écran partait en navigation
      sur une tablette — exactement ce que `CAHIER-UI.md` §2 reproche à
-     l'ancienne barre latérale. Les huit écrans de l'espace restent atteignables
-     : les pages y mènent, et le rail garde les espaces.
+     l'ancienne barre latérale. Les écrans de l'espace passent par la barre
+     posée sous le bandeau (`EcransMobiles`), et le rail garde les espaces.
 
      Deux effets suivent, et ils sont voulus. La zone de travail gagne les
      296 px de la colonne, donc le tableau n'a plus besoin de se replier en
@@ -517,8 +517,8 @@
   }
 
   /* Le mobile garde son acquis : la navigation passe en bas, dans la zone du
-     pouce, et la colonne disparaît — ses écrans restent atteignables par les
-     pages elles-mêmes. Le placement est explicite pour que l'ordre visuel ne
+     pouce, et la colonne disparaît — ses écrans passent par la barre posée
+     sous le bandeau (`EcransMobiles`), qui ouvre les mêmes groupes. Le placement est explicite pour que l'ordre visuel ne
      dépende pas de l'ordre du DOM : la navigation vient en premier dans le
      document, où les lecteurs d'écran la cherchent. */
   @media (max-width: 767px) {

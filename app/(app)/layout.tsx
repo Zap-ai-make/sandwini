@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 import { BandeauEtat } from "@/components/BandeauEtat";
+import { EcransMobiles } from "@/components/EcransMobiles";
 import { GardeSession } from "@/components/GardeSession";
 import { NavigationPrincipale } from "@/components/NavigationPrincipale";
 import { FournisseurPerimetre } from "@/lib/perimetre/perimetre";
@@ -32,6 +33,9 @@ export default function DispositionApplication({ children }: { children: ReactNo
           <NavigationPrincipale />
           <div className="travail">
             <BandeauEtat />
+            {/* Sous 1024 px, la colonne des écrans s'efface : cette barre la
+                remplace, et ouvre les mêmes groupes (11 novembre 2026). */}
+            <EcransMobiles />
             {/* `relative` n'est pas un réglage de mise en page : c'est ce qui
                 garde les éléments absolus **dans** la zone qui défile.
 

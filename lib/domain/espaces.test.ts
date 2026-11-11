@@ -6,6 +6,7 @@ import {
   accueilDuRole,
   ecranCourant,
   destinationApresPerimetre,
+  entreeCourante,
   ecransVisibles,
   espaceDuChemin,
   espacesVisibles,
@@ -278,6 +279,26 @@ describe("ecranCourant", () => {
     expect(ecranCourant("reglages", "responsable", "/parametres/utilisateurs")).toBe(
       "/parametres/utilisateurs",
     );
+  });
+});
+
+/* La barre des écrans, sur téléphone, nomme l'écran où l'on se trouve. C'est la
+   même entrée que la colonne allume, avec son libellé. */
+describe("entreeCourante", () => {
+  it("rend l’entrée de l’écran courant, avec son libellé", () => {
+    expect(entreeCourante("reglages", "responsable", "/parametres/utilisateurs")?.libelle).toBe(
+      "Utilisateurs",
+    );
+    expect(entreeCourante("motos", "gerant", "/motos")?.libelle).toBe("Stock motos");
+  });
+
+  it("nomme l’écran parent d’une fiche ouverte depuis lui", () => {
+    expect(entreeCourante("motos", "gerant", "/motos/ventes/nouvelle")?.libelle).toBe("Ventes");
+  });
+
+  it("ne nomme rien hors des écrans de l’espace", () => {
+    expect(entreeCourante("reglages", "responsable", "/parametres")).toBeNull();
+    expect(entreeCourante("reglages", "gerant", "/parametres/utilisateurs")).toBeNull();
   });
 });
 

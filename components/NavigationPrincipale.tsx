@@ -36,8 +36,7 @@ import {
   groupesVisibles,
   type Espace,
 } from "@/lib/domain/espaces";
-import { compter } from "@/lib/domain/format";
-import { LIBELLE_ROLE, type Role } from "@/lib/domain/roles";
+import { situationDuCompte, type Role } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { useComptes } from "@/lib/repositories/comptes";
 
@@ -85,8 +84,10 @@ const ICONE_ESPACE: Record<Espace, Icone> = {
  * colonne porte le second niveau, groupé par intention du métier.
  *
  * Sur téléphone, la colonne s'efface et le rail passe en bas, dans la zone du
- * pouce : c'est l'acquis du produit et il ne régresse pas. Les écrans du second
- * niveau restent atteignables depuis les pages, comme aujourd'hui.
+ * pouce : c'est l'acquis du produit et il ne régresse pas. Sous 1024 px, les
+ * écrans du second niveau passent par `EcransMobiles`, la barre posée sous le
+ * bandeau : les pages-sommaires qui y menaient ont disparu une à une, et le
+ * téléphone avait perdu la moitié du produit (11 novembre 2026).
  *
  * Les entrées ne sont pas une liste figée : elles se déduisent du rôle et des
  * métiers de la boutique en cours (D62). Un gérant de boutique motos n'a pas
@@ -137,7 +138,9 @@ export function NavigationPrincipale() {
         {/* Le pied du rail, que le produit n'avait pas : les maquettes y
             posent la bascule de thème et la déconnexion. Sur téléphone le rail
             passe en bas et devient une barre d'espaces — y ajouter deux
-            entrées la surchargerait, et les réglages portent déjà les deux. */}
+            entrées la surchargerait. Les deux vivent alors au pied du panneau
+            des écrans (`EcransMobiles`) : les réglages, qu'on disait les
+            porter, ne les ont jamais portés. */}
         <div className="mt-auto flex flex-col items-center gap-1 max-md:hidden">
           <BasculeTheme className={LIEN_RAIL} />
           <button type="button" onClick={() => void seDeconnecter()} className={LIEN_RAIL}>
@@ -411,12 +414,7 @@ function PiedColonne({ repliee }: { repliee: boolean }) {
 
   const { nom, email, role } = session.utilisateur;
   const affiche = nom || email;
-  const dessous =
-    role === "responsable"
-      ? `${LIBELLE_ROLE[role]} · ${compter(boutiques.filter((b) => b.actif).length, "boutique")}`
-      : perimetre.type === "boutique"
-        ? `${LIBELLE_ROLE[role]} · ${perimetre.nom}`
-        : `${LIBELLE_ROLE[role]} · aucune boutique`;
+  const dessous = situationDuCompte(role, perimetre, boutiques.filter((b) => b.actif).length);
 
   return (
     <Link
