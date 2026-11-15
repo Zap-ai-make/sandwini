@@ -214,6 +214,13 @@ function Stock() {
     () => filtrerMotos(stock ?? [], { ...filtres, boutiqueId: boutiqueFiltree }),
     [stock, filtres, boutiqueFiltree],
   );
+  /* Les cartes « En stock » et « Vendues » posent le statut (15 novembre
+     2026) : elles comptent donc la liste d'avant ce choix, sans quoi en
+     choisir une ferait tomber l'autre à zéro. */
+  const avantStatut = useMemo(
+    () => filtrerMotos(stock ?? [], { ...filtres, boutiqueId: boutiqueFiltree, statut: "" }),
+    [stock, filtres, boutiqueFiltree],
+  );
   /* Les cases comptent tout ce que les autres filtres laissent, quelle que
      soit la boutique choisie : en choisir une ne fait pas tomber les autres à
      zéro. */
@@ -225,7 +232,10 @@ function Stock() {
     () => (toutesBoutiques && stock !== null ? repartirParBoutique(horsBoutique, boutiques ?? []) : []),
     [toutesBoutiques, stock, horsBoutique, boutiques],
   );
-  const bilan = useMemo(() => bilanStock(resultats), [resultats]);
+  const bilan = useMemo(
+    () => bilanStock(avantStatut, filtres.statut),
+    [avantStatut, filtres.statut],
+  );
   const choisirBoutique = (boutiqueId: string) =>
     setFiltres((actuel) => ({ ...actuel, boutiqueId }));
   const modelesDeLaMarque = filtres.marqueId
@@ -388,6 +398,8 @@ function Stock() {
       {stock !== null && total > 0 && (
         <CartesStock
           bilan={bilan}
+          statut={filtres.statut}
+          choisirStatut={(statut) => setFiltres((actuel) => ({ ...actuel, statut }))}
           repartitionOuverte={repartitionOuverte}
           basculerRepartition={() => setRepartitionOuverte((ouverte) => !ouverte)}
           repartitionId="repartition-marques"

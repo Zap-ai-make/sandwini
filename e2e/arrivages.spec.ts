@@ -116,6 +116,52 @@ test("un lot de 120 motos avec leur prix s’enregistre en entier", async ({ pag
   await expect(ligne).toContainText("120 en stock");
 });
 
+/* « Quand on rentre le nombre de motos et que les lignes se créent, on doit
+   pouvoir supprimer chaque ligne » (15 novembre 2026). La ligne du milieu part,
+   le nombre suit, et les numéros se resserrent. */
+test("une ligne du lot se retire, et le nombre suit", async ({ page }) => {
+  await seConnecterEtEntrer(page);
+  const terrain = await preparerTerrain(page);
+
+  const nomArrivage = nomUnique("Arrivage");
+  const modal = await ouvrirLeModal(page, nomArrivage, terrain, nomUnique("HAOJUE Import"));
+  const [garde1, retiree, garde2] = [chassisUnique("RETA"), chassisUnique("RETB"), chassisUnique("RETC")];
+
+  await modal.getByLabel("Nombre de motos").fill("3");
+  await modal.getByLabel("Numéro de châssis, moto 1").fill(garde1);
+  await modal.getByLabel("Numéro de châssis, moto 2").fill(retiree);
+  await modal.getByLabel("Numéro de châssis, moto 3").fill(garde2);
+
+  /* **La croix se voit sans faire défiler**, et un clic ne le prouverait pas :
+     Playwright fait défiler avant de cliquer. Sur ce téléphone, châssis et
+     couleur débordent la largeur ; la première version laissait la croix
+     hors de l'écran, derrière la couleur. */
+  const croix = modal.getByRole("button", { name: "Retirer la moto 2" });
+  await expect(croix).toBeInViewport({ ratio: 1 });
+
+  await croix.click();
+  await expect(modal.getByLabel("Nombre de motos")).toHaveValue("2");
+  await expect(modal.getByLabel("Numéro de châssis, moto 1")).toHaveValue(garde1);
+  await expect(modal.getByLabel("Numéro de châssis, moto 2")).toHaveValue(garde2);
+  await expect(modal.getByLabel("Numéro de châssis, moto 3")).toHaveCount(0);
+
+  await modal.getByRole("button", { name: "Enregistrer le lot" }).click();
+  await expect(contenu(page).getByRole("status")).toContainText("2 motos entrées", {
+    timeout: 20_000,
+  });
+
+  await attendreLaFileVide(page);
+  await page.reload({ waitUntil: "load" });
+  await expect(contenu(page).getByRole("row").filter({ hasText: nomArrivage })).toContainText(
+    "2 en stock",
+  );
+
+  await page.goto("/motos", { waitUntil: "load" });
+  await expect(contenu(page).getByText(garde1)).toBeVisible();
+  await expect(contenu(page).getByText(garde2)).toBeVisible();
+  await expect(contenu(page).getByText(retiree)).toHaveCount(0);
+});
+
 test("un lot mêle deux marques : chaque groupe entre avec la sienne", async ({ page }) => {
   await seConnecterEtEntrer(page);
   const terrain = await preparerTerrain(page);

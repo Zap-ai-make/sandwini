@@ -1,6 +1,13 @@
 "use client";
 
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import {
+  EmailAuthProvider,
+  onAuthStateChanged,
+  reauthenticateWithCredential,
+  signOut,
+  updatePassword,
+  type User,
+} from "firebase/auth";
 import { clearIndexedDbPersistence, terminate } from "firebase/firestore";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { authentification, configurationPresente, db } from "@/lib/firebase/client";
@@ -108,4 +115,25 @@ export async function seDeconnecter(): Promise<void> {
      Firestore vient d’être terminée pour vider son cache, elle n’est plus
      utilisable. Seul un redémarrage de l’application la recrée proprement. */
   window.location.replace(new URL("/login", window.location.origin).toString());
+}
+
+/**
+ * Change le mot de passe du compte connecté (15 novembre 2026).
+ *
+ * **Le mot de passe actuel est redemandé**, et pas seulement par prudence :
+ * Firebase refuse `updatePassword` à une session ouverte depuis longtemps
+ * (`auth/requires-recent-login`). Réauthentifier juste avant rend le geste sûr
+ * quel que soit l'âge de la session, et empêche qu'un appareil laissé ouvert
+ * au comptoir change le mot de passe de son propriétaire.
+ *
+ * **On attend la réponse du serveur**, à l'inverse des écritures Firestore
+ * (D76) : ce geste n'a pas de file d'attente hors ligne, et annoncer un
+ * changement qui n'a pas eu lieu laisserait quelqu'un dehors au prochain
+ * démarrage. La session en cours reste ouverte.
+ */
+export async function changerMonMotDePasse(actuel: string, nouveau: string): Promise<void> {
+  const compte = authentification().currentUser;
+  if (!compte?.email) throw Object.assign(new Error("Aucun compte connecté."), { code: "auth/user-mismatch" });
+  await reauthenticateWithCredential(compte, EmailAuthProvider.credential(compte.email, actuel));
+  await updatePassword(compte, nouveau);
 }

@@ -160,6 +160,19 @@ export function ajusterNombreDeLignes(lignes: LigneLot[], nombre: number): Ligne
   return [...lignes, ...Array.from({ length: cible - lignes.length }, () => ({ ...LIGNE_VIDE }))];
 }
 
+/**
+ * Retire une ligne du groupe (15 novembre 2026) : « on doit pouvoir supprimer
+ * chaque ligne ». Un châssis tapé deux fois, une moto restée au port — on
+ * l'enlève sans retaper le nombre et voir partir les lignes du bas.
+ *
+ * Jamais sous une ligne, comme `ajusterNombreDeLignes` : un groupe sans moto ne
+ * veut rien dire, et c'est le groupe entier qu'on retire alors.
+ */
+export function retirerLigne(lignes: LigneLot[], index: number): LigneLot[] {
+  if (lignes.length <= 1 || index < 0 || index >= lignes.length) return lignes;
+  return lignes.filter((_, i) => i !== index);
+}
+
 export type Ecoulement = { total: number; vendues: number; restant: number };
 
 /** Combien de motos d'un lot sont vendues, combien restent à écouler. */

@@ -308,6 +308,9 @@ const ECRANS_HORS_LIGNE = [
   "/parametres/entreprise",
   "/parametres/catalogue",
   "/parametres/referentiels",
+  /* Le changement exige le réseau, mais l'écran doit s'ouvrir en coupure :
+     il dit alors pourquoi le geste échoue, au lieu de l'écran hors ligne. */
+  "/parametres/mot-de-passe",
   "/prestataires",
   "/cartes-grises",
   "/parametres/cartes-grises",

@@ -307,7 +307,14 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
   accueil: [
     {
       titre: "Ma journée",
-      ecrans: [{ href: "/dashboard", libelle: "Aujourd’hui" }],
+      ecrans: [
+        { href: "/dashboard", libelle: "Aujourd’hui" },
+        /* « Dépenses n'est présent que chez le superviseur, ajoute au niveau
+           des boutiques » (15 novembre 2026). L'écran était ouvert au gérant,
+           mais rangé sous Caisse, où il ne le cherchait pas. Un renvoi : la
+           page reste celle de l'espace caisse, qui allume sa colonne. */
+        { href: "/caisse/depenses", libelle: "Dépenses", renvoi: true },
+      ],
     },
     {
       titre: "Ce qui m’attend",
@@ -576,6 +583,14 @@ export const GROUPES_DE: Record<Espace, readonly GroupeDEcrans[]> = {
            retirer du menu ne la supprime pas. Il ouvre `/parametres/cartes-grises`
            le jour où elle servira. */
       ],
+    },
+    {
+      /* **Chacun change son propre mot de passe** (15 novembre 2026). Aucune
+         capacité : ce n'est pas de l'administration, et le gérant, qui n'a
+         droit à aucun écran de « L'entreprise », trouve enfin quelque chose
+         derrière « Paramètres ». */
+      titre: "Mon compte",
+      ecrans: [{ href: "/parametres/mot-de-passe", libelle: "Mot de passe" }],
     },
     /*
       « Le catalogue » a disparu, et « Cet appareil » avec lui (S54).

@@ -3411,3 +3411,30 @@ quelqu'un qui ne la relit pas ; elle ne l'est plus, puisqu'il la relit.
   confirmation avant de quitter une saisie engagée.
 - `voir_marges` est accordé au gérant : c'est l'affichage ; les règles bornent
   la lecture à sa boutique.
+
+## D111 — Chaque compte change son propre mot de passe
+
+*15 novembre 2026.*
+
+**Le retour.** « Permets au superviseur de changer son mot de passe. » Le compte
+du responsable avait été créé dans la console Firebase, et rien dans
+l'application ne permettait d'en changer le mot de passe. Le responsable ne
+pouvait changer que celui d'un gérant (`modifierGerant`).
+
+**La décision du commanditaire** (choisie parmi « chaque compte, le sien » et
+« le responsable seulement ») : **chaque compte change le sien**, sous
+Paramètres › Mon compte › Mot de passe. Le responsable garde la main pour
+réinitialiser un gérant qui l'a oublié.
+
+*Conséquences :*
+- Le mot de passe actuel est redemandé et sert à réauthentifier avant
+  `updatePassword` : Firebase refuse le changement à une session ancienne, et
+  un appareil resté ouvert au comptoir ne doit pas pouvoir changer le mot de
+  passe de son propriétaire.
+- Dix caractères au moins, la longueur qu'exige déjà la création d'un gérant.
+- Le geste exige le réseau et attend la réponse du serveur, à l'inverse des
+  écritures Firestore (D76) : il n'a pas de file d'attente hors ligne, et
+  annoncer un changement qui n'a pas eu lieu laisserait quelqu'un dehors.
+- Le groupe « Mon compte » n'exige aucune capacité. « Paramètres » cesse d'être
+  une impasse pour le gérant, qui y tombait sur « Réservé au responsable » :
+  `/parametres` mène au premier écran que le compte peut ouvrir.

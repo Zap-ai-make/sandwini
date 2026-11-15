@@ -16,6 +16,7 @@ import {
   ajusterNombreDeLignes,
   ligneEngagee,
   preparerLot,
+  retirerLigne,
   type Arrivage,
   type LigneLot,
   type SaisieArrivage,
@@ -124,6 +125,17 @@ function CorpsArrivageModal({
 
   const changerLignes = (index: number, lignes: LigneLot[]) =>
     setGroupes((actuel) => actuel.map((g, i) => (i === index ? { ...g, lignes } : g)));
+
+  /* Le nombre suit la ligne retirée : 115 devient 114, sans quoi le champ
+     annoncerait une moto que le tableau ne montre plus. */
+  const retirerLigneDuGroupe = (index: number, rang: number) =>
+    setGroupes((actuel) =>
+      actuel.map((g, i) => {
+        if (i !== index) return g;
+        const lignes = retirerLigne(g.lignes, rang);
+        return { ...g, lignes, nombre: String(lignes.length) };
+      }),
+    );
 
   const ajouterGroupe = () => setGroupes((actuel) => [...actuel, groupeVide()]);
   const retirerGroupe = (index: number) =>
@@ -292,7 +304,11 @@ function CorpsArrivageModal({
         </fieldset>
 
         {groupes.map((groupe, index) => (
-          <fieldset key={index} className="cadre p-4">
+          /* `min-w-0` : un fieldset s'élargit par défaut à la largeur de son
+             contenu. Sur téléphone, le tableau des motos le poussait hors de
+             la fenêtre, et la croix de chaque ligne avec lui ; borné, c'est le
+             tableau qui défile, et la croix reste en vue. */
+          <fieldset key={index} className="cadre min-w-0 p-4">
             <legend className="flex items-center gap-2 px-1 font-semibold text-encre">
               {plusieurs ? `Groupe ${index + 1}` : "La marque et ses motos"}
               {plusieurs && (
@@ -363,6 +379,7 @@ function CorpsArrivageModal({
               <SaisieLotMotos
                 lignes={groupe.lignes}
                 setLignes={(lignes) => changerLignes(index, lignes)}
+                retirer={(rang) => retirerLigneDuGroupe(index, rang)}
                 numeroDepart={offsets[index]}
               />
             </div>

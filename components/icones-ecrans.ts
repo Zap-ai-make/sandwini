@@ -8,6 +8,7 @@ import {
   FolderSync,
   HardHat,
   IdCard,
+  KeyRound,
   LayoutGrid,
   type LucideIcon,
   Plus,
@@ -67,6 +68,7 @@ export const ICONE_ECRAN: Record<string, LucideIcon> = {
   "/parametres/entreprise": Building2,
   "/parametres/boutiques": Store,
   "/parametres/utilisateurs": UserCheck,
+  "/parametres/mot-de-passe": KeyRound,
   "/parametres/catalogue": Tags,
   "/parametres/referentiels": Activity,
 };

@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { useSession } from "@/lib/auth/session";
+import { ecransVisibles } from "@/lib/domain/espaces";
 
 /**
  * Les réglages n'ont plus d'accueil : ils ouvrent sur l'identité (26 octobre 2026).
@@ -27,24 +29,36 @@ import { useEffect } from "react";
  * des réglages se reconnaît au préfixe `/parametres` : pointer la barre
  * directement sur `/parametres/entreprise` aurait fait sortir les boutiques et
  * les utilisateurs de leur propre espace. L'adresse reste donc, et elle mène.
+ *
+ * **Elle mène au premier écran que ce compte peut ouvrir** (15 novembre 2026).
+ * Le gérant y tombait sur « Réservé au responsable » ; il a désormais son mot
+ * de passe à changer, et c'est là qu'il arrive. Le responsable ouvre toujours
+ * sur l'identité, premier écran de la liste.
  */
 export default function PageParametres() {
   const router = useRouter();
+  const session = useSession();
+  const destination =
+    session.statut === "connecte"
+      ? (ecransVisibles("reglages", session.utilisateur.role)[0] ?? null)
+      : null;
 
   useEffect(() => {
     /* `replace` et non `push` : cette page n'est pas une étape, et un retour
        arrière qui retombe dessus rebondirait aussitôt. */
-    router.replace("/parametres/entreprise");
-  }, [router]);
+    if (destination) router.replace(destination.href);
+  }, [destination, router]);
 
   /* Le lien est là pour le temps — court — où le script n'a pas encore repris
      la main, et pour qui navigue sans lui. Un écran blanc ne dit rien. */
   return (
     <p className="mt-6 text-corps text-encre-doux">
       Ouverture des paramètres…{" "}
-      <Link href="/parametres/entreprise" className="underline">
-        Identité de l’entreprise
-      </Link>
+      {destination && (
+        <Link href={destination.href} className="underline">
+          {destination.libelle}
+        </Link>
+      )}
     </p>
   );
 }

@@ -230,4 +230,33 @@ describe("bilanStock", () => {
     const motos = [avec({ marqueId: "ya" }, 1), avec({ marqueId: "ya" }, 2), avec({ marqueId: "ha" }, 3)];
     expect(bilanStock(motos).marques).toBe(repartirParMarque(motos, nomMarque, nomModele).length);
   });
+
+  /* Les cartes « En stock » et « Vendues » filtrent le tableau (15 novembre
+     2026). Elles sont le choix lui-même : choisir « En stock » ne doit pas
+     faire tomber « Vendues » à zéro. « Marques » et « CMC manquants », elles,
+     décrivent ce que le tableau montre — la première ouvre sa répartition. */
+  describe("avec un statut choisi", () => {
+    const motos = [
+      avec({ statut: "en_stock", cmcRecu: true, marqueId: "ya" }, 1),
+      avec({ statut: "en_stock", cmcRecu: false, marqueId: "ya" }, 2),
+      avec({ statut: "vendue", cmcRecu: false, marqueId: "ha" }, 3),
+      avec({ statut: "vendue", cmcRecu: false, marqueId: "ap" }, 4),
+    ];
+
+    it("garde le compte de chaque statut, quel que soit celui choisi", () => {
+      for (const statut of ["en_stock", "vendue"] as const) {
+        const bilan = bilanStock(motos, statut);
+        expect([bilan.motos, bilan.enStock, bilan.vendues]).toEqual([4, 2, 2]);
+      }
+    });
+
+    it("compte les marques et les CMC manquants des seules motos montrées", () => {
+      expect(bilanStock(motos, "en_stock")).toMatchObject({ marques: 1, cmcManquants: 1 });
+      expect(bilanStock(motos, "vendue")).toMatchObject({ marques: 2, cmcManquants: 2 });
+    });
+
+    it("ne change rien sans statut", () => {
+      expect(bilanStock(motos, "")).toEqual(bilanStock(motos));
+    });
+  });
 });

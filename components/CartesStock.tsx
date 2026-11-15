@@ -1,7 +1,9 @@
 "use client";
 
 import { ChevronDown } from "lucide-react";
+import type { ReactNode } from "react";
 import { CarteChiffre } from "@/components/patrons/CarteChiffre";
+import type { StatutMoto } from "@/lib/domain/moto";
 import type { BilanStock } from "@/lib/domain/repartition";
 
 /**
@@ -16,40 +18,54 @@ import type { BilanStock } from "@/lib/domain/repartition";
  * bloc replié à part. Le nombre de marques est la question ; le détail par
  * marque et par modèle est sa suite, au même endroit. Un bouton qui dit s'il
  * est ouvert (`aria-expanded`), et un chevron qui pivote pour l'œil.
+ *
+ * **« En stock » et « Vendues » filtrent le tableau** (15 novembre 2026) : « si
+ * on clique dessus, elles doivent filtrer ». Des boutons qui se pressent
+ * (`aria-pressed`) ; un second clic rend toutes les motos.
  */
 export function CartesStock({
   bilan,
+  statut,
+  choisirStatut,
   repartitionOuverte,
   basculerRepartition,
   repartitionId,
 }: {
   bilan: BilanStock;
+  /** Vide : aucun statut choisi. */
+  statut: StatutMoto | "";
+  choisirStatut: (statut: StatutMoto | "") => void;
   repartitionOuverte: boolean;
   basculerRepartition: () => void;
   /** L'identifiant du bloc que la carte « Marques » ouvre. */
   repartitionId: string;
 }) {
+  const basculerStatut = (choisi: StatutMoto) => choisirStatut(statut === choisi ? "" : choisi);
+
   return (
     <div className="mb-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
       <div className="cadre p-4">
         <CarteChiffre nom="Motos" valeur={bilan.motos} />
       </div>
-      <div className="cadre p-4">
+      <CarteBouton
+        onClick={() => basculerStatut("en_stock")}
+        aria-pressed={statut === "en_stock"}
+        actif={statut === "en_stock"}
+      >
         <CarteChiffre nom="En stock" valeur={bilan.enStock} />
-      </div>
-      <div className="cadre p-4">
+      </CarteBouton>
+      <CarteBouton
+        onClick={() => basculerStatut("vendue")}
+        aria-pressed={statut === "vendue"}
+        actif={statut === "vendue"}
+      >
         <CarteChiffre nom="Vendues" valeur={bilan.vendues} couleur="var(--color-solde)" />
-      </div>
-      <button
-        type="button"
+      </CarteBouton>
+      <CarteBouton
         onClick={basculerRepartition}
         aria-expanded={repartitionOuverte}
         aria-controls={repartitionId}
-        className={[
-          "cadre p-4 text-left hover:bg-survol",
-          "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-encre",
-          repartitionOuverte ? "border-encre" : "",
-        ].join(" ")}
+        actif={repartitionOuverte}
       >
         <CarteChiffre
           nom="Marques"
@@ -61,7 +77,7 @@ export function CartesStock({
             />
           }
         />
-      </button>
+      </CarteBouton>
       <div className="cadre p-4">
         <CarteChiffre
           nom="CMC manquants"
@@ -70,5 +86,33 @@ export function CartesStock({
         />
       </div>
     </div>
+  );
+}
+
+/** Une carte qui se presse : même cadre que ses voisines, le trait foncé quand elle est choisie. */
+function CarteBouton({
+  actif,
+  children,
+  ...attributs
+}: {
+  actif: boolean;
+  children: ReactNode;
+  onClick: () => void;
+  "aria-pressed"?: boolean;
+  "aria-expanded"?: boolean;
+  "aria-controls"?: string;
+}) {
+  return (
+    <button
+      type="button"
+      {...attributs}
+      className={[
+        "cadre p-4 text-left hover:bg-survol",
+        "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-encre",
+        actif ? "border-encre" : "",
+      ].join(" ")}
+    >
+      {children}
+    </button>
   );
 }

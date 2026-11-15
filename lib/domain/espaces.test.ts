@@ -152,10 +152,12 @@ describe("le second niveau de navigation", () => {
       "Ma journée",
       "Ce qui m’attend",
     ]);
-    /* Un seul groupe depuis S54 : « Le catalogue » est descendu dans l'espace
-       motos, et « Cet appareil » a disparu avec l'écran de synchronisation. */
+    /* « Le catalogue » est descendu dans l'espace motos en S54, et « Cet
+       appareil » a disparu avec l'écran de synchronisation. « Mon compte »
+       est arrivé le 15 novembre 2026, avec le mot de passe. */
     expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
       "L’entreprise",
+      "Mon compte",
     ]);
     /* L'espace pièces calque les motos : Vendre, Suivre, Enregistrer (S65).
        Le gérant les voit tous — il vend, consulte et tient son catalogue. */
@@ -181,12 +183,36 @@ describe("le second niveau de navigation", () => {
    * « L'entreprise » suivi de rien.
    */
   it("retire les groupes que les droits ont vidés", () => {
-    /* Tous les écrans des paramètres exigent un droit que le gérant n'a pas :
-       sa colonne « Paramètres » n'a plus aucun groupe, plutôt qu'un titre nu. */
-    expect(groupesVisibles("reglages", "gerant")).toEqual([]);
+    /* Les écrans de « L'entreprise » exigent un droit que le gérant n'a pas :
+       il ne lit que « Mon compte », plutôt qu'un titre suivi de rien. */
+    expect(groupesVisibles("reglages", "gerant").map((g) => g.titre)).toEqual(["Mon compte"]);
     expect(groupesVisibles("reglages", "responsable").map((g) => g.titre)).toEqual([
       "L’entreprise",
+      "Mon compte",
     ]);
+  });
+
+  /* « Permets au superviseur de changer son mot de passe » (15 novembre
+     2026), et le commanditaire l'a ouvert à chaque compte : chacun change le
+     sien. Pour le gérant, c'est aussi ce qui fait de « Paramètres » autre
+     chose qu'une impasse — il y tombait sur « Réservé au responsable ». */
+  it("ouvre le mot de passe à chaque compte, sous « Mon compte »", () => {
+    for (const role of ["responsable", "gerant"] as const) {
+      expect(ecransVisibles("reglages", role).map((e) => e.href)).toContain(
+        "/parametres/mot-de-passe",
+      );
+    }
+  });
+
+  /* « Dépenses n'est présent que chez le superviseur, ajoute au niveau des
+     boutiques » (15 novembre 2026). L'écran était ouvert au gérant, mais
+     rangé sous Caisse : l'accueil le nomme désormais, à côté d'« Aujourd'hui ».
+     C'est un renvoi — la page reste celle de l'espace caisse. */
+  it("met les dépenses sur l’accueil, sans les retirer à la caisse", () => {
+    const journee = groupesVisibles("accueil", "gerant").find((g) => g.titre === "Ma journée");
+    expect(journee?.ecrans.map((e) => e.href)).toEqual(["/dashboard", "/caisse/depenses"]);
+    expect(espaceDuChemin("/caisse/depenses", espacesVisibles("gerant", ["motos"]))).toBe("caisse");
+    expect(ecranCourant("accueil", "gerant", "/caisse/depenses")).toBeNull();
   });
 
   /*
@@ -214,18 +240,15 @@ describe("le second niveau de navigation", () => {
   });
 
   it("cache au gérant les écrans d’administration qu’une garde lui refuserait", () => {
-    /* Plus rien du tout depuis S54 : les quatre écrans des paramètres
-       demandent un droit que le gérant n'a pas, et « Synchronisation » — la
-       seule entrée qui lui restait — a été retirée. Le groupe vide disparaît,
-       donc l'espace aussi : c'est bien ce qu'on veut dire par « un titre sans
-       entrée sous lui est un rangement qui ment ». */
+    /* Aucun écran d'administration : ils demandent un droit que le gérant
+       n'a pas. Il ne lui reste que son propre mot de passe (15 novembre
+       2026), qui n'administre rien d'autre que lui-même. */
     const hrefs = ecransVisibles("reglages", "gerant").map((e) => e.href);
-    expect(hrefs).toEqual([]);
-    /* Trois depuis le 26 octobre 2026 : la reprise des cartes grises a quitté
-       le menu à la demande du commanditaire. Son écran existe toujours à son
-       adresse — une reprise de données qu'on lance une fois n'a pas besoin
-       d'une entrée permanente. */
-    expect(ecransVisibles("reglages", "responsable").length).toBe(3);
+    expect(hrefs).toEqual(["/parametres/mot-de-passe"]);
+    /* Trois écrans d'administration depuis le 26 octobre 2026 — la reprise
+       des cartes grises a quitté le menu, son écran existe toujours à son
+       adresse —, plus le mot de passe depuis le 15 novembre. */
+    expect(ecransVisibles("reglages", "responsable").length).toBe(4);
   });
 
   it("désigne l’écran le plus précis, pas le préfixe le plus court", () => {

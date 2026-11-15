@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, Coins, Plus, Store, UserPlus } from "lucide-react";
+import { ArrowRight, Coins, Plus, ReceiptText, Store, UserPlus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -148,6 +148,13 @@ function GesteDuJour() {
         <Link href="/clients" className="bouton bouton-neutre">
           <UserPlus aria-hidden="true" className="size-4" />
           Nouveau client
+        </Link>
+        {/* « Dépenses n'est présent que chez le superviseur, ajoute au niveau
+            des boutiques » (15 novembre 2026). L'écran était ouvert au
+            gérant, mais seulement sous Caisse. */}
+        <Link href="/caisse/depenses" className="bouton bouton-neutre">
+          <ReceiptText aria-hidden="true" className="size-4" />
+          Enregistrer une dépense
         </Link>
       </div>
     </div>

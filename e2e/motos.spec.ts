@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 import {
   attendreLaFileVide,
   bandeauEtat,
+  chassisUnique,
   codeUnique,
   contenu,
   creerBoutique,
@@ -13,6 +14,7 @@ import {
   seConnecter,
   seConnecterEtEntrer,
   selecteurPerimetre,
+  vendre,
 } from "./aide";
 
 /**
@@ -154,6 +156,47 @@ test.describe("recherche dans le stock", () => {
     /* Plus de message « aucun résultat » (28 octobre 2026) : le tableau se vide. */
     await page.getByLabel("Chercher dans le stock").fill("CHASSIS-INTROUVABLE");
     await expect(page.locator("tbody tr")).toHaveCount(0);
+  });
+
+  /* « Dans stock, les cases "en stock" et "vendu" doivent filtrer si on clique
+     dessus » (15 novembre 2026). Une vente à crédit fait passer la moto en
+     « vendue » ; une seconde moto reste en stock, dans la même boutique. */
+  test("les cartes « En stock » et « Vendues » filtrent le tableau", async ({ page }) => {
+    await seConnecterEtEntrer(page);
+    const { terrain, chassis: vendue } = await vendre(page, {
+      mode: "Crédit",
+      prix: "1200000",
+      encaisse: "400000",
+    });
+    const enStock = chassisUnique("STK");
+    await saisirMoto(page, terrain, enStock);
+    await attendreLaFileVide(page);
+
+    await page.goto("/motos", { waitUntil: "load" });
+    const lignes = contenu(page).locator("tbody tr");
+    await expect(lignes.filter({ hasText: vendue })).toBeVisible();
+    await expect(lignes.filter({ hasText: enStock })).toBeVisible();
+
+    const carteEnStock = contenu(page).getByRole("button", { name: /^En stock/ });
+    const carteVendues = contenu(page).getByRole("button", { name: /^Vendues/ });
+
+    await carteEnStock.click();
+    await expect(carteEnStock).toHaveAttribute("aria-pressed", "true");
+    await expect(lignes.filter({ hasText: enStock })).toBeVisible();
+    await expect(lignes.filter({ hasText: vendue })).toHaveCount(0);
+    /* Choisir l'une ne fait pas tomber l'autre à zéro : elle reste un choix. */
+    await expect(carteVendues).toHaveAccessibleName(/1/);
+
+    await carteVendues.click();
+    await expect(carteEnStock).toHaveAttribute("aria-pressed", "false");
+    await expect(lignes.filter({ hasText: vendue })).toBeVisible();
+    await expect(lignes.filter({ hasText: enStock })).toHaveCount(0);
+
+    /* Un second clic rend toutes les motos. */
+    await carteVendues.click();
+    await expect(carteVendues).toHaveAttribute("aria-pressed", "false");
+    await expect(lignes.filter({ hasText: vendue })).toBeVisible();
+    await expect(lignes.filter({ hasText: enStock })).toBeVisible();
   });
 });
 

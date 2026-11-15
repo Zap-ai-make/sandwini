@@ -18,7 +18,7 @@
  */
 
 import type { Boutique } from "./boutique";
-import type { Moto } from "./moto";
+import type { Moto, StatutMoto } from "./moto";
 
 /**
  * Le nom des motos dont le modèle n'a pas été saisi.
@@ -161,15 +161,24 @@ export type BilanStock = {
  * répartition, et les deux ne doivent pas se contredire. Le CMC manquant se
  * compte vendues comprises, comme aux arrivages : un papier qui manque à une
  * moto vendue manque toujours.
+ *
+ * **Avec un statut choisi** (15 novembre 2026), les cartes « En stock » et
+ * « Vendues » filtrant le tableau : `motos` est alors la liste d'avant ce
+ * choix. « Motos », « En stock » et « Vendues » sont le choix lui-même et la
+ * comptent entière — choisir « En stock » ne fait pas tomber « Vendues » à
+ * zéro, comme les cases par boutique. « Marques » et « CMC manquants »
+ * décrivent ce que le tableau montre, et la première ouvre sa répartition.
  */
 export function bilanStock(
   motos: readonly Pick<Moto, "statut" | "marqueId" | "cmcRecu">[],
+  statut: StatutMoto | "" = "",
 ): BilanStock {
+  const montrees = statut ? motos.filter((moto) => moto.statut === statut) : motos;
   return {
     motos: motos.length,
     enStock: motos.filter((moto) => moto.statut === "en_stock").length,
     vendues: motos.filter((moto) => moto.statut === "vendue").length,
-    marques: new Set(motos.map((moto) => moto.marqueId)).size,
-    cmcManquants: motos.filter((moto) => !moto.cmcRecu).length,
+    marques: new Set(montrees.map((moto) => moto.marqueId)).size,
+    cmcManquants: montrees.filter((moto) => !moto.cmcRecu).length,
   };
 }

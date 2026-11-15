@@ -18,6 +18,7 @@ import {
   lignesDuLot,
   preparerCorrectionLot,
   preparerLot,
+  retirerLigne,
   validerArrivage,
   validerLigneLot,
   validerSousLot,
@@ -131,6 +132,34 @@ describe("validerLigneLot", () => {
   });
   it("accepte une ligne avec châssis, la couleur étant facultative", () => {
     expect(validerLigneLot(ligne({ couleur: "" }))).toBeNull();
+  });
+});
+
+/* « Quand on rentre le nombre de motos et que les lignes se créent, on doit
+   pouvoir supprimer chaque ligne » (15 novembre 2026). */
+describe("retirerLigne", () => {
+  const trois = [ligne({ numeroChassis: "AAA" }), ligne({ numeroChassis: "BBB" }), ligne({ numeroChassis: "CCC" })];
+
+  it("retire la ligne visée et garde les autres dans l’ordre", () => {
+    expect(retirerLigne(trois, 1).map((l) => l.numeroChassis)).toEqual(["AAA", "CCC"]);
+    expect(retirerLigne(trois, 0).map((l) => l.numeroChassis)).toEqual(["BBB", "CCC"]);
+    expect(retirerLigne(trois, 2).map((l) => l.numeroChassis)).toEqual(["AAA", "BBB"]);
+  });
+
+  it("ne touche pas à la liste reçue", () => {
+    retirerLigne(trois, 1);
+    expect(trois).toHaveLength(3);
+  });
+
+  /* Un groupe sans moto n'a plus de sens : c'est le groupe qu'on retire. */
+  it("ne descend jamais sous une ligne", () => {
+    const seule = [ligne({ numeroChassis: "AAA" })];
+    expect(retirerLigne(seule, 0)).toEqual(seule);
+  });
+
+  it("ignore un rang qui n’existe pas", () => {
+    expect(retirerLigne(trois, 7)).toEqual(trois);
+    expect(retirerLigne(trois, -1)).toEqual(trois);
   });
 });
 

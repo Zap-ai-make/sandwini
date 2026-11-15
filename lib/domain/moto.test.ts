@@ -306,6 +306,30 @@ describe("filtrerMotos", () => {
       filtrerMotos(deux, { ...FILTRES_VIDES, boutiqueId: "POU", marqueId: "m1" }).map((m) => m.id),
     ).toEqual(["a"]);
   });
+
+  /* **Le filtre par statut** (15 novembre 2026) : « dans stock, les cases
+     "en stock" et "vendu" doivent filtrer si on clique dessus ». */
+  it("filtre par statut, et se combine avec la marque", () => {
+    const trois = [
+      moto({ id: "a", statut: "en_stock", marqueId: "m1" }),
+      moto({ id: "b", statut: "vendue", marqueId: "m1" }),
+      moto({ id: "c", statut: "en_stock", marqueId: "m2" }),
+    ];
+    expect(filtrerMotos(trois, { ...FILTRES_VIDES, statut: "en_stock" }).map((m) => m.id)).toEqual([
+      "a",
+      "c",
+    ]);
+    expect(filtrerMotos(trois, { ...FILTRES_VIDES, statut: "vendue" }).map((m) => m.id)).toEqual([
+      "b",
+    ]);
+    expect(
+      filtrerMotos(trois, { ...FILTRES_VIDES, statut: "en_stock", marqueId: "m2" }).map((m) => m.id),
+    ).toEqual(["c"]);
+  });
+
+  it("ne filtre pas le statut tant qu’aucune case n’est choisie", () => {
+    expect(FILTRES_VIDES.statut).toBe("");
+  });
 });
 
 describe("chassisDejaPris", () => {
