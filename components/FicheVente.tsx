@@ -25,6 +25,7 @@ import {
   TitrePanneau,
 } from "@/components/patrons/PanneauLateral";
 import { useSession } from "@/lib/auth/session";
+import { peut } from "@/lib/domain/roles";
 import { formaterTelephone, nomDuClient, type Client } from "@/lib/domain/client";
 import { formaterDate, formaterDateHeure, formaterMontant } from "@/lib/domain/format";
 import { PapiersDeLaVente } from "@/components/PapiersDeLaVente";
@@ -137,7 +138,9 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
   );
   const { valeur: moto } = useAbonnement(souscrireMoto, "La moto n’a pas pu être chargée.");
 
-  const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
+  /* Le responsable, et depuis le 15 novembre 2026 le gérant de la boutique de
+     la vente : les règles ne lui ouvrent que les marges de sa boutique. */
+  const voitLesMarges = session.statut === "connecte" && peut(session.utilisateur.role, "voir_marges");
   const client = vente ? clients.find((fiche) => fiche.id === vente.clientId) : undefined;
 
   /* **Modifier et annuler** (S25) : le responsable, et le gérant de la
@@ -314,7 +317,7 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
 
           <section>
             <TitrePanneau>Marge</TitrePanneau>
-            {estResponsable ? <Marge id={id} /> : <MargeMasquee />}
+            {voitLesMarges ? <Marge id={id} /> : <MargeMasquee />}
           </section>
 
           {annulationOuverte && (

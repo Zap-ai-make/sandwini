@@ -39,8 +39,9 @@ import { creerEntree, creerModele, type Auteur } from "@/lib/repositories/refere
  * Le prix d'achat et les frais d'entrée : le gérant les saisissait sans jamais
  * pouvoir les relire (D4), et le bloc s'en excusait à l'écran. Le commanditaire
  * a tranché — il fait entrer la moto, la supervision pose ce qu'elle a coûté.
- * Le bloc ne s'affiche donc plus qu'au responsable, et la moto entre sans coût
- * quand c'est un gérant qui la saisit.
+ * **Il est revenu le 15 novembre 2026** : « le gérant doit pouvoir ajouter les
+ * prix », et il voit tout pour sa boutique, marges comprises. Le bloc suit donc
+ * `voir_marges`, que le gérant porte désormais.
  *
  * Et le panneau qui barrait l'écran tant qu'aucune marque n'était déclarée. Les
  * listes restent — sans elles la même marque finit écrite de trois façons —
@@ -71,8 +72,8 @@ export default function PageNouvelleMoto() {
   /* Ce qui décide de l'affichage des coûts. La même capacité que partout
      ailleurs (`voir_marges`), pour qu'il n'existe qu'une seule réponse à
      « a-t-il le droit ». Elle ne protège rien à elle seule : les règles
-     Firestore refusent l'écriture du coût à quiconque n'est pas responsable,
-     et c'est cela qui protège. */
+     Firestore bornent l'écriture du coût à la boutique de la moto
+     (`coutSuitSaMoto`), et c'est cela qui protège. */
   const role = session.statut === "connecte" ? session.utilisateur.role : null;
   const voitLesCouts = role !== null && peut(role, "voir_marges");
 

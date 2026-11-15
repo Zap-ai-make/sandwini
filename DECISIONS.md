@@ -3369,3 +3369,45 @@ sous un nouveau numéro : il n'existe pas de vente réécrite.
 
 *Conséquence :* les règles accordent l'annulation à `peutVendrePour(boutiqueId)`
 et non à `estResponsable()`. La spec est `specs/S25-annuler-et-corriger-une-vente.md`.
+
+## D110 — Le gérant voit et saisit les coûts de sa boutique ; les coûts d'un lot partent par tranches
+
+*15 novembre 2026. Revient sur D89 (S39) et resserre D2 autour des boutiques.*
+
+**Le retour.** Un arrivage de plus de 115 motos : le clic sur « Enregistrer »
+semblait ne rien faire, et une actualisation a tout effacé. Et « le gérant doit
+pouvoir ajouter les prix ».
+
+**Deux causes, mesurées et non supposées.**
+- Le plafond d'un arrivage était de 80 motos, groupes confondus, alors que le
+  champ « Nombre de motos » ne bornait que chaque groupe. Le refus tombait à
+  l'enregistrement, et s'écrivait sous la dernière ligne du lot, hors de la vue.
+- Un `writeBatch` ne tolère que **20 consultations de document par les
+  règles**, et chaque coût en faisait une (`exists` de sa moto ; deux sur une
+  moto existante, avec le `get`). Mesuré contre l'émulateur : 20 motos avec
+  leur prix passaient, 21 faisaient tomber le lot entier — fenêtre déjà fermée,
+  donc sans un mot, et le lot affiché disparaissait au refus du serveur.
+
+**La décision du commanditaire** (choisie parmi « saisir sans relire »,
+« saisir et voir les prix », « tout voir ») : **le gérant voit tout, marges
+comprises, pour sa boutique.** Le mur de D2 ne disparaît pas, il passe entre les
+boutiques : `motos/{id}/prive/cout` et `ventesMotos/{id}/prive/marge` se lisent
+par le responsable et par le gérant de la boutique qu'ils portent, et le coût
+s'écrit par eux seuls. D89 avait raison de refuser une donnée écrite par
+quelqu'un qui ne la relit pas ; elle ne l'est plus, puisqu'il la relit.
+
+*Conséquences :*
+- `coutSuitSaMoto` : le coût est tenu égal à la boutique de sa moto par une
+  **seule** consultation, `getAfter`, qui voit la moto écrite dans le même lot.
+  Un coût sans moto est désormais refusé — la tolérance qu'imposait `exists`
+  n'a plus de raison d'être.
+- L'arrivage écrit l'arrivage et toutes ses motos d'un tenant (aucune
+  consultation), puis les coûts par tranches de `COUTS_PAR_ECRITURE` (20). Le
+  déplacement groupé fait de même pour la boutique des coûts. Une tranche qui
+  échouerait laisserait des motos sans coût — l'état que la supervision sait
+  déjà signaler —, pas un lot à moitié perdu.
+- Le plafond passe à 300 motos par arrivage ; l'erreur se lit à côté du bouton,
+  un refus du serveur s'affiche sur la page, et le navigateur demande
+  confirmation avant de quitter une saisie engagée.
+- `voir_marges` est accordé au gérant : c'est l'affichage ; les règles bornent
+  la lecture à sa boutique.

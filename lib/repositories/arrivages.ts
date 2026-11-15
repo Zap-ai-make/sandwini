@@ -12,14 +12,15 @@ import {
   type DocumentSnapshot,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
-import { construireCout } from "@/lib/domain/moto";
+import { construireCout, type CoutMoto } from "@/lib/domain/moto";
 import type {
   Arrivage,
   ChampsCorrectionMoto,
   MotoDuLot,
   SaisieArrivage,
 } from "@/lib/domain/arrivage";
-import { ecrireMotoDansLot } from "./motos";
+import { COUTS_PAR_ECRITURE, enTranches } from "@/lib/domain/ecritures";
+import { ecrireCoutDansLot, ecrireMotoDansLot } from "./motos";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
 import { traceCreation, traceModification, type Auteur } from "./referentiels";
@@ -28,10 +29,11 @@ import { traceCreation, traceModification, type Auteur } from "./referentiels";
  * Les arrivages — les lots de motos entrées ensemble (S42).
  *
  * Un arrivage et ses motos s'écrivent d'un seul `writeBatch` : soit le lot
- * entier arrive, soit rien. Le coût de chaque moto n'est joint que si le
- * responsable l'a saisi — un gérant n'en fournit pas, et aucun document
- * `prive/cout` n'est alors écrit (D2/S39). Les règles Firestore le garantissent
- * de toute façon ; l'interface ne fait que ne pas le tenter.
+ * entier arrive, soit rien. Les coûts suivent, par tranches de
+ * `COUTS_PAR_ECRITURE` (15 novembre 2026) : chacun fait consulter sa moto par
+ * les règles, et un lot d'écriture n'en tolère que 20. Le responsable et,
+ * depuis le même jour, le gérant les saisissent ; un coût absent n'est écrit
+ * nulle part (D82).
  */
 
 function lireArrivage(instantane: DocumentSnapshot<DocumentData>): Arrivage {
@@ -78,9 +80,18 @@ export function ecouterArrivages(
  *
  * Chaque moto porte déjà la marque, le modèle et le prix de son groupe
  * (`preparerLot`) : un lot peut donc mêler plusieurs marques. `voitLesCouts`
- * reste le seul interrupteur du coût : à faux (gérant), `preparerLot` a déjà
- * vidé les prix, et aucun `prive/cout` n'est monté ici. Les motos reçues sont
- * supposées déjà validées.
+ * reste le seul interrupteur du coût : à faux, `preparerLot` a déjà vidé les
+ * prix, et aucun `prive/cout` n'est monté ici. Les motos reçues sont supposées
+ * déjà validées.
+ *
+ * **Pourquoi les coûts partent à part** (mesuré le 15 novembre 2026). Tout
+ * écrire d'un seul lot faisait tomber l'arrivage entier dès le 21ᵉ prix, sans
+ * un mot : la fenêtre était déjà fermée. Les motos ne consultent rien et
+ * passent d'un tenant ; les tranches de coûts partent juste derrière, dans
+ * l'ordre — hors ligne compris, la file les rejoue dans cet ordre, et chaque
+ * coût trouve sa moto déjà écrite. Si une tranche échouait, ses motos
+ * resteraient en stock sans coût : l'état que la supervision sait déjà
+ * signaler, et non un lot à moitié perdu.
  */
 export function enregistrerArrivage(
   saisie: SaisieArrivage,
@@ -101,15 +112,16 @@ export function enregistrerArrivage(
     ...traceCreation(auteur),
   });
 
+  const couts: { motoId: string; cout: CoutMoto }[] = [];
   for (const moto of motos) {
-    /* Le coût est propre à chaque groupe, et n'est monté que pour le
-       responsable dont le prix a survécu à `preparerLot` (D2/S39). */
+    /* Le coût est propre à chaque groupe, et n'existe que si le prix a survécu
+       à `preparerLot`. */
     const cout =
       voitLesCouts && moto.prixAchat.trim()
         ? construireCout({ prixAchat: moto.prixAchat, fraisEntree: [] })
         : null;
 
-    ecrireMotoDansLot(
+    const motoId = ecrireMotoDansLot(
       lot,
       {
         boutiqueId,
@@ -125,12 +137,25 @@ export function enregistrerArrivage(
         arrivageId: arrivageRef.id,
         papiersFournis: [],
       },
-      cout,
+      null,
       auteur,
     );
+    if (cout) couts.push({ motoId, cout });
   }
 
-  return { id: arrivageRef.id, enregistre: suivreEcriture(lot.commit()) };
+  /* Les `commit` sont lancés dans l'ordre, sans s'attendre : c'est l'ordre de
+     la file d'écritures, et l'écran n'attend pas le serveur (D76). */
+  const ecritures = [lot.commit()];
+  for (const tranche of enTranches(couts, COUTS_PAR_ECRITURE)) {
+    const lotCouts = writeBatch(db());
+    for (const { motoId, cout } of tranche) ecrireCoutDansLot(lotCouts, motoId, boutiqueId, cout, auteur);
+    ecritures.push(lotCouts.commit());
+  }
+
+  return {
+    id: arrivageRef.id,
+    enregistre: suivreEcriture(Promise.all(ecritures).then(() => undefined)),
+  };
 }
 
 /**

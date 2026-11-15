@@ -206,8 +206,8 @@ beforeEach(async () => {
       ...versement(),
       ...auditFige,
     });
-    /* La marge, telle que le déclencheur l'écrit : c'est elle que le gérant ne
-       doit jamais atteindre. */
+    /* La marge, telle que le déclencheur l'écrit : le gérant de la boutique la
+       lit, personne ne l'écrit depuis un navigateur. */
     await setDoc(doc(base, "ventesMotos/vente-ptg/prive/marge"), {
       boutiqueId: "PTG",
       coutMotoSnapshot: 865_000,
@@ -273,13 +273,32 @@ beforeEach(async () => {
   });
 });
 
-describe("la marge est hors de portée, et infalsifiable", () => {
-  it("le gérant ne lit pas la marge d’une vente de sa propre boutique", async () => {
-    await assertFails(getDoc(doc(gerant(), "ventesMotos/vente-ptg/prive/marge")));
+/* **Le gérant lit la marge de sa boutique** (15 novembre 2026, « tout voir,
+   marges comprises »). Ce qui reste fermé : la marge des autres boutiques, et
+   l'écriture, à tout navigateur. */
+describe("la marge : lue par sa boutique, infalsifiable partout", () => {
+  it("le gérant lit la marge d’une vente de sa boutique", async () => {
+    await assertSucceeds(getDoc(doc(gerant(), "ventesMotos/vente-ptg/prive/marge")));
   });
 
-  it("le gérant ne parcourt pas la sous-collection privée", async () => {
-    await assertFails(getDocs(collection(gerant(), "ventesMotos/vente-ptg/prive")));
+  it("le gérant parcourt la sous-collection privée d’une vente, filtrée sur sa boutique", async () => {
+    const prive = collection(gerant(), "ventesMotos/vente-ptg/prive");
+    await assertSucceeds(getDocs(query(prive, where("boutiqueId", "==", "PTG"))));
+    await assertFails(getDocs(prive));
+  });
+
+  it("le gérant ne lit pas la marge d’une vente d’une autre boutique", async () => {
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await setDoc(doc(contexte.firestore(), "ventesMotos/vente-kdg/prive/marge"), {
+        boutiqueId: "KDG",
+        coutMotoSnapshot: 865_000,
+        marge: 335_000,
+        updatedAt: new Date("2026-08-01T08:00:00Z"),
+        updatedBy: "systeme",
+        updatedByName: "Calcul automatique",
+      });
+    });
+    await assertFails(getDoc(doc(gerant(), "ventesMotos/vente-kdg/prive/marge")));
   });
 
   it("le responsable, lui, la lit", async () => {

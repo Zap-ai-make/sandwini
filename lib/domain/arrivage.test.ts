@@ -151,6 +151,13 @@ describe("ajusterNombreDeLignes", () => {
   it("plafonne au maximum de lignes", () => {
     expect(ajusterNombreDeLignes([LIGNE_VIDE], LIGNES_MAX + 50)).toHaveLength(LIGNES_MAX);
   });
+
+  /* Le commanditaire a saisi un arrivage de plus de 115 motos (15 novembre
+     2026) : le plafond de 80 le refusait. Un conteneur en porte davantage. */
+  it("laisse un groupe porter bien plus de 115 motos", () => {
+    expect(LIGNES_MAX).toBeGreaterThanOrEqual(300);
+    expect(ajusterNombreDeLignes([LIGNE_VIDE], 250)).toHaveLength(250);
+  });
 });
 
 describe("ecoulement", () => {
@@ -166,6 +173,21 @@ describe("ecoulement", () => {
 });
 
 describe("preparerLot", () => {
+  it("accepte un lot de 120 motos réparties sur deux marques", () => {
+    const lignes = (debut: number) =>
+      Array.from({ length: 60 }, (_, i) =>
+        ligne({ numeroChassis: `LC6PCJ1A9K${String(debut + i).padStart(7, "0")}` }),
+      );
+    const res = preparerLot(
+      arrivage(),
+      [sousLot({ lignes: lignes(0) }), sousLot({ marqueId: "m2", modeleId: "", lignes: lignes(60) })],
+      [],
+      false,
+    );
+    expect(res.ok).toBe(true);
+    if (res.ok) expect(res.motos).toHaveLength(120);
+  });
+
   it("refuse d'écrire tant que le stock n'est pas lu (D95)", () => {
     const res = preparerLot(arrivage(), [sousLot()], null, false);
     expect(res.ok).toBe(false);

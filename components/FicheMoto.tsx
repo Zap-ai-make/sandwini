@@ -11,6 +11,7 @@ import { EtatChargement, EtatErreur } from "@/components/patrons/Etats";
 import { useSession } from "@/lib/auth/session";
 import { formaterDate, formaterMontant } from "@/lib/domain/format";
 import { LIBELLE_STATUT, type Moto } from "@/lib/domain/moto";
+import { peut } from "@/lib/domain/roles";
 import { destinationsPossibles, raisonDeNePasPartir, type Transfert } from "@/lib/domain/transfert";
 import { nomDeBoutique, type Boutique } from "@/lib/domain/boutique";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
@@ -23,10 +24,9 @@ import { ecouterArriveeDeLaMoto } from "@/lib/repositories/transferts";
 /**
  * La fiche d'une moto.
  *
- * Deux lectures pour un même objet, et c'est le cœur du modèle : la moto, que
- * le gérant lit pour la vendre, et son coût, que seul le responsable peut lire.
- * L'écran ne cache pas cette coupure — il la nomme, pour qu'un gérant qui ne
- * voit pas les montants comprenne que ce n'est pas une panne (D2).
+ * Deux lectures pour un même objet, et c'est le cœur du modèle : la moto, et
+ * son coût, que lisent ceux qui portent `voir_marges` — le responsable, et
+ * depuis le 15 novembre 2026 le gérant de la boutique de la moto (D2).
  *
  * Ce n'est pas une route à part mais un panneau de `/motos`, ouvert par le
  * paramètre `?moto=`. Une route `/motos/[id]` obligeait le navigateur à
@@ -46,7 +46,11 @@ export function FicheMoto({ id }: { id: string }) {
   );
   const { valeur: moto, erreur } = useAbonnement(souscrire, "Cette moto n’a pas pu être chargée.");
 
-  const estResponsable = session.statut === "connecte" && session.utilisateur.role === "responsable";
+  /* Le coût se montre à qui peut voir les marges — le responsable, et depuis
+     le 15 novembre 2026 le gérant, pour sa boutique : la fiche n'ouvre que les
+     motos de son périmètre, et les règles bornent la lecture du coût à la
+     boutique de la moto. */
+  const voitLesCouts = session.statut === "connecte" && peut(session.utilisateur.role, "voir_marges");
 
   return (
     <div>
@@ -144,9 +148,9 @@ export function FicheMoto({ id }: { id: string }) {
 
           <PapiersMoto moto={moto} />
 
-          <Deplacement moto={moto} estResponsable={estResponsable} />
+          <Deplacement moto={moto} voitLesCouts={voitLesCouts} />
 
-          {estResponsable ? <Cout moto={moto} catalogue={catalogue} /> : <CoutMasque />}
+          {voitLesCouts ? <Cout moto={moto} catalogue={catalogue} /> : <CoutMasque />}
         </>
       )}
     </div>
@@ -164,7 +168,7 @@ export function FicheMoto({ id }: { id: string }) {
  * est écrite (`DESIGN.md` §10). Elle vient du domaine, pas d'une condition
  * recopiée ici.
  */
-function Deplacement({ moto, estResponsable }: { moto: Moto; estResponsable: boolean }) {
+function Deplacement({ moto, voitLesCouts }: { moto: Moto; voitLesCouts: boolean }) {
   const session = useSession();
   const [ouvert, setOuvert] = useState(false);
 
@@ -247,7 +251,7 @@ function Deplacement({ moto, estResponsable }: { moto: Moto; estResponsable: boo
           moto={moto}
           boutiques={boutiques}
           auteur={auteur}
-          voitLesCouts={estResponsable}
+          voitLesCouts={voitLesCouts}
           ouvert
           onFermer={() => setOuvert(false)}
         />
@@ -369,7 +373,8 @@ function Cout({ moto, catalogue }: { moto: Moto; catalogue: Catalogue }) {
 }
 
 /**
- * Ce que le gérant voit à la place.
+ * Ce que voit, à la place, un compte sans `voir_marges` — aucun depuis le
+ * 15 novembre 2026, mais la capacité reste la seule réponse à la question.
  *
  * Dire « réservé au responsable » vaut mieux que ne rien afficher : un blanc se
  * lit comme une panne, une explication se lit comme une règle (DESIGN.md §10).

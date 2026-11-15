@@ -150,31 +150,32 @@ describe("un visiteur sans compte", () => {
   });
 });
 
-describe("le coût d’une moto : ni lu ni écrit par le gérant (D2, S39)", () => {
+describe("le coût d’une moto : lu et écrit par sa boutique seulement", () => {
   /* La formulation la plus délicate du dépôt, et celle qui a le plus bougé.
-     Jusqu'à S39 elle disait « écrit sans être lu » (D4) : le gérant saisissait
-     le prix d'achat à l'entrée en stock et ne pouvait plus jamais le relire.
-     Le cloisonnement était donc tenu d'un côté et ouvert de l'autre.
-
-     Le commanditaire a tranché : le gérant fait entrer la moto, la supervision
-     pose ce qu'elle a coûté. Les deux sens se testent, sinon on croit avoir
-     cloisonné alors qu'on a seulement compliqué. */
-  it("refuse au gérant d’écrire un coût", async () => {
-    await assertFails(
-      setDoc(doc(gerant(), "motos/moto-ptg/prive/cout"), {
-        boutiqueId: "PTG",
-        prixAchat: 900_000,
-        coutTotal: 915_000,
-        fraisEntree: [],
-        updatedAt: serverTimestamp(),
-        updatedBy: "ger-1",
-        updatedByName: "Gérant",
-      }),
-    );
+     D4 disait « écrit sans être lu » ; S39 a tout fermé au gérant (D89) ; le
+     15 novembre 2026, le commanditaire a choisi qu'il voie tout, marges
+     comprises, **pour sa boutique**. Les deux sens se testent toujours : le
+     mur ne disparaît pas, il passe entre les boutiques. */
+  const coutDe = (boutiqueId: string, auteur: string) => ({
+    boutiqueId,
+    prixAchat: 900_000,
+    coutTotal: 915_000,
+    fraisEntree: [],
+    updatedAt: serverTimestamp(),
+    updatedBy: auteur,
+    updatedByName: "Gérant",
   });
 
-  it("et de le relire", async () => {
-    await assertFails(getDoc(doc(gerant(), "motos/moto-ptg/prive/cout")));
+  it("laisse le gérant écrire et relire le coût d’une moto de sa boutique", async () => {
+    await assertSucceeds(setDoc(doc(gerant(), "motos/moto-ptg/prive/cout"), coutDe("PTG", "ger-1")));
+    await assertSucceeds(getDoc(doc(gerant(), "motos/moto-ptg/prive/cout")));
+  });
+
+  it("refuse au gérant d’une autre boutique d’écrire ou de lire ce coût", async () => {
+    const autre = gerant("ger-2", "KDG");
+    await assertFails(setDoc(doc(autre, "motos/moto-ptg/prive/cout"), coutDe("PTG", "ger-2")));
+    await assertFails(setDoc(doc(autre, "motos/moto-ptg/prive/cout"), coutDe("KDG", "ger-2")));
+    await assertFails(getDoc(doc(autre, "motos/moto-ptg/prive/cout")));
   });
 
   it("le laisse écrire et relire au responsable", async () => {
@@ -262,20 +263,17 @@ describe("les cas croisés, entre deux specs", () => {
     await assertFails(getDoc(doc(gerant(), "motos/moto-ptg")));
   });
 
-  /* Un `prive/` sans son parent est **accepté**, et c'est voulu : dans un lot,
-     Firestore évalue chaque écriture contre l'état d'AVANT, donc la moto
-     n'existe pas encore quand son coût est validé. Fermer cette tolérance
-     casserait l'entrée en stock — qui écrit la moto et son coût ensemble, et
-     doit marcher hors ligne.
+  /* **Un coût sans sa moto est refusé** (15 novembre 2026). Il était accepté,
+     et c'était voulu : `exists()` lit l'état d'AVANT le lot, donc la moto
+     écrite dans le même lot que son coût n'existait pas encore pour la règle.
+     `getAfter()` lit l'état d'APRÈS : la moto du même lot est vue, et la
+     tolérance n'a plus de raison d'être. L'entrée en stock, qui écrit les deux
+     ensemble, passe toujours (`motos.test.ts`).
 
-     Ce que le responsable y gagne se limite à des documents orphelins, et il a
-     de toute façon le droit de les lire. Ce test existe pour que la tolérance
-     soit **écrite** quelque part : personne ne la retrouverait en lisant la
-     règle six mois plus tard, et quelqu'un la refermerait en croyant boucher
-     un trou. Depuis S39 seul le responsable écrit ici, ce qui la rend encore
-     moins coûteuse qu'elle ne l'était. */
-  it("accepte un coût sans sa moto — le lot d’entrée en stock l’exige", async () => {
-    await assertSucceeds(
+     Fermer la porte compte davantage depuis que le gérant écrit des coûts : un
+     coût orphelin porterait une boutique que rien ne contredit. */
+  it("refuse un coût sans sa moto", async () => {
+    await assertFails(
       setDoc(doc(responsable(), "motos/moto-a-venir/prive/cout"), {
         boutiqueId: "PTG",
         prixAchat: 100_000,

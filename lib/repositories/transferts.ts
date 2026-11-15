@@ -11,6 +11,7 @@ import {
 } from "firebase/firestore";
 import { db } from "@/lib/firebase/client";
 import type { Moto } from "@/lib/domain/moto";
+import { COUTS_PAR_ECRITURE, enTranches } from "@/lib/domain/ecritures";
 import {
   MOTOS_PAR_DEPLACEMENT_MAX,
   type SaisieTransfert,
@@ -125,8 +126,15 @@ export function deplacerMoto(
  * **Les coûts privés sont lus avant le lot, pas pendant.** Chacun demande un
  * aller-retour ; les lancer ensemble évite de les enchaîner un par un. Hors
  * ligne la lecture échoue, et on laisse alors le coût tel quel plutôt que de
- * faire échouer le déplacement pour un champ que personne ne lit (voir
- * `deplacerMoto`).
+ * faire échouer le déplacement (voir `deplacerMoto`).
+ *
+ * **Et ils partent derrière l'envoi, par tranches** (15 novembre 2026). Chaque
+ * coût fait consulter sa moto par les règles, et un lot d'écriture n'en tolère
+ * que 20 : joints à l'envoi, ils faisaient tomber les motos avec eux dès la
+ * 21ᵉ. L'envoi reste d'un seul tenant — aucune moto ne change de boutique sans
+ * sa trace —, et le coût rejoint sa moto dans la foulée. Il compte davantage
+ * depuis que le gérant lit les coûts de sa boutique : c'est son `boutiqueId`
+ * qui ouvre la lecture à la boutique d'arrivée.
  */
 export function deplacerMotos(
   motos: readonly Moto[],
@@ -175,11 +183,16 @@ export function deplacerMotos(
       });
     }
 
-    for (const reference of coutsAEcrire) {
-      if (reference) lot.update(reference, { boutiqueId: vers });
+    /* Lancés dans l'ordre, sans s'attendre : l'envoi d'abord, puis les coûts,
+       qui trouvent ainsi leur moto déjà arrivée (`coutSuitSaMoto`). */
+    const ecritures = [lot.commit()];
+    const references = coutsAEcrire.filter((reference) => reference !== null);
+    for (const tranche of enTranches(references, COUTS_PAR_ECRITURE)) {
+      const lotCouts = writeBatch(db());
+      for (const reference of tranche) lotCouts.update(reference, { boutiqueId: vers });
+      ecritures.push(lotCouts.commit());
     }
-
-    await lot.commit();
+    await Promise.all(ecritures);
   })();
 
   return { enregistre: suivreEcriture(enregistre) };

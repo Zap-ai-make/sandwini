@@ -7,9 +7,9 @@
  * composent — chaque ligne ne porte que ce qui varie d'une moto à l'autre : son
  * numéro de châssis, et sa couleur.
  *
- * Le prix d'achat reste cloisonné (D2/S39) : il n'est saisi et validé, groupe
- * par groupe, que lorsque le rôle courant voit les coûts ; sinon il n'est ni lu
- * ni transmis.
+ * Le prix d'achat n'est saisi et validé, groupe par groupe, que lorsque le
+ * rôle courant voit les coûts ; sinon il n'est ni lu ni transmis. Le gérant les
+ * voit depuis le 15 novembre 2026, pour sa boutique.
  */
 
 import {
@@ -86,11 +86,12 @@ export const SOUS_LOT_VIDE: SousLot = {
 export const LONGUEUR_NOM_MAX = 80;
 export const LONGUEUR_DESCRIPTION_MAX = 200;
 
-/* Un lot passe par un writeBatch (arrivage + N motos + N coûts), et un batch
-   Firestore plafonne à 500 opérations. Bien en dessous, pour laisser de la
-   marge et parce qu'au-delà la relecture d'un tel tableau devient illisible.
-   Le plafond vaut pour tout le lot, groupes confondus. */
-export const LIGNES_MAX = 80;
+/* **300 motos par arrivage, groupes confondus** (15 novembre 2026). Le
+   plafond était de 80, et le commanditaire en a saisi plus de 115 : refusé au
+   moment d'enregistrer. L'arrivage et ses motos partent en un seul writeBatch
+   (1 + N écritures), qu'on garde loin des 500 qu'admet Firestore ; les coûts
+   suivent à part, par tranches (`COUTS_PAR_ECRITURE`). */
+export const LIGNES_MAX = 300;
 
 function estDateValide(iso: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return false;
@@ -329,7 +330,7 @@ export type ResultatLot = { ok: true; motos: MotoDuLot[] } | { ok: false; erreur
  *
  * Un groupe sans aucune moto est ignoré (comme une ligne vide). Le prix n'est
  * porté sur les motos que si `voitCouts` ; sinon il est mis à "" — aucun coût ne
- * franchit cette frontière (D2/S39).
+ * franchit cette frontière (D2).
  *
  * `stock` à `null` veut dire « pas encore lu » : on refuse de décider, comme les
  * six contrôles d'unicité de S40 (D95).
@@ -417,7 +418,7 @@ export function preparerLot(
  * Le statut, la boutique, les papiers, le coût et la date d'entrée n'y sont
  * pas — ce sont des faits qui se sont produits, pas des cases qu'on remplit, et
  * chacun a son geste ailleurs. Le coût en particulier vit dans une
- * sous-collection que le gérant ne lit pas (D2).
+ * sous-collection à part (D2), avec son propre geste.
  *
  * Les montants sont du texte, comme partout dans les saisies de ce dépôt : un
  * champ vidé doit pouvoir rester vide sans devenir zéro.

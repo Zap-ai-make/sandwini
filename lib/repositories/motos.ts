@@ -209,8 +209,10 @@ export type ChampsMoto = {
  * pour qu'un champ ajouté ici (comme `arrivageId`) ne s'oublie pas là-bas.
  *
  * **Le coût n'est écrit que s'il y en a un** (S39, D82) : une moto sans coût
- * n'est pas une erreur, c'est le signal que la supervision cherche. Un gérant
- * n'en fournit jamais — sa moto part seule.
+ * n'est pas une erreur, c'est le signal que la supervision cherche. Le gérant
+ * en fournit un depuis le 15 novembre 2026, comme le responsable. Un arrivage
+ * passe `null` ici et écrit ses coûts à part, par tranches
+ * (`ecrireCoutDansLot`) : un lot d'écriture ne tolère que 20 coûts.
  */
 export function ecrireMotoDansLot(
   lot: WriteBatch,
@@ -239,14 +241,27 @@ export function ecrireMotoDansLot(
     dateEntree: Timestamp.fromDate(new Date()),
     ...traceCreation(auteur),
   });
-  if (cout) {
-    lot.set(doc(reference, "prive", "cout"), {
-      boutiqueId: champs.boutiqueId,
-      ...cout,
-      ...traceCout(auteur),
-    });
-  }
+  if (cout) ecrireCoutDansLot(lot, reference.id, champs.boutiqueId, cout, auteur);
   return reference.id;
+}
+
+/**
+ * Écrit le coût d'une moto dans un lot déjà ouvert. Le seul endroit qui
+ * connaisse la forme de `motos/{id}/prive/cout` : son `boutiqueId` doit égaler
+ * celui de la moto, c'est lui qui décide qui le lit (`coutSuitSaMoto`).
+ */
+export function ecrireCoutDansLot(
+  lot: WriteBatch,
+  motoId: string,
+  boutiqueId: string,
+  cout: CoutMoto,
+  auteur: Auteur,
+): void {
+  lot.set(doc(db(), "motos", motoId, "prive", "cout"), {
+    boutiqueId,
+    ...cout,
+    ...traceCout(auteur),
+  });
 }
 
 /**

@@ -395,3 +395,75 @@ describe("le lot complet, tel que l’application l’écrit", () => {
     expect(restantes.empty).toBe(true);
   });
 });
+
+/**
+ * Le coût suit la moto (15 novembre 2026).
+ *
+ * Depuis que le gérant voit les coûts de sa boutique, le `boutiqueId` du coût
+ * n'est plus une simple cohérence : c'est lui qui décide qui le lit. La moto
+ * envoyée doit donc emmener son coût, sans quoi la boutique d'arrivée ne le
+ * verrait jamais.
+ */
+describe("le coût part avec la moto", () => {
+  const coutDe = (boutiqueId: string) => ({
+    boutiqueId,
+    prixAchat: 850_000,
+    fraisEntree: [],
+    coutTotal: 850_000,
+    updatedAt: serverTimestamp(),
+    updatedBy: "ger-1",
+    updatedByName: "Auteur",
+  });
+
+  it("le gérant d’origine envoie la moto, sa trace et son coût dans la même écriture", async () => {
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      await setDoc(doc(contexte.firestore(), "motos/moto-ptg/prive/cout"), {
+        ...coutDe("PTG"),
+        updatedAt: new Date("2026-01-01T08:00:00Z"),
+      });
+    });
+    const base = gerant();
+    const lot = writeBatch(base);
+    lot.update(doc(base, "motos/moto-ptg"), deplacement("KDG"));
+    lot.set(doc(collection(base, "transfertsMotos")), trace());
+    lot.update(doc(base, "motos/moto-ptg/prive/cout"), { boutiqueId: "KDG", updatedAt: serverTimestamp(), updatedBy: "ger-1", updatedByName: "Auteur" });
+    await assertSucceeds(lot.commit());
+
+    await assertSucceeds(getDoc(doc(gerant("ger-2", "KDG"), "motos/moto-ptg/prive/cout")));
+  });
+
+  it("un envoi de 30 motos passe, puis leurs coûts par tranches de 20", async () => {
+    const ids = Array.from({ length: 30 }, (_, i) => `moto-lot-${i}`);
+    await env.withSecurityRulesDisabled(async (contexte) => {
+      const base = contexte.firestore();
+      for (const id of ids) {
+        await setDoc(doc(base, `motos/${id}`), moto());
+        await setDoc(doc(base, `motos/${id}/prive/cout`), {
+          ...coutDe("PTG"),
+          updatedAt: new Date("2026-01-01T08:00:00Z"),
+        });
+      }
+    });
+    const base = gerant();
+    const envoi = writeBatch(base);
+    for (const id of ids) {
+      envoi.update(doc(base, `motos/${id}`), deplacement("KDG"));
+      envoi.set(doc(collection(base, "transfertsMotos")), trace({ motoId: id }));
+    }
+    await assertSucceeds(envoi.commit());
+
+    for (let debut = 0; debut < ids.length; debut += 20) {
+      const tranche = writeBatch(base);
+      for (const id of ids.slice(debut, debut + 20)) {
+        tranche.update(doc(base, `motos/${id}/prive/cout`), {
+          boutiqueId: "KDG",
+          updatedAt: serverTimestamp(),
+          updatedBy: "ger-1",
+          updatedByName: "Auteur",
+        });
+      }
+      await assertSucceeds(tranche.commit());
+    }
+  });
+});
+

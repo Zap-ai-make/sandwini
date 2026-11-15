@@ -5,7 +5,7 @@ import {
   type RulesTestEnvironment,
 } from "@firebase/rules-unit-testing";
 import { readFileSync } from "node:fs";
-import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, serverTimestamp, setDoc, updateDoc, writeBatch } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
 /**
@@ -157,16 +157,20 @@ describe("arrivages — portée boutique", () => {
   });
 });
 
-describe("le lot ne fuit pas le coût (D2)", () => {
+describe("le coût d'un lot reste dans sa boutique (D2, 15 novembre 2026)", () => {
   it("un gérant fait entrer une moto de lot : arrivageId, aucune provenance, aucun coût", async () => {
     await assertSucceeds(setDoc(doc(gerant(), "motos/m-lot"), motoDeLot()));
   });
 
-  it("un gérant ne peut PAS écrire le coût d'une moto de lot", async () => {
+  it("un gérant pose le coût d'une moto de lot de sa boutique, pas d'une autre", async () => {
     await env.withSecurityRulesDisabled(async (c) => {
       await setDoc(doc(c.firestore(), "motos/m-lot2"), motoDeLot());
+      await setDoc(doc(c.firestore(), "motos/m-lot-kdg"), motoDeLot({ boutiqueId: "KDG" }));
     });
-    await assertFails(setDoc(doc(gerant(), "motos/m-lot2/prive/cout"), cout({ updatedBy: "ger-1" })));
+    await assertSucceeds(setDoc(doc(gerant(), "motos/m-lot2/prive/cout"), cout({ updatedBy: "ger-1" })));
+    await assertFails(
+      setDoc(doc(gerant(), "motos/m-lot-kdg/prive/cout"), cout({ boutiqueId: "KDG", updatedBy: "ger-1" })),
+    );
   });
 
   it("une moto sans provenance ni arrivage est refusée : elle n'a pas d'origine", async () => {
@@ -233,5 +237,57 @@ describe("S43 — suivi d'un lot", () => {
 
   it("le responsable supprime un arrivage de n'importe quelle boutique", async () => {
     await assertSucceeds(deleteDoc(doc(responsable(), "arrivages/arr-kdg")));
+  });
+});
+
+/**
+ * Un gros lot passe (15 novembre 2026).
+ *
+ * Le commanditaire a saisi un arrivage de plus de 115 motos : refusé, puis
+ * perdu. Mesuré ici avant correction : **un `writeBatch` ne tolère que 20
+ * consultations de document par les règles**, et chaque coût en fait une (la
+ * boutique de sa moto). 20 motos avec leur prix passaient, 21 faisaient tomber
+ * le lot entier — sans un mot à l'écran, la fenêtre étant déjà fermée.
+ *
+ * L'application écrit donc l'arrivage et toutes ses motos d'un seul tenant —
+ * aucune consultation —, puis les prix par tranches de 20. Ces tests
+ * reproduisent exactement ces écritures.
+ */
+describe("un gros lot passe", () => {
+  const MOTOS = 120;
+  const TRANCHE = 20;
+  const id = (i: number) => `m-gros-${i}`;
+
+  async function lotComplet(base: ReturnType<typeof responsable>, auteur: string) {
+    const lot = writeBatch(base);
+    lot.set(doc(base, "arrivages/arr-gros"), arrivage({ createdBy: auteur, updatedBy: auteur }));
+    for (let i = 0; i < MOTOS; i++) {
+      lot.set(
+        doc(base, `motos/${id(i)}`),
+        motoDeLot({
+          arrivageId: "arr-gros",
+          numeroChassis: `LC6PCJ1A9K${String(i).padStart(7, "0")}`,
+          createdBy: auteur,
+          updatedBy: auteur,
+        }),
+      );
+    }
+    await assertSucceeds(lot.commit());
+
+    for (let debut = 0; debut < MOTOS; debut += TRANCHE) {
+      const tranche = writeBatch(base);
+      for (let i = debut; i < Math.min(MOTOS, debut + TRANCHE); i++) {
+        tranche.set(doc(base, `motos/${id(i)}/prive/cout`), cout({ updatedBy: auteur }));
+      }
+      await assertSucceeds(tranche.commit());
+    }
+  }
+
+  it("le responsable enregistre 120 motos, puis leurs prix", async () => {
+    await lotComplet(responsable(), "resp-1");
+  });
+
+  it("un gérant enregistre 120 motos, puis leurs prix", async () => {
+    await lotComplet(gerant(), "ger-1");
   });
 });

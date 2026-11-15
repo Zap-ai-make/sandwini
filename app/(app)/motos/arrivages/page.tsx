@@ -473,7 +473,16 @@ export default function PageArrivages() {
         <ArrivageModal
           ouvert={modaleOuverte}
           onFermer={() => setModaleOuverte(false)}
-          onEnregistre={(info) => setDernierLot(info)}
+          onEnregistre={({ nombre, enregistre }) => {
+            setDernierLot({ nombre });
+            setErreurAction(null);
+            /* Un refus du serveur arrive fenêtre fermée : il retire l'annonce
+               et se dit ici, au lieu de laisser le lot s'effacer en silence. */
+            enregistre.catch((cause) => {
+              setDernierLot(null);
+              setErreurAction(messageErreurArrivage(cause));
+            });
+          }}
           fournisseurs={fournisseurs}
           marques={catalogue.lues.marques}
           modeles={catalogue.lues.modeles}

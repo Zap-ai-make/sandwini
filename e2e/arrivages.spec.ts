@@ -78,6 +78,44 @@ test("un lot de deux motos entre en une fois, et l'écoulement se lit", async ({
   await expect(contenu(page).getByText(chassis2)).toBeVisible();
 });
 
+/**
+ * Le lot du commanditaire (15 novembre 2026) : plus de 115 motos, avec leur
+ * prix. Le clic sur « Enregistrer » semblait ne rien faire — plafond de 80 —, et
+ * au-delà de 20 prix le serveur refusait le lot entier, fenêtre déjà fermée.
+ * Un refus se lirait désormais sur la page (`role="alert"`) : son absence, une
+ * fois la file vidée, dit que les tranches de prix sont toutes passées.
+ */
+test("un lot de 120 motos avec leur prix s’enregistre en entier", async ({ page }) => {
+  test.setTimeout(240_000);
+  await seConnecterEtEntrer(page);
+  const terrain = await preparerTerrain(page);
+
+  const nomArrivage = nomUnique("Conteneur");
+  const modal = await ouvrirLeModal(page, nomArrivage, terrain, nomUnique("HAOJUE Import"));
+
+  await modal.getByLabel("Nombre de motos").fill("120");
+  await modal.getByLabel(/^Prix d’achat commun/).fill("450000");
+  const prefixe = chassisUnique("GROS");
+  for (let i = 1; i <= 120; i++) {
+    /* `exact` : « moto 1 » désignerait aussi les motos 10 à 19 et 100 à 120. */
+    await modal
+      .getByLabel(`Numéro de châssis, moto ${i}`, { exact: true })
+      .fill(`${prefixe}${String(i).padStart(3, "0")}`);
+  }
+
+  await modal.getByRole("button", { name: "Enregistrer le lot" }).click();
+  await expect(contenu(page).getByRole("status")).toContainText("120 motos entrées", {
+    timeout: 20_000,
+  });
+
+  await attendreLaFileVide(page);
+  await expect(contenu(page).getByRole("alert")).toHaveCount(0);
+
+  await page.reload({ waitUntil: "load" });
+  const ligne = contenu(page).getByRole("row").filter({ hasText: nomArrivage });
+  await expect(ligne).toContainText("120 en stock");
+});
+
 test("un lot mêle deux marques : chaque groupe entre avec la sienne", async ({ page }) => {
   await seConnecterEtEntrer(page);
   const terrain = await preparerTerrain(page);

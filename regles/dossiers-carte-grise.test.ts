@@ -178,8 +178,9 @@ describe("ce que la personne des cartes grises ne voit pas", () => {
         ...audit(),
       });
     });
-    /* Le mur de D2 ne bouge pas : `prive/` est réservé au responsable, et elle
-       est gérante comme les autres. */
+    /* Le mur de D2 passe entre les boutiques depuis le 15 novembre 2026 : un
+       gérant lit les coûts de **sa** boutique. Celle-ci n'est pas la boutique
+       de la moto, et elle reste dehors. */
     await assertFails(getDoc(doc(gerantCartes(), "motos/m1/prive/cout")));
   });
 

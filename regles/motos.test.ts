@@ -145,13 +145,26 @@ beforeEach(async () => {
   });
 });
 
-describe("le coût est hors de portée du gérant", () => {
-  it("le gérant ne lit pas le coût de sa propre moto", async () => {
-    await assertFails(getDoc(doc(gerant(), "motos/moto-ptg/prive/cout")));
+/* **Le gérant voit le coût de sa boutique** (15 novembre 2026). Le
+   commanditaire a choisi « tout voir, marges comprises » : le mur de D2 ne
+   sépare plus le gérant de ses propres coûts, il le sépare des coûts des
+   autres boutiques. C'est cette seconde moitié qui reste à prouver ici. */
+describe("le coût : la boutique de la moto, et elle seule", () => {
+  it("le gérant lit le coût d’une moto de sa boutique", async () => {
+    await assertSucceeds(getDoc(doc(gerant(), "motos/moto-ptg/prive/cout")));
   });
 
-  it("le gérant ne parcourt pas la sous-collection privée", async () => {
-    await assertFails(getDocs(collection(gerant(), "motos/moto-ptg/prive")));
+  /* Comme pour le stock : une liste se demande filtrée sur sa boutique, sinon
+     elle ramasserait aussi ce qu'il n'a pas le droit de lire, et Firestore
+     refuse la requête entière. */
+  it("le gérant parcourt la sous-collection privée de sa moto, filtrée sur sa boutique", async () => {
+    const prive = collection(gerant(), "motos/moto-ptg/prive");
+    await assertSucceeds(getDocs(query(prive, where("boutiqueId", "==", "PTG"))));
+    await assertFails(getDocs(prive));
+  });
+
+  it("le gérant ne lit pas le coût d’une moto d’une autre boutique", async () => {
+    await assertFails(getDoc(doc(gerant(), "motos/moto-kdg/prive/cout")));
   });
 
   it("le responsable, lui, le lit", async () => {
@@ -203,18 +216,32 @@ describe("entrée en stock", () => {
     await assertSucceeds(addDoc(collection(gerant(), "motos"), moto()));
   });
 
-  it("le gérant n’écrit plus aucun coût, même sur sa propre moto (S39)", async () => {
-    /* L'autre moitié du test précédent, et la seule qui prouve quelque chose :
-       ce lot passait avant S39. Le cloisonnement de D2 était tenu en lecture et
-       ouvert en écriture — la moitié d'un cloisonnement (D79). */
+  it("le gérant fait entrer une moto et son coût dans le même lot", async () => {
+    /* Fermé par S39, rouvert le 15 novembre 2026 : « le gérant doit pouvoir
+       ajouter les prix ». Il lit aussi ce qu'il écrit — le cloisonnement se
+       tient désormais entre boutiques, dans les deux sens (D89). */
     const base = gerant();
     const reference = doc(collection(base, "motos"));
     const lot = writeBatch(base);
     lot.set(reference, moto());
     lot.set(doc(reference, "prive", "cout"), cout());
-    await assertFails(lot.commit());
+    await assertSucceeds(lot.commit());
 
-    await assertFails(setDoc(doc(base, "motos/moto-ptg/prive/cout"), cout()));
+    await assertSucceeds(setDoc(doc(base, "motos/moto-ptg/prive/cout"), cout()));
+  });
+
+  it("le gérant n’écrit pas le coût d’une moto d’une autre boutique", async () => {
+    const base = gerant();
+    await assertFails(setDoc(doc(base, "motos/moto-kdg/prive/cout"), cout()));
+    /* Ni en déclarant sa boutique sur le coût d'une moto qui n'y est pas : le
+       coût suit la boutique de la moto, pas celle qu'on écrit dessus. */
+    await assertFails(
+      setDoc(doc(base, "motos/moto-kdg/prive/cout"), cout({ boutiqueId: "PTG" })),
+    );
+  });
+
+  it("un coût sans moto est refusé : il n’a pas de boutique à suivre", async () => {
+    await assertFails(setDoc(doc(responsable(), "motos/fantome/prive/cout"), cout({}, "resp-1")));
   });
 
   it("le responsable fait entrer une moto et son coût dans le même lot", async () => {

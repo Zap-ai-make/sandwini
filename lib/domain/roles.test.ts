@@ -28,13 +28,12 @@ describe("peut", () => {
     "gerer_utilisateurs",
     "gerer_boutiques",
     "gerer_referentiels",
-    "voir_marges",
     "voir_toutes_boutiques",
     "corriger_versement",
   ];
 
   it("donne toutes les capacités au responsable", () => {
-    for (const capacite of [...administratives, "gerer_pieces" as Capacite]) {
+    for (const capacite of [...administratives, "gerer_pieces", "voir_marges"] as Capacite[]) {
       expect(peut("responsable", capacite), capacite).toBe(true);
     }
   });
@@ -52,8 +51,15 @@ describe("peut", () => {
     expect(peut("gerant", "gerer_pieces")).toBe(true);
   });
 
-  it("refuse en particulier les trois capacités qui exposeraient de l’argent ou des droits", () => {
-    expect(peut("gerant", "voir_marges")).toBe(false);
+  /* « Le gérant doit pouvoir ajouter les prix » — et le commanditaire a
+     choisi qu'il voie tout, marges comprises (15 novembre 2026). Ce qu'il voit
+     reste borné à sa boutique : ce sont les règles qui le tiennent, pas ce
+     droit d'affichage. */
+  it("donne au gérant les coûts et les marges de sa boutique", () => {
+    expect(peut("gerant", "voir_marges")).toBe(true);
+  });
+
+  it("refuse en particulier les deux capacités qui exposeraient des droits ou l’argent d’autrui", () => {
     expect(peut("gerant", "gerer_utilisateurs")).toBe(false);
     expect(peut("gerant", "corriger_versement")).toBe(false);
   });

@@ -67,7 +67,10 @@ const CAPACITES: Record<Role, readonly Capacite[]> = {
      un responsable travaillant dans une de ses boutiques ne pouvait rien
      écrire, et le geste devenait intraçable. Le partage du travail est porté
      par les écrans, pas par une interdiction. */
-  gerant: ["gerer_pieces"],
+  /* `voir_marges` depuis le 15 novembre 2026 : « le gérant doit pouvoir
+     ajouter les prix », et voir tout, marges comprises. Ce droit décide de ce
+     qu'on affiche ; les règles Firestore bornent la lecture à sa boutique. */
+  gerant: ["gerer_pieces", "voir_marges"],
 };
 
 export function peut(role: Role, capacite: Capacite): boolean {

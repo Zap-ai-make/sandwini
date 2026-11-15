@@ -1,7 +1,7 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChoixOuNouveau } from "@/components/ChoixOuNouveau";
 import { SaisieLotMotos } from "@/components/SaisieLotMotos";
 import { SelectFournisseur } from "@/components/SelectFournisseur";
@@ -14,6 +14,7 @@ import {
   LONGUEUR_DESCRIPTION_MAX,
   LONGUEUR_NOM_MAX,
   ajusterNombreDeLignes,
+  ligneEngagee,
   preparerLot,
   type Arrivage,
   type LigneLot,
@@ -23,7 +24,7 @@ import {
 import type { Fournisseur } from "@/lib/domain/fournisseur";
 import type { Modele, Referentiel } from "@/lib/domain/referentiel";
 import type { Moto } from "@/lib/domain/moto";
-import { enregistrerArrivage, messageErreurArrivage } from "@/lib/repositories/arrivages";
+import { enregistrerArrivage } from "@/lib/repositories/arrivages";
 import { creerEntree, creerModele, type Auteur } from "@/lib/repositories/referentiels";
 
 /**
@@ -34,8 +35,8 @@ import { creerEntree, creerModele, type Auteur } from "@/lib/repositories/refere
  * groupe fixe sa marque, son modèle et son prix, puis liste ses châssis. On
  * ajoute un groupe pour une autre marque. Le nom propose les arrivages passés :
  * en choisir un reprend son fournisseur et amorce la première marque — un
- * nouveau lot du même fournisseur ressemble au précédent. Le prix reste
- * cloisonné : il n'apparaît qu'au responsable (D2/S39).
+ * nouveau lot du même fournisseur ressemble au précédent. Le prix suit
+ * `voir_marges` : le responsable, et depuis le 15 novembre 2026 le gérant.
  *
  * **Il a quitté `<dialog>` en S44.** C'était le dernier modal natif de saisie du
  * produit, et le seul à l'être : les trois autres étaient déjà des calques,
@@ -61,7 +62,9 @@ const groupeVide = (): GroupeSaisie => ({
 type ProprietesArrivageModal = {
   ouvert: boolean;
   onFermer: () => void;
-  onEnregistre: (info: { nombre: number }) => void;
+  /** `enregistre` se règle au retour du serveur : la fenêtre est déjà fermée,
+      c'est donc la page qui dira un refus (15 novembre 2026). */
+  onEnregistre: (info: { nombre: number; enregistre: Promise<void> }) => void;
   fournisseurs: Fournisseur[] | null;
   marques: Referentiel[] | null;
   modeles: Modele[] | null;
@@ -167,6 +170,19 @@ function CorpsArrivageModal({
     }
   }
 
+  /* **Une actualisation ne doit pas emporter la saisie en silence**
+     (15 novembre 2026). Le commanditaire a rechargé la page sur un lot de plus
+     de 115 motos, et tout a disparu : la saisie ne vit que dans cette fenêtre.
+     Tant qu'une ligne est engagée, le navigateur demande confirmation avant de
+     quitter. */
+  const saisieEngagee = groupes.some((groupe) => groupe.lignes.some(ligneEngagee));
+  useEffect(() => {
+    if (!saisieEngagee) return;
+    const retenir = (evenement: BeforeUnloadEvent) => evenement.preventDefault();
+    window.addEventListener("beforeunload", retenir);
+    return () => window.removeEventListener("beforeunload", retenir);
+  }, [saisieEngagee]);
+
   function soumettre() {
     if (!auteur || !boutiqueId) return;
     const resultat = preparerLot(saisie, groupes, stock, voitLesCouts);
@@ -176,8 +192,10 @@ function CorpsArrivageModal({
     }
     setErreur(null);
     const { enregistre } = enregistrerArrivage(saisie, resultat.motos, boutiqueId, auteur, voitLesCouts);
-    enregistre.catch((cause) => setErreur(messageErreurArrivage(cause)));
-    onEnregistre({ nombre: resultat.motos.length });
+    /* La fenêtre se ferme sans attendre le serveur (D76) : un refus qui
+       arriverait après ne trouverait plus personne ici pour le dire. La page le
+       reçoit et l'affiche. */
+    onEnregistre({ nombre: resultat.motos.length, enregistre });
     onFermer();
   }
 
@@ -198,6 +216,12 @@ function CorpsArrivageModal({
       titre="Enregistrer un arrivage"
       taille="large"
       pied={
+        <>
+          {/* **L'erreur se lit à côté du bouton**, et non sous la dernière ligne
+              du lot : sur plus de cent motos, elle tombait hors de la vue, et
+              un clic sur « Enregistrer » semblait ne rien faire (15 novembre
+              2026). */}
+          {erreur && <EtatErreurSaisie message={erreur} className="basis-full" />}
         <div className="ml-auto flex flex-wrap gap-2">
           <button type="button" onClick={onFermer} className="bouton bouton-discret">
             Annuler
@@ -211,6 +235,7 @@ function CorpsArrivageModal({
             {stock === null ? "Lecture du stock…" : "Enregistrer le lot"}
           </button>
         </div>
+        </>
       }
     >
       <div className="space-y-6">
@@ -351,7 +376,6 @@ function CorpsArrivageModal({
           </button>
         </div>
 
-        <EtatErreurSaisie message={erreur} />
       </div>
     </Modale>
   );

@@ -714,10 +714,9 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
-    // Le coût. Le `boutiqueId` y est répété : au sein d'un même lot d'écriture,
-    // les règles évaluent chaque document contre l'état d'avant, donc la moto
-    // parente n'existe pas encore quand son coût est validé. On vérifie donc le
-    // claim directement, et le parent en plus dès qu'il existe.
+    // Le coût. Le `boutiqueId` y est répété : c'est lui que la lecture compare
+    // au compte, sans aller chercher la moto à chaque lecture. Son égalité avec
+    // la boutique de la moto est tenue à l'écriture (`coutSuitSaMoto`).
     //
     // Limite assumée : les règles ne savent pas parcourir une liste, donc ni la
     // forme de chaque ligne de frais ni l'égalité coutTotal = prixAchat + frais
@@ -738,28 +737,48 @@ service cloud.firestore {
              && texteBorne(donnees.updatedByName, 200);
     }
 
-    function boutiqueDeLaMoto(motoId) {
-      return get(/databases/$(database)/documents/motos/$(motoId)).data.boutiqueId;
+    // **Le coût suit la boutique de sa moto, en une seule consultation.**
+    //
+    // `getAfter` lit la moto telle qu'elle sera **après** l'écriture : créée
+    // dans le même lot, déplacée dans le même lot, ou déjà en place. Une seule
+    // consultation par coût, et c'est la contrainte qui compte : un lot
+    // d'écriture n'en tolère que 20 (mesuré le 15 novembre 2026 — 20 coûts
+    // passaient, 21 faisaient tomber le lot entier). L'ancienne forme,
+    // `!exists(moto) || get(moto)…`, en faisait deux sur une moto existante.
+    //
+    // Un coût sans moto est refusé : il n'aurait pas de boutique à suivre.
+    function coutSuitSaMoto(motoId) {
+      return getAfter(/databases/$(database)/documents/motos/$(motoId)).data.boutiqueId
+             == request.resource.data.boutiqueId;
     }
 
-    // **Le responsable seul écrit ici, depuis S39.** Le gérant y avait accès en
-    // écriture — il saisissait le prix d'achat à l'entrée en stock sans jamais
-    // pouvoir le relire (D4). Le cloisonnement de D2 était donc tenu en lecture
-    // et ouvert en écriture, ce qui n'est un cloisonnement qu'à moitié.
+    // **La boutique de la moto lit et écrit son coût** (15 novembre 2026).
     //
-    // Le commanditaire a tranché : le gérant fait entrer la moto, la
-    // supervision pose ce qu'elle a coûté. Une moto peut donc exister sans ce
-    // document — et son absence est le signal que la supervision attend.
-    // L'écrire à zéro dirait « acquise gratuitement » au lieu de « on ne sait
-    // pas » (D82) ; rien ici ne l'exige, et le domaine ne le construit pas.
+    // D4 laissait le gérant écrire sans relire ; S39 le lui avait tout fermé
+    // (D89). Le commanditaire a tranché autrement : « le gérant doit pouvoir
+    // ajouter les prix », et il voit tout, marges comprises, **pour sa
+    // boutique**. Le mur de D2 ne disparaît pas, il passe entre les boutiques :
+    // le `boutiqueId` du coût, tenu égal à celui de la moto par
+    // `coutSuitSaMoto`, décide désormais qui le lit.
+    //
+    // La mise à jour s'ouvre aussi au gérant que le coût **quitte** : c'est lui
+    // qui envoie la moto, et le coût part avec elle dans le même geste
+    // (`deplacerMoto`). `coutSuitSaMoto` l'empêche de l'envoyer ailleurs que là
+    // où la moto arrive.
     match /motos/{motoId}/prive/{section} {
-      allow read: if estResponsable();
+      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
 
-      allow create, update: if section == 'cout'
-                            && estResponsable()
-                            && coutValide(request.resource.data)
-                            && (!exists(/databases/$(database)/documents/motos/$(motoId))
-                                || boutiqueDeLaMoto(motoId) == request.resource.data.boutiqueId);
+      allow create: if section == 'cout'
+                    && coutValide(request.resource.data)
+                    && coutSuitSaMoto(motoId)
+                    && (estResponsable() || estGerantDe(request.resource.data.boutiqueId));
+
+      allow update: if section == 'cout'
+                    && coutValide(request.resource.data)
+                    && coutSuitSaMoto(motoId)
+                    && (estResponsable()
+                        || estGerantDe(request.resource.data.boutiqueId)
+                        || estGerantDe(resource.data.boutiqueId));
 
       allow delete: if false;
     }
@@ -1204,8 +1223,10 @@ service cloud.firestore {
     // monde. Seul le déclencheur `figerMargeVente` la remplit, et il passe par
     // le SDK Admin — hors de portée de ces règles, donc hors de portée d'un
     // navigateur.
+    // La marge se lit dans sa boutique (15 novembre 2026, « tout voir, marges
+    // comprises ») et ne s'écrit que par le serveur (D51).
     match /ventesMotos/{venteId}/prive/{section} {
-      allow read: if estResponsable();
+      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
       allow write: if false;
     }
 
