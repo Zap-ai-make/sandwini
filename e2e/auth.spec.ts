@@ -143,7 +143,12 @@ test.describe("gestion des comptes", () => {
     await page.getByLabel("Mot de passe provisoire").fill("court");
     await page.getByRole("button", { name: /Créer le compte/ }).click();
 
-    await expect(messageErreur(page)).toContainText("10 caractères", { timeout: 20_000 });
+    /* Le refus s'affiche dans la modale, rendue hors du `main` depuis S54 —
+       ce test le cherchait encore dans la page. Six caractères depuis le 16
+       novembre 2026 ; « court » en a cinq. */
+    await expect(page.getByRole("dialog").getByRole("alert")).toContainText("6 caractères", {
+      timeout: 20_000,
+    });
   });
 
   test("un gérant n’atteint pas l’administration des comptes", async ({ page, browser }) => {

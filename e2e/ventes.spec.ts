@@ -6,6 +6,7 @@ import {
   contenu,
   creerClientDepuisLeFichier,
   emailUnique,
+  ouvrirLaVente,
   prendreLaMainEtMettreEnCache,
   preparerTerrain,
   saisirMoto,
@@ -730,4 +731,36 @@ test.describe("hors ligne", () => {
        le lot part **tout seul** — pas en combien de temps. */
     await attendreLaFileVide(page, 90_000);
   });
+});
+
+/* « Dans le formulaire de vente, après avoir choisi la moto, si on a oublié de
+   renseigner la couleur lors de l'enregistrement de l'arrivage, ajoute un
+   champ » (16 novembre 2026). La couleur tapée part sur la moto avec la vente :
+   le stock la montre, le reçu aussi, puisqu'il la lit sur la moto. */
+test("la couleur oubliée à l’entrée en stock se pose dans la vente", async ({ page }) => {
+  await seConnecterEtEntrer(page);
+  const terrain = await preparerTerrain(page);
+  /* `saisirMoto` ne remplit pas la couleur : la moto entre sans. */
+  const chassis = chassisUnique("COUL");
+  await saisirMoto(page, terrain, chassis, { conseille: "1200000" });
+  const client = `Ouedraogo ${Date.now().toString(36)}`;
+  await creerClientDepuisLeFichier(page, client, `76${String(Date.now()).slice(-6)}`);
+  await attendreLaFileVide(page);
+
+  await page.goto("/motos/ventes?nouvelle=1", { waitUntil: "load" });
+  await ouvrirLaVente(page, { chassis, client });
+  await page.getByLabel("Couleur, ligne 1").fill("Rouge brique");
+  await page.getByLabel("Prix convenu, ligne 1").fill("1200000");
+  await choisirDansLaListe(page, "Mode de paiement", "Crédit");
+  await page.getByLabel(/Montant reçu/).fill("400000");
+  await page.getByRole("button", { name: "Enregistrer la vente" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "Vente enregistrée" }).getByRole("status"),
+  ).toContainText("Vente enregistrée", { timeout: 20_000 });
+
+  await attendreLaFileVide(page);
+  await page.goto("/motos", { waitUntil: "load" });
+  await expect(contenu(page).locator("tbody tr").filter({ hasText: chassis })).toContainText(
+    "Rouge brique",
+  );
 });

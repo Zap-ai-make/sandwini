@@ -16,6 +16,7 @@ import { Modale } from "@/components/patrons/Modale";
 import { TetePage } from "@/components/patrons/Page";
 import { useSession } from "@/lib/auth/session";
 import type { Boutique } from "@/lib/domain/boutique";
+import { LONGUEUR_MOT_DE_PASSE_MIN } from "@/lib/domain/mot-de-passe";
 import { LIBELLE_ROLE } from "@/lib/domain/roles";
 import { usePerimetre } from "@/lib/perimetre/perimetre";
 import { attribuerBoutique } from "@/lib/repositories/boutiques";
@@ -513,7 +514,7 @@ function FormulaireGerant({
             id="mot-de-passe-gerant"
             type="text"
             required
-            minLength={10}
+            minLength={LONGUEUR_MOT_DE_PASSE_MIN}
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
             className="saisie font-code"

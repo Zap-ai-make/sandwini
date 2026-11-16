@@ -3431,7 +3431,10 @@ réinitialiser un gérant qui l'a oublié.
   `updatePassword` : Firebase refuse le changement à une session ancienne, et
   un appareil resté ouvert au comptoir ne doit pas pouvoir changer le mot de
   passe de son propriétaire.
-- Dix caractères au moins, la longueur qu'exige déjà la création d'un gérant.
+- La même longueur minimale que la création d'un gérant. Dix caractères au
+  départ ; **six depuis le 16 novembre 2026**, à la demande du commanditaire,
+  partout à la fois — l'écran de chacun, la création et la modification d'un
+  gérant (`LONGUEUR_MOT_DE_PASSE`, Cloud Functions à redéployer).
 - Le geste exige le réseau et attend la réponse du serveur, à l'inverse des
   écritures Firestore (D76) : il n'a pas de file d'attente hors ligne, et
   annoncer un changement qui n'a pas eu lieu laisserait quelqu'un dehors.

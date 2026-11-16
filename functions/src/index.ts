@@ -3,7 +3,7 @@ import { logger } from "firebase-functions";
 import { onDocumentCreated, onDocumentWritten } from "firebase-functions/v2/firestore";
 import { HttpsError, onCall, onRequest, type CallableRequest } from "firebase-functions/v2/https";
 import { QueryDocumentSnapshot, Timestamp } from "firebase-admin/firestore";
-import { fermeLesSessions, lireModification } from "./gerants";
+import { LONGUEUR_MOT_DE_PASSE, fermeLesSessions, lireModification } from "./gerants";
 import { resoudreCollision, type PieceNumerotee } from "./numerotation";
 import { construireSuivi } from "./suivi";
 
@@ -132,10 +132,13 @@ export const creerGerant = onCall({ region: REGION }, async (requete) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     throw new HttpsError("invalid-argument", "Adresse e-mail invalide.");
   }
-  // Firebase impose 6 caractères ; on demande davantage sans tomber dans la
-  // politique de mot de passe qui pousse à l'écrire sur un papier.
-  if (motDePasse.length < 10) {
-    throw new HttpsError("invalid-argument", "Le mot de passe doit faire au moins 10 caractères.");
+  // La même longueur qu'à la modification (`LONGUEUR_MOT_DE_PASSE`) : six,
+  // le plancher de Firebase, depuis le 16 novembre 2026.
+  if (motDePasse.length < LONGUEUR_MOT_DE_PASSE) {
+    throw new HttpsError(
+      "invalid-argument",
+      `Le mot de passe doit faire au moins ${LONGUEUR_MOT_DE_PASSE} caractères.`,
+    );
   }
 
   const { auth, base, horodatage } = await admin();

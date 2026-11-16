@@ -379,6 +379,17 @@ describe("correction d’une moto", () => {
     );
   });
 
+  /* La vente pose la couleur que l'arrivage avait oubliée (16 novembre 2026),
+     dans la même écriture que le statut : c'est ce que fait `enregistrerVentes`. */
+  it("la vente passe la moto en vendue et lui pose sa couleur d’un même geste", async () => {
+    await assertSucceeds(
+      updateDoc(
+        doc(gerant(), "motos/moto-ptg"),
+        modification({ statut: "vendue", couleur: "Rouge" }),
+      ),
+    );
+  });
+
   it("le gérant ne déplace pas une moto vers une autre boutique — c’est un transfert", async () => {
     await assertFails(
       updateDoc(doc(gerant(), "motos/moto-ptg"), modification({ boutiqueId: "KDG" })),

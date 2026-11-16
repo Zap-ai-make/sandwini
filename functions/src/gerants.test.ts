@@ -77,6 +77,12 @@ describe("lireModification", () => {
     }
   });
 
+  /* « Réduis le minimum de mot de passe à 6 » (16 novembre 2026) : le
+     plancher de Firebase, et celui de l'écran où chacun change le sien. */
+  it("demande six caractères au moins", () => {
+    expect(LONGUEUR_MOT_DE_PASSE).toBe(6);
+  });
+
   it("refuse un mot de passe plus court que la création ne l’exige", () => {
     expect(refus({ motDePasse: "a".repeat(LONGUEUR_MOT_DE_PASSE - 1) })).toMatch(/mot de passe/i);
     expect(modification({ motDePasse: "a".repeat(LONGUEUR_MOT_DE_PASSE) }).motDePasse).toHaveLength(

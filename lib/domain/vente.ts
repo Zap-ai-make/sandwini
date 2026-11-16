@@ -1,4 +1,5 @@
 import { formaterMontant } from "./format";
+import { LONGUEUR_TEXTE_MAX } from "./moto";
 import { dansLaPeriode, type BornesPeriode } from "./periode";
 
 /**
@@ -299,6 +300,11 @@ export type SaisieVente = {
   montantEncaisse: string;
   moyenPaiement: MoyenPaiement;
   reference: string;
+  /**
+   * La couleur à poser sur la moto en la vendant, si l'arrivage l'avait
+   * oubliée (16 novembre 2026). Absente : la moto garde la sienne.
+   */
+  couleur?: string;
 };
 
 export const SAISIE_VENTE_VIDE: SaisieVente = {
@@ -957,6 +963,13 @@ export const MOTOS_PAR_VENTE_MAX = 10;
 export type LigneMotoVendue = {
   motoId: string;
   prixConvenu: string;
+  /**
+   * La couleur, tapée dans la vente quand l'arrivage l'avait oubliée (16
+   * novembre 2026) : « si on a oublié de renseigner la couleur lors de
+   * l'arrivage ». Facultative ; le champ ne paraît que sur une moto sans
+   * couleur.
+   */
+  couleur?: string;
 };
 
 /**
@@ -1084,6 +1097,11 @@ export function validerVenteGroupee(groupe: SaisieVenteGroupee): RefusGroupe | n
     if (prixConvenu > MONTANT_MAX) {
       return { message: "Le prix convenu dépasse le maximum admis.", rang };
     }
+    /* La même borne qu'à l'entrée en stock : la règle Firestore de la moto
+       refuserait au-delà, et le lot entier tomberait avec elle. */
+    if ((ligne.couleur ?? "").trim().length > LONGUEUR_TEXTE_MAX) {
+      return { message: `La couleur dépasse ${LONGUEUR_TEXTE_MAX} caractères.`, rang };
+    }
   }
 
   const total = totalGroupe(groupe.motos);
@@ -1129,17 +1147,23 @@ export function ventesDuGroupe(groupe: SaisieVenteGroupee): SaisieVente[] {
   const prix = groupe.motos.map((ligne) => lireMontant(ligne.prixConvenu) ?? 0);
   const parts = repartirEncaisse(lireMontantEncaisse(groupe.montantEncaisse) ?? 0, prix);
 
-  return groupe.motos.map((ligne, rang) => ({
-    motoId: ligne.motoId,
-    clientId: groupe.clientId,
-    prixConvenu: ligne.prixConvenu,
-    modePaiement: groupe.modePaiement,
-    carteGrise: groupe.carteGrise,
-    casque: groupe.casque,
-    montantEncaisse: String(parts[rang]),
-    moyenPaiement: groupe.moyenPaiement,
-    reference: groupe.reference,
-  }));
+  return groupe.motos.map((ligne, rang) => {
+    /* Une couleur vide ne s'écrit pas : elle effacerait celle d'une moto qui
+       en a déjà une. */
+    const couleur = (ligne.couleur ?? "").trim();
+    return {
+      motoId: ligne.motoId,
+      clientId: groupe.clientId,
+      prixConvenu: ligne.prixConvenu,
+      modePaiement: groupe.modePaiement,
+      carteGrise: groupe.carteGrise,
+      casque: groupe.casque,
+      montantEncaisse: String(parts[rang]),
+      moyenPaiement: groupe.moyenPaiement,
+      reference: groupe.reference,
+      ...(couleur ? { couleur } : {}),
+    };
+  });
 }
 
 /**

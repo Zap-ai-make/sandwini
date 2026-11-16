@@ -616,9 +616,14 @@ function ecrireVenteDansLot(
 
   /* La moto change de statut dans le même lot : une vente dont la moto reste
      « en stock » se revendrait à quelqu'un d'autre. `update` et non `set` —
-     on ne réécrit pas une moto qu'on n'a pas relue en entier. */
+     on ne réécrit pas une moto qu'on n'a pas relue en entier.
+
+     La couleur oubliée à l'arrivage part dans la même écriture (16 novembre
+     2026) : le reçu la lit sur la moto, et une couleur posée après coup ne
+     figurerait pas sur celui qu'on imprime maintenant. */
   lot.update(doc(db(), "motos", saisie.motoId), {
     statut: statutMotoApresVente(saisie.modePaiement),
+    ...(saisie.couleur ? { couleur: saisie.couleur } : {}),
     ...traceModification(auteur),
   });
 

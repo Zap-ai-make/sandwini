@@ -21,7 +21,7 @@ import {
 } from "@/lib/domain/client";
 import { creerClient, messageErreurClient } from "@/lib/repositories/clients";
 import { formaterMontant, formaterNombre } from "@/lib/domain/format";
-import { normaliserChassis, type Moto } from "@/lib/domain/moto";
+import { LONGUEUR_TEXTE_MAX, normaliserChassis, type Moto } from "@/lib/domain/moto";
 import {
   LIBELLE_INCLUSION,
   LIBELLE_MODE,
@@ -372,6 +372,14 @@ export function ModaleVente({
       motos: saisie.motos.map((ligne, index) =>
         index === rang ? { ...ligne, prixConvenu } : ligne,
       ),
+    });
+  }
+
+  /* La couleur que l'arrivage avait oubliée (16 novembre 2026). Elle ne
+     touche ni au total ni à l'acompte : seule la ligne change. */
+  function changerCouleur(rang: number, couleur: string) {
+    changer({
+      motos: saisie.motos.map((ligne, index) => (index === rang ? { ...ligne, couleur } : ligne)),
     });
   }
 
@@ -736,6 +744,7 @@ export function ModaleVente({
                       catalogue={catalogue}
                       rangFautif={refus?.rang ?? null}
                       changerPrix={changerPrix}
+                      changerCouleur={changerCouleur}
                       retirer={retirerMoto}
                     />
                   </div>
@@ -966,6 +975,11 @@ export function ModaleVente({
  *
  * La grille est celle du classeur des cartes grises (S59) : la forme que le
  * commanditaire lit sans l'apprendre.
+ *
+ * **Une moto sans couleur en reçoit une ici** (16 novembre 2026) : « si on a
+ * oublié de renseigner la couleur lors de l'enregistrement de l'arrivage ». Le
+ * champ ne paraît que sur ces motos-là, et il est facultatif ; ce qu'on y tape
+ * part sur la moto avec la vente, donc sur le reçu.
  */
 function LignesVendues({
   lignes,
@@ -975,6 +989,7 @@ function LignesVendues({
   catalogue,
   rangFautif,
   changerPrix,
+  changerCouleur,
   retirer,
 }: {
   lignes: LigneMotoVendue[];
@@ -985,6 +1000,7 @@ function LignesVendues({
   catalogue: Catalogue;
   rangFautif: number | null;
   changerPrix: (rang: number, valeur: string) => void;
+  changerCouleur: (rang: number, valeur: string) => void;
   retirer: (rang: number) => void;
 }) {
   const detaille = lignes.length > 1;
@@ -1045,6 +1061,17 @@ function LignesVendues({
                         <span className="block text-corps text-encre-doux">
                           {catalogue.nomMarque(moto.marqueId)} {catalogue.nomModele(moto.modeleId)}
                         </span>
+                        {!moto.couleur && (
+                          <input
+                            value={ligne.couleur ?? ""}
+                            maxLength={LONGUEUR_TEXTE_MAX}
+                            autoComplete="off"
+                            placeholder="Couleur"
+                            onChange={(evenement) => changerCouleur(rang, evenement.target.value)}
+                            className="saisie mt-1.5 h-9 w-full px-2.5 text-corps"
+                            aria-label={`Couleur, ligne ${rang + 1}`}
+                          />
+                        )}
                       </>
                     ) : (
                       /* Elle a été vendue ailleurs pendant la saisie. Nommée et

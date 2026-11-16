@@ -23,8 +23,12 @@ export type ModificationGerant = {
   motDePasse: string | null;
 };
 
-/** Le plus court mot de passe acceptable — le même qu'à la création. */
-export const LONGUEUR_MOT_DE_PASSE = 10;
+/**
+ * Le plus court mot de passe acceptable, à la création comme à la
+ * modification. Six depuis le 16 novembre 2026, à la demande du commanditaire :
+ * le plancher de Firebase.
+ */
+export const LONGUEUR_MOT_DE_PASSE = 6;
 
 /** Le plus long que Firebase accepte. Au-delà, l'appel échouerait côté serveur. */
 const MOT_DE_PASSE_MAXIMUM = 128;

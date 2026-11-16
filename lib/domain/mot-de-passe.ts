@@ -9,11 +9,14 @@
  */
 
 /**
- * La longueur qu'exige la création d'un gérant (`functions/src/gerants.ts`,
- * `LONGUEUR_MOT_DE_PASSE`). Un compte ne doit pas pouvoir se donner un mot de
- * passe plus faible que celui qu'on lui a remis.
+ * La longueur qu'exige aussi la création d'un gérant (`functions/src/gerants.ts`,
+ * `LONGUEUR_MOT_DE_PASSE`) : un compte ne se donne pas un mot de passe plus
+ * faible que celui qu'on lui a remis.
+ *
+ * Six depuis le 16 novembre 2026, à la demande du commanditaire, au lieu de
+ * dix : c'est aussi le plancher de Firebase.
  */
-export const LONGUEUR_MOT_DE_PASSE_MIN = 10;
+export const LONGUEUR_MOT_DE_PASSE_MIN = 6;
 const LONGUEUR_MOT_DE_PASSE_MAX = 128;
 
 export type ChangementMotDePasse = {

@@ -22,15 +22,19 @@ describe("validerChangementMotDePasse", () => {
     expect(validerChangementMotDePasse({ ...valide, actuel: "" })).toMatch(/actuel/);
   });
 
-  /* La même longueur que celle qu'exige la création d'un gérant
-     (`functions/src/gerants.ts`) : un compte ne doit pas pouvoir se donner un
-     mot de passe plus faible que celui qu'on lui a remis. */
+  /* Six caractères depuis le 16 novembre 2026, à la demande du commanditaire
+     — le plancher de Firebase. La même longueur qu'à la création d'un gérant
+     (`functions/src/gerants.ts`). */
   it("refuse un nouveau mot de passe trop court", () => {
-    expect(LONGUEUR_MOT_DE_PASSE_MIN).toBe(10);
+    expect(LONGUEUR_MOT_DE_PASSE_MIN).toBe(6);
     const court = "a".repeat(LONGUEUR_MOT_DE_PASSE_MIN - 1);
     expect(
       validerChangementMotDePasse({ ...valide, nouveau: court, confirmation: court }),
-    ).toMatch(/10 caractères/);
+    ).toMatch(/6 caractères/);
+    const juste = "a".repeat(LONGUEUR_MOT_DE_PASSE_MIN);
+    expect(
+      validerChangementMotDePasse({ ...valide, nouveau: juste, confirmation: juste }),
+    ).toBeNull();
   });
 
   it("refuse deux saisies qui ne correspondent pas", () => {

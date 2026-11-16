@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { normaliserNom } from "./client";
 import { formaterMontant } from "./format";
+import { LONGUEUR_TEXTE_MAX } from "./moto";
 import { estNumeroValide } from "./numerotation";
 import {
   FILTRES_PAIEMENT,
@@ -1071,6 +1072,35 @@ describe("vendre plusieurs motos d’un coup", () => {
       expect(refus?.rang).toBe(1);
     });
 
+    /* La couleur oubliée à l'arrivage se pose dans la vente (16 novembre
+       2026). Bornée comme à l'entrée en stock, et refusée sur sa ligne. */
+    it("refuse une couleur trop longue, sur sa ligne", () => {
+      const refus = validerVenteGroupee(
+        groupe({
+          motos: [
+            { motoId: "moto-1", prixConvenu: "800000" },
+            {
+              motoId: "moto-2",
+              prixConvenu: "1200000",
+              couleur: "r".repeat(LONGUEUR_TEXTE_MAX + 1),
+            },
+          ],
+        }),
+      );
+      expect(refus?.message).toMatch(/couleur/i);
+      expect(refus?.rang).toBe(1);
+    });
+
+    it("accepte une couleur posée sur une ligne", () => {
+      const avecCouleur = groupe({
+        motos: [
+          { motoId: "moto-1", prixConvenu: "800000", couleur: "Rouge" },
+          { motoId: "moto-2", prixConvenu: "1200000" },
+        ],
+      });
+      expect(validerVenteGroupee(avecCouleur)).toBeNull();
+    });
+
     it("refuse plus de motos que le plafond", () => {
       const motos = Array.from({ length: MOTOS_PAR_VENTE_MAX + 1 }, (_, rang) => ({
         motoId: `moto-${rang}`,
@@ -1155,6 +1185,22 @@ describe("vendre plusieurs motos d’un coup", () => {
         expect(vente.casque).toBe(false);
         expect(vente.carteGrise).toBe(true);
       }
+    });
+
+    /* Facultative : une couleur restée vide ne s'écrit pas, et ne vide donc
+       jamais celle qu'une moto aurait déjà. */
+    it("porte la couleur tapée sur sa vente, et rien quand elle reste vide", () => {
+      const ventes = ventesDuGroupe(
+        groupe({
+          motos: [
+            { motoId: "moto-1", prixConvenu: "800000", couleur: "  Rouge vif " },
+            { motoId: "moto-2", prixConvenu: "1200000", couleur: "   " },
+          ],
+        }),
+      );
+      expect(ventes[0].couleur).toBe("Rouge vif");
+      expect(ventes[1].couleur).toBeUndefined();
+      expect(ventes[1]).not.toHaveProperty("couleur");
     });
 
     /* Le pont avec l'existant : chaque vente projetée doit franchir la
