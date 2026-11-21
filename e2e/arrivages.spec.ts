@@ -162,6 +162,53 @@ test("une ligne du lot se retire, et le nombre suit", async ({ page }) => {
   await expect(contenu(page).getByText(retiree)).toHaveCount(0);
 });
 
+/* « Dans arrivage, ajouter le prix lors de modification pour que, quand on
+   oublie de renseigner le prix à l'enregistrement, on puisse se rattraper »
+   (20 novembre 2026). Le prix commun remplit les motos sans prix ; une ligne
+   se corrige à part. Rouvrir le lot montre ce qui a été écrit. */
+test("un prix oublié à l’enregistrement se rattrape en modifiant le lot", async ({ page }) => {
+  await seConnecterEtEntrer(page);
+  const terrain = await preparerTerrain(page);
+
+  const nomArrivage = nomUnique("Sans prix");
+  const modal = await ouvrirLeModal(page, nomArrivage, terrain, nomUnique("HAOJUE Import"));
+  await modal.getByLabel("Nombre de motos").fill("2");
+  await modal.getByLabel("Numéro de châssis, moto 1").fill(chassisUnique("PRXA"));
+  await modal.getByLabel("Numéro de châssis, moto 2").fill(chassisUnique("PRXB"));
+  await modal.getByRole("button", { name: "Enregistrer le lot" }).click();
+  await expect(contenu(page).getByRole("status")).toContainText("2 motos entrées", {
+    timeout: 20_000,
+  });
+  await attendreLaFileVide(page);
+  await page.reload({ waitUntil: "load" });
+
+  const ouvrirLaModification = async () => {
+    await contenu(page).getByRole("button", { name: new RegExp(`^${nomArrivage}`) }).click();
+    await page.getByRole("dialog").getByRole("button", { name: "Modifier", exact: true }).click();
+    return page.getByRole("dialog", { name: "Modifier l’arrivage" });
+  };
+  const prixDeLaLigne = (dialogue: ReturnType<typeof page.getByRole>, rang: number) =>
+    dialogue.getByLabel(`Prix d’achat, ligne ${rang}`, { exact: true });
+
+  let modification = await ouvrirLaModification();
+  /* La case s'ouvre une fois le prix lu — ici, lu absent. */
+  await expect(prixDeLaLigne(modification, 1)).toBeEnabled();
+  await modification.getByLabel(/^Prix d’achat commun/).fill("400000");
+  await expect(prixDeLaLigne(modification, 1)).toHaveValue("400000");
+  await expect(prixDeLaLigne(modification, 2)).toHaveValue("400000");
+  await prixDeLaLigne(modification, 2).fill("450000");
+  await modification.getByRole("button", { name: "Enregistrer les modifications" }).click();
+  await expect(modification).toBeHidden();
+
+  await attendreLaFileVide(page);
+  await expect(contenu(page).getByRole("alert")).toHaveCount(0);
+
+  await page.reload({ waitUntil: "load" });
+  modification = await ouvrirLaModification();
+  await expect(prixDeLaLigne(modification, 1)).toHaveValue("400000");
+  await expect(prixDeLaLigne(modification, 2)).toHaveValue("450000");
+});
+
 test("un lot mêle deux marques : chaque groupe entre avec la sienne", async ({ page }) => {
   await seConnecterEtEntrer(page);
   const terrain = await preparerTerrain(page);

@@ -7,7 +7,9 @@ import {
   champsDossierNeuf,
   champsRetourMagasin,
   chercherDossiers,
+  chercherDossiersAEnvoyer,
   dossierEnCours,
+  dossiersEnvoyes,
   ENTETES_LIGNE,
   estTerminal,
   LIBELLE_STATUT_CARTE_GRISE,
@@ -19,6 +21,7 @@ import {
   ORDRE_LIGNE,
   rangerDossiers,
   statutDeLaLigne,
+  statutDuDossierDeVente,
   validerLigne,
   type DossierCarteGrise,
   type SaisieLigne,
@@ -791,5 +794,92 @@ describe("retour d'un paquet en bloc", () => {
       expect(champs.revenuLe).not.toBeNull();
       expect(champs.statut).toBe("revenu_magasin");
     });
+  });
+});
+
+/* « Une vente ne doit pas envoyer directement le dossier dans cartes grises,
+   ça doit être manuel » (20 novembre 2026). La vente écrit son dossier « à
+   envoyer » : il n'est d'aucune liste de l'espace, et quelqu'un l'y fait
+   entrer à la main, en le cherchant par châssis ou par client. */
+describe("un dossier à envoyer aux cartes grises", () => {
+  const normaliser = (brut: string) =>
+    brut.trim().normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ");
+
+  const dossier = (partie: Partial<DossierCarteGrise>): DossierCarteGrise => ({
+    id: "d1",
+    boutiqueId: "PTG",
+    venteId: "v1",
+    origine: "vente",
+    clientNom: "SAWADOGO HAROUNA",
+    clientTelephone: "",
+    motoLibelle: "Haojue HJ125",
+    numeroChassis: "LBPKE1300R0123456",
+    recu: false,
+    credit: null,
+    statut: "a_envoyer",
+    prestataireId: null,
+    prestataireNom: "",
+    deposeLe: null,
+    avance: null,
+    disponibleLe: null,
+    immatriculation: "",
+    revenuLe: null,
+    remisLe: null,
+    remisANom: "",
+    remisATelephone: "",
+    venteAnnulee: false,
+    ...partie,
+  });
+
+  const aEnvoyer = dossier({ id: "a" });
+  const envoye = dossier({ id: "b", statut: "a_faire", numeroChassis: "LBPKE1300R0999999" });
+  const autreAEnvoyer = dossier({
+    id: "c",
+    clientNom: "OUEDRAOGO AMINATA",
+    numeroChassis: "LC6PCJ1A9K0000777",
+  });
+
+  it("porte un nom, sans pour autant être un état du classeur", () => {
+    expect(LIBELLE_STATUT_CARTE_GRISE.a_envoyer).toBe("À envoyer");
+  });
+
+  it("n’est dans aucune liste de l’espace tant qu’on ne l’y a pas fait entrer", () => {
+    expect(dossiersEnvoyes([aEnvoyer, envoye, autreAEnvoyer]).map((d) => d.id)).toEqual(["b"]);
+  });
+
+  it("se retrouve par un bout de châssis, ou par le nom du client", () => {
+    const tous = [aEnvoyer, envoye, autreAEnvoyer];
+    expect(chercherDossiersAEnvoyer(tous, "123456", normaliser).map((d) => d.id)).toEqual(["a"]);
+    expect(chercherDossiersAEnvoyer(tous, "aminata", normaliser).map((d) => d.id)).toEqual(["c"]);
+  });
+
+  it("ne rend jamais un dossier déjà envoyé", () => {
+    expect(chercherDossiersAEnvoyer([envoye], "999999", normaliser)).toEqual([]);
+  });
+
+  /* Rien ne s'affiche avant qu'on tape : des mois de ventes non envoyées
+     feraient une liste qu'on ne lit pas. On cherche la moto qu'on a devant soi. */
+  it("ne montre rien tant qu’on n’a rien tapé", () => {
+    expect(chercherDossiersAEnvoyer([aEnvoyer, autreAEnvoyer], "  ", normaliser)).toEqual([]);
+  });
+
+  /* La case du comptoir pilote toujours le dossier (S53, arbitrage 5) : un
+     client qui ne veut pas de carte grise n'a rien à envoyer. */
+  it("naît à envoyer d’une vente avec carte grise, sans objet sinon", () => {
+    expect(statutDuDossierDeVente(true)).toBe("a_envoyer");
+    expect(statutDuDossierDeVente(false)).toBe("non_applicable");
+  });
+
+  it("naît à envoyer quand la vente l’écrit", () => {
+    const champs = champsDossierNeuf({
+      boutiqueId: "PTG",
+      venteId: "v1",
+      origine: "vente",
+      clientNom: "SAWADOGO HAROUNA",
+      motoLibelle: "Haojue HJ125",
+      numeroChassis: "LBPKE1300R0123456",
+      statut: "a_envoyer",
+    });
+    expect(champs.statut).toBe("a_envoyer");
   });
 });

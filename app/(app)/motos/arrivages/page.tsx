@@ -530,6 +530,7 @@ export default function PageArrivages() {
           marques={catalogue.lues.marques}
           modeles={catalogue.lues.modeles}
           auteur={auteur}
+          voitLesCouts={voitLesCouts}
           onFermer={() => setModifierArr(null)}
           onModifie={() => undefined}
           onEchec={setErreurAction}

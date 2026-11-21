@@ -1,8 +1,9 @@
 "use client";
 
-import { PackageCheck, Plus, Search } from "lucide-react";
+import { PackageCheck, Plus, Search, Send } from "lucide-react";
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 
+import { AjouterMotoVendueModal } from "@/components/AjouterMotoVendueModal";
 import { DepotsCartesGrises } from "@/components/DepotsCartesGrises";
 import { GardeEspace } from "@/components/GardeSession";
 import { LigneModale } from "@/components/GestesDossierCarteGrise";
@@ -16,6 +17,7 @@ import { depotsDeCartesGrises, dossiersDuLot } from "@/lib/domain/depots-carte-g
 import {
   aMarquerRecu,
   chercherDossiers,
+  dossiersEnvoyes,
   ENTETES_LIGNE,
   ORDRE_LIGNE,
   type CleColonneLigne,
@@ -76,6 +78,8 @@ function Ecran() {
   const session = useSession();
   const { perimetre } = usePerimetre();
   const [creation, setCreation] = useState(false);
+  const [ajoutVendue, setAjoutVendue] = useState(false);
+  const [erreurEnvoi, setErreurEnvoi] = useState<string | null>(null);
   const [recherche, setRecherche] = useState("");
   const [lotChoisi, setLotChoisi] = useState<string | null>(null);
   const [etat, setEtat] = useState<EtatClasseur>("en_cours");
@@ -107,7 +111,13 @@ function Ecran() {
     "La liste des prestataires n’a pas pu être chargée.",
   );
 
-  const depots = useMemo(() => depotsDeCartesGrises(valeur ?? []), [valeur]);
+  /* **Les dossiers à envoyer n'entrent dans aucune liste** (20 novembre
+     2026) : une vente écrit le sien sans l'envoyer, et c'est « Ajouter une
+     moto vendue » qui l'y fait entrer à la main. Tout ce qui suit lit donc
+     `envoyes`, jamais la lecture brute. */
+  const envoyes = useMemo(() => (valeur === null ? null : dossiersEnvoyes(valeur)), [valeur]);
+
+  const depots = useMemo(() => depotsDeCartesGrises(envoyes ?? []), [envoyes]);
   /* Un lot dont le dernier dossier a changé de dépôt disparaît du bandeau :
      le filtre tombe avec lui, plutôt que de montrer un classeur vide sans
      carte choisie pour l'expliquer. */
@@ -118,8 +128,8 @@ function Ecran() {
      recherche a trouvé — celui qui cherche un nom ne sait pas si le papier
      est encore dehors ou déjà rendu, et le compte le lui dit. */
   const trouves = useMemo(
-    () => chercherDossiers(dossiersDuLot(valeur ?? [], lot), recherche, normaliserNom),
-    [valeur, lot, recherche],
+    () => chercherDossiers(dossiersDuLot(envoyes ?? [], lot), recherche, normaliserNom),
+    [envoyes, lot, recherche],
   );
   const comptes = useMemo(() => compterParEtat(trouves), [trouves]);
   const montres = useMemo(() => rangerSelonEtat(trouves, etat), [trouves, etat]);
@@ -137,18 +147,36 @@ function Ecran() {
       <TetePage
         titre="Dossiers"
         actions={
-          boutiqueId !== null ? (
+          <>
+            {/* Ouvert à tout compte qui lit l'écran : le dossier garde la
+                boutique de sa vente, il n'en réclame pas une au périmètre. */}
             <button
               type="button"
-              onClick={() => setCreation(true)}
-              className="bouton bouton-principal"
+              onClick={() => {
+                setErreurEnvoi(null);
+                setAjoutVendue(true);
+              }}
+              disabled={valeur === null}
+              className="bouton bouton-neutre"
             >
-              <Plus aria-hidden="true" className="size-4" />
-              Nouvelle ligne
+              <Send aria-hidden="true" className="size-4" />
+              Ajouter une moto vendue
             </button>
-          ) : undefined
+            {boutiqueId !== null && (
+              <button
+                type="button"
+                onClick={() => setCreation(true)}
+                className="bouton bouton-principal"
+              >
+                <Plus aria-hidden="true" className="size-4" />
+                Nouvelle ligne
+              </button>
+            )}
+          </>
         }
       />
+
+      {erreurEnvoi && <EtatErreurSaisie message={erreurEnvoi} className="mb-3" />}
 
       {/* **La liste entière manque, et l'écran n'a plus rien à montrer.** Un
           bandeau au-dessus d'un tableau vide laisserait croire qu'il n'y a
@@ -191,7 +219,7 @@ function Ecran() {
 
           <DepotsCartesGrises
             depots={depots}
-            total={(valeur ?? []).length}
+            total={(envoyes ?? []).length}
             choisi={lot}
             choisir={setLotChoisi}
           />
@@ -214,7 +242,7 @@ function Ecran() {
           <div className="mt-4">
             <Liste
               dossiers={montres}
-              chargement={valeur === null}
+              chargement={envoyes === null}
               boutiqueId={boutiqueId}
               prestataires={connus}
               auteur={auteur}
@@ -224,6 +252,15 @@ function Ecran() {
             />
           </div>
         </>
+      )}
+
+      {ajoutVendue && valeur !== null && (
+        <AjouterMotoVendueModal
+          dossiers={valeur}
+          auteur={auteur}
+          onFermer={() => setAjoutVendue(false)}
+          onEchec={setErreurEnvoi}
+        />
       )}
 
       {creation && boutiqueId !== null && (

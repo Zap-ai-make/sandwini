@@ -20,6 +20,7 @@ import type {
   SaisieArrivage,
 } from "@/lib/domain/arrivage";
 import { COUTS_PAR_ECRITURE, enTranches } from "@/lib/domain/ecritures";
+import type { CoutAPoser } from "@/lib/domain/prix-lot";
 import { ecrireCoutDansLot, ecrireMotoDansLot } from "./motos";
 import { suivreEcriture } from "@/lib/reseau/file-ecritures";
 import { signalerSourceDonnees } from "@/lib/reseau/source-donnees";
@@ -173,14 +174,19 @@ export function enregistrerArrivage(
  * triées. Le plafond est celui de la saisie d'un lot (80 motos), loin des 500
  * opérations d'un lot Firestore.
  *
- * **Le coût n'est pas touché** : il vit dans `motos/{id}/prive/cout`, où le
- * gérant n'a pas accès (D2), et aucune colonne de la grille ne le concerne.
+ * **Le prix d'achat suit, par tranches** (20 novembre 2026) : « quand on
+ * oublie de renseigner le prix à l'enregistrement, qu'on puisse se rattraper ».
+ * Les coûts que `preparerPrixDuLot` a retenus partent après le lot des motos,
+ * par `COUTS_PAR_ECRITURE` comme à l'enregistrement : chacun fait consulter sa
+ * moto par les règles, et un lot n'en tolère que 20. Les commits partent dans
+ * l'ordre sans s'attendre, ce qui garde l'ordre de la file hors ligne (D76).
  */
 export function corrigerLot(
   arrivageId: string,
   saisie: SaisieArrivage,
   corrigees: readonly ChampsCorrectionMoto[],
   auteur: Auteur,
+  couts: readonly CoutAPoser[] = [],
 ): { enregistre: Promise<void> } {
   const lot = writeBatch(db());
 
@@ -208,7 +214,16 @@ export function corrigerLot(
       ...traceModification(auteur),
     });
   }
-  return { enregistre: suivreEcriture(lot.commit()) };
+
+  const ecritures = [lot.commit()];
+  for (const tranche of enTranches(couts, COUTS_PAR_ECRITURE)) {
+    const lotCouts = writeBatch(db());
+    for (const { motoId, boutiqueId, cout } of tranche) {
+      ecrireCoutDansLot(lotCouts, motoId, boutiqueId, cout, auteur);
+    }
+    ecritures.push(lotCouts.commit());
+  }
+  return { enregistre: suivreEcriture(Promise.all(ecritures).then(() => undefined)) };
 }
 
 /**

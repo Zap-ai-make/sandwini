@@ -16,10 +16,12 @@ import {
 } from "@/lib/domain/arrivage";
 import { Modale } from "@/components/patrons/Modale";
 import type { Fournisseur } from "@/lib/domain/fournisseur";
+import { prixAffiche, preparerPrixDuLot, type EtatPrix } from "@/lib/domain/prix-lot";
 import { jourLocal } from "@/lib/domain/format";
 import { LONGUEUR_CHASSIS_MAX, LONGUEUR_TEXTE_MAX, type Moto } from "@/lib/domain/moto";
 import type { Modele, Referentiel } from "@/lib/domain/referentiel";
 import { corrigerLot, messageErreurArrivage } from "@/lib/repositories/arrivages";
+import { useCoutsDesMotos } from "@/lib/repositories/couts-motos";
 import type { Auteur } from "@/lib/repositories/referentiels";
 
 /**
@@ -45,6 +47,12 @@ import type { Auteur } from "@/lib/repositories/referentiels";
  * mal choisie, et une marque qui n'existe pas encore s'ajoute là où le
  * catalogue se tient.
  *
+ * **Le prix d'achat s'y rattrape** (20 novembre 2026) : « quand on oublie de
+ * renseigner le prix à l'enregistrement, qu'on puisse se rattraper ». Une
+ * colonne par moto, pré-remplie du prix déjà posé, et en tête un prix commun
+ * qui remplit d'un coup les motos qui n'en ont pas (`prixAffiche`). Pour les
+ * comptes qui voient les coûts (`voir_marges`) seulement.
+ *
  * Monté seulement à l'ouverture : l'état part du lot à corriger, sans effet de
  * remise à zéro. Le calque, le focus, Échap et le verrou de défilement viennent
  * de `Modale` depuis S44.
@@ -56,6 +64,7 @@ export function ModifierArrivageModal({
   marques,
   modeles,
   auteur,
+  voitLesCouts,
   onFermer,
   onModifie,
   onEchec,
@@ -68,6 +77,8 @@ export function ModifierArrivageModal({
   marques: Referentiel[] | null;
   modeles: Modele[] | null;
   auteur: Auteur | null;
+  /** Le prix d'achat se lit et se pose ici : `voir_marges`. */
+  voitLesCouts: boolean;
   onFermer: () => void;
   onModifie: () => void;
   /** Un refus du serveur arrive après la fermeture : c'est l'écran qui le porte. */
@@ -85,6 +96,14 @@ export function ModifierArrivageModal({
     description: arrivage.description,
   });
   const [lignes, setLignes] = useState<LigneCorrection[]>(() => lignesDuLot(motosDuLot));
+
+  /* Les coûts ne se lisent que pour qui les voit : un compte sans le droit
+     recevrait un refus par moto. Une liste vide ne lit rien. */
+  const { etats } = useCoutsDesMotos(voitLesCouts ? motosDuLot : AUCUNE_MOTO);
+  const [prixSaisis, setPrixSaisis] = useState<ReadonlyMap<string, string>>(new Map());
+  const [prixCommun, setPrixCommun] = useState("");
+  const changerPrix = (motoId: string, valeur: string) =>
+    setPrixSaisis((actuels) => new Map([...actuels, [motoId, valeur]]));
   /* Le rang voyage avec le message : la grille allume la ligne fautive plutôt
      que de laisser chercher laquelle des trente l'est (`DESIGN.md` §5). */
   const [refus, setRefus] = useState<{ message: string; rang: number | null } | null>(null);
@@ -112,7 +131,25 @@ export function ModifierArrivageModal({
       return;
     }
 
-    const { enregistre } = corrigerLot(arrivage.id, saisie, resultat.corrigees, auteur);
+    /* Les motos dans l'ordre des lignes : le rang d'un prix refusé doit
+       allumer la bonne ligne de la grille. */
+    const parId = new Map(motosDuLot.map((moto) => [moto.id, moto]));
+    const motosDesLignes = lignes.flatMap((ligne) => parId.get(ligne.motoId) ?? []);
+    const prix = voitLesCouts
+      ? preparerPrixDuLot(motosDesLignes, etats, prixSaisis, prixCommun)
+      : { ok: true as const, couts: [] };
+    if (!prix.ok) {
+      setRefus({ message: prix.erreur, rang: prix.rang });
+      return;
+    }
+
+    const { enregistre } = corrigerLot(
+      arrivage.id,
+      saisie,
+      resultat.corrigees,
+      auteur,
+      prix.couts,
+    );
     /* L'écriture n'est pas attendue : hors ligne elle part en file et ne revient
        jamais. L'écran se ferme tout de suite, et un refus remonte à la page,
        qui reste là pour l'afficher (D66). */
@@ -180,6 +217,19 @@ export function ModifierArrivageModal({
               className="saisie"
             />
           </Champ>
+          {voitLesCouts && motosDuLot.length > 0 && (
+            <Champ id="mod-prix-commun" libelle="Prix d’achat commun" facultatif>
+              <input
+                id="mod-prix-commun"
+                inputMode="numeric"
+                autoComplete="off"
+                value={prixCommun}
+                placeholder="450000"
+                onChange={(evenement) => setPrixCommun(evenement.target.value)}
+                className="saisie"
+              />
+            </Champ>
+          )}
         </div>
 
         <section aria-labelledby="titre-motos-lot">
@@ -199,6 +249,11 @@ export function ModifierArrivageModal({
                 modeles={modeles}
                 rangFautif={refus?.rang ?? null}
                 changer={changerLigne}
+                prix={
+                  voitLesCouts
+                    ? { etats, saisis: prixSaisis, commun: prixCommun, changer: changerPrix }
+                    : null
+                }
               />
             </>
           )}
@@ -209,6 +264,8 @@ export function ModifierArrivageModal({
     </Modale>
   );
 }
+
+const AUCUNE_MOTO: Moto[] = [];
 
 /** Les colonnes, dans l'ordre où le bordereau se lit. */
 const COLONNES: { cle: keyof LigneCorrection; titre: string; largeur: string }[] = [
@@ -226,12 +283,20 @@ function GrilleMotos({
   modeles,
   rangFautif,
   changer,
+  prix,
 }: {
   lignes: LigneCorrection[];
   marques: Referentiel[] | null;
   modeles: Modele[] | null;
   rangFautif: number | null;
   changer: (rang: number, partie: Partial<LigneCorrection>) => void;
+  /** `null` pour qui ne voit pas les coûts : la colonne n'existe pas. */
+  prix: {
+    etats: ReadonlyMap<string, EtatPrix>;
+    saisis: ReadonlyMap<string, string>;
+    commun: string;
+    changer: (motoId: string, valeur: string) => void;
+  } | null;
 }) {
   return (
     <div className="cadre-grille mt-2">
@@ -250,6 +315,11 @@ function GrilleMotos({
                 {colonne.titre}
               </th>
             ))}
+            {prix && (
+              <th scope="col" style={{ width: "9rem" }}>
+                Prix d’achat
+              </th>
+            )}
           </tr>
         </thead>
 
@@ -345,6 +415,27 @@ function GrilleMotos({
                   aria-label={`Année, ligne ${rang + 1}`}
                 />
               </td>
+
+              {prix && (
+                <td>
+                  {/* Fermée tant que le prix n'est pas lu, ou si sa lecture
+                      est tombée : on ne corrige pas un prix qu'on ne voit
+                      pas, et le prix commun ne l'écrase pas (D82). */}
+                  <input
+                    value={prixAffiche(
+                      prix.etats.get(ligne.motoId),
+                      prix.saisis.get(ligne.motoId),
+                      prix.commun,
+                    )}
+                    disabled={(prix.etats.get(ligne.motoId)?.sorte ?? "inconnu") === "inconnu"}
+                    inputMode="numeric"
+                    autoComplete="off"
+                    onChange={(evenement) => prix.changer(ligne.motoId, evenement.target.value)}
+                    className="cellule font-code tabular-nums"
+                    aria-label={`Prix d’achat, ligne ${rang + 1}`}
+                  />
+                </td>
+              )}
 
             </tr>
           ))}

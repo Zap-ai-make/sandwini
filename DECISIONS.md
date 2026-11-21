@@ -3441,3 +3441,38 @@ réinitialiser un gérant qui l'a oublié.
 - Le groupe « Mon compte » n'exige aucune capacité. « Paramètres » cesse d'être
   une impasse pour le gérant, qui y tombait sur « Réservé au responsable » :
   `/parametres` mène au premier écran que le compte peut ouvrir.
+
+## D112 — Une vente n'envoie plus son dossier dans les cartes grises
+
+*20 novembre 2026. Revient sur S59, qui faisait naître le dossier « à faire »
+dans le lot de la vente.*
+
+**Le retour.** « Détache les cartes grises des ventes : une vente ne doit pas
+envoyer directement le dossier dans cartes grises, ça doit être manuel. »
+
+**Les choix du commanditaire.** L'envoi se fait **depuis l'espace Cartes
+grises** (parmi « depuis la fiche de la vente », « depuis Dossiers en cours »,
+« depuis l'espace Cartes grises »). **Dossiers en cours ne change pas** : la
+vente y inscrit toujours sa carte grise, c'est le suivi de la boutique.
+
+**Pourquoi la vente écrit quand même un dossier.** La personne des cartes
+grises (`traiteLesCartesGrises`) ne lit pas les ventes ni le stock des
+boutiques motos (D2) ; elle ne lit que les dossiers. Sans dossier, elle ne
+retrouverait pas la moto qu'on lui apporte. La vente l'écrit donc **« à
+envoyer »** (`a_envoyer`) : client, téléphone, moto, châssis, aucun prix.
+
+*Conséquences :*
+- Nouveau statut `a_envoyer` dans les règles (`statutCarteGriseConnu`), tenu
+  comme « à faire » : aucune case de dépôt, de retour ni de remise.
+  **Les règles doivent être déployées avant le site** : une vente écrite par
+  le nouveau site contre les anciennes règles serait refusée en entier.
+- `dossiersEnvoyes` le tient hors de toutes les listes de l'espace ; les
+  autres lecteurs (Confier, paquets) ne retiennent que « à faire » et
+  l'ignorent déjà.
+- « Ajouter une moto vendue » le cherche par châssis ou par client
+  (`chercherDossiersAEnvoyer`, rien avant qu'on tape) et le passe « à faire »,
+  journal compris (`envoyerAuxCartesGrises`).
+- Confier la carte depuis Dossiers en cours reste possible et fait entrer le
+  dossier chez le prestataire : c'est aussi un geste fait à la main.
+- Les dossiers créés avant ce changement restent où ils sont. Une vente
+  corrigée repart d'un dossier « à envoyer ».

@@ -339,6 +339,49 @@ export function marquerRetoursMagasin(
   return suivreEcriture(lot.commit());
 }
 
+/** Deux écritures par dossier — la ligne et son journal — sous les 500 d'un lot. */
+const ENVOIS_PAR_LOT_MAX = 200;
+
+/**
+ * Fait entrer à la main, dans les cartes grises, des dossiers nés d'une vente
+ * (20 novembre 2026).
+ *
+ * « Une vente ne doit pas envoyer directement le dossier dans cartes grises,
+ * ça doit être manuel. » La vente l'écrit « à envoyer » ; ce geste le passe
+ * « à faire », et il apparaît alors dans la liste comme n'importe quel dossier.
+ * Le journal garde qui l'a fait entrer, et quand — comme pour un retour.
+ *
+ * Un seul lot : trois motos d'une même vente entrent ensemble ou pas du tout.
+ */
+export function envoyerAuxCartesGrises(
+  dossiers: readonly DossierCarteGrise[],
+  auteur: Auteur,
+): Promise<void> {
+  if (dossiers.length === 0) return Promise.resolve();
+  if (dossiers.length > ENVOIS_PAR_LOT_MAX) {
+    return Promise.reject(
+      new Error(`Pas plus de ${ENVOIS_PAR_LOT_MAX} motos à la fois.`),
+    );
+  }
+
+  const lot = writeBatch(db());
+  for (const dossier of dossiers) {
+    const reference = doc(db(), COLLECTION, dossier.id);
+    lot.update(reference, { statut: "a_faire", ...traceModification(auteur) });
+    lot.set(doc(collection(reference, "historique")), {
+      boutiqueId: dossier.boutiqueId,
+      dossierId: dossier.id,
+      de: dossier.statut,
+      vers: "a_faire",
+      le: Timestamp.fromDate(new Date()),
+      ...traceCreation(auteur),
+    });
+  }
+
+  /* Comme les autres gestes de ce fichier, la promesse ne s'attend pas (D76). */
+  return suivreEcriture(lot.commit());
+}
+
 /**
  * Les dates du domaine en horodatages Firestore.
  *

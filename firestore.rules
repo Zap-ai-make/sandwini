@@ -1400,9 +1400,16 @@ service cloud.firestore {
                   .data.metiers.hasAny(['cartes_grises']);
     }
 
+    // `a_envoyer` (20 novembre 2026) : le dossier qu'une vente ecrit, et que
+    // l'espace des cartes grises ne montre pas tant que quelqu'un ne l'y a pas
+    // fait entrer a la main. « Une vente ne doit pas envoyer directement le
+    // dossier dans cartes grises, ca doit etre manuel. » Il nait quand meme :
+    // la personne des cartes grises ne lit pas les ventes des boutiques motos
+    // (`traiteLesCartesGrises` n'ouvre que ces dossiers), et sans lui elle ne
+    // retrouverait pas la moto vendue.
     function statutCarteGriseConnu(statut) {
-      return statut in ['a_faire', 'chez_prestataire', 'revenu_magasin', 'remis',
-                        'non_applicable'];
+      return statut in ['a_envoyer', 'a_faire', 'chez_prestataire', 'revenu_magasin',
+                        'remis', 'non_applicable'];
     }
 
     // Le statut doit s'accorder avec les cases, et c'est tout ce qu'on
@@ -1447,7 +1454,9 @@ service cloud.firestore {
              || (donnees.statut == 'chez_prestataire'
                  && (donnees.get('deposeLe', null) != null
                      || donnees.get('prestataireNom', '') != ''))
-             || (donnees.statut == 'a_faire'
+             // A envoyer comme a faire : rien n'est encore parti, donc aucune
+             // case de depot, de retour ou de remise n'est remplie.
+             || (donnees.statut in ['a_envoyer', 'a_faire']
                  && donnees.get('deposeLe', null) == null
                  && donnees.get('prestataireNom', '') == ''
                  && donnees.get('immatriculation', '') == ''

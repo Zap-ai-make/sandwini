@@ -16,6 +16,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from "firebase/firestore";
 import { afterAll, beforeAll, beforeEach, describe, it } from "vitest";
 
@@ -333,6 +334,73 @@ describe("écrire un dossier", () => {
         dossier({ boutiqueId: "CGP", venteId: null, origine: "exterieur", numeroChassis: "", ...audit("ger-cg") }),
       ),
     );
+  });
+});
+
+/* « Détache les cartes grises des ventes : une vente ne doit pas envoyer
+   directement le dossier dans cartes grises, ça doit être manuel » (20 novembre
+   2026). La vente écrit le dossier « à envoyer » ; l'espace des cartes grises
+   ne le montre pas, et quelqu'un l'y fait entrer à la main en le passant « à
+   faire ». Il naît quand même : la personne des cartes grises ne lit pas les
+   ventes des boutiques motos, et sans lui elle ne retrouverait pas la moto. */
+describe("un dossier à envoyer aux cartes grises", () => {
+  it("naît de la vente, écrit par le gérant qui vend", () => {
+    return assertSucceeds(
+      setDoc(doc(gerantMotos(), "dossiersCarteGrise/v-a-envoyer"), dossier({ venteId: "v-a-envoyer", statut: "a_envoyer" })),
+    );
+  });
+
+  it("ne porte encore aucun dépôt", async () => {
+    await assertFails(
+      setDoc(
+        doc(gerantMotos(), "dossiersCarteGrise/v-a-envoyer"),
+        dossier({ venteId: "v-a-envoyer", statut: "a_envoyer", prestataireNom: "Bohary" }),
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(gerantMotos(), "dossiersCarteGrise/v-a-envoyer"),
+        dossier({ venteId: "v-a-envoyer", statut: "a_envoyer", immatriculation: "11 AA 2233" }),
+      ),
+    );
+  });
+
+  it("entre dans les cartes grises à la main, par la personne qui les traite", async () => {
+    await env.withSecurityRulesDisabled((contexte) =>
+      setDoc(
+        doc(contexte.firestore(), "dossiersCarteGrise/v-a-envoyer"),
+        dossier({ venteId: "v-a-envoyer", statut: "a_envoyer" }),
+      ),
+    );
+    /* Ce qu'écrit `envoyerAuxCartesGrises` : la ligne et son journal, d'un lot. */
+    const base = gerantCartes();
+    const lot = writeBatch(base);
+    lot.update(doc(base, "dossiersCarteGrise/v-a-envoyer"), {
+      statut: "a_faire",
+      updatedAt: serverTimestamp(),
+      updatedBy: "ger-cg",
+      updatedByName: "Gérant",
+    });
+    lot.set(doc(base, "dossiersCarteGrise/v-a-envoyer/historique/h-envoi"), {
+      boutiqueId: "PTG",
+      dossierId: "v-a-envoyer",
+      de: "a_envoyer",
+      vers: "a_faire",
+      le: new Date(),
+      ...audit("ger-cg"),
+    });
+    await assertSucceeds(lot.commit());
+  });
+
+  it("se lit par la personne des cartes grises, qui ne lit pas la vente", async () => {
+    await env.withSecurityRulesDisabled((contexte) =>
+      setDoc(
+        doc(contexte.firestore(), "dossiersCarteGrise/v-a-envoyer"),
+        dossier({ venteId: "v-a-envoyer", statut: "a_envoyer" }),
+      ),
+    );
+    await assertSucceeds(getDoc(doc(gerantCartes(), "dossiersCarteGrise/v-a-envoyer")));
+    await assertFails(getDoc(doc(gerantCartes(), "ventesMotos/v1")));
   });
 });
 

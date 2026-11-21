@@ -26,6 +26,10 @@ import { lireMontant, MONTANT_MAX } from "./vente";
  */
 
 export const STATUTS_CARTE_GRISE = [
+  /* Le dossier qu'une vente écrit, que l'espace ne montre pas tant que
+     quelqu'un ne l'y a pas fait entrer (20 novembre 2026). Voir
+     `dossiersEnvoyes`. */
+  "a_envoyer",
   "a_faire",
   "chez_prestataire",
   "revenu_magasin",
@@ -35,6 +39,7 @@ export const STATUTS_CARTE_GRISE = [
 export type StatutCarteGrise = (typeof STATUTS_CARTE_GRISE)[number];
 
 export const LIBELLE_STATUT_CARTE_GRISE: Record<StatutCarteGrise, string> = {
+  a_envoyer: "À envoyer",
   a_faire: "À faire",
   chez_prestataire: "Chez le prestataire",
   /* « Au magasin » et non « Revenu » : ce qui compte pour celui qui lit la
@@ -208,7 +213,7 @@ export type DossierNeuf = {
    * décocher « Carte grise » laissait jusque-là un document « à faire » que
    * personne n'allait jamais faire, et qui bloquait la clôture.
    */
-  statut: Extract<StatutCarteGrise, "a_faire" | "non_applicable">;
+  statut: Extract<StatutCarteGrise, "a_envoyer" | "a_faire" | "non_applicable">;
 };
 
 export function champsDossierNeuf(naissance: DossierNeuf) {
@@ -651,6 +656,55 @@ export function chercherDossiers(
     const serre = foin.replace(/[\s-]+/g, "");
     return mots.every((mot) => foin.includes(mot) || serre.includes(mot.replace(/[\s-]+/g, "")));
   });
+}
+
+/**
+ * Le statut du dossier qu'une vente écrit.
+ *
+ * **À envoyer, et non plus à faire** (20 novembre 2026) : le dossier attend
+ * qu'on le fasse entrer à la main dans les cartes grises. La case du comptoir
+ * le pilote toujours (S53, arbitrage 5) — un client qui ne veut pas de carte
+ * grise n'a rien à envoyer.
+ */
+export function statutDuDossierDeVente(carteGrise: boolean): "a_envoyer" | "non_applicable" {
+  return carteGrise ? "a_envoyer" : "non_applicable";
+}
+
+/**
+ * Les dossiers de l'espace des cartes grises : tous, sauf ceux à envoyer.
+ *
+ * « Détache les cartes grises des ventes : une vente ne doit pas envoyer
+ * directement le dossier dans cartes grises, ça doit être manuel » (20
+ * novembre 2026). La vente écrit donc son dossier « à envoyer », et c'est ici
+ * qu'il reste hors des listes. Il naît quand même : la personne des cartes
+ * grises ne lit pas les ventes des boutiques motos, et sans lui elle ne
+ * retrouverait pas la moto qu'on lui apporte.
+ */
+export function dossiersEnvoyes<T extends Pick<DossierCarteGrise, "statut">>(
+  dossiers: readonly T[],
+): T[] {
+  return dossiers.filter((dossier) => dossier.statut !== "a_envoyer");
+}
+
+/**
+ * Les dossiers à envoyer qui répondent à ce qu'on a tapé — un bout de châssis,
+ * le nom du client.
+ *
+ * **Rien tant qu'on n'a rien tapé**, à l'inverse de la liste : des mois de
+ * ventes jamais envoyées feraient une page qu'on ne lit pas. On cherche la
+ * moto dont on a les papiers en main.
+ */
+export function chercherDossiersAEnvoyer(
+  dossiers: readonly DossierCarteGrise[],
+  recherche: string,
+  normaliser: (brut: string) => string,
+): DossierCarteGrise[] {
+  if (normaliser(recherche) === "") return [];
+  return chercherDossiers(
+    dossiers.filter((dossier) => dossier.statut === "a_envoyer"),
+    recherche,
+    normaliser,
+  );
 }
 
 /** Tout ce qu'une ligne montre, mis bout à bout pour être fouillé. */

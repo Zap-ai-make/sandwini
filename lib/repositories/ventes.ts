@@ -45,7 +45,11 @@ import {
   motifDeCorrection,
   remboursementsDAnnulation,
 } from "@/lib/domain/annulation-vente";
-import { champsDossierNeuf, type DossierCarteGrise } from "@/lib/domain/dossier-carte-grise";
+import {
+  champsDossierNeuf,
+  statutDuDossierDeVente,
+  type DossierCarteGrise,
+} from "@/lib/domain/dossier-carte-grise";
 import { numeroLisible } from "@/lib/domain/numerotation";
 import { validerFichierPapier, type PapierMoto } from "@/lib/domain/moto";
 import { reserverNumero, type Numeroteur } from "@/lib/numerotation/compteur";
@@ -551,7 +555,13 @@ function ecrireVenteDansLot(
      **Chaque moto a son dossier.** Une vente groupée en ouvre autant qu'elle
      porte de motos : les papiers d'une moto suivent la moto, et la personne des
      cartes grises les traite une par une, chez des prestataires différents s'il
-     le faut. */
+     le faut.
+
+     **Il naît « à envoyer »** (20 novembre 2026) : « une vente ne doit pas
+     envoyer directement le dossier dans cartes grises, ça doit être manuel ».
+     L'espace des cartes grises ne le montre pas tant que quelqu'un ne l'y a
+     pas fait entrer (`envoyerAuxCartesGrises`). Le document sous la vente, lui,
+     reste « à faire » : c'est le suivi de la boutique, dans Dossiers en cours. */
   lot.set(doc(db(), "dossiersCarteGrise", reference.id), {
     ...champsDossierNeuf({
       boutiqueId,
@@ -560,7 +570,7 @@ function ecrireVenteDansLot(
       clientNom: dossier.clientNom,
       motoLibelle: dossier.motoLibelle,
       numeroChassis: dossier.numeroChassis,
-      statut: statutCarteGrise === "non_applicable" ? "non_applicable" : "a_faire",
+      statut: statutDuDossierDeVente(saisie.carteGrise !== false),
     }),
     ...traceCreation(auteur),
   });

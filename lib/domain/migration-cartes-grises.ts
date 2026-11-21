@@ -52,6 +52,9 @@ const STATUTS: Partial<Record<StatutDocument, StatutCarteGrise>> = {
  * ne saute pas d'étape, donc on les traverse toutes.
  */
 const CHEMIN_VERS: Record<StatutCarteGrise, readonly StatutCarteGrise[]> = {
+  /* La reprise ne fabrique jamais un dossier à envoyer : elle reprend ce que
+     l'ancien modèle avait déjà mis dans les cartes grises. */
+  a_envoyer: [],
   a_faire: [],
   non_applicable: [],
   chez_prestataire: ["chez_prestataire"],
