@@ -113,10 +113,16 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
     "Cette vente n’a pas pu être chargée.",
   );
 
+  /* Versements et dossier s'écoutent une fois la vente connue : leur requête
+     est bornée à sa boutique, faute de quoi le gérant ne les lirait pas
+     (`ecouterVersements`). */
+  const boutiqueVente = vente?.boutiqueId ?? "";
   const souscrireVersements = useCallback(
     (auChangement: (versements: Versement[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterVersements(id, auChangement, enErreur),
-    [id],
+      boutiqueVente
+        ? ecouterVersements({ id, boutiqueId: boutiqueVente }, auChangement, enErreur)
+        : () => {},
+    [id, boutiqueVente],
   );
   const { valeur: versements } = useAbonnement(
     souscrireVersements,
@@ -125,8 +131,10 @@ export function FicheVente({ id, base = "/motos/ventes" }: { id: string; base?: 
 
   const souscrireDocuments = useCallback(
     (auChangement: (documents: DocumentDossier[]) => void, enErreur: (cause: unknown) => void) =>
-      ecouterDocumentsDeVente(id, auChangement, enErreur),
-    [id],
+      boutiqueVente
+        ? ecouterDocumentsDeVente({ id, boutiqueId: boutiqueVente }, auChangement, enErreur)
+        : () => {},
+    [id, boutiqueVente],
   );
   const { valeur: documents } = useAbonnement(souscrireDocuments, "Le dossier n’a pas pu être lu.");
 

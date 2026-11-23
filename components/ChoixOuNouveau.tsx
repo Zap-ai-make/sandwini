@@ -1,11 +1,11 @@
 "use client";
 
-import { Check, X } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { Check, Plus } from "lucide-react";
+import { useState, type KeyboardEvent } from "react";
 import { Champ } from "@/components/patrons/Champ";
 import { useSession } from "@/lib/auth/session";
 import {
-  optionsAvecChoix,
+  suggestionsDeChoix,
   trouverParNom,
   validerNom,
   type Referentiel,
@@ -27,16 +27,19 @@ import {
  * stock se coupe en autant de morceaux. Un champ libre à suggestions n’empêche
  * rien — il propose, et la deuxième orthographe passe quand même.
  *
- * **Ce qu’on fait à la place.** La liste reste la seule source ; c’est
- * l’endroit où on la remplit qui change. « + Ajouter… » ouvre un champ sur
- * place, sans quitter l’écran ni perdre ce qui est déjà tapé, et le nom saisi
- * est d’abord cherché **sous forme réduite** — sans casse ni accents. S’il
- * existe, on sélectionne l’existant et on le dit, au lieu d’en créer un second.
- * « apsonic » tapé le jour où « Apsonic » existe ne dédouble donc rien.
+ * **La liste se tape** (23 novembre 2026) : « ajoute la recherche au niveau de
+ * marque et modèle ». Choix du commanditaire, parmi « un champ de recherche
+ * au-dessus de la liste » et « une liste qu’on tape » : on tape dans le champ,
+ * les noms qui contiennent ce qu’on a tapé s’affichent dessous, on touche le
+ * bon (`suggestionsDeChoix`). Ce n’est pas un champ libre pour autant — la
+ * valeur reste l’identifiant d’une entrée, et un texte tapé qu’on ne choisit
+ * pas est oublié en quittant le champ.
  *
- * Les désactivées comptent dans cette recherche : retaper un nom, c’est le
- * vouloir, et en créer un double couperait le stock en deux exactement comme
- * l’aurait fait la troisième orthographe.
+ * **« + Ajouter « … » » vient de ce qu’on a tapé**, et seulement pour un nom
+ * qui n’existe pas : l’ancien détour — choisir « + Ajouter… », puis taper dans
+ * un second champ — disparaît. Le nom est d’abord cherché **sous forme
+ * réduite**, sans casse ni accents, désactivées comprises : « apsonic » tapé le
+ * jour où « Apsonic » existe rend l’existante au lieu d’en créer une seconde.
  */
 export function ChoixOuNouveau({
   id,
@@ -67,31 +70,18 @@ export function ChoixOuNouveau({
    * d'afficher la liste : il décide, à l'ajout, si le nom saisi y figure déjà.
    * Tant qu'il ne l'a pas lue, il ne peut pas répondre — et un `?? []` chez
    * l'appelant lui ferait répondre « libre » sur du vide fabriqué (D95). Il
-   * retire donc « + Ajouter… » de la liste jusqu'à ce qu'il sache.
+   * ne propose donc rien, ni choix ni ajout, jusqu'à ce qu'il sache.
    */
   toutes: Referentiel[] | null;
   invite: string;
   /**
    * Ce champ dépend d'un autre, pas encore renseigné (la marque, pour un
    * modèle). Il n'y a donc rien à proposer — mais **le champ n'est pas
-   * désactivé pour autant** (S44).
-   *
-   * Il l'était, et le `disabled:opacity-60` le faisait lire comme verrouillé :
-   * on croyait le modèle interdit alors qu'il était simplement en attente. Un
-   * champ grisé ne dit pas *pourquoi*, et `DESIGN.md` §10 demande que l'état
-   * désactivé se justifie **avant** le geste, pas après l'échec. L'invite
-   * porte donc la raison, le champ garde l'aspect et le focus de son voisin,
-   * et seule « + Ajouter… » se retire — on ne peut pas créer un modèle sans
-   * savoir chez quelle marque le ranger.
+   * désactivé pour autant** (S44) : un champ grisé ne dit pas *pourquoi*.
+   * L'invite porte la raison, et la liste reste vide.
    */
   enAttente?: boolean;
-  /**
-   * Marque le champ comme facultatif, comme le fait `Champ` ailleurs.
-   *
-   * Posé sur la branche « choisir » uniquement : quand on bascule en création,
-   * le nom qu'on tape est, lui, bien requis — écrire « (facultatif) » au-dessus
-   * d'un champ dont la validation refuse le vide serait un mensonge d'écran.
-   */
+  /** Marque le champ comme facultatif, comme le fait `Champ` ailleurs. */
   facultatif?: boolean;
   /**
    * Écrit la nouvelle entrée et rend son identifiant **tout de suite**, sans
@@ -104,157 +94,180 @@ export function ChoixOuNouveau({
   };
 }) {
   const session = useSession();
-  const [saisieOuverte, setSaisieOuverte] = useState(false);
-  const [nom, setNom] = useState("");
+  /* `null` tant qu'on ne tape pas : le champ montre alors le nom choisi. */
+  const [texte, setTexte] = useState<string | null>(null);
+  const [ouverte, setOuverte] = useState(false);
+  const [active, setActive] = useState(0);
+  /* Un nom refusé à l'ajout, ou le refus du serveur — les seuls messages qui
+     restent sous le champ (28 octobre 2026). */
   const [erreur, setErreur] = useState<string | null>(null);
-  /* Le seul message qui survive sous la liste : le refus du serveur. Les
-     confirmations (« ajouté », « existait déjà ») ont disparu avec les autres
-     détails le 28 octobre 2026 — la liste qui affiche le bon nom suffit. */
-  const [refus, setRefus] = useState<string | null>(null);
-  const champ = useRef<HTMLInputElement>(null);
 
-  /* Le champ prend la main dès qu’il s’ouvre : sans cela, le geste demande un
-     second appui pour commencer à taper — sur un téléphone, au comptoir, c’est
-     la moitié du bénéfice qui part. */
-  useEffect(() => {
-    if (saisieOuverte) champ.current?.focus();
-  }, [saisieOuverte]);
+  const choisie = (toutes ?? []).find((entree) => entree.id === valeur) ?? null;
+  const affiche = texte ?? choisie?.nom ?? "";
 
-  /* Pour l'affichage, « pas encore lu » et « vide » donnent le même menu : un
-     `?? []` est ici sans conséquence, et c'est la frontière exacte que D95
-     trace — aplatir pour lire, jamais pour décider. */
-  const options = optionsAvecChoix(toutes ?? [], valeur);
-  const nouveau = determinant === "cette" ? "Nouvelle" : "Nouveau";
-  const un = determinant === "cette" ? "une" : "un";
+  const { entrees, ajout } =
+    enAttente || toutes === null
+      ? { entrees: [] as Referentiel[], ajout: null }
+      : suggestionsDeChoix(toutes, valeur, texte ?? "");
+  const nombre = entrees.length + (ajout ? 1 : 0);
+  const rang = Math.min(active, Math.max(nombre - 1, 0));
+  const listeId = `${id}-choix`;
 
-  function ouvrir() {
-    setNom("");
-    setErreur(null);
-    setRefus(null);
-    setSaisieOuverte(true);
-  }
-
-  function fermer() {
-    setSaisieOuverte(false);
+  function choisir(identifiant: string) {
+    changer(identifiant);
+    setTexte(null);
+    setOuverte(false);
     setErreur(null);
   }
 
-  function enregistrer() {
-    if (session.statut !== "connecte") return;
+  function ajouter(nom: string) {
+    if (session.statut !== "connecte" || toutes === null) return;
     const probleme = validerNom(nom, `${determinant} ${singulier}`);
     if (probleme) {
       setErreur(probleme);
       return;
     }
-
-    /* Ce garde ne devrait pas se déclencher — l'option « + Ajouter… » n'existe
-       pas tant que la liste manque — mais il reste : le chemin d'écriture ne
-       s'appuie pas sur ce que l'affichage a bien voulu montrer. */
-    if (toutes === null) {
-      setErreur("La liste n’a pas fini d’arriver. Réessayez dans un instant.");
-      return;
-    }
-
+    /* Le chemin d'écriture ne s'appuie pas sur ce que l'affichage a bien voulu
+       montrer : il recherche lui-même l'existante. */
     const existante = trouverParNom(nom, toutes);
     if (existante) {
-      changer(existante.id);
-      fermer();
+      choisir(existante.id);
       return;
     }
-
     const { id: nouvelle, enregistre } = creer(nom.trim(), {
       uid: session.utilisateur.uid,
       nom: session.utilisateur.nom,
     });
+    choisir(nouvelle);
     enregistre.catch(() =>
-      /* L’entrée reste sélectionnée : elle est dans le cache local, et la moto
-         qui la cite partira avec. Ce qu’on annonce, c’est que le serveur l’a
-         refusée — pas que le geste n’a rien fait. */
-      setRefus(`« ${nom.trim()} » n’a pas été accepté${determinant === "cette" ? "e" : ""} par le serveur.`),
+      /* L’entrée reste choisie : elle est dans le cache local, et la moto qui
+         la cite partira avec. Ce qu’on annonce, c’est le refus du serveur. */
+      setErreur(
+        `« ${nom.trim()} » n’a pas été accepté${determinant === "cette" ? "e" : ""} par le serveur.`,
+      ),
     );
-    changer(nouvelle);
-    fermer();
   }
 
-  if (saisieOuverte) {
-    return (
-      /* Large : le champ et ses deux boutons tiennent sur une ligne. La
-         saisie, elle, reste bornée par `.saisie`. */
-      <Champ id={`${id}-nouveau`} libelle={`${nouveau} ${singulier}`} erreur={erreur} large>
-        <div className="flex flex-wrap gap-2">
-          <input
-            ref={champ}
-            id={`${id}-nouveau`}
-            value={nom}
-            maxLength={60}
-            autoComplete="off"
-            aria-describedby={erreur ? `${id}-nouveau-erreur` : undefined}
-            onChange={(evenement) => setNom(evenement.target.value)}
-            /* Entrée valide la nouvelle entrée — et surtout n’envoie pas le
-               formulaire qui entoure ce champ, ce qu’elle ferait sinon : la
-               moto serait enregistrée sans sa marque. */
-            onKeyDown={(evenement) => {
-              if (evenement.key === "Enter") {
-                evenement.preventDefault();
-                enregistrer();
-              }
-              if (evenement.key === "Escape") fermer();
-            }}
-            className="saisie h-11 min-w-0 flex-1"
-          />
-          <button type="button" onClick={enregistrer} className="bouton bouton-principal">
-            <Check aria-hidden="true" className="size-4" />
-            Ajouter
-          </button>
-          <button
-            type="button"
-            onClick={fermer}
-            className="inline-flex size-11 shrink-0 items-center justify-center rounded-plaque border border-bord text-encre hover:bg-fond"
-          >
-            <X aria-hidden="true" className="size-4" />
-            <span className="sr-only">Annuler l’ajout</span>
-          </button>
-        </div>
-      </Champ>
-    );
+  /** Le geste de la ligne `rang` : choisir une entrée, ou ajouter le nom tapé. */
+  function agir(cible: number) {
+    if (cible < entrees.length) choisir(entrees[cible].id);
+    else if (ajout) ajouter(ajout);
   }
+
+  /* Quitter le champ oublie un texte qu'on n'a pas choisi : la valeur reste
+     une entrée de la liste, jamais une saisie libre. Un champ vidé, lui, vide
+     le choix — c'est ainsi qu'on retire un modèle facultatif. */
+  function quitter() {
+    if (texte !== null && texte.trim() === "") changer("");
+    setTexte(null);
+    setOuverte(false);
+  }
+
+  function touche(evenement: KeyboardEvent<HTMLInputElement>) {
+    if (evenement.key === "ArrowDown") {
+      evenement.preventDefault();
+      setOuverte(true);
+      setActive(Math.min(rang + 1, Math.max(nombre - 1, 0)));
+    } else if (evenement.key === "ArrowUp") {
+      evenement.preventDefault();
+      setActive(Math.max(rang - 1, 0));
+    } else if (evenement.key === "Enter") {
+      /* Entrée choisit — et surtout n’envoie pas le formulaire qui entoure ce
+         champ : la moto partirait sans sa marque. */
+      if (ouverte && nombre > 0) {
+        evenement.preventDefault();
+        agir(rang);
+      }
+    } else if (evenement.key === "Escape") {
+      setTexte(null);
+      setOuverte(false);
+    }
+  }
+
+  const montree = ouverte && nombre > 0;
 
   return (
-    <Champ id={id} libelle={libelle} facultatif={facultatif} erreur={refus}>
-      <select
-        id={id}
-        value={valeur}
-        aria-describedby={refus ? `${id}-erreur` : undefined}
-        onChange={(evenement) => {
-          if (evenement.target.value === NOUVELLE) {
-            ouvrir();
-            return;
-          }
-          setRefus(null);
-          changer(evenement.target.value);
-        }}
-        className="saisie"
-      >
-        {/* L'invite dit l'attente au lieu de proposer un choix qu'on ne peut
-            pas encore faire : un menu vide et un menu pas encore lu se
-            ressemblent trop pour qu'on laisse le lecteur trancher. */}
-        <option value="">{toutes === null ? "Lecture de la liste…" : invite}</option>
-        {options.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.nom}
-            {option.actif ? "" : " — hors liste"}
-          </option>
-        ))}
-        {!enAttente && toutes !== null && (
-          <option value={NOUVELLE}>
-            + Ajouter {un} {singulier}…
-          </option>
+    <Champ id={id} libelle={libelle} facultatif={facultatif} erreur={erreur}>
+      <div className="relative">
+        <input
+          id={id}
+          role="combobox"
+          aria-expanded={montree}
+          aria-controls={listeId}
+          aria-autocomplete="list"
+          aria-activedescendant={montree ? `${id}-option-${rang}` : undefined}
+          aria-describedby={erreur ? `${id}-erreur` : undefined}
+          value={affiche}
+          maxLength={60}
+          autoComplete="off"
+          spellCheck={false}
+          placeholder={toutes === null ? "Lecture de la liste…" : invite}
+          onFocus={() => setOuverte(true)}
+          onBlur={quitter}
+          onChange={(evenement) => {
+            setTexte(evenement.target.value);
+            setOuverte(true);
+            setActive(0);
+            setErreur(null);
+          }}
+          onKeyDown={touche}
+          className="saisie"
+        />
+
+        {montree && (
+          <ul
+            id={listeId}
+            role="listbox"
+            /* Pas le libellé seul : le champ et sa liste porteraient le même
+               nom, et « Marque » désignerait deux choses. */
+            aria-label={`Suggestions — ${libelle}`}
+            className="cadre absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-y-auto py-1 shadow-lg"
+          >
+            {entrees.map((entree, index) => (
+              <li
+                key={entree.id}
+                id={`${id}-option-${index}`}
+                role="option"
+                aria-selected={entree.id === valeur}
+                /* `mousedown` et non `click` : sans cela, le champ perd la main
+                   avant que le choix ne se fasse, et `quitter` l'efface. */
+                onMouseDown={(evenement) => {
+                  evenement.preventDefault();
+                  choisir(entree.id);
+                }}
+                className={[
+                  "flex cursor-pointer items-center justify-between gap-2 px-3 py-2.5 text-corps text-encre",
+                  index === rang ? "bg-survol" : "",
+                ].join(" ")}
+              >
+                <span className={entree.id === valeur ? "font-semibold" : undefined}>
+                  {entree.nom}
+                  {entree.actif ? "" : " — hors liste"}
+                </span>
+                {entree.id === valeur && <Check aria-hidden="true" className="size-4 shrink-0" />}
+              </li>
+            ))}
+            {ajout && (
+              <li
+                id={`${id}-option-${entrees.length}`}
+                role="option"
+                aria-selected={false}
+                onMouseDown={(evenement) => {
+                  evenement.preventDefault();
+                  ajouter(ajout);
+                }}
+                className={[
+                  "flex cursor-pointer items-center gap-2 border-t border-bord px-3 py-2.5 text-corps font-medium text-encre",
+                  rang === entrees.length ? "bg-survol" : "",
+                ].join(" ")}
+              >
+                <Plus aria-hidden="true" className="size-4 shrink-0" />
+                Ajouter « {ajout} »
+              </li>
+            )}
+          </ul>
         )}
-      </select>
+      </div>
     </Champ>
   );
 }
-
-/* Une valeur qu’aucun identifiant Firestore ne peut porter : ils font vingt
-   caractères alphanumériques, sans souligné. */
-const NOUVELLE = "__nouvelle__";

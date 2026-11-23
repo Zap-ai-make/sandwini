@@ -5,10 +5,12 @@ import {
   contenu,
   creerBoutique,
   emailUnique,
+  encaisser,
   messageErreur,
   messageSucces,
   seConnecter,
   seConnecterEtEntrer,
+  vendre,
 } from "./aide";
 
 /**
@@ -23,10 +25,13 @@ import {
 
 type Gerant = { email: string; motDePasse: string };
 
-/** Le responsable crée une boutique et son gérant, par l'écran des utilisateurs. */
-async function creerGerant(page: Page): Promise<Gerant> {
-  const code = codeUnique();
-  await creerBoutique(page, code, ["Motos"]);
+/**
+ * Le responsable crée le gérant d'une boutique, par l'écran des utilisateurs —
+ * celle qu'on lui donne, ou une neuve.
+ */
+async function creerGerant(page: Page, boutique?: string): Promise<Gerant> {
+  const code = boutique ?? codeUnique();
+  if (!boutique) await creerBoutique(page, code, ["Motos"]);
 
   await page.goto("/parametres/utilisateurs", { waitUntil: "load" });
   const gerant = { email: emailUnique("compte"), motDePasse: "gerant-compte-001" };
@@ -106,4 +111,42 @@ test("le gérant change son mot de passe, et seul le nouveau ouvre la session", 
   await expect(ailleurs.getByText("Adresse e-mail ou mot de passe incorrect")).toBeVisible();
   await seConnecter(ailleurs, gerant.email, nouveau);
   await ailleurs.waitForURL("**/dashboard");
+});
+
+/* « Vérifie si les encaissements passent pour les boutiques : il essaye de le
+   faire mais ça passe pas » (23 novembre 2026). Les tests des versements
+   tournaient tous sous le responsable, dont la règle ne regarde pas le
+   document : chez le gérant, la fiche de la vente ne lisait pas ses
+   versements, et le formulaire d'encaissement ne s'ouvrait jamais. */
+test("le gérant encaisse un versement sur une vente à crédit de sa boutique", async ({
+  page,
+  browser,
+}) => {
+  await seConnecterEtEntrer(page);
+  const { terrain, numero } = await vendre(page, {
+    mode: "Crédit",
+    prix: "1200000",
+    encaisse: "400000",
+  });
+  const ficheDeLaVente = page.url();
+  await attendreLaFileVide(page);
+
+  const pageGerant = await sessionDuGerant(browser, await creerGerant(page, terrain.code));
+  await pageGerant.goto(ficheDeLaVente, { waitUntil: "load" });
+  await expect(contenu(pageGerant)).toContainText("800 000 FCFA", { timeout: 20_000 });
+
+  await encaisser(pageGerant, "300000");
+  const confirmation = contenu(pageGerant).getByRole("status");
+  await expect(confirmation).toContainText("Versement enregistré", { timeout: 20_000 });
+  /* `vendre` rend le numéro tel que l'écran le montre (« n° 0001 ») ; le reçu
+     porte le numéro entier. Le rang 2 suit le versement du jour de la vente. */
+  await expect(confirmation.locator(".plaque-code")).toHaveText(
+    new RegExp(`${numero.replace(/\D/g, "")}/V2$`),
+  );
+  await expect(contenu(pageGerant)).toContainText("500 000 FCFA");
+
+  /* Parvenu au serveur, et sans refus : c'est là que le lot tombait. */
+  await attendreLaFileVide(pageGerant);
+  /* La zone d'erreur existe toujours, vide : c'est un texte qu'on guette. */
+  await expect(contenu(pageGerant).getByRole("alert").filter({ hasText: /\S/ })).toHaveCount(0);
 });

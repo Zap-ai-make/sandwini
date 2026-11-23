@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /**
  * Outils partagés par les tests bout en bout.
@@ -257,6 +257,17 @@ export async function ajouterMarqueEtModele(page: Page, marque: string, modele: 
 export type Terrain = { code: string; marque: string; modele: string; provenance: string };
 
 /**
+ * Choisit une entrée dans une liste qu'on tape — marque, modèle, provenance
+ * (23 novembre 2026). On tape le nom, on touche la suggestion : le geste du
+ * comptoir. Le champ montre ensuite le nom choisi.
+ */
+export async function choisirEntree(champ: Locator, nom: string) {
+  await champ.fill(nom);
+  await champ.page().getByRole("option", { name: nom, exact: true }).click();
+  await expect(champ).toHaveValue(nom);
+}
+
+/**
  * Met en place ce qu'une moto exige avant d'exister : une boutique où la ranger,
  * une marque, un modèle et une provenance. Tout passe par l'interface — c'est
  * le vrai chemin d'un premier jour d'utilisation.
@@ -302,10 +313,10 @@ export async function saisirMoto(
   options: { prixAchat?: string; conseille?: string; refusAttendu?: boolean } = {},
 ) {
   await page.goto("/motos/nouvelle", { waitUntil: "load" });
-  await page.getByLabel("Marque").selectOption({ label: terrain.marque });
-  await page.getByLabel("Modèle").selectOption({ label: terrain.modele });
+  await choisirEntree(page.getByLabel(/^Marque/), terrain.marque);
+  await choisirEntree(page.getByLabel(/^Modèle/), terrain.modele);
   await page.getByLabel("Numéro de châssis").fill(chassis);
-  await page.getByLabel("Provenance").selectOption({ label: terrain.provenance });
+  await choisirEntree(page.getByLabel(/^Provenance/), terrain.provenance);
 
   /* **Le champ n'existe que pour le responsable depuis S39.** Le gérant fait
      entrer la moto ; la supervision pose ce qu'elle a coûté. L'aide ne force

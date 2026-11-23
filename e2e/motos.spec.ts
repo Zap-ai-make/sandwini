@@ -3,6 +3,7 @@ import {
   attendreLaFileVide,
   bandeauEtat,
   chassisUnique,
+  choisirEntree,
   codeUnique,
   contenu,
   creerBoutique,
@@ -40,10 +41,10 @@ test.describe("entrée en stock", () => {
     const terrain = await preparerTerrain(page);
 
     await page.goto("/motos/nouvelle", { waitUntil: "load" });
-    await page.getByLabel("Marque").selectOption({ label: terrain.marque });
-    await page.getByLabel("Modèle").selectOption({ label: terrain.modele });
+    await choisirEntree(page.getByLabel(/^Marque/), terrain.marque);
+    await choisirEntree(page.getByLabel(/^Modèle/), terrain.modele);
     await page.getByLabel("Numéro de châssis").fill("lc6p cj1a 0000001");
-    await page.getByLabel("Provenance").selectOption({ label: terrain.provenance });
+    await choisirEntree(page.getByLabel(/^Provenance/), terrain.provenance);
     await page.getByLabel("Prix d’achat").fill("850000");
 
     // Le total se met à jour pendant la saisie : c'est le seul moment où le
@@ -108,10 +109,10 @@ test.describe("entrée en stock", () => {
     await saisirMoto(page, terrain, chassis);
 
     await page.goto("/motos/nouvelle", { waitUntil: "commit" });
-    await page.getByLabel("Marque").selectOption({ label: terrain.marque });
-    await page.getByLabel("Modèle").selectOption({ label: terrain.modele });
+    await choisirEntree(page.getByLabel(/^Marque/), terrain.marque);
+    await choisirEntree(page.getByLabel(/^Modèle/), terrain.modele);
     await page.getByLabel("Numéro de châssis").fill(chassis);
-    await page.getByLabel("Provenance").selectOption({ label: terrain.provenance });
+    await choisirEntree(page.getByLabel(/^Provenance/), terrain.provenance);
     await page.getByRole("button", { name: "Faire entrer en stock" }).click();
 
     await expect(contenu(page).getByRole("alert")).toContainText("déjà en stock", {
@@ -319,32 +320,36 @@ test.describe("le coût est réservé au responsable", () => {
     await expect(contenu(page)).not.toContainText("Il manque une marque");
 
     const marque = nomUnique("Apsonic");
-    await ajouterDepuisLaListe(page, "Marque", marque);
-    await ajouterDepuisLaListe(page, "Modèle", nomUnique("AP 125"));
-    await ajouterDepuisLaListe(page, "Provenance", nomUnique("Lomé"));
+    await ajouterDepuisLaListe(page, /^Marque/, marque);
+    await ajouterDepuisLaListe(page, /^Modèle/, nomUnique("AP 125"));
+    await ajouterDepuisLaListe(page, /^Provenance/, nomUnique("Lomé"));
 
     const chassis = `NEUF${Date.now().toString(36).toUpperCase()}`;
     await page.getByLabel("Numéro de châssis").fill(chassis);
     await page.getByRole("button", { name: "Faire entrer en stock" }).click();
     await expect(contenu(page).getByRole("status")).toContainText(chassis, { timeout: 20_000 });
 
-    /* La même marque retapée dans une autre casse ne dédouble pas la liste :
-       c'est ce qui remplace le référentiel fermé. */
-    await ajouterDepuisLaListe(page, "Marque", marque.toUpperCase());
-    await expect(contenu(page)).toContainText("existait déjà");
-    await expect(
-      page.getByLabel("Marque", { exact: true }).locator("option", { hasText: marque }),
-    ).toHaveCount(1);
+    /* **La liste se tape** (23 novembre 2026). La même marque retapée dans une
+       autre casse est proposée telle qu'elle existe, et rien n'offre de la
+       créer une seconde fois : c'est ce qui remplace le référentiel fermé. */
+    const champMarque = page.getByLabel(/^Marque/);
+    await champMarque.fill(marque.toUpperCase());
+    await expect(page.getByRole("option", { name: marque, exact: true })).toBeVisible();
+    await expect(page.getByRole("option", { name: /^Ajouter/ })).toHaveCount(0);
+
+    /* Trois lettres suffisent à la retrouver. */
+    await choisirEntree(champMarque, marque);
+    await champMarque.fill(marque.slice(0, 3));
+    await expect(page.getByRole("option", { name: marque, exact: true })).toBeVisible();
   });
 });
 
-/** Ouvre « + Ajouter… » sur une liste de choix, saisit un nom, valide. */
-async function ajouterDepuisLaListe(page: Page, libelle: string, nom: string) {
-  await page.getByLabel(libelle, { exact: true }).selectOption("__nouvelle__");
-  const champ = page.getByLabel(/^Nouve(lle|au) /);
+/** Tape un nom que la liste ne connaît pas, et touche « Ajouter « … » ». */
+async function ajouterDepuisLaListe(page: Page, libelle: RegExp, nom: string) {
+  const champ = page.getByLabel(libelle);
   await champ.fill(nom);
-  await champ.press("Enter");
-  await expect(page.getByLabel(libelle, { exact: true })).toBeVisible();
+  await page.getByRole("option", { name: `Ajouter « ${nom} »` }).click();
+  await expect(champ).toHaveValue(nom);
 }
 
 test.describe("hors ligne", () => {
@@ -376,10 +381,10 @@ test.describe("hors ligne", () => {
     await page.getByRole("link", { name: /Faire entrer une moto/ }).first().click();
     await page.waitForURL("**/motos/nouvelle");
 
-    await page.getByLabel("Marque").selectOption({ label: terrain.marque });
-    await page.getByLabel("Modèle").selectOption({ label: terrain.modele });
+    await choisirEntree(page.getByLabel(/^Marque/), terrain.marque);
+    await choisirEntree(page.getByLabel(/^Modèle/), terrain.modele);
     await page.getByLabel("Numéro de châssis").fill(chassis);
-    await page.getByLabel("Provenance").selectOption({ label: terrain.provenance });
+    await choisirEntree(page.getByLabel(/^Provenance/), terrain.provenance);
     await page.getByLabel("Prix d’achat").fill("500000");
     await page.getByRole("button", { name: "Faire entrer en stock" }).click();
 

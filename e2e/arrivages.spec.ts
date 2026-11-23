@@ -3,6 +3,7 @@ import {
   ajouterMarqueEtModele,
   attendreLaFileVide,
   chassisUnique,
+  choisirEntree,
   contenu,
   nomUnique,
   preparerTerrain,
@@ -39,8 +40,8 @@ async function ouvrirLeModal(page: Page, nom: string, terrain: Terrain, fourniss
      jamais rien dire. Même famille que les deux fichiers orphelins trouvés par
      l'audit du 15 octobre : un test qu'on n'exécute pas ne protège rien tout en
      ayant l'air d'exister. */
-  await modal.getByLabel("Marque", { exact: true }).selectOption({ label: terrain.marque });
-  await modal.getByLabel(/^Modèle/).selectOption({ label: terrain.modele });
+  await choisirEntree(modal.getByLabel("Marque", { exact: true }), terrain.marque);
+  await choisirEntree(modal.getByLabel(/^Modèle/), terrain.modele);
   return modal;
 }
 
@@ -231,8 +232,8 @@ test("un lot mêle deux marques : chaque groupe entre avec la sienne", async ({ 
   // On ajoute un groupe pour une autre marque, sa propre moto.
   await modal.getByRole("button", { name: "Ajouter une marque" }).click();
   const groupe2 = modal.locator("fieldset").filter({ hasText: "Groupe 2" });
-  await groupe2.getByLabel("Marque", { exact: true }).selectOption({ label: marque2 });
-  await groupe2.getByLabel(/^Modèle/).selectOption({ label: modele2 });
+  await choisirEntree(groupe2.getByLabel("Marque", { exact: true }), marque2);
+  await choisirEntree(groupe2.getByLabel(/^Modèle/), modele2);
   await modal.getByLabel("Numéro de châssis, moto 2").fill(chassisB);
 
   await modal.getByRole("button", { name: "Enregistrer le lot" }).click();

@@ -279,14 +279,25 @@ function lireDocumentDossier(instantane: QueryDocumentSnapshot<DocumentData>): D
  *
  * Une écoute de chemin direct plutôt que le groupe de collections : sur une
  * fiche, on connaît la vente, et cette requête-là ne demande aucun index.
+ *
+ * **Filtrée sur la boutique de la vente, et c'est une nécessité** (23 novembre
+ * 2026). La règle se lit sur chaque document (`peutVendrePour(resource.data
+ * .boutiqueId)`), et Firestore refuse une requête qu'il ne peut pas prouver
+ * bornée. Sans ce filtre, le responsable passait — sa condition ne regarde pas
+ * le document — et le gérant jamais : sa fiche ne lisait ni les versements ni
+ * le dossier, et le formulaire d'encaissement disparaissait sous ses doigts.
+ * Sur sandwini, aucun versement ultérieur n'avait pu être fait par un gérant.
  */
 export function ecouterDocumentsDeVente(
-  venteId: string,
+  vente: { id: string; boutiqueId: string },
   auChangement: (documents: DocumentDossier[]) => void,
   enErreur: (cause: unknown) => void,
 ): () => void {
   return onSnapshot(
-    collection(db(), "ventesMotos", venteId, "documents"),
+    query(
+      collection(db(), "ventesMotos", vente.id, "documents"),
+      where("boutiqueId", "==", vente.boutiqueId),
+    ),
     { includeMetadataChanges: true },
     (instantane) => {
       const documents = instantane.docs.map(lireDocumentDossier);
@@ -339,12 +350,17 @@ function parDate(a: Versement, b: Versement): number {
 }
 
 export function ecouterVersements(
-  venteId: string,
+  vente: { id: string; boutiqueId: string },
   auChangement: (versements: Versement[]) => void,
   enErreur: (cause: unknown) => void,
 ): () => void {
+  /* Filtrée sur la boutique pour la même raison que `ecouterDocumentsDeVente` :
+     sans elle, le gérant ne lit pas ses propres versements. */
   return onSnapshot(
-    collection(db(), "ventesMotos", venteId, "versements"),
+    query(
+      collection(db(), "ventesMotos", vente.id, "versements"),
+      where("boutiqueId", "==", vente.boutiqueId),
+    ),
     { includeMetadataChanges: true },
     (instantane) => auChangement(instantane.docs.map(lireVersement).sort(parDate)),
     enErreur,

@@ -80,10 +80,16 @@ export function PanneauRecu({
   );
   const vente = etatVente?.vente ?? null;
 
+  /* Bornée à la boutique de la vente, donc écoutée une fois la vente lue :
+     sans ce filtre, le gérant ne lisait pas les versements de son reçu
+     (`ecouterVersements`). */
+  const boutiqueVente = vente?.boutiqueId ?? "";
   const souscrireVersements = useCallback(
     (auChangement: (versements: Versement[]) => void, enErreur: (cause: unknown) => void) =>
-      venteId ? ecouterVersements(venteId, auChangement, enErreur) : () => {},
-    [venteId],
+      venteId && boutiqueVente
+        ? ecouterVersements({ id: venteId, boutiqueId: boutiqueVente }, auChangement, enErreur)
+        : () => {},
+    [venteId, boutiqueVente],
   );
   const { valeur: versements } = useAbonnement(
     souscrireVersements,

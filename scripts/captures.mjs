@@ -982,11 +982,11 @@ for (const {
       .catch(() => {});
     await page.waitForTimeout(1500);
   }
-  /* « + Ajouter une marque… » remplace le select par un champ : c'est l'état
-     que S39 ajoute, et il n'existe sur aucune capture au repos. */
+  /* La liste se tape (23 novembre 2026) : un nom inconnu fait proposer
+     « Ajouter « … » » sous le champ. C'est l'état que S39 ajoute, et il
+     n'existe sur aucune capture au repos. */
   if (ajoutMarque) {
-    await page.getByLabel("Marque", { exact: true }).selectOption("__nouvelle__");
-    await page.getByLabel(/^Nouvelle marque/).fill("Apsonic");
+    await page.getByLabel(/^Marque/).fill("Apsonic");
     await page.waitForTimeout(300);
   }
   /* Le formulaire de création vit derrière un bouton : sans ce clic, la

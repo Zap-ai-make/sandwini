@@ -7,6 +7,7 @@ import {
   nommerEntree,
   optionsAvecChoix,
   reduire,
+  suggestionsDeChoix,
   trouverParNom,
   validerNom,
   type Referentiel,
@@ -107,6 +108,67 @@ describe("optionsAvecChoix", () => {
 
   it("ignore une valeur choisie qui n’existe plus du tout", () => {
     expect(optionsAvecChoix(liste, "disparue").map((e) => e.id)).toEqual(["1", "3"]);
+  });
+});
+
+/* « Ajoute la recherche au niveau de marque et modèle » (23 novembre 2026) :
+   la liste se tape. Ce qu'on a tapé réduit les choix, et « + Ajouter » n'est
+   offert que pour un nom qui n'existe pas encore. */
+describe("suggestionsDeChoix", () => {
+  const liste = [
+    entree("1", "Yamaha"),
+    entree("2", "Apsonic", false),
+    entree("3", "Haojue"),
+    entree("4", "Bajaj"),
+    entree("5", "Jaguar"),
+    entree("6", "Électra"),
+  ];
+
+  it("propose toute la liste tant qu’on n’a rien tapé", () => {
+    expect(suggestionsDeChoix(liste, "", "  ").entrees.map((e) => e.id)).toEqual([
+      "1",
+      "3",
+      "4",
+      "5",
+      "6",
+    ]);
+  });
+
+  it("garde ce qui contient ce qu’on tape, sans casse ni accents", () => {
+    expect(suggestionsDeChoix(liste, "", "HAO").entrees.map((e) => e.nom)).toEqual(["Haojue"]);
+    expect(suggestionsDeChoix(liste, "", "electr").entrees.map((e) => e.nom)).toEqual(["Électra"]);
+  });
+
+  /* On tape le début d'un nom : ce qui commence par là passe devant ce qui le
+     contient quelque part. */
+  it("met devant ce qui commence par ce qu’on tape", () => {
+    expect(suggestionsDeChoix(liste, "", "ja").entrees.map((e) => e.nom)).toEqual([
+      "Jaguar",
+      "Bajaj",
+    ]);
+  });
+
+  it("ne propose pas une désactivée, sauf si c’est elle qui est choisie", () => {
+    expect(suggestionsDeChoix(liste, "", "aps").entrees).toEqual([]);
+    expect(suggestionsDeChoix(liste, "2", "aps").entrees.map((e) => e.id)).toEqual(["2"]);
+  });
+
+  /* Son nom entier, lui, la fait revenir : retaper un nom, c'est le vouloir
+     (S39), et la liste ne peut pas répondre « rien » à un nom qu'elle connaît. */
+  it("rend une désactivée quand on tape son nom entier", () => {
+    expect(suggestionsDeChoix(liste, "", "apsonic").entrees.map((e) => e.id)).toEqual(["2"]);
+  });
+
+  it("offre d’ajouter un nom qui n’existe pas, tel qu’on l’a tapé", () => {
+    expect(suggestionsDeChoix(liste, "", "  Kymco ").ajout).toBe("Kymco");
+  });
+
+  /* Retaper un nom connu — même désactivé, même autrement écrit — n'en crée
+     pas un second : c'est le garde de S39, qui coupait le stock en deux. */
+  it("n’offre pas d’ajouter un nom déjà connu, même désactivé ou autrement écrit", () => {
+    expect(suggestionsDeChoix(liste, "", "yamaha").ajout).toBeNull();
+    expect(suggestionsDeChoix(liste, "", "APSONIC").ajout).toBeNull();
+    expect(suggestionsDeChoix(liste, "", "").ajout).toBeNull();
   });
 });
 

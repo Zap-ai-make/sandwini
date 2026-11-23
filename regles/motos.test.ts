@@ -167,6 +167,25 @@ describe("le coût : la boutique de la moto, et elle seule", () => {
     await assertFails(getDoc(doc(gerant(), "motos/moto-kdg/prive/cout")));
   });
 
+  /* Une moto sans prix n'a pas de document de coût, et le gérant doit pouvoir
+     le constater (23 novembre 2026). La règle lisait la boutique sur le coût
+     lui-même ; absent, il n'en portait aucune, et la lecture tombait. « Modifier
+     l'arrivage » et la fiche tenaient alors le prix pour illisible : le prix
+     oublié ne se rattrapait pas, précisément chez le gérant qui l'avait oublié. */
+  it("le gérant constate qu’une moto de sa boutique n’a pas encore de coût", async () => {
+    await env.withSecurityRulesDisabled((contexte) =>
+      setDoc(doc(contexte.firestore(), "motos/moto-sans-prix"), motoFigee()),
+    );
+    await assertSucceeds(getDoc(doc(gerant(), "motos/moto-sans-prix/prive/cout")));
+  });
+
+  it("mais pas sur une moto d’une autre boutique", async () => {
+    await env.withSecurityRulesDisabled((contexte) =>
+      setDoc(doc(contexte.firestore(), "motos/moto-kdg-sans-prix"), motoFigee({ boutiqueId: "KDG" })),
+    );
+    await assertFails(getDoc(doc(gerant(), "motos/moto-kdg-sans-prix/prive/cout")));
+  });
+
   it("le responsable, lui, le lit", async () => {
     await assertSucceeds(getDoc(doc(responsable(), "motos/moto-ptg/prive/cout")));
   });

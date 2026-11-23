@@ -766,7 +766,16 @@ service cloud.firestore {
     // (`deplacerMoto`). `coutSuitSaMoto` l'empêche de l'envoyer ailleurs que là
     // où la moto arrive.
     match /motos/{motoId}/prive/{section} {
-      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+      // **Un coût absent se lit aussi** (23 novembre 2026). Une moto sans prix
+      // n'a pas de document de coût : la boutique ne pouvait pas se lire sur
+      // lui, et la lecture tombait chez le gérant. « Modifier l'arrivage » et
+      // la fiche tenaient alors le prix pour illisible, et le prix oublie ne se
+      // rattrapait pas. Absent, on lit la boutique de sa moto — une seule
+      // consultation, et seulement dans ce cas.
+      allow read: if estResponsable()
+                  || (resource != null && estGerantDe(resource.data.boutiqueId))
+                  || (resource == null
+                      && estGerantDe(get(/databases/$(database)/documents/motos/$(motoId)).data.boutiqueId));
 
       allow create: if section == 'cout'
                     && coutValide(request.resource.data)
@@ -1226,7 +1235,13 @@ service cloud.firestore {
     // La marge se lit dans sa boutique (15 novembre 2026, « tout voir, marges
     // comprises ») et ne s'écrit que par le serveur (D51).
     match /ventesMotos/{venteId}/prive/{section} {
-      allow read: if estResponsable() || estGerantDe(resource.data.boutiqueId);
+      // Meme regle que le cout : la marge s'ecrit par le serveur apres la
+      // vente, et jamais sans cout. Absente, la fiche du gerant affichait
+      // « Vos droits ne permettent pas de lire ces donnees » (23 novembre 2026).
+      allow read: if estResponsable()
+                  || (resource != null && estGerantDe(resource.data.boutiqueId))
+                  || (resource == null
+                      && estGerantDe(get(/databases/$(database)/documents/ventesMotos/$(venteId)).data.boutiqueId));
       allow write: if false;
     }
 

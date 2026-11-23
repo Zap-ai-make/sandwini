@@ -27,15 +27,17 @@ export function CorrigerVente({ id, onFermer }: { id: string; onFermer: () => vo
     ),
     "Cette vente n’a pas pu être chargée.",
   );
+  /* La boutique d'abord : versements et dossier s'écoutent bornés à elle,
+     sans quoi le gérant ne les lirait pas (`ecouterVersements`). */
+  const boutiqueId = vente?.boutiqueId ?? "";
   const { valeur: versements, erreur: erreurVersements } = useAbonnement(
     useCallback(
       (auChangement: (versements: Versement[]) => void, enErreur: (cause: unknown) => void) =>
-        ecouterVersements(id, auChangement, enErreur),
-      [id],
+        boutiqueId ? ecouterVersements({ id, boutiqueId }, auChangement, enErreur) : () => {},
+      [id, boutiqueId],
     ),
     "Les versements n’ont pas pu être lus.",
   );
-  const boutiqueId = vente?.boutiqueId ?? "";
   const { valeur: lu, erreur: erreurDossier } = useAbonnement(
     useCallback(
       (

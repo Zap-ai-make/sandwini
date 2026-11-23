@@ -287,6 +287,22 @@ describe("la marge : lue par sa boutique, infalsifiable partout", () => {
     await assertFails(getDocs(prive));
   });
 
+  /* La marge s'écrit par le serveur, après la vente, et jamais sans coût :
+     longtemps, ou pour toujours, elle n'existe pas. La fiche du gérant affichait
+     alors « Vos droits ne permettent pas de lire ces données » (23 novembre
+     2026) — la règle lisait la boutique sur la marge absente. */
+  it("le gérant constate qu’une vente de sa boutique n’a pas encore de marge", async () => {
+    await env.withSecurityRulesDisabled((contexte) =>
+      setDoc(doc(contexte.firestore(), "ventesMotos/vente-sans-marge"), {
+        ...vente({ numero: "PTG-2608-0090", numeroInitial: "PTG-2608-0090" }),
+        ...auditFige,
+      }),
+    );
+    await assertSucceeds(getDoc(doc(gerant(), "ventesMotos/vente-sans-marge/prive/marge")));
+    /* `vente-kdg` n'a pas de marge non plus : elle reste fermée au gérant de PTG. */
+    await assertFails(getDoc(doc(gerant(), "ventesMotos/vente-kdg/prive/marge")));
+  });
+
   it("le gérant ne lit pas la marge d’une vente d’une autre boutique", async () => {
     await env.withSecurityRulesDisabled(async (contexte) => {
       await setDoc(doc(contexte.firestore(), "ventesMotos/vente-kdg/prive/marge"), {
@@ -337,6 +353,25 @@ describe("cloisonnement par boutique", () => {
       getDocs(query(collection(base, "ventesMotos"), where("boutiqueId", "==", "KDG"))),
     );
     await assertFails(getDocs(collection(base, "ventesMotos")));
+  });
+
+  /* **Le défaut des encaissements du 23 novembre 2026.** La fiche d'une vente
+     écoutait ses versements sans filtre : la règle se lit sur chaque document
+     (`peutVendrePour(resource.data.boutiqueId)`), et Firestore refuse une
+     requête qu'il ne peut pas prouver bornée. Le responsable passait — sa
+     condition ne regarde pas le document —, le gérant jamais : la liste ne
+     s'ouvrait pas, le formulaire de versement non plus. Sur sandwini, aucun
+     versement ultérieur n'avait été enregistré par un gérant. */
+  it("le gérant lit les versements et les documents d’une vente de sa boutique, filtrés", async () => {
+    const base = gerant();
+    for (const sous of ["versements", "documents"]) {
+      await assertFails(getDocs(collection(base, `ventesMotos/vente-ptg/${sous}`)));
+      await assertSucceeds(
+        getDocs(
+          query(collection(base, `ventesMotos/vente-ptg/${sous}`), where("boutiqueId", "==", "PTG")),
+        ),
+      );
+    }
   });
 
   it("la lecture d’ensemble des dossiers reste bornée à sa boutique", async () => {

@@ -123,6 +123,42 @@ export function nomDejaPris(nom: string, existants: Referentiel[], sauf?: string
  * invite, et enregistrer la fiche effaçait silencieusement la marque. Le défaut
  * existait avant S39 et n'avait jamais mordu parce que rien ne se désactivait.
  */
+/**
+ * Ce que la liste qu'on tape propose, pour ce qu'on y a tapé (23 novembre
+ * 2026) : « ajoute la recherche au niveau de marque et modèle ».
+ *
+ * Les mêmes entrées qu'`optionsAvecChoix` — les actives, et celle qui est
+ * choisie même désactivée —, réduites à celles qui contiennent le texte, sans
+ * casse ni accents. Ce qui **commence** par le texte passe devant : on tape le
+ * début d'un nom.
+ *
+ * `ajout` est le nom à proposer de créer, ou `null`. Jamais un nom déjà connu,
+ * même désactivé ou autrement écrit : c'est le garde de S39, sans lequel
+ * « apsonic » retapé ferait une seconde marque et couperait le stock en deux.
+ */
+export function suggestionsDeChoix<T extends Referentiel>(
+  entrees: T[],
+  choisi: string,
+  texte: string,
+): { entrees: T[]; ajout: string | null } {
+  const base = optionsAvecChoix(entrees, choisi);
+  const cible = reduire(texte);
+  if (!cible) return { entrees: base, ajout: null };
+
+  const contenant = base.filter((entree) => reduire(entree.nom).includes(cible));
+  const debut = contenant.filter((entree) => reduire(entree.nom).startsWith(cible));
+  const ailleurs = contenant.filter((entree) => !reduire(entree.nom).startsWith(cible));
+
+  /* Une désactivée tapée en entier revient en tête : retaper un nom, c'est le
+     vouloir (S39), et la liste ne répond pas « rien » à un nom qu'elle connaît. */
+  const connue = trouverParNom(texte, entrees);
+  const revenue = connue && !contenant.includes(connue) ? [connue] : [];
+  return {
+    entrees: [...revenue, ...debut, ...ailleurs],
+    ajout: connue ? null : texte.trim(),
+  };
+}
+
 export function optionsAvecChoix<T extends Referentiel>(entrees: T[], choisi: string): T[] {
   const actives = entrees.filter((entree) => entree.actif);
   if (!choisi || actives.some((entree) => entree.id === choisi)) return actives;

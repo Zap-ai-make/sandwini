@@ -3476,3 +3476,40 @@ envoyer »** (`a_envoyer`) : client, téléphone, moto, châssis, aucun prix.
   dossier chez le prestataire : c'est aussi un geste fait à la main.
 - Les dossiers créés avant ce changement restent où ils sont. Une vente
   corrigée repart d'un dossier « à envoyer ».
+
+## D113 — Ce que lit un gérant se demande borné à sa boutique, et un document absent se lit par son parent
+
+*23 novembre 2026.*
+
+**Le retour.** « Vérifie si les encaissements passent pour les boutiques : il
+essaye de le faire mais ça passe pas. » Sur sandwini, trente-neuf ventes et un
+seul versement ultérieur, fait par le responsable ; aucun par un gérant, dont
+les droits (rôle, boutique) étaient pourtant justes.
+
+**Deux causes, prouvées par des tests de règles avant d'être corrigées.**
+- La fiche d'une vente écoutait ses versements et ses documents **sans
+  filtre**. La règle se lit sur chaque document (`peutVendrePour(resource
+  .data.boutiqueId)`), et Firestore refuse une requête qu'il ne peut pas
+  prouver bornée. Le responsable passait — sa condition ne regarde pas le
+  document —, le gérant jamais : le formulaire de versement apparaissait le
+  temps de la lecture locale, puis disparaissait sous ses doigts.
+- Le coût d'une moto sans prix et la marge d'une vente pas encore calculée
+  **n'existent pas**, et la règle lisait la boutique sur eux. Chez le gérant,
+  la lecture tombait : « Vos droits ne permettent pas de lire ces données »
+  sur la marge, et un prix tenu pour illisible dans « Modifier l'arrivage ».
+
+*Conséquences :*
+- `ecouterVersements` et `ecouterDocumentsDeVente` prennent la vente et
+  filtrent sur sa boutique ; la fiche, la correction et le reçu s'abonnent une
+  fois la vente lue.
+- Les règles de `prive` (coût, marge) lisent, pour un document absent, la
+  boutique de sa moto ou de sa vente — une consultation, dans ce cas seul.
+  **À déployer** ; le site ne dépend pas de l'ordre.
+- Tous les tests des versements tournaient sous le responsable : c'est ce qui
+  a laissé passer le défaut. `gerant.spec.ts` encaisse désormais en gérant.
+
+**La liste qu'on tape** (même jour). « Ajoute la recherche au niveau de marque
+et modèle. » Choix du commanditaire : un seul champ où l'on tape, les
+suggestions dessous, et « Ajouter « … » » pour un nom inconnu
+(`suggestionsDeChoix`, `ChoixOuNouveau`). La valeur reste l'identifiant d'une
+entrée ; un texte qu'on ne choisit pas s'oublie en quittant le champ.
